@@ -66,40 +66,148 @@ function isHttpUrl(s: string) {
   return /^https?:\/\//i.test(s.trim());
 }
 
-async function generateOne(opts: {
-  apiKey: string;
-  imageUrls: string[];
-  prompt: string;
-  variantHint?: string;
-}): Promise<{ dataUrl?: string; text?: string; error?: string; status?: number }> {
+type GenResult = { dataUrl?: string; text?: string; error?: string; status?: number; provider?: string };
+
+async function fetchUrlAsDataUrl(url: string): Promise<string> {
+  if (url.startsWith("data:")) return url;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Falha ao baixar imagem (${res.status}): ${url}`);
+  const ct = res.headers.get("content-type") || "image/png";
+  const buf = new Uint8Array(await res.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+  return `data:${ct};base64,${btoa(bin)}`;
+}
+
+async function generateLovable(opts: { apiKey: string; imageUrls: string[]; prompt: string; variantHint?: string }): Promise<GenResult> {
   const content: Array<Record<string, unknown>> = [
     { type: "text", text: opts.prompt + (opts.variantHint ? `\n\n${opts.variantHint}` : "") },
   ];
-  for (const url of opts.imageUrls) {
-    content.push({ type: "image_url", image_url: { url } });
-  }
+  for (const url of opts.imageUrls) content.push({ type: "image_url", image_url: { url } });
 
   const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${opts.apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash-image",
       messages: [{ role: "user", content }],
       modalities: ["image", "text"],
     }),
   });
-
-  if (!aiRes.ok) {
-    const errText = await aiRes.text();
-    return { error: errText, status: aiRes.status };
-  }
+  if (!aiRes.ok) return { error: await aiRes.text(), status: aiRes.status, provider: "lovable" };
   const aiData = await aiRes.json();
   const dataUrl: string | undefined = aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
   const textResp: string | undefined = aiData?.choices?.[0]?.message?.content;
-  return { dataUrl, text: textResp };
+  return { dataUrl, text: textResp, provider: "lovable" };
+}
+
+async function generateOpenAI(opts: { apiKey: string; imageUrls: string[]; prompt: string; variantHint?: string }): Promise<GenResult> {
+  const fullPrompt = opts.prompt + (opts.variantHint ? `\n\n${opts.variantHint}` : "");
+  try {
+    if (opts.imageUrls.length > 0) {
+      // Edição: usa /v1/images/edits com gpt-image-1 (multipart)
+      const form = new FormData();
+      form.append("model", "gpt-image-1");
+      form.append("prompt", fullPrompt);
+      form.append("size", "1024x1024");
+      for (let i = 0; i < opts.imageUrls.length; i++) {
+        const dUrl = await fetchUrlAsDataUrl(opts.imageUrls[i]);
+        const m = dUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!m) continue;
+        const mime = m[1]; const b64 = m[2];
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const ext = (mime.split("/")[1] || "png").split("+")[0];
+        form.append("image[]", new Blob([bytes], { type: mime }), `img-${i}.${ext}`);
+      }
+      const res = await fetch("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${opts.apiKey}` },
+        body: form,
+      });
+      if (!res.ok) return { error: await res.text(), status: res.status, provider: "openai" };
+      const data = await res.json();
+      const b64 = data?.data?.[0]?.b64_json;
+      if (!b64) return { error: "OpenAI não retornou imagem", provider: "openai" };
+      return { dataUrl: `data:image/png;base64,${b64}`, provider: "openai" };
+    } else {
+      // Geração pura
+      const res = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-image-1", prompt: fullPrompt, size: "1024x1024" }),
+      });
+      if (!res.ok) return { error: await res.text(), status: res.status, provider: "openai" };
+      const data = await res.json();
+      const b64 = data?.data?.[0]?.b64_json;
+      if (!b64) return { error: "OpenAI não retornou imagem", provider: "openai" };
+      return { dataUrl: `data:image/png;base64,${b64}`, provider: "openai" };
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e), provider: "openai" };
+  }
+}
+
+async function generateEmergent(opts: { apiKey: string; imageUrls: string[]; prompt: string; variantHint?: string }): Promise<GenResult> {
+  // Emergent expõe um gateway compatível com OpenAI Chat Completions (modalities image+text)
+  const fullPrompt = opts.prompt + (opts.variantHint ? `\n\n${opts.variantHint}` : "");
+  const content: Array<Record<string, unknown>> = [{ type: "text", text: fullPrompt }];
+  for (const url of opts.imageUrls) content.push({ type: "image_url", image_url: { url } });
+  try {
+    const res = await fetch("https://integrations.emergentagent.com/llm/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gemini-2.5-flash-image-preview",
+        messages: [{ role: "user", content }],
+        modalities: ["image", "text"],
+      }),
+    });
+    if (!res.ok) return { error: await res.text(), status: res.status, provider: "emergent" };
+    const data = await res.json();
+    const dataUrl: string | undefined =
+      data?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
+      (data?.data?.[0]?.b64_json ? `data:image/png;base64,${data.data[0].b64_json}` : undefined);
+    if (!dataUrl) return { error: "Emergent não retornou imagem", provider: "emergent" };
+    return { dataUrl, provider: "emergent" };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e), provider: "emergent" };
+  }
+}
+
+async function generateOne(opts: {
+  lovableKey?: string;
+  openaiKey?: string;
+  emergentKey?: string;
+  imageUrls: string[];
+  prompt: string;
+  variantHint?: string;
+}): Promise<GenResult> {
+  const attempts: string[] = [];
+
+  // 1) Lovable AI
+  if (opts.lovableKey) {
+    const r = await generateLovable({ apiKey: opts.lovableKey, imageUrls: opts.imageUrls, prompt: opts.prompt, variantHint: opts.variantHint });
+    if (r.dataUrl) return r;
+    attempts.push(`lovable[${r.status ?? "?"}]: ${(r.error || "").slice(0, 200)}`);
+    // Em 429 (rate limit) deixa o caller fazer retry; em outros, segue para fallback
+    if (r.status === 429) return { ...r, error: attempts.join(" | ") };
+  }
+
+  // 2) OpenAI
+  if (opts.openaiKey) {
+    const r = await generateOpenAI({ apiKey: opts.openaiKey, imageUrls: opts.imageUrls, prompt: opts.prompt, variantHint: opts.variantHint });
+    if (r.dataUrl) return r;
+    attempts.push(`openai[${r.status ?? "?"}]: ${(r.error || "").slice(0, 200)}`);
+  }
+
+  // 3) Emergent
+  if (opts.emergentKey) {
+    const r = await generateEmergent({ apiKey: opts.emergentKey, imageUrls: opts.imageUrls, prompt: opts.prompt, variantHint: opts.variantHint });
+    if (r.dataUrl) return r;
+    attempts.push(`emergent[${r.status ?? "?"}]: ${(r.error || "").slice(0, 200)}`);
+  }
+
+  return { error: attempts.join(" || ") || "Nenhum provedor configurado" };
 }
 
 Deno.serve(async (req) => {
