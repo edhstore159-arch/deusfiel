@@ -57,17 +57,21 @@ const PRESETS: Preset[] = [
   { id: "free", label: "Edição livre", spec: "—" },
 ];
 
-const editImageViaAI = async (
-  imageUrls: string[],
-  prompt: string,
-  preset: string
-): Promise<string> => {
+const editImageViaAI = async (params: {
+  imageUrls: string[];
+  prompt: string;
+  preset: string;
+  count?: number;
+  replaceFaceUrl?: string;
+  referenceUrl?: string;
+}): Promise<string[]> => {
   const { data, error } = await supabase.functions.invoke("edit-image", {
-    body: { imageUrls, prompt, preset },
+    body: params,
   });
   if (error) throw error;
-  if (!data?.url) throw new Error(data?.error || "Sem URL retornada");
-  return data.url as string;
+  const urls: string[] | undefined = data?.urls || (data?.url ? [data.url] : undefined);
+  if (!urls || urls.length === 0) throw new Error(data?.error || "Sem URL retornada");
+  return urls;
 };
 
 const isAdmin = () => {
