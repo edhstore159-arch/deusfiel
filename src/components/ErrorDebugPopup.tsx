@@ -371,8 +371,6 @@ const mountPopup = () => {
   const fire = () => {
     const text = textarea.value.trim();
     if (!text && attachments.length === 0) return;
-    const confirmed = window.confirm("Isso vai abrir o overlay de debug com um erro intencional. Deseja continuar?");
-    if (!confirmed) return;
     let message = `${PREFIX}\n\n${text}`;
     if (attachments.length > 0) {
       message += `\n\nANEXOS:\n${attachments.map((a) => `- ${a.name}: ${a.url}`).join("\n")}`;
