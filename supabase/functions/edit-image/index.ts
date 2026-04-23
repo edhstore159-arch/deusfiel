@@ -163,28 +163,43 @@ Deno.serve(async (req) => {
     const n = Math.max(1, Math.min(MAX_COUNT, Number(count) || 1));
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Gera N variações em paralelo
-    const tasks = Array.from({ length: n }).map((_, i) =>
-      generateOne({
-        apiKey: LOVABLE_API_KEY,
-        imageUrls: resolvedImageUrls,
-        prompt: baseUserPrompt,
-        variantHint: n > 1 ? `Variação ${i + 1} de ${n}: produza uma versão ligeiramente diferente mas coerente com a instrução.` : undefined,
-      })
-    );
-    const results = await Promise.all(tasks);
+    // Gera N variações SEQUENCIALMENTE com retry em 429 (evita rate limit do AI Gateway)
+    const results: Array<{ dataUrl?: string; text?: string; error?: string; status?: number }> = [];
+    let hitNoCredits = false;
+    let hitRateLimit = false;
+    for (let i = 0; i < n; i++) {
+      let attempt = 0;
+      let r: { dataUrl?: string; text?: string; error?: string; status?: number } | null = null;
+      while (attempt < 3) {
+        r = await generateOne({
+          apiKey: LOVABLE_API_KEY,
+          imageUrls: resolvedImageUrls,
+          prompt: baseUserPrompt,
+          variantHint: n > 1 ? `Variação ${i + 1} de ${n}: produza uma versão ligeiramente diferente mas coerente com a instrução.` : undefined,
+        });
+        if (r.status === 429 && attempt < 2) {
+          await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+          attempt++;
+          continue;
+        }
+        break;
+      }
+      if (r) {
+        if (r.status === 402) hitNoCredits = true;
+        if (r.status === 429) hitRateLimit = true;
+        results.push(r);
+      }
+      if (i < n - 1) await new Promise((res) => setTimeout(res, 600));
+    }
 
-    // Trata rate limit / créditos coletivamente
-    const rateLimited = results.find((r) => r.status === 429);
-    if (rateLimited) {
-      return new Response(JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns instantes." }), {
-        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (hitNoCredits && results.every((r) => !r.dataUrl)) {
+      return new Response(JSON.stringify({ ok: false, error: "Créditos insuficientes na Lovable AI. Adicione créditos em Settings > Workspace > Usage." }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const noCredits = results.find((r) => r.status === 402);
-    if (noCredits) {
-      return new Response(JSON.stringify({ error: "Créditos insuficientes na Lovable AI. Adicione créditos em Settings > Workspace > Usage." }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (hitRateLimit && results.every((r) => !r.dataUrl)) {
+      return new Response(JSON.stringify({ ok: false, error: "Limite de requisições atingido. Reduza a quantidade ou tente novamente em alguns instantes." }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -214,20 +229,20 @@ Deno.serve(async (req) => {
     }
 
     if (urls.length === 0) {
-      return new Response(JSON.stringify({ error: "Nenhuma imagem gerada", details: errors }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ ok: false, error: errors[0] || "Nenhuma imagem gerada", details: errors }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     return new Response(
-      JSON.stringify({ urls, url: urls[0], errors, prompt: baseUserPrompt, count: urls.length }),
+      JSON.stringify({ ok: true, urls, url: urls[0], errors, prompt: baseUserPrompt, count: urls.length }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("edit-image error:", msg);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ ok: false, error: msg }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
