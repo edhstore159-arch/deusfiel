@@ -214,10 +214,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || undefined;
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || undefined;
+    const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY") || undefined;
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
+    if (!LOVABLE_API_KEY && !OPENAI_API_KEY && !EMERGENT_API_KEY) {
+      throw new Error("Nenhum provedor configurado (LOVABLE_API_KEY, OPENAI_API_KEY ou EMERGENT_API_KEY)");
+    }
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase env ausente");
 
     const body = await req.json().catch(() => ({}));
@@ -237,7 +241,6 @@ Deno.serve(async (req) => {
       referenceUrl?: string;
     };
 
-    // Resolve referenceUrl (post de IG/etc) → imagem direta via og:image
     const resolvedImageUrls: string[] = [...imageUrls];
     let referenceNote = "";
     if (referenceUrl && isHttpUrl(referenceUrl)) {
@@ -251,9 +254,9 @@ Deno.serve(async (req) => {
       referenceNote += `\n[Última imagem = pessoa/rosto que deve substituir a pessoa principal do post]`;
     }
 
-    if (resolvedImageUrls.length === 0) {
-      return new Response(JSON.stringify({ error: "Forneça imageUrls ou referenceUrl" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (resolvedImageUrls.length === 0 && !prompt?.trim()) {
+      return new Response(JSON.stringify({ ok: false, error: "Forneça imageUrls, referenceUrl ou um prompt" }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -271,21 +274,22 @@ Deno.serve(async (req) => {
     const n = Math.max(1, Math.min(MAX_COUNT, Number(count) || 1));
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Gera N variações SEQUENCIALMENTE com retry em 429 (evita rate limit do AI Gateway)
-    const results: Array<{ dataUrl?: string; text?: string; error?: string; status?: number }> = [];
+    const results: GenResult[] = [];
     let hitNoCredits = false;
     let hitRateLimit = false;
     for (let i = 0; i < n; i++) {
       let attempt = 0;
-      let r: { dataUrl?: string; text?: string; error?: string; status?: number } | null = null;
+      let r: GenResult | null = null;
       while (attempt < 3) {
         r = await generateOne({
-          apiKey: LOVABLE_API_KEY,
+          lovableKey: LOVABLE_API_KEY,
+          openaiKey: OPENAI_API_KEY,
+          emergentKey: EMERGENT_API_KEY,
           imageUrls: resolvedImageUrls,
           prompt: baseUserPrompt,
           variantHint: n > 1 ? `Variação ${i + 1} de ${n}: produza uma versão ligeiramente diferente mas coerente com a instrução.` : undefined,
         });
-        if (r.status === 429 && attempt < 2) {
+        if (!r.dataUrl && r.status === 429 && attempt < 2) {
           await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
           attempt++;
           continue;
@@ -301,14 +305,61 @@ Deno.serve(async (req) => {
     }
 
     if (hitNoCredits && results.every((r) => !r.dataUrl)) {
-      return new Response(JSON.stringify({ ok: false, error: "Créditos insuficientes na Lovable AI. Adicione créditos em Settings > Workspace > Usage." }), {
+      return new Response(JSON.stringify({ ok: false, error: "Créditos insuficientes em todos os provedores. Verifique sua conta OpenAI/Emergent ou adicione créditos em Settings > Workspace > Usage." }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     if (hitRateLimit && results.every((r) => !r.dataUrl)) {
-      return new Response(JSON.stringify({ ok: false, error: "Limite de requisições atingido. Reduza a quantidade ou tente novamente em alguns instantes." }), {
+      return new Response(JSON.stringify({ ok: false, error: "Limite de requisições atingido em todos os provedores. Aguarde alguns instantes." }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const urls: string[] = [];
+    const errors: string[] = [];
+    const providers: string[] = [];
+
+    for (const r of results) {
+      if (!r.dataUrl) {
+        errors.push(r.error || r.text || "Modelo não retornou imagem");
+        continue;
+      }
+      const match = r.dataUrl.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
+      if (!match) { errors.push("Formato de data URL inválido"); continue; }
+      const mime = match[1];
+      const ext = mime.split("/")[1].split("+")[0] || "png";
+      const base64 = match[2];
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+
+      const path = `edited/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, bytes, {
+        contentType: mime,
+        upsert: false,
+      });
+      if (upErr) { errors.push(`Upload falhou: ${upErr.message}`); continue; }
+      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      urls.push(pub.publicUrl);
+      if (r.provider) providers.push(r.provider);
+    }
+
+    if (urls.length === 0) {
+      return new Response(JSON.stringify({ ok: false, error: errors[0] || "Nenhuma imagem gerada", details: errors }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(
+      JSON.stringify({ ok: true, urls, url: urls[0], errors, providers, prompt: baseUserPrompt, count: urls.length }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("edit-image error:", msg);
+    return new Response(JSON.stringify({ ok: false, error: msg }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
     }
 
     const urls: string[] = [];
