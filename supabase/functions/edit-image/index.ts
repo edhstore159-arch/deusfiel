@@ -150,7 +150,14 @@ Deno.serve(async (req) => {
     }
 
     const presetText = PRESET_INSTRUCTIONS[preset] ?? "";
-    const baseUserPrompt = [presetText, prompt?.trim() || "", referenceNote]
+
+    const isFaceSwap = preset.startsWith("face-swap") || preset === "clone-post";
+    let imageAnnotation = "";
+    if (isFaceSwap && resolvedImageUrls.length >= 2) {
+      imageAnnotation = `[IMAGE 1 = base scene/composition. IMAGE 2 = person whose face/identity must replace the subject in IMAGE 1. Keep IMAGE 1's pose, lighting, framing and background; only swap the person.]`;
+    }
+
+    const baseUserPrompt = [presetText, prompt?.trim() || "", referenceNote, imageAnnotation]
       .filter(Boolean).join("\n\n") || "Edite a imagem mantendo o estilo original.";
 
     const n = Math.max(1, Math.min(MAX_COUNT, Number(count) || 1));
