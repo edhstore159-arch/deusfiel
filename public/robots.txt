@@ -12,3 +12,9 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+# Sitemaps
+Sitemap: https://raya.photo/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 1
