@@ -1,10 +1,29 @@
 import { useEffect, useState } from "react";
 
+const DEBUG_ERROR_ARM_KEY = "__lovable_debug_error_armed__";
+const DEBUG_ERROR_ARM_TTL_MS = 5000;
+
+const consumeArmedDebugError = () => {
+  if (typeof window === "undefined") return false;
+
+  try {
+    const raw = window.sessionStorage.getItem(DEBUG_ERROR_ARM_KEY);
+    window.sessionStorage.removeItem(DEBUG_ERROR_ARM_KEY);
+
+    if (!raw) return false;
+
+    const timestamp = Number(raw);
+    return Number.isFinite(timestamp) && Date.now() - timestamp <= DEBUG_ERROR_ARM_TTL_MS;
+  } catch {
+    return false;
+  }
+};
+
 /**
  * DebugErrorThrower
  *
  * Componente sem UI que escuta o evento "lovable-debug-error" e, ao receber
- * uma mensagem, lança um erro fatal real durante o render.
+ * uma mensagem explicitamente armada pelo popup, lança um erro fatal real durante o render.
  *
  * IMPORTANTE: este componente DEVE ficar FORA de qualquer ErrorBoundary,
  * Suspense ou boundary local. O erro precisa escapar para o overlay global
@@ -23,6 +42,7 @@ const DebugErrorThrower = () => {
     const handler = (event: Event) => {
       const custom = event as CustomEvent<string>;
       if (typeof custom.detail !== "string" || custom.detail.length === 0) return;
+      if (!consumeArmedDebugError()) return;
 
       const nextMessage = custom.detail;
       setMessage((current) => {
