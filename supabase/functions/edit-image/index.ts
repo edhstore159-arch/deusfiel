@@ -25,6 +25,12 @@ const PRESET_INSTRUCTIONS: Record<string, string> = {
   "bg-replace": "Substitua o fundo conforme a descrição do usuário; mantenha o sujeito principal exatamente como está.",
   "enhance": "Melhore qualidade: nitidez, balanço de cores, iluminação. Mantenha a composição original.",
   "clone-post": "RECRIE este post de rede social IDENTICAMENTE: mesma composição, enquadramento, iluminação, cores, tipografia, layout, textos, logos e estilo geral. A ÚNICA mudança permitida é substituir a pessoa/rosto principal pela pessoa da imagem de referência fornecida (mantendo pose, ângulo, expressão e roupa o mais próximo possível do post original). Preserve todos os outros detalhes ao máximo.",
+  "face-swap": "Use the FIRST image as the base composition, lighting, and environment. Replace the subject/person in it with the person from the SECOND image. Keep the original pose, camera angle, framing, lighting, shadows, reflections, background and depth of field. Match skin tone and color grading naturally. Seamless realistic integration: no distortions, no artifacts, correct proportions. Ultra realistic, high detail, sharp focus, 8k.",
+  "face-swap-cinematic": "Use the FIRST image as cinematic base. Replace the subject with the person from the SECOND image. Film lighting, dramatic shadows, volumetric light, depth of field, anamorphic lens. Hyper-realistic movie still with Hollywood color grading. Keep pose, framing and environment intact.",
+  "face-swap-fusion": "Fuse both uploaded images: structure and environment from IMAGE 1, identity from IMAGE 2. AI reconstruction with neural blending and ultra-detailed textures. Perfect face integration, realistic lighting adaptation, no artifacts.",
+  "face-swap-photo": "Use the FIRST image as a professional photo setup. Replace the subject with the person from the SECOND image. Studio lighting, realistic skin, natural shadows, 85mm lens, f/1.8, DSLR quality, ultra realistic.",
+  "face-swap-art": "Transform the FIRST image into a stylized artwork while replacing the subject with the person from the SECOND image. Digital painting, soft brush, dramatic light, semi-realistic, expressive, high detail.",
+  "face-swap-social": "Perfect face replacement using IMAGE 1 as base scene and IMAGE 2 as the person. Same pose, same lighting, same framing. Clean skin, natural look, influencer quality. Ultra realistic, no distortions.",
   "free": "",
 };
 
@@ -144,7 +150,14 @@ Deno.serve(async (req) => {
     }
 
     const presetText = PRESET_INSTRUCTIONS[preset] ?? "";
-    const baseUserPrompt = [presetText, prompt?.trim() || "", referenceNote]
+
+    const isFaceSwap = preset.startsWith("face-swap") || preset === "clone-post";
+    let imageAnnotation = "";
+    if (isFaceSwap && resolvedImageUrls.length >= 2) {
+      imageAnnotation = `[IMAGE 1 = base scene/composition. IMAGE 2 = person whose face/identity must replace the subject in IMAGE 1. Keep IMAGE 1's pose, lighting, framing and background; only swap the person.]`;
+    }
+
+    const baseUserPrompt = [presetText, prompt?.trim() || "", referenceNote, imageAnnotation]
       .filter(Boolean).join("\n\n") || "Edite a imagem mantendo o estilo original.";
 
     const n = Math.max(1, Math.min(MAX_COUNT, Number(count) || 1));

@@ -46,12 +46,18 @@ const PRESET_KEY = "lovable-debug-preset";
 
 type Preset = { id: string; label: string; spec: string };
 const PRESETS: Preset[] = [
+  { id: "face-swap", label: "👥 Face Swap (realista)", spec: "img1=cena, img2=pessoa" },
+  { id: "face-swap-cinematic", label: "🎬 Face Swap Cinemático", spec: "film grading" },
+  { id: "face-swap-fusion", label: "🧪 Face Swap Fusion (RADLINE)", spec: "neural blend" },
+  { id: "face-swap-photo", label: "📸 Face Swap Fotográfico", spec: "85mm DSLR" },
+  { id: "face-swap-art", label: "🎨 Face Swap Artístico", spec: "digital paint" },
+  { id: "face-swap-social", label: "⚡ Face Swap Social", spec: "influencer" },
+  { id: "clone-post", label: "🔁 Clonar post (URL+pessoa)", spec: "IG/social" },
   { id: "ig-post", label: "Instagram Post (1:1)", spec: "1080x1080" },
   { id: "ig-story", label: "Instagram Story (9:16)", spec: "1080x1920" },
   { id: "fb-post", label: "Facebook Post (1.91:1)", spec: "1200x630" },
   { id: "yt-thumb", label: "YouTube Thumb (16:9)", spec: "1280x720" },
   { id: "linkedin", label: "LinkedIn (1.91:1)", spec: "1200x627" },
-  { id: "clone-post", label: "🔁 Clonar post (trocar pessoa)", spec: "URL + foto" },
   { id: "bg-remove", label: "Remover fundo", spec: "PNG transparente" },
   { id: "bg-replace", label: "Trocar fundo", spec: "manter sujeito" },
   { id: "enhance", label: "Melhorar qualidade", spec: "nitidez + cores" },
@@ -602,10 +608,12 @@ const mountPopup = () => {
     if (imageEntries.some((i) => i.uploading)) { alert("Aguarde o upload terminar."); return; }
     const count = Math.max(1, Math.min(6, parseInt(countInput.value) || 1));
 
-    // Se anexou imagens: a primeira anexada é tratada como "face" se preset = clone-post e nenhuma faceUrl foi dada
+    // Para presets de face-swap/clone-post: se 2+ imagens anexadas e não há faceUrl explícita,
+    // a última imagem é tratada como "pessoa" (replaceFaceUrl) e o resto como cena-base.
     let imageUrls = ready;
     let replaceFaceUrl: string | undefined = faceUrl || undefined;
-    if (presetSelect.value === "clone-post" && !replaceFaceUrl && ready.length > 0) {
+    const isFaceSwap = presetSelect.value === "clone-post" || presetSelect.value.startsWith("face-swap");
+    if (isFaceSwap && !replaceFaceUrl && ready.length >= 2) {
       replaceFaceUrl = ready[ready.length - 1];
       imageUrls = ready.slice(0, -1);
     }
