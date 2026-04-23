@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Lovable Debug Tool",
+  "version": "1.0.0",
+  "description": "Detecta projetos Lovable automaticamente e injeta o Debug Tool flutuante para disparar instruções via 'Try to Fix' sem usar o chat lateral.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://*.lovable.app/*",
+    "https://*.lovableproject.com/*",
+    "https://lovable.dev/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Lovable Debug Tool"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.lovable.app/*",
+        "https://*.lovableproject.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
