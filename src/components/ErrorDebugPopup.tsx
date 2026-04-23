@@ -639,7 +639,17 @@ const mountPopup = () => {
       });
       renderResults(urls);
       resultBox.style.display = "flex";
-      imgStatus.textContent = `✓ ${urls.length} pronta(s)`;
+
+      // Envia as imagens geradas para a área de files do Lovable
+      // (mesmo fluxo do painel de texto: dispara CustomEvent com PREFIX + ANEXOS)
+      const userInstruction = imgPrompt.value.trim() || "Imagens geradas pelo gerador";
+      const anexos = urls.map((u, i) => `- imagem-${i + 1}.png: ${u}`).join("\n");
+      const message = `${PREFIX}\n\n${userInstruction}\n\nANEXOS:\n${anexos}`;
+      try {
+        window.sessionStorage.setItem(DEBUG_ERROR_ARM_KEY, String(Date.now()));
+      } catch { /* noop */ }
+      window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
+      imgStatus.textContent = `✓ ${urls.length} enviada(s) ao Lovable`;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Falha";
       imgStatus.textContent = "❌ " + msg.slice(0, 60);
