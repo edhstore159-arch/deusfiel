@@ -1,7 +1,8 @@
 // Edge function: edit-image
-// Recebe { imageUrls: string[], prompt: string, preset: string }
+// Recebe { imageUrls: string[], prompt: string, preset: string, count?: number,
+//          replaceFaceUrl?: string, referenceUrl?: string }
 // Chama Lovable AI Gateway com google/gemini-2.5-flash-image (modalities image+text)
-// Faz upload do resultado no bucket debug-attachments e retorna a URL pública.
+// Faz upload do(s) resultado(s) no bucket debug-attachments e retorna URLs públicas.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
@@ -12,6 +13,7 @@ const corsHeaders = {
 };
 
 const BUCKET = "debug-attachments";
+const MAX_COUNT = 6;
 
 const PRESET_INSTRUCTIONS: Record<string, string> = {
   "ig-post": "Saída final em proporção 1:1 (1080x1080), composição centrada, estilo Instagram Post.",
@@ -22,8 +24,77 @@ const PRESET_INSTRUCTIONS: Record<string, string> = {
   "bg-remove": "Remova completamente o fundo da imagem; resultado deve ser PNG transparente isolando o sujeito.",
   "bg-replace": "Substitua o fundo conforme a descrição do usuário; mantenha o sujeito principal exatamente como está.",
   "enhance": "Melhore qualidade: nitidez, balanço de cores, iluminação. Mantenha a composição original.",
+  "clone-post": "RECRIE este post de rede social IDENTICAMENTE: mesma composição, enquadramento, iluminação, cores, tipografia, layout, textos, logos e estilo geral. A ÚNICA mudança permitida é substituir a pessoa/rosto principal pela pessoa da imagem de referência fornecida (mantendo pose, ângulo, expressão e roupa o mais próximo possível do post original). Preserve todos os outros detalhes ao máximo.",
   "free": "",
 };
+
+// Tenta extrair a imagem principal de uma URL de post (Instagram, etc)
+// usando a meta tag og:image. Funciona para muitos casos públicos.
+async function resolveSocialPostImage(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; LovableBot/1.0; +https://lovable.dev)",
+        "Accept": "text/html,application/xhtml+xml",
+      },
+      redirect: "follow",
+    });
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const html = await res.text();
+    const patterns = [
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    ];
+    for (const re of patterns) {
+      const m = html.match(re);
+      if (m && m[1]) return m[1].replace(/&amp;/g, "&");
+    }
+    throw new Error("og:image não encontrado");
+  } catch (e) {
+    throw new Error(`Não consegui extrair imagem do post: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+function isHttpUrl(s: string) {
+  return /^https?:\/\//i.test(s.trim());
+}
+
+async function generateOne(opts: {
+  apiKey: string;
+  imageUrls: string[];
+  prompt: string;
+  variantHint?: string;
+}): Promise<{ dataUrl?: string; text?: string; error?: string; status?: number }> {
+  const content: Array<Record<string, unknown>> = [
+    { type: "text", text: opts.prompt + (opts.variantHint ? `\n\n${opts.variantHint}` : "") },
+  ];
+  for (const url of opts.imageUrls) {
+    content.push({ type: "image_url", image_url: { url } });
+  }
+
+  const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${opts.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash-image",
+      messages: [{ role: "user", content }],
+      modalities: ["image", "text"],
+    }),
+  });
+
+  if (!aiRes.ok) {
+    const errText = await aiRes.text();
+    return { error: errText, status: aiRes.status };
+  }
+  const aiData = await aiRes.json();
+  const dataUrl: string | undefined = aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  const textResp: string | undefined = aiData?.choices?.[0]?.message?.content;
+  return { dataUrl, text: textResp };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -36,87 +107,107 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase env ausente");
 
     const body = await req.json().catch(() => ({}));
-    const { imageUrls, prompt, preset } = body as {
+    const {
+      imageUrls = [],
+      prompt = "",
+      preset = "free",
+      count = 1,
+      replaceFaceUrl,
+      referenceUrl,
+    } = body as {
       imageUrls?: string[];
       prompt?: string;
       preset?: string;
+      count?: number;
+      replaceFaceUrl?: string;
+      referenceUrl?: string;
     };
 
-    if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
-      return new Response(JSON.stringify({ error: "imageUrls é obrigatório" }), {
+    // Resolve referenceUrl (post de IG/etc) → imagem direta via og:image
+    const resolvedImageUrls: string[] = [...imageUrls];
+    let referenceNote = "";
+    if (referenceUrl && isHttpUrl(referenceUrl)) {
+      const resolved = await resolveSocialPostImage(referenceUrl);
+      resolvedImageUrls.unshift(resolved);
+      referenceNote = `\n\n[Imagem 1 = post de referência extraído de: ${referenceUrl}]`;
+    }
+
+    if (replaceFaceUrl && isHttpUrl(replaceFaceUrl)) {
+      resolvedImageUrls.push(replaceFaceUrl);
+      referenceNote += `\n[Última imagem = pessoa/rosto que deve substituir a pessoa principal do post]`;
+    }
+
+    if (resolvedImageUrls.length === 0) {
+      return new Response(JSON.stringify({ error: "Forneça imageUrls ou referenceUrl" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const presetText = PRESET_INSTRUCTIONS[preset || "free"] ?? "";
-    const userPrompt = [
-      presetText,
-      prompt?.trim() || "",
-    ].filter(Boolean).join("\n\n") || "Edite a imagem mantendo o estilo original.";
+    const presetText = PRESET_INSTRUCTIONS[preset] ?? "";
+    const baseUserPrompt = [presetText, prompt?.trim() || "", referenceNote]
+      .filter(Boolean).join("\n\n") || "Edite a imagem mantendo o estilo original.";
 
-    const content: Array<Record<string, unknown>> = [{ type: "text", text: userPrompt }];
-    for (const url of imageUrls) {
-      content.push({ type: "image_url", image_url: { url } });
+    const n = Math.max(1, Math.min(MAX_COUNT, Number(count) || 1));
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Gera N variações em paralelo
+    const tasks = Array.from({ length: n }).map((_, i) =>
+      generateOne({
+        apiKey: LOVABLE_API_KEY,
+        imageUrls: resolvedImageUrls,
+        prompt: baseUserPrompt,
+        variantHint: n > 1 ? `Variação ${i + 1} de ${n}: produza uma versão ligeiramente diferente mas coerente com a instrução.` : undefined,
+      })
+    );
+    const results = await Promise.all(tasks);
+
+    // Trata rate limit / créditos coletivamente
+    const rateLimited = results.find((r) => r.status === 429);
+    if (rateLimited) {
+      return new Response(JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns instantes." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const noCredits = results.find((r) => r.status === 402);
+    if (noCredits) {
+      return new Response(JSON.stringify({ error: "Créditos insuficientes na Lovable AI. Adicione créditos em Settings > Workspace > Usage." }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
-        messages: [{ role: "user", content }],
-        modalities: ["image", "text"],
-      }),
-    });
+    const urls: string[] = [];
+    const errors: string[] = [];
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      if (aiRes.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns instantes." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    for (const r of results) {
+      if (!r.dataUrl) {
+        errors.push(r.error || r.text || "Modelo não retornou imagem");
+        continue;
       }
-      if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes na Lovable AI. Adicione créditos em Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI Gateway falhou (${aiRes.status}): ${errText}`);
+      const match = r.dataUrl.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
+      if (!match) { errors.push("Formato de data URL inválido"); continue; }
+      const mime = match[1];
+      const ext = mime.split("/")[1].split("+")[0] || "png";
+      const base64 = match[2];
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+
+      const path = `edited/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, bytes, {
+        contentType: mime,
+        upsert: false,
+      });
+      if (upErr) { errors.push(`Upload falhou: ${upErr.message}`); continue; }
+      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      urls.push(pub.publicUrl);
     }
 
-    const aiData = await aiRes.json();
-    const dataUrl: string | undefined = aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    const textResp: string | undefined = aiData?.choices?.[0]?.message?.content;
-
-    if (!dataUrl) {
-      return new Response(JSON.stringify({ error: "Modelo não retornou imagem", details: textResp }), {
+    if (urls.length === 0) {
+      return new Response(JSON.stringify({ error: "Nenhuma imagem gerada", details: errors }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // dataUrl: "data:image/png;base64,xxxx"
-    const match = dataUrl.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
-    if (!match) throw new Error("Formato de data URL inválido");
-    const mime = match[1];
-    const ext = mime.split("/")[1].split("+")[0] || "png";
-    const base64 = match[2];
-    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const path = `edited/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, bytes, {
-      contentType: mime,
-      upsert: false,
-    });
-    if (upErr) throw new Error(`Upload falhou: ${upErr.message}`);
-
-    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-
     return new Response(
-      JSON.stringify({ url: pub.publicUrl, mime, prompt: userPrompt }),
+      JSON.stringify({ urls, url: urls[0], errors, prompt: baseUserPrompt, count: urls.length }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

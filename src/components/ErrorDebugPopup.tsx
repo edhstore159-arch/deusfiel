@@ -51,23 +51,28 @@ const PRESETS: Preset[] = [
   { id: "fb-post", label: "Facebook Post (1.91:1)", spec: "1200x630" },
   { id: "yt-thumb", label: "YouTube Thumb (16:9)", spec: "1280x720" },
   { id: "linkedin", label: "LinkedIn (1.91:1)", spec: "1200x627" },
+  { id: "clone-post", label: "🔁 Clonar post (trocar pessoa)", spec: "URL + foto" },
   { id: "bg-remove", label: "Remover fundo", spec: "PNG transparente" },
   { id: "bg-replace", label: "Trocar fundo", spec: "manter sujeito" },
   { id: "enhance", label: "Melhorar qualidade", spec: "nitidez + cores" },
   { id: "free", label: "Edição livre", spec: "—" },
 ];
 
-const editImageViaAI = async (
-  imageUrls: string[],
-  prompt: string,
-  preset: string
-): Promise<string> => {
+const editImageViaAI = async (params: {
+  imageUrls: string[];
+  prompt: string;
+  preset: string;
+  count?: number;
+  replaceFaceUrl?: string;
+  referenceUrl?: string;
+}): Promise<string[]> => {
   const { data, error } = await supabase.functions.invoke("edit-image", {
-    body: { imageUrls, prompt, preset },
+    body: params,
   });
   if (error) throw error;
-  if (!data?.url) throw new Error(data?.error || "Sem URL retornada");
-  return data.url as string;
+  const urls: string[] | undefined = data?.urls || (data?.url ? [data.url] : undefined);
+  if (!urls || urls.length === 0) throw new Error(data?.error || "Sem URL retornada");
+  return urls;
 };
 
 const isAdmin = () => {
@@ -509,66 +514,124 @@ const mountPopup = () => {
     try { window.localStorage.setItem(IMG_PROMPT_KEY, imgPrompt.value); } catch {}
   });
 
+  // Novos campos: URL post de redes sociais + URL/upload da pessoa + quantidade
+  const inputStyle = {
+    background: "rgba(0,0,0,0.4)", color: "#fff",
+    border: "1px solid rgba(255,255,255,0.15)", borderRadius: "4px",
+    padding: "6px 8px", fontSize: "12px", outline: "none", width: "100%",
+    boxSizing: "border-box",
+  } as Partial<CSSStyleDeclaration>;
+
+  const refLabel = document.createElement("label");
+  refLabel.textContent = "🔗 URL do post (Instagram, etc) — opcional";
+  refLabel.style.cssText = "font-size:11px;opacity:0.8;";
+  const refInput = document.createElement("input");
+  refInput.type = "url";
+  refInput.placeholder = "https://www.instagram.com/p/...";
+  Object.assign(refInput.style, inputStyle);
+
+  const faceLabel = document.createElement("label");
+  faceLabel.textContent = "👤 Foto da pessoa para substituir — anexe acima OU cole URL";
+  faceLabel.style.cssText = "font-size:11px;opacity:0.8;";
+  const faceInput = document.createElement("input");
+  faceInput.type = "url";
+  faceInput.placeholder = "https://... (opcional, se não anexou foto)";
+  Object.assign(faceInput.style, inputStyle);
+
+  const countWrap = document.createElement("div");
+  countWrap.style.cssText = "display:flex;align-items:center;gap:6px;font-size:11px;";
+  const countLabel = document.createElement("label");
+  countLabel.textContent = "Quantos posts gerar:";
+  countLabel.style.opacity = "0.8";
+  const countInput = document.createElement("input");
+  countInput.type = "number"; countInput.min = "1"; countInput.max = "6"; countInput.value = "1";
+  Object.assign(countInput.style, { ...inputStyle, width: "60px" });
+  countWrap.appendChild(countLabel);
+  countWrap.appendChild(countInput);
+
   const resultBox = document.createElement("div");
   Object.assign(resultBox.style, {
-    display: "none", flexDirection: "column", gap: "4px",
+    display: "none", flexDirection: "column", gap: "6px",
     padding: "6px", background: "rgba(0,0,0,0.3)", borderRadius: "4px",
   } as Partial<CSSStyleDeclaration>);
-  const resultImg = document.createElement("img");
-  resultImg.style.cssText = "max-width:100%;max-height:200px;object-fit:contain;border-radius:4px;";
-  const resultActions = document.createElement("div");
-  resultActions.style.cssText = "display:flex;gap:6px;font-size:11px;";
-  const downloadLink = document.createElement("a");
-  downloadLink.textContent = "⬇ Baixar";
-  downloadLink.style.cssText = "color:#fff;text-decoration:underline;cursor:pointer;";
-  downloadLink.target = "_blank";
-  const copyLink = document.createElement("button");
-  copyLink.textContent = "📋 Copiar URL";
-  Object.assign(copyLink.style, {
-    background: "transparent", color: "#fff", border: "1px solid rgba(255,255,255,0.2)",
-    borderRadius: "3px", padding: "2px 6px", cursor: "pointer", fontSize: "11px",
-  } as Partial<CSSStyleDeclaration>);
-  resultActions.appendChild(downloadLink);
-  resultActions.appendChild(copyLink);
-  resultBox.appendChild(resultImg);
-  resultBox.appendChild(resultActions);
+  const resultGrid = document.createElement("div");
+  resultGrid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;";
+  resultBox.appendChild(resultGrid);
+
+  const renderResults = (urls: string[]) => {
+    resultGrid.innerHTML = "";
+    urls.forEach((url) => {
+      const card = document.createElement("div");
+      card.style.cssText = "display:flex;flex-direction:column;gap:3px;background:rgba(0,0,0,0.3);padding:4px;border-radius:4px;";
+      const im = document.createElement("img");
+      im.src = url;
+      im.style.cssText = "width:100%;height:120px;object-fit:cover;border-radius:3px;cursor:pointer;";
+      im.addEventListener("click", () => window.open(url, "_blank"));
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:4px;font-size:10px;";
+      const dl = document.createElement("a");
+      dl.textContent = "⬇"; dl.href = url; dl.target = "_blank"; dl.title = "Abrir/Baixar";
+      dl.style.cssText = "color:#fff;text-decoration:none;padding:2px 4px;background:rgba(255,255,255,0.1);border-radius:3px;";
+      const cp = document.createElement("button");
+      cp.textContent = "📋"; cp.title = "Copiar URL";
+      Object.assign(cp.style, { background: "rgba(255,255,255,0.1)", color: "#fff", border: "none", borderRadius: "3px", padding: "2px 4px", cursor: "pointer", fontSize: "10px" } as Partial<CSSStyleDeclaration>);
+      cp.addEventListener("click", () => { navigator.clipboard.writeText(url); cp.textContent = "✓"; setTimeout(() => (cp.textContent = "📋"), 1200); });
+      row.appendChild(dl); row.appendChild(cp);
+      card.appendChild(im); card.appendChild(row);
+      resultGrid.appendChild(card);
+    });
+  };
 
   const imgFooter = document.createElement("div");
   imgFooter.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;";
   const imgStatus = document.createElement("span");
   imgStatus.style.cssText = "font-size:10px;opacity:0.6;";
   const editBtn = document.createElement("button");
-  editBtn.textContent = "🎨 Editar Imagem";
+  editBtn.textContent = "🎨 Gerar";
   Object.assign(editBtn.style, {
     padding: "6px 12px", background: "hsl(280, 70%, 55%)", color: "#fff",
     border: "none", borderRadius: "4px", fontSize: "12px",
     fontWeight: "500", cursor: "pointer",
   } as Partial<CSSStyleDeclaration>);
   editBtn.addEventListener("click", async () => {
-    const ready = imageEntries.filter((i) => i.url);
-    if (ready.length === 0) { alert("Anexe ao menos uma imagem (e aguarde o upload)."); return; }
+    const ready = imageEntries.filter((i) => i.url).map((i) => i.url!);
+    const refUrl = refInput.value.trim();
+    const faceUrl = faceInput.value.trim();
+    const hasAnyImage = ready.length > 0 || refUrl || faceUrl;
+    if (!hasAnyImage) { alert("Anexe imagens, cole URL do post ou URL da pessoa."); return; }
     if (imageEntries.some((i) => i.uploading)) { alert("Aguarde o upload terminar."); return; }
+    const count = Math.max(1, Math.min(6, parseInt(countInput.value) || 1));
+
+    // Se anexou imagens: a primeira anexada é tratada como "face" se preset = clone-post e nenhuma faceUrl foi dada
+    let imageUrls = ready;
+    let replaceFaceUrl: string | undefined = faceUrl || undefined;
+    if (presetSelect.value === "clone-post" && !replaceFaceUrl && ready.length > 0) {
+      replaceFaceUrl = ready[ready.length - 1];
+      imageUrls = ready.slice(0, -1);
+    }
+
     editBtn.disabled = true;
     editBtn.textContent = "⏳ Gerando...";
-    imgStatus.textContent = "Chamando Lovable AI...";
+    imgStatus.textContent = `Gerando ${count} imagem(ns)...`;
     try {
-      const url = await editImageViaAI(
-        ready.map((i) => i.url!),
-        imgPrompt.value.trim(),
-        presetSelect.value,
-      );
-      resultImg.src = url;
-      downloadLink.href = url;
-      copyLink.onclick = () => { navigator.clipboard.writeText(url); copyLink.textContent = "✓ Copiado"; setTimeout(() => (copyLink.textContent = "📋 Copiar URL"), 1500); };
+      const urls = await editImageViaAI({
+        imageUrls,
+        prompt: imgPrompt.value.trim(),
+        preset: presetSelect.value,
+        count,
+        replaceFaceUrl,
+        referenceUrl: refUrl || undefined,
+      });
+      renderResults(urls);
       resultBox.style.display = "flex";
-      imgStatus.textContent = "✓ Pronto";
+      imgStatus.textContent = `✓ ${urls.length} pronta(s)`;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Falha";
       imgStatus.textContent = "❌ " + msg.slice(0, 60);
       alert("Erro: " + msg);
     } finally {
       editBtn.disabled = false;
-      editBtn.textContent = "🎨 Editar Imagem";
+      editBtn.textContent = "🎨 Gerar";
     }
   });
   imgFooter.appendChild(imgStatus);
@@ -576,11 +639,16 @@ const mountPopup = () => {
 
   imagePanel.appendChild(presetLabel);
   imagePanel.appendChild(presetSelect);
+  imagePanel.appendChild(refLabel);
+  imagePanel.appendChild(refInput);
   imagePanel.appendChild(dropZone);
   imagePanel.appendChild(imgFileInput);
   imagePanel.appendChild(thumbs);
+  imagePanel.appendChild(faceLabel);
+  imagePanel.appendChild(faceInput);
   imagePanel.appendChild(imgPromptLabel);
   imagePanel.appendChild(imgPrompt);
+  imagePanel.appendChild(countWrap);
   imagePanel.appendChild(resultBox);
   imagePanel.appendChild(imgFooter);
 
