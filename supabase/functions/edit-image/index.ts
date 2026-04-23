@@ -229,20 +229,20 @@ Deno.serve(async (req) => {
     }
 
     if (urls.length === 0) {
-      return new Response(JSON.stringify({ error: "Nenhuma imagem gerada", details: errors }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ ok: false, error: errors[0] || "Nenhuma imagem gerada", details: errors }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     return new Response(
-      JSON.stringify({ urls, url: urls[0], errors, prompt: baseUserPrompt, count: urls.length }),
+      JSON.stringify({ ok: true, urls, url: urls[0], errors, prompt: baseUserPrompt, count: urls.length }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("edit-image error:", msg);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ ok: false, error: msg }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
