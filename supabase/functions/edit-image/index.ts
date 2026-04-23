@@ -157,7 +157,7 @@ async function generateEmergent(opts: { apiKey: string; imageUrls: string[]; pro
       method: "POST",
       headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gemini-2.5-flash-image-preview",
+        model: "gemini-2.0-flash-exp-image-generation",
         messages: [{ role: "user", content }],
         modalities: ["image", "text"],
       }),
