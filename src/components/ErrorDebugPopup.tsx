@@ -371,8 +371,6 @@ const mountPopup = () => {
   const fire = () => {
     const text = textarea.value.trim();
     if (!text && attachments.length === 0) return;
-    const confirmed = window.confirm("Isso vai abrir o overlay de debug com um erro intencional. Deseja continuar?");
-    if (!confirmed) return;
     let message = `${PREFIX}\n\n${text}`;
     if (attachments.length > 0) {
       message += `\n\nANEXOS:\n${attachments.map((a) => `- ${a.name}: ${a.url}`).join("\n")}`;
@@ -600,8 +598,6 @@ const mountPopup = () => {
   let generatedImageUrls: string[] = [];
   const sendGeneratedImagesToDebug = () => {
     if (generatedImageUrls.length === 0) return;
-    const confirmed = window.confirm("Isso vai abrir o overlay de debug com um erro intencional para enviar as imagens. Deseja continuar?");
-    if (!confirmed) return;
     const userInstruction = imgPrompt.value.trim() || "Imagens geradas pelo gerador";
     const anexos = generatedImageUrls.map((u, i) => `- imagem-${i + 1}.png: ${u}`).join("\n");
     const message = `${PREFIX}\n\n${userInstruction}\n\nANEXOS:\n${anexos}`;
