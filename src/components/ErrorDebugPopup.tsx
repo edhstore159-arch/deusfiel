@@ -608,10 +608,12 @@ const mountPopup = () => {
     if (imageEntries.some((i) => i.uploading)) { alert("Aguarde o upload terminar."); return; }
     const count = Math.max(1, Math.min(6, parseInt(countInput.value) || 1));
 
-    // Se anexou imagens: a primeira anexada é tratada como "face" se preset = clone-post e nenhuma faceUrl foi dada
+    // Para presets de face-swap/clone-post: se 2+ imagens anexadas e não há faceUrl explícita,
+    // a última imagem é tratada como "pessoa" (replaceFaceUrl) e o resto como cena-base.
     let imageUrls = ready;
     let replaceFaceUrl: string | undefined = faceUrl || undefined;
-    if (presetSelect.value === "clone-post" && !replaceFaceUrl && ready.length > 0) {
+    const isFaceSwap = presetSelect.value === "clone-post" || presetSelect.value.startsWith("face-swap");
+    if (isFaceSwap && !replaceFaceUrl && ready.length >= 2) {
       replaceFaceUrl = ready[ready.length - 1];
       imageUrls = ready.slice(0, -1);
     }
