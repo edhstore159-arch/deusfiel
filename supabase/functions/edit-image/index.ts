@@ -24,13 +24,13 @@ const PRESET_INSTRUCTIONS: Record<string, string> = {
   "bg-remove": "Remova completamente o fundo da imagem; resultado deve ser PNG transparente isolando o sujeito.",
   "bg-replace": "Substitua o fundo conforme a descrição do usuário; mantenha o sujeito principal exatamente como está.",
   "enhance": "Melhore qualidade: nitidez, balanço de cores, iluminação. Mantenha a composição original.",
-  "clone-post": "RECREATE the social post with the exact composition, framing, typography, layout, colors, lighting, shadows, reflections and environment from IMAGE 1 only. Completely remove the original person from IMAGE 1. Insert only the person from IMAGE 2 in the exact same position. Full identity replacement required: 100% identity from IMAGE 2, 0% identity from IMAGE 1. Do not blend faces, do not retain any facial feature from IMAGE 1, no double face, no morphing, no blur. Preserve pose, camera angle and overall scene.",
-  "face-swap": "Use IMAGE 1 for composition, background, pose, camera angle, lighting, reflections and environment only. Do NOT use the person from IMAGE 1. Completely remove that person and replace them with only the person from IMAGE 2. Final output must contain 100% identity, face and body features from IMAGE 2 and 0% identity from IMAGE 1. No blended faces, no retained facial features, no artifacts, no distortion, photorealistic, ultra detailed.",
-  "face-swap-cinematic": "Use IMAGE 1 only for scene composition, lensing, pose and cinematic lighting. Remove the original subject entirely. Insert only the person from IMAGE 2 in the exact same position with full identity transfer. 100% identity from IMAGE 2, 0% from IMAGE 1. No face blending, no morphing, no ghosting, no distortion. Hyper-realistic movie still.",
-  "face-swap-fusion": "Use IMAGE 1 only for structure, environment, pose and lighting. Use IMAGE 2 only for identity, face, skin tone and body features. Strict separation: composition-only from IMAGE 1, identity-only from IMAGE 2. Completely remove the IMAGE 1 person. No blended identity, no trace of the original face, no artifacts.",
-  "face-swap-photo": "Use IMAGE 1 as the photo setup only: framing, pose, studio lighting, shadows and background. Replace the subject completely with the person from IMAGE 2. Keep the exact pose and camera angle, but preserve only IMAGE 2 identity. No blending with IMAGE 1 face. DSLR-quality, ultra realistic, natural skin.",
-  "face-swap-art": "Use IMAGE 1 only for composition and pose, and IMAGE 2 only for identity. Completely replace the original person from IMAGE 1 with the person from IMAGE 2. No mixed face traits, no trace of the first identity. Stylized artwork but with clean, accurate identity transfer.",
-  "face-swap-social": "Use IMAGE 1 only for background, pose, framing and lighting. Replace the subject completely with the person from IMAGE 2. The result must show only IMAGE 2 identity with seamless social-media-grade realism. No blending, no double face, no leftover features from IMAGE 1.",
+  "clone-post": "RECRIE este post de rede social IDENTICAMENTE: mesma composição, enquadramento, iluminação, cores, tipografia, layout, textos, logos e estilo geral. A ÚNICA mudança permitida é substituir a pessoa/rosto principal pela pessoa da imagem de referência fornecida (mantendo pose, ângulo, expressão e roupa o mais próximo possível do post original). Preserve todos os outros detalhes ao máximo.",
+  "face-swap": "Use the FIRST image as the base composition, lighting, and environment. Replace the subject/person in it with the person from the SECOND image. Keep the original pose, camera angle, framing, lighting, shadows, reflections, background and depth of field. Match skin tone and color grading naturally. Seamless realistic integration: no distortions, no artifacts, correct proportions. Ultra realistic, high detail, sharp focus, 8k.",
+  "face-swap-cinematic": "Use the FIRST image as cinematic base. Replace the subject with the person from the SECOND image. Film lighting, dramatic shadows, volumetric light, depth of field, anamorphic lens. Hyper-realistic movie still with Hollywood color grading. Keep pose, framing and environment intact.",
+  "face-swap-fusion": "Fuse both uploaded images: structure and environment from IMAGE 1, identity from IMAGE 2. AI reconstruction with neural blending and ultra-detailed textures. Perfect face integration, realistic lighting adaptation, no artifacts.",
+  "face-swap-photo": "Use the FIRST image as a professional photo setup. Replace the subject with the person from the SECOND image. Studio lighting, realistic skin, natural shadows, 85mm lens, f/1.8, DSLR quality, ultra realistic.",
+  "face-swap-art": "Transform the FIRST image into a stylized artwork while replacing the subject with the person from the SECOND image. Digital painting, soft brush, dramatic light, semi-realistic, expressive, high detail.",
+  "face-swap-social": "Perfect face replacement using IMAGE 1 as base scene and IMAGE 2 as the person. Same pose, same lighting, same framing. Clean skin, natural look, influencer quality. Ultra realistic, no distortions.",
   "free": "",
 };
 
@@ -154,12 +154,7 @@ Deno.serve(async (req) => {
     const isFaceSwap = preset.startsWith("face-swap") || preset === "clone-post";
     let imageAnnotation = "";
     if (isFaceSwap && resolvedImageUrls.length >= 2) {
-      imageAnnotation = [
-        "[IMAGE 1 = composition only: use only its background, pose, framing, camera angle, lighting, shadows, reflections and environment.]",
-        "[IMAGE 2 = identity only: use only this person's face, identity, skin tone and body features.]",
-        "[Hard rule: completely remove the original person from IMAGE 1. The final person must be only IMAGE 2 with zero facial or identity traits from IMAGE 1.]",
-        "[Negative constraints: no mixed faces, no morphing, no ghosting, no double face, no trace of the original subject, no blur.]",
-      ].join("\n");
+      imageAnnotation = `[IMAGE 1 = base scene/composition. IMAGE 2 = person whose face/identity must replace the subject in IMAGE 1. Keep IMAGE 1's pose, lighting, framing and background; only swap the person.]`;
     }
 
     const baseUserPrompt = [presetText, prompt?.trim() || "", referenceNote, imageAnnotation]

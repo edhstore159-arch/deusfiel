@@ -85,17 +85,11 @@ const isAdmin = () => {
   if (typeof window === "undefined") return false;
   try {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("admin") === "1") {
-      window.localStorage.setItem(STORAGE_KEY, "enabled");
-      return true;
-    }
-    if (params.get("admin") === "0") {
-      window.localStorage.setItem(STORAGE_KEY, "disabled");
-      return false;
-    }
-    return window.localStorage.getItem(STORAGE_KEY) === "enabled";
+    if (params.get("admin") === "1") window.localStorage.removeItem(STORAGE_KEY);
+    if (params.get("admin") === "0") window.localStorage.setItem(STORAGE_KEY, "disabled");
+    return window.localStorage.getItem(STORAGE_KEY) !== "disabled";
   } catch {
-    return false;
+    return true;
   }
 };
 
@@ -717,7 +711,6 @@ const mountPopup = () => {
   });
 
   closeBtn.addEventListener("click", () => {
-    try { window.localStorage.setItem(STORAGE_KEY, "disabled"); } catch {}
     root.remove();
   });
 
