@@ -75,7 +75,8 @@ const editImageViaAI = async (params: {
   const { data, error } = await supabase.functions.invoke("edit-image", {
     body: params,
   });
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Falha ao chamar edit-image");
+  if (data && data.ok === false) throw new Error(data.error || "Falha na geração");
   const urls: string[] | undefined = data?.urls || (data?.url ? [data.url] : undefined);
   if (!urls || urls.length === 0) throw new Error(data?.error || "Sem URL retornada");
   return urls;
