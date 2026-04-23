@@ -360,48 +360,4 @@ Deno.serve(async (req) => {
     });
   }
 });
-    }
 
-    const urls: string[] = [];
-    const errors: string[] = [];
-
-    for (const r of results) {
-      if (!r.dataUrl) {
-        errors.push(r.error || r.text || "Modelo não retornou imagem");
-        continue;
-      }
-      const match = r.dataUrl.match(/^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/);
-      if (!match) { errors.push("Formato de data URL inválido"); continue; }
-      const mime = match[1];
-      const ext = mime.split("/")[1].split("+")[0] || "png";
-      const base64 = match[2];
-      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-
-      const path = `edited/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, bytes, {
-        contentType: mime,
-        upsert: false,
-      });
-      if (upErr) { errors.push(`Upload falhou: ${upErr.message}`); continue; }
-      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      urls.push(pub.publicUrl);
-    }
-
-    if (urls.length === 0) {
-      return new Response(JSON.stringify({ ok: false, error: errors[0] || "Nenhuma imagem gerada", details: errors }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response(
-      JSON.stringify({ ok: true, urls, url: urls[0], errors, prompt: baseUserPrompt, count: urls.length }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("edit-image error:", msg);
-    return new Response(JSON.stringify({ ok: false, error: msg }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-});
