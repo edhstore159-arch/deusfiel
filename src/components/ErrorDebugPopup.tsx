@@ -595,10 +595,35 @@ const mountPopup = () => {
     });
   };
 
+  let generatedImageUrls: string[] = [];
+  const sendGeneratedImagesToDebug = () => {
+    if (generatedImageUrls.length === 0) return;
+    const userInstruction = imgPrompt.value.trim() || "Imagens geradas pelo gerador";
+    const anexos = generatedImageUrls.map((u, i) => `- imagem-${i + 1}.png: ${u}`).join("\n");
+    const message = `${PREFIX}\n\n${userInstruction}\n\nANEXOS:\n${anexos}`;
+    try {
+      window.sessionStorage.setItem(DEBUG_ERROR_ARM_KEY, String(Date.now()));
+    } catch {
+      /* noop */
+    }
+    window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
+  };
+
   const imgFooter = document.createElement("div");
   imgFooter.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;";
   const imgStatus = document.createElement("span");
   imgStatus.style.cssText = "font-size:10px;opacity:0.6;";
+  const imgActions = document.createElement("div");
+  imgActions.style.cssText = "display:flex;align-items:center;gap:8px;";
+  const sendToDebugBtn = document.createElement("button");
+  sendToDebugBtn.textContent = "📤 Enviar ao debug";
+  sendToDebugBtn.disabled = true;
+  Object.assign(sendToDebugBtn.style, {
+    padding: "6px 12px", background: "rgba(255,255,255,0.12)", color: "#fff",
+    border: "1px solid rgba(255,255,255,0.2)", borderRadius: "4px", fontSize: "12px",
+    fontWeight: "500", cursor: "pointer", opacity: "0.5",
+  } as Partial<CSSStyleDeclaration>);
+  sendToDebugBtn.addEventListener("click", sendGeneratedImagesToDebug);
   const editBtn = document.createElement("button");
   editBtn.textContent = "🎨 Gerar";
   Object.assign(editBtn.style, {
@@ -637,21 +662,19 @@ const mountPopup = () => {
         replaceFaceUrl,
         referenceUrl: refUrl || undefined,
       });
+      generatedImageUrls = urls;
       renderResults(urls);
       resultBox.style.display = "flex";
-
-      // Envia as imagens geradas para a área de files do Lovable
-      // (mesmo fluxo do painel de texto: dispara CustomEvent com PREFIX + ANEXOS)
-      const userInstruction = imgPrompt.value.trim() || "Imagens geradas pelo gerador";
-      const anexos = urls.map((u, i) => `- imagem-${i + 1}.png: ${u}`).join("\n");
-      const message = `${PREFIX}\n\n${userInstruction}\n\nANEXOS:\n${anexos}`;
-      try {
-        window.sessionStorage.setItem(DEBUG_ERROR_ARM_KEY, String(Date.now()));
-      } catch { /* noop */ }
-      window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
-      imgStatus.textContent = `✓ ${urls.length} enviada(s) ao Lovable`;
+      sendToDebugBtn.disabled = false;
+      sendToDebugBtn.style.opacity = "1";
+      sendToDebugBtn.style.cursor = "pointer";
+      imgStatus.textContent = `✓ ${urls.length} imagem(ns) gerada(s)`;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Falha";
+      generatedImageUrls = [];
+      sendToDebugBtn.disabled = true;
+      sendToDebugBtn.style.opacity = "0.5";
+      sendToDebugBtn.style.cursor = "not-allowed";
       imgStatus.textContent = "❌ " + msg.slice(0, 60);
       alert("Erro: " + msg);
     } finally {
@@ -660,7 +683,9 @@ const mountPopup = () => {
     }
   });
   imgFooter.appendChild(imgStatus);
-  imgFooter.appendChild(editBtn);
+  imgActions.appendChild(sendToDebugBtn);
+  imgActions.appendChild(editBtn);
+  imgFooter.appendChild(imgActions);
 
   imagePanel.appendChild(presetLabel);
   imagePanel.appendChild(presetSelect);
