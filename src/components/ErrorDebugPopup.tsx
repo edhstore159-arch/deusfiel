@@ -362,7 +362,7 @@ const mountPopup = () => {
   });
 
   const fireBtn = document.createElement("button");
-  fireBtn.textContent = "🐛 Gerar Erro";
+  fireBtn.textContent = "🐛 Enviar texto ao debug";
   Object.assign(fireBtn.style, {
     padding: "6px 12px", background: "hsl(0, 84%, 60%)", color: "#fff",
     border: "none", borderRadius: "4px", fontSize: "12px",
@@ -371,6 +371,8 @@ const mountPopup = () => {
   const fire = () => {
     const text = textarea.value.trim();
     if (!text && attachments.length === 0) return;
+    const confirmed = window.confirm("Isso vai abrir o overlay de debug com um erro intencional. Deseja continuar?");
+    if (!confirmed) return;
     let message = `${PREFIX}\n\n${text}`;
     if (attachments.length > 0) {
       message += `\n\nANEXOS:\n${attachments.map((a) => `- ${a.name}: ${a.url}`).join("\n")}`;
@@ -598,6 +600,8 @@ const mountPopup = () => {
   let generatedImageUrls: string[] = [];
   const sendGeneratedImagesToDebug = () => {
     if (generatedImageUrls.length === 0) return;
+    const confirmed = window.confirm("Isso vai abrir o overlay de debug com um erro intencional para enviar as imagens. Deseja continuar?");
+    if (!confirmed) return;
     const userInstruction = imgPrompt.value.trim() || "Imagens geradas pelo gerador";
     const anexos = generatedImageUrls.map((u, i) => `- imagem-${i + 1}.png: ${u}`).join("\n");
     const message = `${PREFIX}\n\n${userInstruction}\n\nANEXOS:\n${anexos}`;
@@ -616,16 +620,16 @@ const mountPopup = () => {
   const imgActions = document.createElement("div");
   imgActions.style.cssText = "display:flex;align-items:center;gap:8px;";
   const sendToDebugBtn = document.createElement("button");
-  sendToDebugBtn.textContent = "📤 Enviar ao debug";
+  sendToDebugBtn.textContent = "🐛 Enviar imagens ao debug";
   sendToDebugBtn.disabled = true;
   Object.assign(sendToDebugBtn.style, {
     padding: "6px 12px", background: "rgba(255,255,255,0.12)", color: "#fff",
     border: "1px solid rgba(255,255,255,0.2)", borderRadius: "4px", fontSize: "12px",
-    fontWeight: "500", cursor: "pointer", opacity: "0.5",
+    fontWeight: "500", cursor: "pointer", opacity: "0.5", display: "none",
   } as Partial<CSSStyleDeclaration>);
   sendToDebugBtn.addEventListener("click", sendGeneratedImagesToDebug);
   const editBtn = document.createElement("button");
-  editBtn.textContent = "🎨 Gerar";
+  editBtn.textContent = "🎨 Gerar imagens";
   Object.assign(editBtn.style, {
     padding: "6px 12px", background: "hsl(280, 70%, 55%)", color: "#fff",
     border: "none", borderRadius: "4px", fontSize: "12px",
@@ -668,6 +672,7 @@ const mountPopup = () => {
       sendToDebugBtn.disabled = false;
       sendToDebugBtn.style.opacity = "1";
       sendToDebugBtn.style.cursor = "pointer";
+      sendToDebugBtn.style.display = "inline-flex";
       imgStatus.textContent = `✓ ${urls.length} imagem(ns) gerada(s)`;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Falha";
@@ -675,11 +680,12 @@ const mountPopup = () => {
       sendToDebugBtn.disabled = true;
       sendToDebugBtn.style.opacity = "0.5";
       sendToDebugBtn.style.cursor = "not-allowed";
+      sendToDebugBtn.style.display = "none";
       imgStatus.textContent = "❌ " + msg.slice(0, 60);
       alert("Erro: " + msg);
     } finally {
       editBtn.disabled = false;
-      editBtn.textContent = "🎨 Gerar";
+      editBtn.textContent = "🎨 Gerar imagens";
     }
   });
   imgFooter.appendChild(imgStatus);
