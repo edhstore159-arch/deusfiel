@@ -51,6 +51,7 @@ const PRESETS: Preset[] = [
   { id: "fb-post", label: "Facebook Post (1.91:1)", spec: "1200x630" },
   { id: "yt-thumb", label: "YouTube Thumb (16:9)", spec: "1280x720" },
   { id: "linkedin", label: "LinkedIn (1.91:1)", spec: "1200x627" },
+  { id: "clone-post", label: "🔁 Clonar post (trocar pessoa)", spec: "URL + foto" },
   { id: "bg-remove", label: "Remover fundo", spec: "PNG transparente" },
   { id: "bg-replace", label: "Trocar fundo", spec: "manter sujeito" },
   { id: "enhance", label: "Melhorar qualidade", spec: "nitidez + cores" },
