@@ -3,12 +3,49 @@ import { supabase } from "@/integrations/supabase/client";
 
 const BUCKET = "debug-attachments";
 const MAX_FILE_MB = 25;
+const USER_KEYS_STORAGE = "lovable-debug-user-keys";
 
-const uploadAttachment = async (file: File): Promise<string> => {
-  const ext = file.name.split(".").pop() || "bin";
+type UserKeys = { lovableKey?: string; openaiKey?: string };
+
+const getUserKeys = (): UserKeys => {
+  try {
+    const raw = window.localStorage.getItem(USER_KEYS_STORAGE);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+};
+
+const setUserKeys = (k: UserKeys) => {
+  try { window.localStorage.setItem(USER_KEYS_STORAGE, JSON.stringify(k)); } catch {}
+};
+
+// Comprime imagem no client antes de upload: max 1024px lado maior, JPEG q=0.82.
+// Reduz drasticamente tokens de visão enviados ao modelo.
+const compressImage = async (file: File): Promise<File> => {
+  if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const MAX = 1024;
+    const scale = Math.min(MAX / bitmap.width, MAX / bitmap.height, 1);
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.82));
+    if (!blob) return file;
+    if (blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch { return file; }
+};
+
+const uploadAttachment = async (file: File, opts: { compress?: boolean } = {}): Promise<string> => {
+  const final = opts.compress ? await compressImage(file) : file;
+  const ext = final.name.split(".").pop() || "bin";
   const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    contentType: file.type || "application/octet-stream",
+  const { error } = await supabase.storage.from(BUCKET).upload(path, final, {
+    contentType: final.type || "application/octet-stream",
     upsert: false,
   });
   if (error) throw error;
