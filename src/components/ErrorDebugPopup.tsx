@@ -112,8 +112,9 @@ const editImageViaAI = async (params: {
   replaceFaceUrl?: string;
   referenceUrl?: string;
 }): Promise<string[]> => {
+  const userKeys = getUserKeys();
   const { data, error } = await supabase.functions.invoke("edit-image", {
-    body: params,
+    body: { ...params, userLovableKey: userKeys.lovableKey, userOpenaiKey: userKeys.openaiKey },
   });
   if (error) throw new Error(error.message || "Falha ao chamar edit-image");
   if (data && data.ok === false) throw new Error(data.error || "Falha na geração");
