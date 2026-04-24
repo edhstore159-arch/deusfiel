@@ -668,7 +668,7 @@ const mountPopup = () => {
       imageEntries.push(entry);
       renderImageThumbs();
       try {
-        entry.url = await uploadAttachment(f);
+        entry.url = await uploadAttachment(f, { compress: true });
       } catch (err) {
         entry.error = err instanceof Error ? err.message : "Falha no upload";
       } finally {
