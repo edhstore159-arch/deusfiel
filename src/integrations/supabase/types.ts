@@ -14,16 +14,289 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          patient_id: string
+          session_id: string
+          status: string | null
+          stripe_payment_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          patient_id: string
+          session_id: string
+          status?: string | null
+          stripe_payment_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          patient_id?: string
+          session_id?: string
+          status?: string | null
+          stripe_payment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          full_name: string
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scheduled_posts: {
+        Row: {
+          caption: string
+          created_at: string
+          error_message: string | null
+          external_post_id: string | null
+          id: string
+          image_url: string
+          platforms: string[]
+          scheduled_at: string
+          status: Database["public"]["Enums"]["post_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          caption?: string
+          created_at?: string
+          error_message?: string | null
+          external_post_id?: string | null
+          id?: string
+          image_url: string
+          platforms?: string[]
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["post_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          caption?: string
+          created_at?: string
+          error_message?: string | null
+          external_post_id?: string | null
+          id?: string
+          image_url?: string
+          platforms?: string[]
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["post_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sessions: {
+        Row: {
+          created_at: string
+          duration: number | null
+          id: string
+          notes: string | null
+          patient_id: string
+          price: number
+          room_url: string | null
+          scheduled_at: string
+          status: Database["public"]["Enums"]["session_status"] | null
+          therapist_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration?: number | null
+          id?: string
+          notes?: string | null
+          patient_id: string
+          price: number
+          room_url?: string | null
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["session_status"] | null
+          therapist_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration?: number | null
+          id?: string
+          notes?: string | null
+          patient_id?: string
+          price?: number
+          room_url?: string | null
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["session_status"] | null
+          therapist_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      therapist_availability: {
+        Row: {
+          day_of_week: number
+          end_time: string
+          id: string
+          start_time: string
+          therapist_id: string
+        }
+        Insert: {
+          day_of_week: number
+          end_time: string
+          id?: string
+          start_time: string
+          therapist_id: string
+        }
+        Update: {
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          start_time?: string
+          therapist_id?: string
+        }
+        Relationships: []
+      }
+      therapist_profiles: {
+        Row: {
+          created_at: string
+          crp: string | null
+          education: string | null
+          experience_years: number | null
+          id: string
+          is_available: boolean | null
+          session_duration: number | null
+          session_price: number | null
+          specialties: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          crp?: string | null
+          education?: string | null
+          experience_years?: number | null
+          id?: string
+          is_available?: boolean | null
+          session_duration?: number | null
+          session_price?: number | null
+          specialties?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          crp?: string | null
+          education?: string | null
+          experience_years?: number | null
+          id?: string
+          is_available?: boolean | null
+          session_duration?: number | null
+          session_price?: number | null
+          specialties?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "patient" | "therapist"
+      post_status: "pending" | "posted" | "failed" | "cancelled"
+      session_status: "scheduled" | "completed" | "cancelled" | "in_progress"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +423,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["patient", "therapist"],
+      post_status: ["pending", "posted", "failed", "cancelled"],
+      session_status: ["scheduled", "completed", "cancelled", "in_progress"],
+    },
   },
 } as const

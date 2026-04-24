@@ -1,124 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 222 47% 8%;
-    --foreground: 210 40% 98%;
+    /* Warm, welcoming therapy app colors */
+    --background: 30 50% 98%;
+    --foreground: 25 30% 20%;
 
-    --card: 222 45% 11%;
-    --card-foreground: 210 40% 98%;
+    --card: 30 40% 97%;
+    --card-foreground: 25 30% 20%;
 
-    --popover: 222 45% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 30 40% 97%;
+    --popover-foreground: 25 30% 20%;
 
-    --primary: 210 100% 56%;
-    --primary-foreground: 222 47% 8%;
+    /* Sage green - calming primary */
+    --primary: 145 30% 45%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 222 35% 16%;
-    --secondary-foreground: 210 40% 98%;
+    /* Warm peach - friendly secondary */
+    --secondary: 25 60% 92%;
+    --secondary-foreground: 25 30% 25%;
 
-    --muted: 222 30% 18%;
-    --muted-foreground: 215 20% 70%;
+    --muted: 30 20% 94%;
+    --muted-foreground: 25 15% 50%;
 
-    --accent: 32 100% 55%;
-    --accent-foreground: 222 47% 8%;
+    /* Soft coral accent */
+    --accent: 15 70% 85%;
+    --accent-foreground: 15 50% 30%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 65% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 222 30% 20%;
-    --input: 222 30% 22%;
-    --ring: 210 100% 56%;
+    --border: 30 25% 88%;
+    --input: 30 25% 88%;
+    --ring: 145 30% 45%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
 
-    --gray-50: 0 0% 8%;
-    --gray-100: 0 0% 12%;
-    --gray-200: 0 0% 18%;
-    --gray-300: 0 0% 28%;
-    --gray-400: 0 0% 45%;
-    --gray-500: 0 0% 60%;
-    --gray-600: 0 0% 72%;
-    --gray-800: 0 0% 88%;
-    --gray-900: 0 0% 98%;
+    /* Custom colors */
+    --sage: 145 30% 45%;
+    --sage-light: 145 35% 92%;
+    --peach: 25 70% 90%;
+    --peach-dark: 20 50% 70%;
+    --cream: 40 40% 96%;
+    --warm-gray: 30 10% 60%;
+    --forest: 150 25% 35%;
+
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(145 35% 92%) 0%, hsl(25 70% 95%) 50%, hsl(40 40% 96%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(30 40% 98%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(145 30% 45%) 0%, hsl(150 25% 35%) 100%);
+
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -4px hsl(25 30% 20% / 0.08);
+    --shadow-card: 0 8px 30px -8px hsl(25 30% 20% / 0.12);
+    --shadow-glow: 0 0 40px hsl(145 30% 45% / 0.15);
+
+    --sidebar-background: 30 40% 97%;
+    --sidebar-foreground: 25 30% 20%;
+    --sidebar-primary: 145 30% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 25 60% 92%;
+    --sidebar-accent-foreground: 25 30% 25%;
+    --sidebar-border: 30 25% 88%;
+    --sidebar-ring: 145 30% 45%;
   }
 
   .dark {
-    --background: 30 15% 12%;
-    --foreground: 227 50% 75%;
+    --background: 25 25% 10%;
+    --foreground: 30 20% 92%;
 
-    --card: 30 15% 15%;
-    --card-foreground: 227 50% 75%;
+    --card: 25 20% 14%;
+    --card-foreground: 30 20% 92%;
 
-    --popover: 30 15% 15%;
-    --popover-foreground: 227 50% 75%;
+    --popover: 25 20% 14%;
+    --popover-foreground: 30 20% 92%;
 
-    --primary: 227 50% 75%;
-    --primary-foreground: 30 15% 12%;
+    --primary: 145 35% 55%;
+    --primary-foreground: 25 25% 10%;
 
-    --secondary: 30 12% 18%;
-    --secondary-foreground: 227 50% 75%;
+    --secondary: 25 20% 20%;
+    --secondary-foreground: 30 20% 92%;
 
-    --muted: 30 12% 20%;
-    --muted-foreground: 227 30% 60%;
+    --muted: 25 15% 20%;
+    --muted-foreground: 30 15% 60%;
 
-    --accent: 227 50% 75%;
-    --accent-foreground: 30 15% 12%;
+    --accent: 15 40% 25%;
+    --accent-foreground: 15 70% 85%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 55% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 10% 25%;
-    --input: 30 10% 28%;
-    --ring: 227 50% 75%;
+    --border: 25 15% 22%;
+    --input: 25 15% 22%;
+    --ring: 145 35% 55%;
 
-    --gray-50: 30 12% 18%;
-    --gray-100: 30 12% 22%;
-    --gray-200: 30 10% 30%;
-    --gray-300: 30 8% 40%;
-    --gray-400: 227 10% 50%;
-    --gray-500: 227 20% 60%;
-    --gray-600: 227 30% 70%;
-    --gray-800: 227 40% 85%;
-  }
-}
-
-@layer utilities {
-  .animate-marquee-rtl {
-    animation: marquee-rtl 40s linear infinite;
-  }
-  
-  .animate-marquee-rtl:hover {
-    animation-play-state: paused;
-  }
-
-  /* Custom styles for react-medium-image-zoom dark mode support */
-  [data-rmiz-modal-overlay] {
-    background-color: hsl(var(--background) / 0.95) !important;
-    backdrop-filter: blur(8px);
-  }
-
-  .dark [data-rmiz-modal-overlay] {
-    background-color: hsl(var(--background) / 0.95) !important;
-  }
-
-  [data-rmiz-modal-img] {
-    border-radius: 0.5rem;
-  }
-}
-
-@keyframes marquee-rtl {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
+    --sidebar-background: 25 20% 12%;
+    --sidebar-foreground: 30 20% 92%;
+    --sidebar-primary: 145 35% 55%;
+    --sidebar-primary-foreground: 25 25% 10%;
+    --sidebar-accent: 25 20% 18%;
+    --sidebar-accent-foreground: 30 20% 92%;
+    --sidebar-border: 25 15% 22%;
+    --sidebar-ring: 145 35% 55%;
   }
 }
 
@@ -128,17 +115,40 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground font-inter;
+    @apply bg-background text-foreground font-body antialiased;
   }
 
-  /* Global focus styles for keyboard navigation */
-  *:focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
 
-  /* Skip to content link */
-  .skip-to-content {
-    @apply absolute left-0 top-0 z-[100] -translate-y-full bg-foreground text-background px-6 py-3 text-sm uppercase tracking-widest;
-    @apply focus:translate-y-0 transition-transform duration-200;
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
   }
 }
