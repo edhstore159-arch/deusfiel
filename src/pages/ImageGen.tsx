@@ -204,7 +204,7 @@ export default function ImageGen() {
     setVariants(null);
     try {
       const { data, error } = await supabase.functions.invoke("image-combine", {
-        body: { baseImage: baseImg, referenceImage: refImg, prompt: combinePrompt },
+        body: { baseImage: baseImg, referenceImage: refImg, referenceImage2: refImg2 || undefined, prompt: combinePrompt },
       });
       if (error) throw error;
       if (!data?.imageUrl) throw new Error(data?.error || "Sem imagem na resposta");
