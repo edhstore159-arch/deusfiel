@@ -530,9 +530,9 @@ export default function ImageGen() {
 
               <div className="grid gap-6 md:grid-cols-[1fr_1.2fr]">
                 <Card className="space-y-4 p-5">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-2">
-                      <Label>Foto base (criativo)</Label>
+                      <Label>Foto base</Label>
                       <input
                         ref={baseFileRef}
                         type="file"
@@ -562,7 +562,7 @@ export default function ImageGen() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label>Foto de referência</Label>
+                      <Label>Referência 1</Label>
                       <input
                         ref={refFileRef}
                         type="file"
@@ -587,6 +587,48 @@ export default function ImageGen() {
                         <img
                           src={refImg}
                           alt="ref"
+                          className="mt-1 h-28 w-full rounded-md object-cover"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Referência 2 <span className="text-xs text-muted-foreground">(opcional)</span></Label>
+                      <input
+                        ref={ref2FileRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) readFileToDataUrl(f, setRefImg2);
+                        }}
+                      />
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => ref2FileRef.current?.click()}
+                          className="flex-1"
+                          size="sm"
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          {refImg2 ? "Trocar" : "Enviar"}
+                        </Button>
+                        {refImg2 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setRefImg2(null)}
+                          >
+                            ✕
+                          </Button>
+                        )}
+                      </div>
+                      {refImg2 && (
+                        <img
+                          src={refImg2}
+                          alt="ref2"
                           className="mt-1 h-28 w-full rounded-md object-cover"
                         />
                       )}
