@@ -219,9 +219,6 @@ Deno.serve(async (req) => {
     const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY") || undefined;
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!LOVABLE_API_KEY && !OPENAI_API_KEY && !EMERGENT_API_KEY) {
-      throw new Error("Nenhum provedor configurado (LOVABLE_API_KEY, OPENAI_API_KEY ou EMERGENT_API_KEY)");
-    }
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase env ausente");
 
     const body = await req.json().catch(() => ({}));
@@ -232,6 +229,8 @@ Deno.serve(async (req) => {
       count = 1,
       replaceFaceUrl,
       referenceUrl,
+      userLovableKey,
+      userOpenaiKey,
     } = body as {
       imageUrls?: string[];
       prompt?: string;
@@ -239,7 +238,16 @@ Deno.serve(async (req) => {
       count?: number;
       replaceFaceUrl?: string;
       referenceUrl?: string;
+      userLovableKey?: string;
+      userOpenaiKey?: string;
     };
+
+    // Chaves do usuário têm prioridade (ele paga sua própria conta).
+    const lovableKey = (userLovableKey && userLovableKey.trim()) || LOVABLE_API_KEY;
+    const openaiKey = (userOpenaiKey && userOpenaiKey.trim()) || OPENAI_API_KEY;
+    if (!lovableKey && !openaiKey && !EMERGENT_API_KEY) {
+      throw new Error("Nenhum provedor configurado. Configure suas chaves no popup de debug ou contate o admin.");
+    }
 
     const resolvedImageUrls: string[] = [...imageUrls];
     let referenceNote = "";
@@ -282,8 +290,8 @@ Deno.serve(async (req) => {
       let r: GenResult | null = null;
       while (attempt < 3) {
         r = await generateOne({
-          lovableKey: LOVABLE_API_KEY,
-          openaiKey: OPENAI_API_KEY,
+          lovableKey,
+          openaiKey,
           emergentKey: EMERGENT_API_KEY,
           imageUrls: resolvedImageUrls,
           prompt: baseUserPrompt,

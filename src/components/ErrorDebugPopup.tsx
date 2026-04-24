@@ -3,12 +3,49 @@ import { supabase } from "@/integrations/supabase/client";
 
 const BUCKET = "debug-attachments";
 const MAX_FILE_MB = 25;
+const USER_KEYS_STORAGE = "lovable-debug-user-keys";
 
-const uploadAttachment = async (file: File): Promise<string> => {
-  const ext = file.name.split(".").pop() || "bin";
+type UserKeys = { lovableKey?: string; openaiKey?: string };
+
+const getUserKeys = (): UserKeys => {
+  try {
+    const raw = window.localStorage.getItem(USER_KEYS_STORAGE);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+};
+
+const setUserKeys = (k: UserKeys) => {
+  try { window.localStorage.setItem(USER_KEYS_STORAGE, JSON.stringify(k)); } catch {}
+};
+
+// Comprime imagem no client antes de upload: max 1024px lado maior, JPEG q=0.82.
+// Reduz drasticamente tokens de visão enviados ao modelo.
+const compressImage = async (file: File): Promise<File> => {
+  if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const MAX = 1024;
+    const scale = Math.min(MAX / bitmap.width, MAX / bitmap.height, 1);
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.82));
+    if (!blob) return file;
+    if (blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch { return file; }
+};
+
+const uploadAttachment = async (file: File, opts: { compress?: boolean } = {}): Promise<string> => {
+  const final = opts.compress ? await compressImage(file) : file;
+  const ext = final.name.split(".").pop() || "bin";
   const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    contentType: file.type || "application/octet-stream",
+  const { error } = await supabase.storage.from(BUCKET).upload(path, final, {
+    contentType: final.type || "application/octet-stream",
     upsert: false,
   });
   if (error) throw error;
@@ -75,8 +112,9 @@ const editImageViaAI = async (params: {
   replaceFaceUrl?: string;
   referenceUrl?: string;
 }): Promise<string[]> => {
+  const userKeys = getUserKeys();
   const { data, error } = await supabase.functions.invoke("edit-image", {
-    body: params,
+    body: { ...params, userLovableKey: userKeys.lovableKey, userOpenaiKey: userKeys.openaiKey },
   });
   if (error) throw new Error(error.message || "Falha ao chamar edit-image");
   if (data && data.ok === false) throw new Error(data.error || "Falha na geração");
@@ -630,7 +668,7 @@ const mountPopup = () => {
       imageEntries.push(entry);
       renderImageThumbs();
       try {
-        entry.url = await uploadAttachment(f);
+        entry.url = await uploadAttachment(f, { compress: true });
       } catch (err) {
         entry.error = err instanceof Error ? err.message : "Falha no upload";
       } finally {
@@ -829,6 +867,68 @@ const mountPopup = () => {
   imgActions.appendChild(editBtn);
   imgFooter.appendChild(imgActions);
 
+  // ===== Barra: chaves do usuário + créditos =====
+  const keysBar = document.createElement("div");
+  Object.assign(keysBar.style, {
+    display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap",
+    padding: "6px 8px", background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.08)", borderRadius: "4px",
+    fontSize: "11px",
+  } as Partial<CSSStyleDeclaration>);
+
+  const keysStatus = document.createElement("span");
+  const refreshKeysStatus = () => {
+    const k = getUserKeys();
+    const parts: string[] = [];
+    if (k.lovableKey) parts.push("Lovable✓");
+    if (k.openaiKey) parts.push("OpenAI✓");
+    keysStatus.textContent = parts.length
+      ? `🔑 Chaves próprias: ${parts.join(" + ")}`
+      : "🔑 Usando saldo grátis do workspace";
+    keysStatus.style.opacity = parts.length ? "1" : "0.7";
+  };
+  refreshKeysStatus();
+  keysStatus.style.flex = "1";
+
+  const setKeysBtn = document.createElement("button");
+  setKeysBtn.textContent = "Configurar chaves";
+  Object.assign(setKeysBtn.style, {
+    padding: "4px 8px", background: "rgba(255,255,255,0.1)", color: "#fff",
+    border: "1px solid rgba(255,255,255,0.15)", borderRadius: "4px",
+    fontSize: "11px", cursor: "pointer",
+  } as Partial<CSSStyleDeclaration>);
+  setKeysBtn.addEventListener("click", () => {
+    const current = getUserKeys();
+    const lov = window.prompt(
+      "Cole sua LOVABLE_API_KEY (deixe em branco para remover, cancele para manter).\n\nObtenha em: Lovable → Settings → Workspace → API Keys",
+      current.lovableKey || ""
+    );
+    const next: UserKeys = { ...current };
+    if (lov !== null) next.lovableKey = lov.trim() || undefined;
+    const oai = window.prompt(
+      "Cole sua OPENAI_API_KEY (opcional, fallback). Deixe em branco para remover, cancele para manter.\n\nObtenha em: https://platform.openai.com/api-keys",
+      current.openaiKey || ""
+    );
+    if (oai !== null) next.openaiKey = oai.trim() || undefined;
+    setUserKeys(next);
+    refreshKeysStatus();
+  });
+
+  const creditsBtn = document.createElement("a");
+  creditsBtn.textContent = "💳 Adicionar créditos";
+  creditsBtn.href = "https://lovable.dev/settings/workspace/usage";
+  creditsBtn.target = "_blank";
+  creditsBtn.rel = "noopener noreferrer";
+  Object.assign(creditsBtn.style, {
+    padding: "4px 8px", background: "hsl(160, 70%, 40%)", color: "#fff",
+    border: "none", borderRadius: "4px", textDecoration: "none",
+    fontSize: "11px", cursor: "pointer",
+  } as Partial<CSSStyleDeclaration>);
+
+  keysBar.appendChild(keysStatus);
+  keysBar.appendChild(setKeysBtn);
+  keysBar.appendChild(creditsBtn);
+
   imagePanel.appendChild(presetLabel);
   imagePanel.appendChild(presetSelect);
   imagePanel.appendChild(refLabel);
@@ -841,6 +941,7 @@ const mountPopup = () => {
   imagePanel.appendChild(imgPromptLabel);
   imagePanel.appendChild(imgPrompt);
   imagePanel.appendChild(countWrap);
+  imagePanel.appendChild(keysBar);
   imagePanel.appendChild(resultBox);
   imagePanel.appendChild(imgFooter);
 
