@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { baseImage, referenceImage, prompt } = await req.json();
+    const { baseImage, referenceImage, referenceImage2, prompt } = await req.json();
 
     if (!baseImage || typeof baseImage !== "string") {
       return new Response(
@@ -35,6 +35,7 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    const hasRef2 = typeof referenceImage2 === "string" && referenceImage2.length > 0;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
