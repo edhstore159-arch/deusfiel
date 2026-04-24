@@ -290,8 +290,8 @@ Deno.serve(async (req) => {
       let r: GenResult | null = null;
       while (attempt < 3) {
         r = await generateOne({
-          lovableKey: LOVABLE_API_KEY,
-          openaiKey: OPENAI_API_KEY,
+          lovableKey,
+          openaiKey,
           emergentKey: EMERGENT_API_KEY,
           imageUrls: resolvedImageUrls,
           prompt: baseUserPrompt,
