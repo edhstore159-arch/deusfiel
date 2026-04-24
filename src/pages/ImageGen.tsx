@@ -174,8 +174,10 @@ export default function ImageGen() {
   // -------- Modo "Combinar 2 imagens" (Nano Banana via Lovable AI — pago) --------
   const baseFileRef = useRef<HTMLInputElement>(null);
   const refFileRef = useRef<HTMLInputElement>(null);
+  const ref2FileRef = useRef<HTMLInputElement>(null);
   const [baseImg, setBaseImg] = useState<string | null>(null);
   const [refImg, setRefImg] = useState<string | null>(null);
+  const [refImg2, setRefImg2] = useState<string | null>(null);
   const [combinePrompt, setCombinePrompt] = useState("");
   const [combinedUrl, setCombinedUrl] = useState<string | null>(null);
   const [combining, setCombining] = useState(false);
