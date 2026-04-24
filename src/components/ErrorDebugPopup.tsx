@@ -867,6 +867,68 @@ const mountPopup = () => {
   imgActions.appendChild(editBtn);
   imgFooter.appendChild(imgActions);
 
+  // ===== Barra: chaves do usuário + créditos =====
+  const keysBar = document.createElement("div");
+  Object.assign(keysBar.style, {
+    display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap",
+    padding: "6px 8px", background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.08)", borderRadius: "4px",
+    fontSize: "11px",
+  } as Partial<CSSStyleDeclaration>);
+
+  const keysStatus = document.createElement("span");
+  const refreshKeysStatus = () => {
+    const k = getUserKeys();
+    const parts: string[] = [];
+    if (k.lovableKey) parts.push("Lovable✓");
+    if (k.openaiKey) parts.push("OpenAI✓");
+    keysStatus.textContent = parts.length
+      ? `🔑 Chaves próprias: ${parts.join(" + ")}`
+      : "🔑 Usando saldo grátis do workspace";
+    keysStatus.style.opacity = parts.length ? "1" : "0.7";
+  };
+  refreshKeysStatus();
+  keysStatus.style.flex = "1";
+
+  const setKeysBtn = document.createElement("button");
+  setKeysBtn.textContent = "Configurar chaves";
+  Object.assign(setKeysBtn.style, {
+    padding: "4px 8px", background: "rgba(255,255,255,0.1)", color: "#fff",
+    border: "1px solid rgba(255,255,255,0.15)", borderRadius: "4px",
+    fontSize: "11px", cursor: "pointer",
+  } as Partial<CSSStyleDeclaration>);
+  setKeysBtn.addEventListener("click", () => {
+    const current = getUserKeys();
+    const lov = window.prompt(
+      "Cole sua LOVABLE_API_KEY (deixe em branco para remover, cancele para manter).\n\nObtenha em: Lovable → Settings → Workspace → API Keys",
+      current.lovableKey || ""
+    );
+    const next: UserKeys = { ...current };
+    if (lov !== null) next.lovableKey = lov.trim() || undefined;
+    const oai = window.prompt(
+      "Cole sua OPENAI_API_KEY (opcional, fallback). Deixe em branco para remover, cancele para manter.\n\nObtenha em: https://platform.openai.com/api-keys",
+      current.openaiKey || ""
+    );
+    if (oai !== null) next.openaiKey = oai.trim() || undefined;
+    setUserKeys(next);
+    refreshKeysStatus();
+  });
+
+  const creditsBtn = document.createElement("a");
+  creditsBtn.textContent = "💳 Adicionar créditos";
+  creditsBtn.href = "https://lovable.dev/settings/workspace/usage";
+  creditsBtn.target = "_blank";
+  creditsBtn.rel = "noopener noreferrer";
+  Object.assign(creditsBtn.style, {
+    padding: "4px 8px", background: "hsl(160, 70%, 40%)", color: "#fff",
+    border: "none", borderRadius: "4px", textDecoration: "none",
+    fontSize: "11px", cursor: "pointer",
+  } as Partial<CSSStyleDeclaration>);
+
+  keysBar.appendChild(keysStatus);
+  keysBar.appendChild(setKeysBtn);
+  keysBar.appendChild(creditsBtn);
+
   imagePanel.appendChild(presetLabel);
   imagePanel.appendChild(presetSelect);
   imagePanel.appendChild(refLabel);
@@ -879,6 +941,7 @@ const mountPopup = () => {
   imagePanel.appendChild(imgPromptLabel);
   imagePanel.appendChild(imgPrompt);
   imagePanel.appendChild(countWrap);
+  imagePanel.appendChild(keysBar);
   imagePanel.appendChild(resultBox);
   imagePanel.appendChild(imgFooter);
 
