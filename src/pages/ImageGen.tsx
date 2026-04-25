@@ -348,8 +348,26 @@ export default function ImageGen() {
                       value={seed}
                       onChange={(e) => setSeed(e.target.value)}
                       placeholder="Vazio = aleatório"
+                      disabled={useAI}
                     />
                   </div>
+
+                  <label className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={useAI}
+                      onChange={(e) => setUseAI(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <span>
+                      Usar AI (Lovable → Gemini → Emergent){" "}
+                      {provider && (
+                        <span className="text-xs text-muted-foreground">
+                          — último: {provider}
+                        </span>
+                      )}
+                    </span>
+                  </label>
 
                   <Button
                     onClick={handleGenerate}
