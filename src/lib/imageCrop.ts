@@ -3,17 +3,18 @@
 // Feed 1:1, Landscape 16:9). Zero crédito extra.
 
 export type SocialFormat = {
-  key: "reels" | "feed" | "story" | "landscape";
+  key: "reels" | "story" | "feedVertical" | "feedSquare" | "feedHorizontal";
   label: string;
   width: number;
   height: number;
 };
 
 export const SOCIAL_FORMATS: SocialFormat[] = [
-  { key: "reels", label: "Reels / TikTok (9:16)", width: 1080, height: 1920 },
-  { key: "feed", label: "Feed Instagram (1:1)", width: 1080, height: 1080 },
-  { key: "story", label: "Stories (9:16)", width: 1080, height: 1920 },
-  { key: "landscape", label: "Facebook Landscape (16:9)", width: 1280, height: 720 },
+  { key: "reels", label: "Reels (9:16) — 1080×1920", width: 1080, height: 1920 },
+  { key: "story", label: "Stories IG/FB (9:16) — 1080×1920", width: 1080, height: 1920 },
+  { key: "feedVertical", label: "Feed FB Vertical (4:5) — 1080×1350 ⭐", width: 1080, height: 1350 },
+  { key: "feedSquare", label: "Feed Quadrado (1:1) — 1080×1080", width: 1080, height: 1080 },
+  { key: "feedHorizontal", label: "Feed Horizontal (16:9) — 1200×630", width: 1200, height: 630 },
 ];
 
 async function loadImage(src: string): Promise<HTMLImageElement> {
