@@ -113,6 +113,7 @@ Deno.serve(async (req) => {
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY");
 
     const fullPrompt = hasRef2
       ? `IMAGE 1 is the base subject (preserve identity, face, pose). IMAGE 2 and IMAGE 3 are references for style/background/elements. Instruction: ${prompt}`
@@ -121,6 +122,8 @@ Deno.serve(async (req) => {
     const images = hasRef2
       ? [baseImage, referenceImage, referenceImage2]
       : [baseImage, referenceImage];
+
+    const hasFallback = !!GEMINI_API_KEY || !!EMERGENT_API_KEY;
 
     // Try Lovable AI first if available
     if (LOVABLE_API_KEY) {
@@ -156,11 +159,10 @@ Deno.serve(async (req) => {
           );
         }
       } else if (resp.status === 402 || resp.status === 429) {
-        // Fall through to Gemini direct fallback
-        console.log(`Lovable AI ${resp.status}, tentando fallback Gemini direto`);
-        if (!GEMINI_API_KEY) {
+        console.log(`Lovable AI ${resp.status}, tentando fallback`);
+        if (!hasFallback) {
           const msg = resp.status === 402
-            ? "Créditos Lovable AI esgotados. Configure GEMINI_API_KEY como fallback ou adicione saldo."
+            ? "Créditos Lovable AI esgotados. Configure GEMINI_API_KEY ou EMERGENT_API_KEY ou adicione saldo."
             : "Limite atingido. Tente novamente em instantes.";
           return new Response(
             JSON.stringify({ error: msg }),
@@ -170,8 +172,7 @@ Deno.serve(async (req) => {
       } else {
         const t = await resp.text();
         console.error("Gateway error", resp.status, t);
-        // Try fallback if available
-        if (!GEMINI_API_KEY) {
+        if (!hasFallback) {
           return new Response(
             JSON.stringify({ error: "Erro no gateway Lovable AI" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -180,18 +181,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fallback: Gemini direct
-    if (!GEMINI_API_KEY) {
+    // Fallback 1: Gemini direct
+    if (GEMINI_API_KEY) {
+      try {
+        const url = await callGeminiDirect(GEMINI_API_KEY, fullPrompt, images);
+        return new Response(
+          JSON.stringify({ imageUrl: url, provider: "gemini-direct" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      } catch (e) {
+        console.error("Gemini direct falhou:", e);
+        if (!EMERGENT_API_KEY) throw e;
+      }
+    }
+
+    // Fallback 2: Emergent
+    if (EMERGENT_API_KEY) {
+      const url = await callEmergent(EMERGENT_API_KEY, fullPrompt, images);
       return new Response(
-        JSON.stringify({ error: "Nenhuma API key configurada (LOVABLE_API_KEY ou GEMINI_API_KEY)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        JSON.stringify({ imageUrl: url, provider: "emergent" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const url = await callGeminiDirect(GEMINI_API_KEY, fullPrompt, images);
     return new Response(
-      JSON.stringify({ imageUrl: url, provider: "gemini-direct" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({ error: "Nenhuma API key configurada (LOVABLE/GEMINI/EMERGENT)" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
     console.error("image-combine error:", e);
