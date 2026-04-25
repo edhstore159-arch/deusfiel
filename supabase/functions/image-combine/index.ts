@@ -10,6 +10,35 @@ const corsHeaders = {
 };
 
 const GEMINI_MODEL = "gemini-2.5-flash-image";
+const EMERGENT_MODEL = "gemini-2.5-flash-image-preview";
+const EMERGENT_URL = "https://integrations.emergentagent.com/llm/v1/chat/completions";
+
+async function callEmergent(apiKey: string, fullPrompt: string, images: string[]): Promise<string> {
+  const content: any[] = [{ type: "text", text: fullPrompt }];
+  for (const img of images) {
+    content.push({ type: "image_url", image_url: { url: img } });
+  }
+  const resp = await fetch(EMERGENT_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: EMERGENT_MODEL,
+      messages: [{ role: "user", content }],
+      modalities: ["image", "text"],
+    }),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`Emergent error ${resp.status}: ${t.slice(0, 300)}`);
+  }
+  const data = await resp.json();
+  const url: string | undefined =
+    data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  if (url) return url;
+  const c = data?.choices?.[0]?.message?.content;
+  if (typeof c === "string" && c.startsWith("data:image")) return c;
+  throw new Error("Emergent: nenhuma imagem retornada");
+}
 
 function dataUrlToInline(dataUrl: string): { mime_type: string; data: string } {
   const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
