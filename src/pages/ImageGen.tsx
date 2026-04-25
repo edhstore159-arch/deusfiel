@@ -82,12 +82,15 @@ function downloadAsJpg(srcUrl: string) {
 }
 
 export default function ImageGen() {
-  // -------- Modo "Gerar" (text-to-image, grátis via Pollinations) --------
+  // -------- Modo "Gerar" (text-to-image) --------
+  // Por padrão usa AI (Lovable→Gemini→Emergent). Pollinations só como fallback grátis.
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("flux");
   const [sizeIdx, setSizeIdx] = useState(0);
   const [seed, setSeed] = useState("");
+  const [useAI, setUseAI] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [provider, setProvider] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
@@ -97,24 +100,36 @@ export default function ImageGen() {
     }
     setLoading(true);
     setImageUrl(null);
+    setProvider(null);
     try {
-      const size = SIZES[sizeIdx];
-      const usedSeed =
-        seed.trim() || Math.floor(Math.random() * 1_000_000).toString();
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-        prompt,
-      )}?width=${size.w}&height=${size.h}&model=${model}&seed=${usedSeed}&nologo=true`;
-
-      await new Promise<void>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error("Falha ao carregar"));
-        img.src = url;
-      });
-      setImageUrl(url);
-      toast.success("Imagem gerada!");
-    } catch {
-      toast.error("Não foi possível gerar a imagem.");
+      if (useAI) {
+        const { data, error } = await supabase.functions.invoke("image-generate", {
+          body: { prompt },
+        });
+        if (error) throw error;
+        if (!data?.imageUrl) throw new Error(data?.error || "Sem imagem na resposta");
+        setImageUrl(data.imageUrl);
+        setProvider(data.provider || null);
+        toast.success(`Imagem gerada! (${data.provider || "ai"})`);
+      } else {
+        const size = SIZES[sizeIdx];
+        const usedSeed =
+          seed.trim() || Math.floor(Math.random() * 1_000_000).toString();
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+          prompt,
+        )}?width=${size.w}&height=${size.h}&model=${model}&seed=${usedSeed}&nologo=true`;
+        await new Promise<void>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Falha ao carregar"));
+          img.src = url;
+        });
+        setImageUrl(url);
+        setProvider("pollinations");
+        toast.success("Imagem gerada!");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Não foi possível gerar a imagem.");
     } finally {
       setLoading(false);
     }
@@ -151,18 +166,17 @@ export default function ImageGen() {
     setEditing(true);
     setEditedUrl(null);
     try {
-      const { data, error } = await supabase.functions.invoke("image-edit-hf", {
+      const { data, error } = await supabase.functions.invoke("image-edit", {
         body: {
           imageDataUrl: sourceDataUrl,
           prompt: editPrompt,
           negativePrompt,
-          strength: 0.6,
         },
       });
       if (error) throw error;
       if (!data?.imageUrl) throw new Error(data?.error || "Sem imagem na resposta");
       setEditedUrl(data.imageUrl);
-      toast.success("Imagem editada!");
+      toast.success(`Imagem editada! (${data.provider || "ai"})`);
     } catch (e: any) {
       const msg = e?.message || "Falha na edição";
       toast.error(msg);
@@ -334,8 +348,26 @@ export default function ImageGen() {
                       value={seed}
                       onChange={(e) => setSeed(e.target.value)}
                       placeholder="Vazio = aleatório"
+                      disabled={useAI}
                     />
                   </div>
+
+                  <label className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={useAI}
+                      onChange={(e) => setUseAI(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <span>
+                      Usar AI (Lovable → Gemini → Emergent){" "}
+                      {provider && (
+                        <span className="text-xs text-muted-foreground">
+                          — último: {provider}
+                        </span>
+                      )}
+                    </span>
+                  </label>
 
                   <Button
                     onClick={handleGenerate}
