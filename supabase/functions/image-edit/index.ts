@@ -67,6 +67,7 @@ Deno.serve(async (req) => {
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY");
 
     const fullPrompt = negativePrompt && negativePrompt.trim()
       ? `${prompt}\n\nAvoid: ${negativePrompt}`
