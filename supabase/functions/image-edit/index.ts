@@ -9,11 +9,41 @@ const corsHeaders = {
 };
 
 const GEMINI_MODEL = "gemini-2.5-flash-image";
+const EMERGENT_MODEL = "gemini-2.5-flash-image-preview";
+const EMERGENT_URL = "https://integrations.emergentagent.com/llm/v1/chat/completions";
 
 function dataUrlToInline(dataUrl: string): { mime_type: string; data: string } {
   const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (m) return { mime_type: m[1], data: m[2] };
   return { mime_type: "image/jpeg", data: dataUrl };
+}
+
+async function callEmergent(apiKey: string, fullPrompt: string, images: string[]): Promise<string> {
+  const content: any[] = [{ type: "text", text: fullPrompt }];
+  for (const img of images) {
+    content.push({ type: "image_url", image_url: { url: img } });
+  }
+  const resp = await fetch(EMERGENT_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: EMERGENT_MODEL,
+      messages: [{ role: "user", content }],
+      modalities: ["image", "text"],
+    }),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`Emergent error ${resp.status}: ${t.slice(0, 300)}`);
+  }
+  const data = await resp.json();
+  const url: string | undefined =
+    data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  if (url) return url;
+  // Some responses embed base64 in content
+  const c = data?.choices?.[0]?.message?.content;
+  if (typeof c === "string" && c.startsWith("data:image")) return c;
+  throw new Error("Emergent: nenhuma imagem retornada");
 }
 
 async function callGeminiDirect(apiKey: string, fullPrompt: string, imageDataUrl: string): Promise<string> {
@@ -67,6 +97,7 @@ Deno.serve(async (req) => {
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY");
 
     const fullPrompt = negativePrompt && negativePrompt.trim()
       ? `${prompt}\n\nAvoid: ${negativePrompt}`
@@ -100,30 +131,43 @@ Deno.serve(async (req) => {
           return new Response(JSON.stringify({ imageUrl: editedUrl, provider: "lovable-ai" }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
-      } else if ((response.status === 402 || response.status === 429) && !GEMINI_API_KEY) {
+      } else if ((response.status === 402 || response.status === 429) && !GEMINI_API_KEY && !EMERGENT_API_KEY) {
         const msg = response.status === 402
-          ? "Créditos Lovable AI esgotados. Configure GEMINI_API_KEY ou adicione saldo."
+          ? "Créditos Lovable AI esgotados. Configure GEMINI_API_KEY ou EMERGENT_API_KEY ou adicione saldo."
           : "Limite atingido. Tente novamente em instantes.";
         return new Response(JSON.stringify({ error: msg }),
           { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       } else if (response.status !== 402 && response.status !== 429) {
         const t = await response.text();
         console.error("Gateway error:", response.status, t);
-        if (!GEMINI_API_KEY) {
+        if (!GEMINI_API_KEY && !EMERGENT_API_KEY) {
           return new Response(JSON.stringify({ error: "Erro no gateway de IA" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       }
     }
 
-    if (!GEMINI_API_KEY) {
-      return new Response(JSON.stringify({ error: "Nenhuma API key configurada" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Fallback 1: Gemini direct
+    if (GEMINI_API_KEY) {
+      try {
+        const editedUrl = await callGeminiDirect(GEMINI_API_KEY, fullPrompt, imageDataUrl);
+        return new Response(JSON.stringify({ imageUrl: editedUrl, provider: "gemini-direct" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        console.error("Gemini direct falhou:", e);
+        if (!EMERGENT_API_KEY) throw e;
+      }
     }
 
-    const editedUrl = await callGeminiDirect(GEMINI_API_KEY, fullPrompt, imageDataUrl);
-    return new Response(JSON.stringify({ imageUrl: editedUrl, provider: "gemini-direct" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Fallback 2: Emergent
+    if (EMERGENT_API_KEY) {
+      const editedUrl = await callEmergent(EMERGENT_API_KEY, fullPrompt, [imageDataUrl]);
+      return new Response(JSON.stringify({ imageUrl: editedUrl, provider: "emergent" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    return new Response(JSON.stringify({ error: "Nenhuma API key configurada (LOVABLE/GEMINI/EMERGENT)" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("image-edit error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }),
