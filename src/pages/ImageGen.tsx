@@ -82,12 +82,15 @@ function downloadAsJpg(srcUrl: string) {
 }
 
 export default function ImageGen() {
-  // -------- Modo "Gerar" (text-to-image, grátis via Pollinations) --------
+  // -------- Modo "Gerar" (text-to-image) --------
+  // Por padrão usa AI (Lovable→Gemini→Emergent). Pollinations só como fallback grátis.
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("flux");
   const [sizeIdx, setSizeIdx] = useState(0);
   const [seed, setSeed] = useState("");
+  const [useAI, setUseAI] = useState(true);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [provider, setProvider] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleGenerate = async () => {
@@ -97,24 +100,36 @@ export default function ImageGen() {
     }
     setLoading(true);
     setImageUrl(null);
+    setProvider(null);
     try {
-      const size = SIZES[sizeIdx];
-      const usedSeed =
-        seed.trim() || Math.floor(Math.random() * 1_000_000).toString();
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-        prompt,
-      )}?width=${size.w}&height=${size.h}&model=${model}&seed=${usedSeed}&nologo=true`;
-
-      await new Promise<void>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error("Falha ao carregar"));
-        img.src = url;
-      });
-      setImageUrl(url);
-      toast.success("Imagem gerada!");
-    } catch {
-      toast.error("Não foi possível gerar a imagem.");
+      if (useAI) {
+        const { data, error } = await supabase.functions.invoke("image-generate", {
+          body: { prompt },
+        });
+        if (error) throw error;
+        if (!data?.imageUrl) throw new Error(data?.error || "Sem imagem na resposta");
+        setImageUrl(data.imageUrl);
+        setProvider(data.provider || null);
+        toast.success(`Imagem gerada! (${data.provider || "ai"})`);
+      } else {
+        const size = SIZES[sizeIdx];
+        const usedSeed =
+          seed.trim() || Math.floor(Math.random() * 1_000_000).toString();
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+          prompt,
+        )}?width=${size.w}&height=${size.h}&model=${model}&seed=${usedSeed}&nologo=true`;
+        await new Promise<void>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Falha ao carregar"));
+          img.src = url;
+        });
+        setImageUrl(url);
+        setProvider("pollinations");
+        toast.success("Imagem gerada!");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Não foi possível gerar a imagem.");
     } finally {
       setLoading(false);
     }
