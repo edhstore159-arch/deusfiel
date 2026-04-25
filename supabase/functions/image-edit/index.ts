@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 const GEMINI_MODEL = "gemini-2.5-flash-image";
-const EMERGENT_MODEL = "gemini-2.5-flash-image-preview";
+const EMERGENT_MODEL = "gemini/gemini-2.5-flash-image";
 const EMERGENT_URL = "https://integrations.emergentagent.com/llm/v1/chat/completions";
 
 function dataUrlToInline(dataUrl: string): { mime_type: string; data: string } {
