@@ -166,18 +166,17 @@ export default function ImageGen() {
     setEditing(true);
     setEditedUrl(null);
     try {
-      const { data, error } = await supabase.functions.invoke("image-edit-hf", {
+      const { data, error } = await supabase.functions.invoke("image-edit", {
         body: {
           imageDataUrl: sourceDataUrl,
           prompt: editPrompt,
           negativePrompt,
-          strength: 0.6,
         },
       });
       if (error) throw error;
       if (!data?.imageUrl) throw new Error(data?.error || "Sem imagem na resposta");
       setEditedUrl(data.imageUrl);
-      toast.success("Imagem editada!");
+      toast.success(`Imagem editada! (${data.provider || "ai"})`);
     } catch (e: any) {
       const msg = e?.message || "Falha na edição";
       toast.error(msg);
