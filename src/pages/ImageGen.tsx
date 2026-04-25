@@ -677,13 +677,14 @@ export default function ImageGen() {
                         value={activeVariant}
                         onValueChange={(v) => setActiveVariant(v as SocialFormat["key"])}
                       >
-                        <TabsList className="grid w-full grid-cols-4">
+                        <TabsList className="grid w-full grid-cols-5">
                           {SOCIAL_FORMATS.map((f) => (
                             <TabsTrigger key={f.key} value={f.key} className="text-xs">
                               {f.key === "reels" && "Reels"}
-                              {f.key === "feed" && "Feed"}
                               {f.key === "story" && "Story"}
-                              {f.key === "landscape" && "FB"}
+                              {f.key === "feedVertical" && "FB 4:5"}
+                              {f.key === "feedSquare" && "1:1"}
+                              {f.key === "feedHorizontal" && "16:9"}
                             </TabsTrigger>
                           ))}
                         </TabsList>
