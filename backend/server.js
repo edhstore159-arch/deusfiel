@@ -483,7 +483,7 @@ function isNearDuplicateReply(reply, history) {
 function buildNonRepeatingFallback(userText, contactName = "cliente") {
   const firstName = String(contactName || "cliente").split(" ")[0] || "cliente";
   const txt = String(userText || "").toLowerCase();
-  if (userAskedTemporalInfo(txt)) return `Hoje é ${saoPauloTemporalContext().replace(/^.*referência\s+/i, "").replace(/,\s*America\/Sao_Paulo\..*$/i, ".")}`;
+  if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(txt)) {
     return `${firstName}, claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.`;
   }
@@ -516,6 +516,10 @@ function removeTemporalLeaks(reply, userText) {
 }
 
 async function callAI(messagesPayload, options = {}) {
+  if (userAskedTemporalInfo(options.userText)) {
+    return { ok: true, provider: "ollama-temporal", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: buildTemporalAnswer(), attempts: [] };
+  }
+
   const ollamaPrompt = messagesPayload
     .map((message) => {
       const role = message.role === "system" ? "Instruções" : message.role === "assistant" ? "Atendente" : "Cliente";
@@ -540,72 +544,7 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
   }
 
-  const providers = [
-    LOVABLE_API_KEY && {
-      provider: "lovable-gemini",
-      endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      model: AI_MODEL,
-      headers: { "Lovable-API-Key": LOVABLE_API_KEY, "Content-Type": "application/json" },
-    },
-    OPENAI_API_KEY && {
-      provider: "openai",
-      endpoint: `${OPENAI_BASE_URL.replace(/\/$/, "")}/chat/completions`,
-      model: OPENAI_MODEL,
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    },
-    EMERGENT_API_KEY && {
-      provider: "emergent",
-      endpoint: `${EMERGENT_BASE_URL.replace(/\/$/, "")}/chat/completions`,
-      model: EMERGENT_MODEL,
-      headers: { Authorization: `Bearer ${EMERGENT_API_KEY}`, "Content-Type": "application/json" },
-    },
-  ].filter(Boolean);
-
-  if (!providers.length) {
-    return { ok: false, error: "Ollama falhou e nenhuma chave alternativa de IA está configurada (OPENAI_API_KEY, EMERGENT_API_KEY ou LOVABLE_API_KEY).", attempts, ...attempts[attempts.length - 1] };
-  }
-
-  for (const cfg of providers) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
-    try {
-      const resp = await fetch(cfg.endpoint, {
-        method: "POST",
-        headers: cfg.headers,
-        signal: controller.signal,
-          body: JSON.stringify({
-            model: cfg.model,
-            messages: messagesPayload,
-            ...(typeof options.temperature === "number" ? { temperature: options.temperature } : {}),
-          }),
-      });
-      if (!resp.ok) {
-        const errText = await resp.text();
-        const failed = { ok: false, provider: cfg.provider, endpoint: cfg.endpoint, model: cfg.model, status: resp.status, error: errText.slice(0, 500) };
-        attempts.push(failed);
-        recordAutoReply({ step: "ai_provider_fail", provider: cfg.provider, status: resp.status, error: failed.error });
-        continue;
-      }
-      const data = await resp.json();
-      const reply = data?.choices?.[0]?.message?.content?.trim();
-      if (!reply) {
-        const failed = { ok: false, provider: cfg.provider, endpoint: cfg.endpoint, model: cfg.model, error: "Resposta vazia da IA.", raw: data };
-        attempts.push(failed);
-        recordAutoReply({ step: "ai_provider_fail", provider: cfg.provider, error: failed.error });
-        continue;
-      }
-      return { ok: true, provider: cfg.provider, endpoint: cfg.endpoint, model: cfg.model, reply: cleanRepeatedText(reply), attempts };
-    } catch (e) {
-      const timedOut = e?.name === "AbortError";
-      const failed = { ok: false, provider: cfg.provider, endpoint: cfg.endpoint, model: cfg.model, error: timedOut ? `Tempo esgotado após ${AI_REQUEST_TIMEOUT_MS}ms aguardando resposta da IA.` : e?.message || String(e) };
-      attempts.push(failed);
-      recordAutoReply({ step: "ai_provider_fail", provider: cfg.provider, error: failed.error });
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  return { ok: false, error: "Todos os provedores de IA configurados falharam.", attempts, ...attempts[attempts.length - 1] };
+  return { ok: false, error: "Ollama llama3.2:3b falhou e o chat não usa outro modelo de IA.", attempts, ...attempts[attempts.length - 1] };
 }
 
 async function generateCreativeImage(prompt) {
