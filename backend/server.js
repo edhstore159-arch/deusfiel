@@ -757,6 +757,31 @@ function buildResumeReply(history = [], name = "") {
   return `${prefix}claro, podemos retomar. Estávamos tratando de: "${snippet}". Quer continuar desse ponto ou ajustar algo?`;
 }
 
+function isThanksMessage(text) {
+  const value = String(text || "").trim().toLowerCase();
+  if (!value) return false;
+  if (value.split(/\s+/).length > 6) return false;
+  return /\b(obrigad[ao]s?|muito\s+obrigad[ao]s?|brigad[ao]s?|valeu|vlw|agrade[cç]o|grat[ao]s?|thanks?|thank\s*you|ty)\b/i.test(value);
+}
+
+function buildThanksReply(history = [], name = "") {
+  const replies = [
+    "Por nada! Fico feliz em ajudar. 😊",
+    "Imagina, estou aqui para isso!",
+    "De nada! Se precisar de mais alguma coisa é só me chamar.",
+  ];
+  const used = new Set(
+    history.filter((m) => m.role === "assistant").map((m) => String(m.content || "").trim())
+  );
+  const fresh = replies.find((r) => !used.has(r)) || replies[0];
+  const lastUser = [...history].reverse().find((m) => m.role === "user" && !isThanksMessage(String(m.content || "")));
+  const topicHint = lastUser
+    ? " Quer continuar de onde paramos ou tem outra dúvida?"
+    : " Quer me contar em que posso te ajudar?";
+  const prefix = name ? `${name}, ` : "";
+  return `${prefix}${fresh}${topicHint}`;
+}
+
 function isHistoryDumpReply(text) {
   return /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 }
