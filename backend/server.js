@@ -146,7 +146,7 @@ async function callOllamaModel(modelName, texto) {
         stream: false,
         think: false,
         keep_alive: OLLAMA_KEEP_ALIVE,
-        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 1024, temperature: 0.1 },
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 280, temperature: 0.1 },
       }),
     });
     const raw = await resposta.text();
@@ -1469,7 +1469,7 @@ app.post("/api/generate", async (req, res) => {
         think: false,
         keep_alive: OLLAMA_KEEP_ALIVE,
         system: OLLAMA_SYSTEM_PROMPT,
-        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 1024, temperature: 0.1 },
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 280, temperature: 0.1 },
         ...(req.body || {}),
         model: modelName,
       };
