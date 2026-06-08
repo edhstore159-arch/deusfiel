@@ -18,8 +18,6 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const TWILIO_API_KEY = Deno.env.get("TWILIO_API_KEY")!;
 const AUDIO_BUCKET = "debug-uploads"; // bucket público
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 function getSaoPauloHour() {
   const parts = new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
@@ -206,7 +204,6 @@ Deno.serve(async (req) => {
     }
 
     const { reply, audio_base64 } = await callChatAI(userText, from.replace(/[^\d+]/g, ""), inboundWasAudio);
-    await sleep(1000 + Math.floor(Math.random() * 2000));
     let mediaUrl: string | null = null;
     if (inboundWasAudio && audio_base64) {
       mediaUrl = await uploadAudioPublic(audio_base64);
