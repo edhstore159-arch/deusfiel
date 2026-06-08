@@ -1068,7 +1068,7 @@ app.post("/api/generate", async (req, res) => {
     };
     const upstream = await fetch(OLLAMA_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -1210,7 +1210,8 @@ app.get("/api/whatsapp/ollama-status", async (_req, res) => {
     ...status,
     keep_alive: OLLAMA_KEEP_ALIVE,
     health_interval_ms: OLLAMA_HEALTH_INTERVAL_MS,
-    hint: status.ok ? null : "Se aparecer 404/HTML/ngrok, abra um novo túnel para a porta 11434 e atualize OLLAMA_URL no backend publicado.",
+      probe_timeout_ms: OLLAMA_PROBE_TIMEOUT_MS,
+      hint: status.ok ? null : "O /api/tags pode responder mesmo quando /api/generate trava. Reinicie o Ollama/modelo local, confirme `ollama run qwen3:8b` no servidor do túnel e mantenha o ngrok apontando para a porta 11434.",
   });
 });
 
