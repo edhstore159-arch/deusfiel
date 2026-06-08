@@ -1226,7 +1226,7 @@ app.get("/api/whatsapp/ollama-status", async (_req, res) => {
     keep_alive: OLLAMA_KEEP_ALIVE,
     health_interval_ms: OLLAMA_HEALTH_INTERVAL_MS,
       probe_timeout_ms: OLLAMA_PROBE_TIMEOUT_MS,
-      hint: status.ok ? null : "O /api/tags pode responder mesmo quando /api/generate trava. Reinicie o Ollama/modelo local, confirme `ollama run qwen3:8b` no servidor do túnel e mantenha o ngrok apontando para a porta 11434.",
+      hint: status.ok ? null : `O /api/tags pode responder mesmo quando /api/generate trava. Reinicie o Ollama/modelo local, confirme \`ollama run ${OLLAMA_MODEL}\` no servidor do túnel e mantenha o ngrok apontando para a porta 11434.`,
   });
 });
 
