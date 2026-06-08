@@ -763,7 +763,7 @@ const staticPost = (url, body = {}) => {
         }
         if (!text) throw lastErr || new Error("Ollama indisponível");
 
-        const responseText = isNearDuplicateReply(text, body.history || [])
+        const responseText = isHistoryDumpReply(text) || isNearDuplicateReply(text, body.history || [])
           ? buildNonRepeatingFallback(userText)
           : cleanInternalChatMarkers(text);
         return response({
