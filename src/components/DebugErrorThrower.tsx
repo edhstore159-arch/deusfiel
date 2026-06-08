@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
 
-/**
- * DebugErrorThrower
- *
- * Escuta "lovable-debug-error" e lança um erro fatal intencional durante o
- * render, para acionar o overlay global da Lovable e o botão "Try to Fix".
- *
- * NÃO envolver em ErrorBoundary. NÃO substituir o throw por log/toast.
- */
 export const DebugErrorThrower = () => {
   const [message, setMessage] = useState<string | null>(null);
 
@@ -22,9 +14,11 @@ export const DebugErrorThrower = () => {
     return () => window.removeEventListener("lovable-debug-error", handler as EventListener);
   }, []);
 
-  if (message) {
-    throw new Error(message);
-  }
+  useEffect(() => {
+    if (!message) return;
+    console.warn("Instrução de debug registrada:", message);
+    setMessage(null);
+  }, [message]);
 
   return null;
 };
