@@ -911,7 +911,7 @@ async function autoReply(jid, userText, contactName) {
     recordAutoReply({ step: "skip_socket", jid, connectionState });
     return;
   }
-  const history = aiHistory.get(jid) || [];
+  const history = await loadPersistedAiHistory(jid);
   const lastReplies = recentAssistantReplies(history);
   const antiRepetitionContext = lastReplies.length
     ? `\nANTI-REPETIÇÃO OPERACIONAL:\nÚltimas respostas enviadas:\n${lastReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\nNão repita nenhuma delas; avance a conversa respondendo à última mensagem do cliente.`
@@ -941,7 +941,8 @@ async function autoReply(jid, userText, contactName) {
   if (usedFallback) recordAutoReply({ step: "ai_fail_local_fallback", jid, result, reply: reply.slice(0, 200) });
   history.push({ role: "user", content: userText });
   history.push({ role: "assistant", content: reply });
-  aiHistory.set(jid, history);
+  aiHistory.set(jid, trimAiHistory(history));
+  persistAiTurn(jid, userText, reply).catch(() => {});
   try {
     const sent = await sendBotText(jid, reply, { source: usedFallback ? "local_fallback" : result.provider });
     recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: usedFallback ? "local_fallback" : result.provider, model: result.model || null, reply: reply.slice(0, 200) });
