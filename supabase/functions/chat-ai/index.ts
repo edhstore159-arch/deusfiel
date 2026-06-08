@@ -690,12 +690,14 @@ CONTEXTO TEMPORAL INTERNO (fuso America/Sao_Paulo):
 - Saudação adequada agora: "${saudacao}"
 
 REGRA OBRIGATÓRIA SOBRE DATA, DIA DA SEMANA E HORA:
-- Se o cliente perguntar "que dia da semana é hoje?", "hoje é sábado?", "é domingo?", "é segunda?" etc., RESPONDA usando EXATAMENTE o valor de "DIA DA SEMANA HOJE" acima (${weekdaySp}). Confirme ou corrija o cliente com base nesse valor — nunca chute.
-- Se o cliente perguntar a data ou "que dia é hoje", responda com "${dateOnlySp} (${weekdaySp})".
-- Se o cliente perguntar a hora, responda "${fmtTime}".
-- Nunca diga que não sabe a data, o dia da semana ou a hora, e nunca invente outro valor.
+- GATILHOS (qualquer variação, com ou sem acento, erros de digitação, gírias): "que dia é hoje", "qdia é hj", "que dia da semana", "hj é sábado?", "é domingo?", "é segunda/terça/quarta/quinta/sexta?", "qual a data", "data de hoje", "dia de hoje", "que mês", "que ano", "estamos em que dia", "que horas são", "qhoras", "ke horas", "tá que horas", "me diz a hora", "hora agora", "horário", "horas", "tempo agora", "data e hora", "dia e hora", "me mostra a data", "me fala o dia", "me diga o horário", "today", "hoje", "agora". Trate sinônimos e gírias como equivalentes — sempre responda com os valores reais abaixo.
+- Se o cliente perguntar pelo DIA DA SEMANA (ou afirmar um errado), responda usando EXATAMENTE: ${weekdaySp}. Confirme ou corrija o cliente — nunca chute.
+- Se o cliente perguntar pela DATA, dia, mês ou ano, responda com: "${dateOnlySp} (${weekdaySp})".
+- Se o cliente perguntar pela HORA, horário, "que horas", responda com: "${fmtTime}".
+- Se o cliente pedir DATA E HORA juntas (ou "dia e hora", "data, dia e hora"), responda com: "Hoje é ${weekdaySp}, ${dateOnlySp}, e agora são ${fmtTime}".
+- Nunca diga que não sabe, nunca peça para o cliente consultar relógio/calendário, nunca invente outro valor.
 - Se o cliente NÃO perguntar, não mencione data nem hora.
-- Para "hoje", "amanhã", "próxima sexta" em agendamentos, calcule a partir da referência acima.
+- Para "hoje", "amanhã", "depois de amanhã", "semana que vem", "próxima sexta" em agendamentos, calcule a partir da referência acima.
 
 VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 1. Leia a pergunta completa do cliente (última mensagem + contexto).
