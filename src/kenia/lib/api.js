@@ -36,10 +36,14 @@ Ao iniciar qualquer conversa, cumprimente assim:
 - Sugerir estratégias jurídicas de forma educativa.
 - Nunca substituir a atuação de um advogado habilitado.
 
-## RACIOCÍNIO JURÍDICO E CONTROLE DO OLLAMA
-Use raciocínio jurídico internamente, mas nunca mostre bastidores. Antes de responder, avalie: área do Direito, fatos relevantes, partes envolvidas, objetivo do cliente, base legal aplicável, riscos, documentos necessários e próximos passos.
-Se faltar informação essencial, faça perguntas complementares objetivas antes de concluir.
-Nunca exponha tags <think>, listas de etapas internas, frases como "vou analisar", "preciso raciocinar", "the user" ou qualquer raciocínio em voz alta. A resposta enviada ao cliente deve ser apenas a resposta final, como assistente virtual jurídica.
+## MÉTODO DE RACIOCÍNIO (obrigatório — execute internamente antes de responder)
+Etapa 1 — Identificar o problema: área do Direito, fatos relevantes, partes envolvidas, objetivo do usuário.
+Etapa 2 — Levantar a base legal: Constituição Federal, códigos aplicáveis, leis especiais, jurisprudência, súmulas e precedentes.
+Etapa 3 — Analisar juridicamente: direitos, obrigações, riscos, interpretações possíveis.
+Etapa 4 — Concluir: resposta objetiva, fundamentação e próximos passos.
+Etapa 5 — Grau de confiança: alta / média / baixa.
+Se faltar informação, faça perguntas complementares ANTES de concluir.
+Nunca exponha as etapas internas, tags <think> ou raciocínio em voz alta — envie apenas a resposta final pronta.
 
 ## FORMATO DA RESPOSTA (use sempre que houver uma dúvida jurídica)
 **Resumo:** resposta direta.
@@ -81,23 +85,10 @@ const cleanInternalChatMarkers = (text) =>
     .replace(/`{1,3}\s*HANDOFF[_\s-]*K[EÊ]NIA\s*`{1,3}/giu, "")
     .trim();
 
-const isThinkingLeak = (text) =>
-  /^(okay|ok,|let'?s|the user|the client|first,|i need|i should|we need|so i|wait,|vou analisar|preciso raciocinar|racioc[ií]nio|pensamento|an[aá]lise interna)\b/i.test(String(text || "").trim()) ||
-  /\b(i need to|i should|let me|the client|the user|brazilian labor laws|legal question|severance pay)\b/i.test(String(text || ""));
-
 const sanitizeOllamaReply = (reply, userMessage = "") => {
-  const raw = cleanInternalChatMarkers(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
-  const finalOnly = raw.match(/(?:resposta\s+final|resposta\s+ao\s+cliente|resposta)\s*[:\-]\s*([\s\S]+)$/iu)?.[1] || raw;
-  const text = finalOnly
-    .replace(/^(?:[\s\S]{0,1800}?)(?:resposta\s+final|resposta\s+ao\s+cliente)\s*[:\-]\s*/iu, "")
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter((line) => !/^(etapa\s*\d+|passo\s*\d+|an[aá]lise interna|racioc[ií]nio|pensamento|thinking|the user|i need|i should|vou analisar|preciso raciocinar)\b/i.test(line))
-    .join("\n")
-    .trim();
+  const text = cleanInternalChatMarkers(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
   if (/Tudo bem\?\s*Sou a assistente virtual da Dra\.\s*K[êe]nia Garcia/i.test(text)) return OFFICIAL_GREETING;
-  if (isThinkingLeak(text)) return "";
-  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso|racioc[ií]nio|pensamento|an[aá]lise interna)/i.test(text);
+  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso)/i.test(text);
   const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userMessage || "").trim());
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
   return text;
@@ -139,9 +130,6 @@ const isNearDuplicateReply = (reply, history = []) => {
 
 const buildNonRepeatingFallback = (message) => {
   const text = String(message || "").toLowerCase();
-  if (/\b(demitid|demiss[aã]o|rescis[aã]o|verbas rescis[oó]rias|fgts|seguro-desemprego|trabalhista)\b/i.test(text)) {
-    return "Entendi. Em demissão sem justa causa, normalmente é preciso conferir saldo de salário, aviso-prévio, férias vencidas/proporcionais com 1/3, 13º proporcional, multa de 40% do FGTS e guias de saque/seguro-desemprego, se cabíveis. Me informe a data da demissão, tempo de trabalho, último salário e se houve justa causa para direcionar a análise inicial. Esta resposta possui caráter informativo e não substitui a consulta com advogado regularmente inscrito na OAB. A análise final deve ser feita pela Dra. Kênia Garcia.";
-  }
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
@@ -522,7 +510,7 @@ const staticPost = (url, body = {}) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
-          body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, prompt: `/no_think\n${prompt}`, stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 420, temperature: 0.2 } }),
+          body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, prompt: `/no_think\n${prompt}`, stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 180, temperature: 0.2 } }),
         }).finally(() => clearTimeout(timeout));
         if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
         const raw = await res.text();

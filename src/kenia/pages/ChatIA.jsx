@@ -961,7 +961,7 @@ export default function ChatIA() {
                   <div className="flex justify-start">
                     <div className="bg-white border border-nude-200 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-2 text-sm text-nude-500">
                       <Loader2 className="w-4 h-4 animate-spin text-gold-600" />
-                      Assistente virtual está digitando…
+                      Ana está digitando…
                     </div>
                   </div>
                 )}
@@ -1124,7 +1124,7 @@ export default function ChatIA() {
               <div className="p-5 space-y-5">
                 {!analysis ? (
                   <div className="text-sm text-nude-500 text-center py-10">
-                    A análise aparecerá aqui assim que a assistente virtual receber os primeiros detalhes do seu caso.
+                    A análise aparecerá aqui assim que a Dra. Ana ouvir os primeiros detalhes do seu caso.
                   </div>
                 ) : (
                   <>

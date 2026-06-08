@@ -399,7 +399,7 @@ export default function AdminCases() {
                             }`}
                           >
                             <div className="font-semibold text-[10px] uppercase tracking-widest mb-1 opacity-70">
-                              {m.role === "user" ? "Cliente" : "Assistente virtual"}
+                              {m.role === "user" ? "Cliente" : "Dra. Ana"}
                             </div>
                             <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
                           </div>
