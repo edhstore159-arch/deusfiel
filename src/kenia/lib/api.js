@@ -9,6 +9,7 @@ const DIRECT_OLLAMA_URL = (
   "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate"
 ).replace(/\/$/, "");
 const DIRECT_OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "qwen3:4b";
+const DIRECT_OLLAMA_FALLBACK_MODEL = import.meta.env.VITE_OLLAMA_FALLBACK_MODEL || "llama3.2:3b";
 
 
 const nowIso = () => new Date().toISOString();
