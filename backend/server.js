@@ -135,6 +135,7 @@ export async function perguntarIA(texto) {
         signal: controller.signal,
         body: JSON.stringify({
           model: OLLAMA_MODEL,
+          system: "Você é um assistente jurídico brasileiro. Responda SEMPRE em português do Brasil. Nunca use inglês.",
           prompt: texto,
           stream: false,
           think: false,
