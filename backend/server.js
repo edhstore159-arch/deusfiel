@@ -812,7 +812,12 @@ function isResumeRequest(text) {
 }
 
 function buildResumeReply(history = [], name = "") {
-  const lastUser = [...history].reverse().find((m) => m.role === "user" && String(m.content || "").trim());
+  const lastUser = [...history].reverse().find((m) =>
+    m.role === "user" &&
+    String(m.content || "").trim() &&
+    !isThanksMessage(m.content) &&
+    !isResumeRequest(m.content)
+  );
   const raw = String(lastUser?.content || "").replace(/\s+/g, " ").trim();
   const prefix = name ? `${name}, ` : "";
   if (!raw) {
@@ -821,6 +826,7 @@ function buildResumeReply(history = [], name = "") {
   const snippet = raw.length > 120 ? raw.slice(0, 117).trim() + "..." : raw;
   return `${prefix}claro, podemos retomar. Estávamos tratando de: "${snippet}". Quer continuar desse ponto ou ajustar algo?`;
 }
+
 
 function isThanksMessage(text) {
   const value = String(text || "").trim().toLowerCase();
