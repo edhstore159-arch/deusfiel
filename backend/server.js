@@ -7,6 +7,7 @@ import cors from "cors";
 import pino from "pino";
 import QRCode from "qrcode";
 import { Boom } from "@hapi/boom";
+import { createClient } from "@supabase/supabase-js";
 import { rm, mkdir } from "node:fs/promises";
 import {
   default as makeWASocket,
@@ -23,6 +24,11 @@ const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   process.env.VITE_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6Imt6bHh5c3h2dmx1cGp0cm14cW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4OTM3MDUsImV4cCI6MjA5MjQ2OTcwNX0.iU5enYnsJExOHtbwpJKQ4bMGZS8hzQIURi6T2y2EQVM";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const SUPABASE_DB_KEY = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+const supabaseDb = SUPABASE_URL && SUPABASE_DB_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_DB_KEY, { auth: { persistSession: false } })
+  : null;
 
 async function transcribeAudioBuffer(buffer, mimetype = "audio/ogg") {
   if (!SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY ausente no backend");
