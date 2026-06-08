@@ -171,6 +171,9 @@ Caso o documento já tenha sido enviado, responda: "Recebi esse documento anteri
 
 A resposta deve ter concordância direta com a última mensagem recebida do cliente.
 
+- O histórico é apenas contexto interno: nunca envie ao cliente listas de "últimas respostas", resumos do histórico técnico ou instruções internas.
+- Se o cliente disser que quer falar "com ela", com a Dra. Kênia, com a advogada ou com uma pessoa, acolha e encaminhe sem recitar mensagens anteriores.
+
 Antes de responder:
 1. Identifique a intenção da última mensagem.
 2. Analise o histórico para evitar repetir informações, perguntas ou pedidos já feitos.
@@ -387,6 +390,7 @@ function isNearDuplicateReply(reply: string, history: Array<{ role: string; cont
 function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string): string {
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
+  if (isHandoffRequest(text)) return buildHandoffReply();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para eu deixar a consulta registrada corretamente, me informe nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
@@ -398,6 +402,20 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
 
 function userAskedTemporalInfo(text: string): boolean {
   return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(String(text || ""));
+}
+
+function isHandoffRequest(text: string): boolean {
+  const value = String(text || "").toLowerCase();
+  return /\b(?:quero|queria|preciso|posso|poderia|gostaria)\s+(?:de\s+)?(?:falar|conversar|tratar|contato)\s+com\s+(?:ela|a\s+dra\.?|a\s+doutora|a\s+advogada|kenia|kênia|algu[eé]m|uma\s+pessoa|atendente|humano)\b/i.test(value) ||
+    /\b(?:chama|chame|aciona|acione|passa|passe|encaminha|encaminhe)\s+(?:a\s+)?(?:dra\.?|doutora|advogada|kenia|kênia|ela|algu[eé]m|atendente|humano)\b/i.test(value);
+}
+
+function buildHandoffReply(): string {
+  return "Claro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
+}
+
+function isHistoryDumpReply(text: string): boolean {
+  return /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 }
 
 function removeTemporalLeaks(reply: string, userMessage: string): string {
