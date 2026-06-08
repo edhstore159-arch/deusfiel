@@ -323,7 +323,7 @@ const DEFAULT_PROMPT = SECRETARIA_JURIDICA_PROMPT;
 function stripAppointmentBlock(text: string): string {
   return String(text || "")
     .replace(/<AGENDAMENTO>[\s\S]*?<\/AGENDAMENTO>/g, "")
-    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>/giu, "")
+    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>?/giu, "")
     .replace(/`{1,3}\s*HANDOFF[_\s-]*K[EÊ]NIA\s*`{1,3}/giu, "")
     .trim();
 }
