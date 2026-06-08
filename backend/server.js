@@ -55,8 +55,8 @@ const normalizeOllamaBaseUrl = (value) => {
 const OLLAMA_BASE_URL = normalizeOllamaBaseUrl(OLLAMA_RAW_URL);
 const OLLAMA_URL = `${OLLAMA_BASE_URL}/api/generate`;
 const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen3:4b";
-const OLLAMA_FALLBACK_MODEL = process.env.OLLAMA_FALLBACK_MODEL || "llama3.2:3b";
+const OLLAMA_MODEL = "llama3.2:3b";
+const OLLAMA_FALLBACK_MODEL = "";
 const OLLAMA_REQUEST_RETRIES = Number(process.env.OLLAMA_REQUEST_RETRIES || 0);
 const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 90000);
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
@@ -388,6 +388,7 @@ const buildOllamaPrompt = (prompt) => `/no_think
 ${OLLAMA_SYSTEM_PROMPT}
 
 INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
+Se o cliente pedir data, dia da semana ou hora atual, use obrigatoriamente este contexto: ${saoPauloTemporalContext()}
 
 ${prompt}
 
@@ -492,8 +493,15 @@ function buildNonRepeatingFallback(userText, contactName = "cliente") {
   return `${firstName}, entendi. Para eu avançar no atendimento, me conte em uma frase o que aconteceu e qual orientação você precisa agora.`;
 }
 
+function buildTemporalAnswer() {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const time = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(now);
+  return `Hoje é ${date}, e agora são ${time}.`;
+}
+
 function userAskedTemporalInfo(text) {
-  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|data\s+de\s+hoje|que\s+dia\s+(?:é|estamos)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana)\b/i.test(String(text || ""));
+  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano))\b/i.test(String(text || ""));
 }
 
 function removeTemporalLeaks(reply, userText) {
