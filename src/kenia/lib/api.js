@@ -331,7 +331,7 @@ const isHandoffRequest = (text) => {
 };
 
 const buildHandoffReply = () =>
-  "Claro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
+  "HANDOFF_KENIA\nClaro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
 
 const isHistoryDumpReply = (text) =>
   /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
