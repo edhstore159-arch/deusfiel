@@ -490,16 +490,19 @@ const staticPost = (url, body = {}) => {
         const prompt = `${system}\n\n${history}\nCliente: ${body.message || body.text || ""}\nKênia:`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
+        const timeout = setTimeout(() => controller.abort(), 45000);
         const res = await fetch(OLLAMA_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
           signal: controller.signal,
-          body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false, keep_alive: "10m", options: { num_predict: 220, temperature: 0.2 } }),
+          body: JSON.stringify({ model: OLLAMA_MODEL, prompt: `/no_think\n${prompt}`, stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 180, temperature: 0.2 } }),
         }).finally(() => clearTimeout(timeout));
         if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
-        const data = await res.json();
-        const text = (data?.response || "").trim() || "Sem resposta da IA.";
+        const raw = await res.text();
+        const data = JSON.parse(raw || "{}");
+        if (data?.fallback || data?.error) throw new Error(data.error || "Ollama indisponível");
+        const text = (data?.response || "").trim();
+        if (!text) throw new Error("Ollama retornou resposta vazia");
         const responseText = isNearDuplicateReply(text, body.history || [])
           ? buildNonRepeatingFallback(body.message || body.text || "")
           : cleanInternalChatMarkers(text);
