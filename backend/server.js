@@ -318,7 +318,7 @@ const appendMessage = (jid, msg) => {
   messagesStore.set(jid, list);
 };
 
-// ---- Atendente automático com IA (Gemini via Lovable AI Gateway primeiro; outras chaves como fallback) ----
+// ---- Atendente automático com IA local (Ollama obrigatório, sem fallback) ----
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
