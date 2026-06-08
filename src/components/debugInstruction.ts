@@ -1,9 +1,5 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
-export const shouldSuppressLovableDebugInstruction = (_message: string) => true;
-
-export const isLovableNativeDebugRuntime = () => false;
-
 /**
  * Dispara o evento "lovable-debug-error" para que o DebugErrorThrower
  * lance um erro fatal de runtime intencional, acionando o overlay global
@@ -13,7 +9,6 @@ export const isLovableNativeDebugRuntime = () => false;
  */
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined") return false;
-  if (shouldSuppressLovableDebugInstruction(message) || !isLovableNativeDebugRuntime()) return false;
   window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
   return true;
 };
@@ -21,6 +16,7 @@ export const dispatchLovableDebugError = (message: string) => {
 export const deliverLovableDebugInstruction = (message: string) => {
   return dispatchLovableDebugError(message) ? ("dispatched" as const) : ("skipped" as const);
 };
+
 
 export type DebugAttachment = {
   name: string;
