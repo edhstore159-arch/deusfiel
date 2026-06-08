@@ -321,14 +321,10 @@ Ao iniciar qualquer conversa, cumprimente assim:
 - Sugerir estratégias jurídicas de forma educativa.
 - Nunca substituir a atuação de um advogado habilitado.
 
-## MÉTODO DE RACIOCÍNIO (obrigatório — execute internamente antes de responder)
-Etapa 1 — Identificar o problema: área do Direito, fatos relevantes, partes envolvidas, objetivo do usuário.
-Etapa 2 — Levantar a base legal: Constituição Federal, códigos aplicáveis, leis especiais, jurisprudência, súmulas e precedentes.
-Etapa 3 — Analisar juridicamente: direitos, obrigações, riscos, interpretações possíveis.
-Etapa 4 — Concluir: resposta objetiva, fundamentação e próximos passos.
-Etapa 5 — Grau de confiança: alta / média / baixa.
-Se faltar informação, faça perguntas complementares ANTES de concluir.
-Nunca exponha as etapas internas, tags <think> ou raciocínio em voz alta — envie apenas a resposta final pronta.
+## RACIOCÍNIO JURÍDICO E CONTROLE DO OLLAMA
+Use raciocínio jurídico internamente, mas nunca mostre bastidores. Antes de responder, avalie: área do Direito, fatos relevantes, partes envolvidas, objetivo do cliente, base legal aplicável, riscos, documentos necessários e próximos passos.
+Se faltar informação essencial, faça perguntas complementares objetivas antes de concluir.
+Nunca exponha tags <think>, listas de etapas internas, frases como "vou analisar", "preciso raciocinar", "the user" ou qualquer raciocínio em voz alta. A resposta enviada ao cliente deve ser apenas a resposta final, como assistente virtual jurídica.
 
 ## FORMATO DA RESPOSTA (use sempre que houver dúvida jurídica)
 **Resumo:** resposta direta.
@@ -397,9 +393,16 @@ function cleanRepeatedText(text) {
 }
 
 function sanitizeOllamaReply(reply, userText = "") {
-  const text = cleanRepeatedText(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  const text = cleanRepeatedText(reply)
+    .replace(/<think>[\s\S]*?<\/think>/giu, "")
+    .replace(/^(?:[\s\S]{0,1800}?)(?:resposta\s+final|resposta\s+ao\s+cliente)\s*[:\-]\s*/iu, "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => !/^(etapa\s*\d+|passo\s*\d+|an[aá]lise interna|racioc[ií]nio|pensamento|thinking|the user|i need|i should|vou analisar|preciso raciocinar)\b/i.test(line))
+    .join("\n")
+    .trim();
   if (/Tudo bem\?\s*Sou a assistente virtual da Dra\.\s*K[êe]nia Garcia/i.test(text)) return OFFICIAL_GREETING;
-  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso)/i.test(text);
+  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso|racioc[ií]nio|pensamento|an[aá]lise interna)/i.test(text);
   const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userText || "").trim());
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
   return text;

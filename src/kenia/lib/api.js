@@ -82,9 +82,16 @@ const cleanInternalChatMarkers = (text) =>
     .trim();
 
 const sanitizeOllamaReply = (reply, userMessage = "") => {
-  const text = cleanInternalChatMarkers(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  const text = cleanInternalChatMarkers(reply)
+    .replace(/<think>[\s\S]*?<\/think>/giu, "")
+    .replace(/^(?:[\s\S]{0,1800}?)(?:resposta\s+final|resposta\s+ao\s+cliente)\s*[:\-]\s*/iu, "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => !/^(etapa\s*\d+|passo\s*\d+|an[aá]lise interna|racioc[ií]nio|pensamento|thinking|the user|i need|i should|vou analisar|preciso raciocinar)\b/i.test(line))
+    .join("\n")
+    .trim();
   if (/Tudo bem\?\s*Sou a assistente virtual da Dra\.\s*K[êe]nia Garcia/i.test(text)) return OFFICIAL_GREETING;
-  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso)/i.test(text);
+  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso|racioc[ií]nio|pensamento|an[aá]lise interna)/i.test(text);
   const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userMessage || "").trim());
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
   return text;
