@@ -9,6 +9,8 @@ export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE 
  */
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined") return false;
+  const allowFatalDebug = new URLSearchParams(window.location.search).get("lovableFatalDebug") === "1";
+  if (!allowFatalDebug) return false;
   window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
   return true;
 };
