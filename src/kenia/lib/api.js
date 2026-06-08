@@ -789,6 +789,18 @@ const staticPost = (url, body = {}) => {
             server_time: new Date().toISOString(),
           });
         }
+        if (isThanksMessage(userText)) {
+          return response({
+            session_id: sessionId,
+            response: cleanInternalChatMarkers(buildThanksReply(body.history || [])),
+            audio_base64: null,
+            appointment: null,
+            handoff: false,
+            speaker: null,
+            analysis: { acertividade: 100, qualificacao: "ok" },
+            server_time: new Date().toISOString(),
+          });
+        }
         if (isHandoffRequest(userText)) {
           return response({
             session_id: sessionId,
