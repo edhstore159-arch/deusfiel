@@ -231,6 +231,7 @@ const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS || 60000);
 const KEEP_ALIVE_INTERVAL_MS = Number(process.env.KEEP_ALIVE_INTERVAL_MS || 20000);
 const RECONNECT_DELAY_MS = Number(process.env.RECONNECT_DELAY_MS || 2000);
 const RECONNECT_MAX_DELAY_MS = Number(process.env.RECONNECT_MAX_DELAY_MS || 60000);
+const AUTH_RESET_GRACE_MS = Number(process.env.AUTH_RESET_GRACE_MS || 10 * 60 * 1000);
 const SERVER_STARTED_AT = Date.now();
 const AUTO_REPLY_RECENT_WINDOW_MS = Number(process.env.AUTO_REPLY_RECENT_WINDOW_MS || 180000);
 const logger = pino({ level: "warn" });
@@ -1042,10 +1043,14 @@ async function startSock() {
       lastError = lastDisconnect?.error?.message || null;
       lastDisconnectCode = code || null;
       const loggedOut = code === DisconnectReason.loggedOut;
+      const badSession = code === DisconnectReason.badSession;
+      const forbidden = code === DisconnectReason.forbidden;
+      const multiDeviceMismatch = code === DisconnectReason.multideviceMismatch;
       const replaced = code === DisconnectReason.connectionReplaced;
-      const transientLoggedOut = loggedOut && !manualLogoutRequested && lastOpenAt && Date.now() - lastOpenAt < 30000;
-      const needsFreshPairing = loggedOut && !manualLogoutRequested && !transientLoggedOut;
-      const shouldReconnect = !manualLogoutRequested && (!loggedOut || transientLoggedOut || needsFreshPairing);
+      const authInvalid = loggedOut || badSession || forbidden || multiDeviceMismatch;
+      const canRetrySavedSession = authInvalid && !manualLogoutRequested && lastOpenAt && Date.now() - lastOpenAt < AUTH_RESET_GRACE_MS;
+      const needsFreshPairing = authInvalid && !manualLogoutRequested && !canRetrySavedSession;
+      const shouldReconnect = !manualLogoutRequested && (!authInvalid || canRetrySavedSession || needsFreshPairing);
       reconnectAttempts = shouldReconnect ? reconnectAttempts + 1 : 0;
       if (shouldReconnect && !reconnectingSince) reconnectingSince = Date.now();
       const backoff = Math.min(RECONNECT_DELAY_MS * Math.max(1, reconnectAttempts), RECONNECT_MAX_DELAY_MS);
@@ -1518,8 +1523,8 @@ app.post("/api/whatsapp/test-connection", (_req, res) => {
 // ---- QR Code ----
 app.get("/api/whatsapp/baileys/qr", async (_req, res) => {
   let status = baileysRuntimeStatus();
-  if (!status.connected && (!currentQR || (currentQRAt && Date.now() - currentQRAt > QR_RENEW_AFTER_MS))) {
-    status = await ensureQrReady({ forceRenew: true });
+  if (!status.connected && (!currentQR || (currentQRAt && Date.now() - currentQRAt > QR_TIMEOUT_MS))) {
+    status = await ensureQrReady({ forceRenew: false });
   }
   const qr = currentQR ? await QRCode.toDataURL(currentQR, { width: 320, margin: 2 }) : null;
   res.json({ qr, raw: currentQR, ...status });
@@ -1527,8 +1532,8 @@ app.get("/api/whatsapp/baileys/qr", async (_req, res) => {
 
 app.get("/api/whatsapp/qr", async (_req, res) => {
   let status = baileysRuntimeStatus();
-  if (!status.connected && (!currentQR || (currentQRAt && Date.now() - currentQRAt > QR_RENEW_AFTER_MS))) {
-    status = await ensureQrReady({ forceRenew: true });
+  if (!status.connected && (!currentQR || (currentQRAt && Date.now() - currentQRAt > QR_TIMEOUT_MS))) {
+    status = await ensureQrReady({ forceRenew: false });
   }
   if (!currentQR) {
     return res.json({
@@ -1543,8 +1548,8 @@ app.get("/api/whatsapp/qr", async (_req, res) => {
 
 app.get("/api/whatsapp/qr/image", async (_req, res) => {
   const status = baileysRuntimeStatus();
-  if (!status.connected && (!currentQR || (currentQRAt && Date.now() - currentQRAt > QR_RENEW_AFTER_MS))) {
-    await ensureQrReady({ forceRenew: true });
+  if (!status.connected && (!currentQR || (currentQRAt && Date.now() - currentQRAt > QR_TIMEOUT_MS))) {
+    await ensureQrReady({ forceRenew: false });
   }
   if (!currentQR) return res.status(404).send("No QR available");
   const buf = await QRCode.toBuffer(currentQR, { width: 320 });
