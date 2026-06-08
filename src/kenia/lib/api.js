@@ -442,7 +442,7 @@ const staticPost = (url, body = {}) => {
     return (async () => {
       const sessionId = body.session_id || nextId("session");
       const OLLAMA_URL = import.meta.env.VITE_OLLAMA_URL || "";
-      const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "qwen3:8b";
+      const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "qwen3:4b";
       const fallbackReply =
         "Tive uma instabilidade momentânea. Estou aqui para te ajudar; pode me contar o que aconteceu em uma frase curta?";
       try {
