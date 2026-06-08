@@ -56,6 +56,7 @@ const OLLAMA_BASE_URL = normalizeOllamaBaseUrl(OLLAMA_RAW_URL);
 const OLLAMA_URL = `${OLLAMA_BASE_URL}/api/generate`;
 const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen3:4b";
+const OLLAMA_FALLBACK_MODEL = process.env.OLLAMA_FALLBACK_MODEL || "llama3.2:3b";
 const OLLAMA_REQUEST_RETRIES = Number(process.env.OLLAMA_REQUEST_RETRIES || 0);
 const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 90000);
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
@@ -124,43 +125,55 @@ async function probeOllamaGenerate() {
   }
 }
 
+async function callOllamaModel(modelName, texto) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
+  try {
+    const resposta = await fetch(OLLAMA_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: modelName,
+        system: OLLAMA_SYSTEM_PROMPT,
+        prompt: buildOllamaPrompt(texto),
+        stream: false,
+        think: false,
+        keep_alive: OLLAMA_KEEP_ALIVE,
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
+      }),
+    });
+    const raw = await resposta.text();
+    let data = {};
+    try { data = raw ? JSON.parse(raw) : {}; } catch {}
+    if (!resposta.ok) throw new Error(formatOllamaHttpError(resposta.status, raw));
+    const reply = String(data?.response || "").trim();
+    if (!reply) throw new Error("Resposta vazia do Ollama.");
+    if (isInvalidOllamaReply(reply)) throw new Error(`Ollama retornou raciocínio interno ou resposta inválida: ${reply.slice(0, 160)}`);
+    return reply;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function perguntarIA(texto) {
   let lastErrorForThrow = null;
-  for (let attempt = 1; attempt <= OLLAMA_REQUEST_RETRIES + 1; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
-    try {
-      const resposta = await fetch(OLLAMA_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: OLLAMA_MODEL,
-          system: OLLAMA_SYSTEM_PROMPT,
-          prompt: buildOllamaPrompt(texto),
-          stream: false,
-          think: false,
-          keep_alive: OLLAMA_KEEP_ALIVE,
-          options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
-        }),
-      });
-      const raw = await resposta.text();
-      let data = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch {}
-      if (!resposta.ok) throw new Error(formatOllamaHttpError(resposta.status, raw));
-      const reply = String(data?.response || "").trim();
-      if (!reply) throw new Error("Resposta vazia do Ollama.");
-      if (isInvalidOllamaReply(reply)) throw new Error(`Ollama retornou raciocínio interno ou resposta inválida: ${reply.slice(0, 160)}`);
-      ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null };
-      return reply;
-    } catch (e) {
-      lastErrorForThrow = e;
-      const timedOut = e?.name === "AbortError";
-      const message = timedOut ? `generate timeout ${OLLAMA_GENERATE_TIMEOUT_MS}ms` : e?.message || String(e);
-      ollamaStatus = { ...ollamaStatus, ok: false, last_checked_at: new Date().toISOString(), last_error: message };
-      if (attempt <= OLLAMA_REQUEST_RETRIES) await delay(800 * attempt);
-    } finally {
-      clearTimeout(timeout);
+  const models = OLLAMA_FALLBACK_MODEL && OLLAMA_FALLBACK_MODEL !== OLLAMA_MODEL
+    ? [OLLAMA_MODEL, OLLAMA_FALLBACK_MODEL]
+    : [OLLAMA_MODEL];
+  for (const modelName of models) {
+    for (let attempt = 1; attempt <= OLLAMA_REQUEST_RETRIES + 1; attempt++) {
+      try {
+        const reply = await callOllamaModel(modelName, texto);
+        ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null, last_model: modelName };
+        return reply;
+      } catch (e) {
+        lastErrorForThrow = e;
+        const timedOut = e?.name === "AbortError";
+        const message = timedOut ? `generate timeout ${OLLAMA_GENERATE_TIMEOUT_MS}ms` : e?.message || String(e);
+        ollamaStatus = { ...ollamaStatus, ok: false, last_checked_at: new Date().toISOString(), last_error: `[${modelName}] ${message}` };
+        if (attempt <= OLLAMA_REQUEST_RETRIES) await delay(800 * attempt);
+      }
     }
   }
   throw lastErrorForThrow || new Error("Falha ao consultar Ollama.");
@@ -1101,66 +1114,61 @@ app.get("/api/health", (_req, res) => res.json(ok({ state: connectionState })));
 
 // ---- Proxy direto para Ollama (/api/generate) ----
 app.post("/api/generate", async (req, res) => {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
-  try {
-    const body = {
-      model: OLLAMA_MODEL,
-      stream: false,
-      think: false,
-      keep_alive: OLLAMA_KEEP_ALIVE,
-      system: OLLAMA_SYSTEM_PROMPT,
-      options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
-      ...(req.body || {}),
-    };
-    body.system = OLLAMA_SYSTEM_PROMPT;
-    if (body.prompt) body.prompt = buildOllamaPrompt(body.prompt);
-    const upstream = await fetch(OLLAMA_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    const raw = await upstream.text();
-    let data;
-    try { data = JSON.parse(raw); } catch { data = { response: raw }; }
-    if (!upstream.ok) {
-      return res.status(200).json({
-        ok: false,
-        fallback: true,
-        error: formatOllamaHttpError(upstream.status, raw, "Ollama"),
-        upstream: data,
+  const models = OLLAMA_FALLBACK_MODEL && OLLAMA_FALLBACK_MODEL !== OLLAMA_MODEL
+    ? [OLLAMA_MODEL, OLLAMA_FALLBACK_MODEL]
+    : [OLLAMA_MODEL];
+  let lastFailure = null;
+  for (const modelName of models) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
+    try {
+      const body = {
+        stream: false,
+        think: false,
+        keep_alive: OLLAMA_KEEP_ALIVE,
+        system: OLLAMA_SYSTEM_PROMPT,
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
+        ...(req.body || {}),
+        model: modelName,
+      };
+      body.system = OLLAMA_SYSTEM_PROMPT;
+      if (body.prompt) body.prompt = buildOllamaPrompt(body.prompt);
+      const upstream = await fetch(OLLAMA_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
       });
+      const raw = await upstream.text();
+      let data;
+      try { data = JSON.parse(raw); } catch { data = { response: raw }; }
+      if (!upstream.ok) {
+        lastFailure = { error: formatOllamaHttpError(upstream.status, raw, `Ollama[${modelName}]`), upstream: data };
+        continue;
+      }
+      const reply = String(data?.response || "").trim();
+      if (!reply) {
+        lastFailure = { error: `Ollama[${modelName}] retornou resposta vazia.`, upstream: data };
+        continue;
+      }
+      if (isInvalidOllamaReply(reply)) {
+        lastFailure = { error: `Ollama[${modelName}] retornou raciocínio interno ou resposta inválida.`, upstream: data };
+        continue;
+      }
+      data.model = modelName;
+      return res.json(data);
+    } catch (err) {
+      const aborted = err?.name === "AbortError";
+      lastFailure = {
+        error: aborted
+          ? `Timeout (${OLLAMA_GENERATE_TIMEOUT_MS}ms) ao chamar ${OLLAMA_URL} com ${modelName}.`
+          : `Falha ao chamar Ollama[${modelName}]: ${err?.message || err}`,
+      };
+    } finally {
+      clearTimeout(timer);
     }
-    if (!String(data?.response || "").trim()) {
-      return res.status(200).json({
-        ok: false,
-        fallback: true,
-        error: "Ollama retornou resposta vazia.",
-        upstream: data,
-      });
-    }
-    if (isInvalidOllamaReply(data.response)) {
-      return res.status(200).json({
-        ok: false,
-        fallback: true,
-        error: "Ollama retornou raciocínio interno ou resposta inválida.",
-        upstream: data,
-      });
-    }
-    res.json(data);
-  } catch (err) {
-    const aborted = err?.name === "AbortError";
-    res.status(200).json({
-      ok: false,
-      fallback: true,
-      error: aborted
-        ? `Timeout (${OLLAMA_GENERATE_TIMEOUT_MS}ms) ao chamar ${OLLAMA_URL}.`
-        : `Falha ao chamar Ollama: ${err?.message || err}`,
-    });
-  } finally {
-    clearTimeout(timer);
   }
+  res.status(200).json({ ok: false, fallback: true, ...(lastFailure || { error: "Falha ao chamar Ollama." }) });
 });
 
 
