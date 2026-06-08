@@ -67,8 +67,8 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOllamaBaseUrl = () => OLLAMA_BASE_URL;
 const formatOllamaHttpError = (status, raw, context = "Ollama") => {
   const body = String(raw || "").replace(/\s+/g, " ").trim();
-  if (status === 404 && /ngrok|<!doctype html|<html/i.test(body)) {
-    return `${context} desconectado: o túnel respondeu 404/HTML. Atualize OLLAMA_URL no Render com o ngrok ativo apontando para http://localhost:11434.`;
+  if ((status === 404 || status === 503) && /ERR_NGROK_3200|endpoint .* is offline|ngrok|<!doctype html|<html/i.test(body)) {
+    return `${context} desconectado: o túnel ngrok está offline ou não aponta para o Ollama. Reinicie o Ollama local, rode ngrok para http://localhost:11434 e atualize OLLAMA_URL no Render se a URL mudou.`;
   }
   if (status === 404) {
     return `${context} respondeu 404. Verifique se OLLAMA_URL aponta para a base do Ollama ou para /api/generate e se o modelo ${OLLAMA_MODEL} existe.`;
@@ -1226,7 +1226,7 @@ app.get("/api/whatsapp/ollama-status", async (_req, res) => {
     keep_alive: OLLAMA_KEEP_ALIVE,
     health_interval_ms: OLLAMA_HEALTH_INTERVAL_MS,
       probe_timeout_ms: OLLAMA_PROBE_TIMEOUT_MS,
-      hint: status.ok ? null : "O /api/tags pode responder mesmo quando /api/generate trava. Reinicie o Ollama/modelo local, confirme `ollama run qwen3:8b` no servidor do túnel e mantenha o ngrok apontando para a porta 11434.",
+      hint: status.ok ? null : `O /api/tags pode responder mesmo quando /api/generate trava. Reinicie o Ollama/modelo local, confirme \`ollama run ${OLLAMA_MODEL}\` no servidor do túnel e mantenha o ngrok apontando para a porta 11434.`,
   });
 });
 
