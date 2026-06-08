@@ -61,6 +61,7 @@ const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
 const OLLAMA_HEALTH_INTERVAL_MS = Number(process.env.OLLAMA_HEALTH_INTERVAL_MS || 240000);
 const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS || 8000);
+const OLLAMA_PROBE_TIMEOUT_MS = Number(process.env.OLLAMA_PROBE_TIMEOUT_MS || Math.min(OLLAMA_GENERATE_TIMEOUT_MS, 20000));
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOllamaBaseUrl = () => OLLAMA_BASE_URL;
 const formatOllamaHttpError = (status, raw, context = "Ollama") => {
@@ -75,6 +76,7 @@ const formatOllamaHttpError = (status, raw, context = "Ollama") => {
 };
 let ollamaStatus = {
   ok: false,
+  generate_ok: false,
   configured_url: OLLAMA_RAW_URL,
   base_url: OLLAMA_BASE_URL,
   endpoint: OLLAMA_URL,
@@ -82,7 +84,42 @@ let ollamaStatus = {
   last_checked_at: null,
   last_success_at: null,
   last_error: null,
+  last_generate_error: null,
 };
+
+async function probeOllamaGenerate() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OLLAMA_PROBE_TIMEOUT_MS);
+  const startedAt = Date.now();
+  try {
+    const resp = await fetch(OLLAMA_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        prompt: "/no_think\nResponda apenas OK.",
+        stream: false,
+        keep_alive: OLLAMA_KEEP_ALIVE,
+        options: { num_predict: 8, temperature: 0 },
+      }),
+    });
+    const raw = await resp.text();
+    if (!resp.ok) throw new Error(formatOllamaHttpError(resp.status, raw, "Ollama generate"));
+    const data = JSON.parse(raw || "{}");
+    const reply = String(data?.response || "").trim();
+    if (!reply) throw new Error("Ollama generate retornou resposta vazia.");
+    return { ok: true, latency_ms: Date.now() - startedAt, response_preview: reply.slice(0, 80) };
+  } catch (e) {
+    return {
+      ok: false,
+      latency_ms: Date.now() - startedAt,
+      error: e?.name === "AbortError" ? `generate probe timeout ${OLLAMA_PROBE_TIMEOUT_MS}ms` : e?.message || String(e),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export async function perguntarIA(texto) {
   let lastErrorForThrow = null;
@@ -132,10 +169,22 @@ async function refreshOllamaStatus() {
       signal: controller.signal,
     });
     if (!resp.ok) throw new Error(formatOllamaHttpError(resp.status, await resp.text(), "Ollama health"));
-    ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null };
+    const generate = await probeOllamaGenerate();
+    ollamaStatus = {
+      ...ollamaStatus,
+      ok: generate.ok,
+      tags_ok: true,
+      generate_ok: generate.ok,
+      generate_latency_ms: generate.latency_ms,
+      generate_response_preview: generate.response_preview || null,
+      last_checked_at: new Date().toISOString(),
+      last_success_at: generate.ok ? new Date().toISOString() : ollamaStatus.last_success_at,
+      last_error: generate.ok ? null : generate.error,
+      last_generate_error: generate.ok ? null : generate.error,
+    };
   } catch (e) {
     const message = e?.name === "AbortError" ? `health timeout ${OLLAMA_HEALTH_TIMEOUT_MS}ms` : e?.message || String(e);
-    ollamaStatus = { ...ollamaStatus, ok: false, last_checked_at: new Date().toISOString(), last_error: message };
+    ollamaStatus = { ...ollamaStatus, ok: false, tags_ok: false, generate_ok: false, last_checked_at: new Date().toISOString(), last_error: message };
   } finally {
     clearTimeout(timeout);
   }
@@ -1019,7 +1068,7 @@ app.post("/api/generate", async (req, res) => {
     };
     const upstream = await fetch(OLLAMA_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -1161,7 +1210,8 @@ app.get("/api/whatsapp/ollama-status", async (_req, res) => {
     ...status,
     keep_alive: OLLAMA_KEEP_ALIVE,
     health_interval_ms: OLLAMA_HEALTH_INTERVAL_MS,
-    hint: status.ok ? null : "Se aparecer 404/HTML/ngrok, abra um novo túnel para a porta 11434 e atualize OLLAMA_URL no backend publicado.",
+      probe_timeout_ms: OLLAMA_PROBE_TIMEOUT_MS,
+      hint: status.ok ? null : "O /api/tags pode responder mesmo quando /api/generate trava. Reinicie o Ollama/modelo local, confirme `ollama run qwen3:8b` no servidor do túnel e mantenha o ngrok apontando para a porta 11434.",
   });
 });
 
