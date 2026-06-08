@@ -169,17 +169,15 @@ export async function perguntarIA(texto) {
         body: JSON.stringify({
           model: OLLAMA_MODEL,
           prompt: texto,
-          stream: false,
+          stream: true,
           think: false,
           keep_alive: OLLAMA_KEEP_ALIVE,
           options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
         }),
       });
-      const raw = await resposta.text();
-      let data = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch {}
+      const raw = resposta.ok ? "" : await resposta.text();
       if (!resposta.ok) throw new Error(formatOllamaHttpError(resposta.status, raw));
-      const reply = String(data?.response || "").trim();
+      const reply = await readOllamaStream(resposta);
       if (!reply) throw new Error("Resposta vazia do Ollama.");
       ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null };
       return reply;
