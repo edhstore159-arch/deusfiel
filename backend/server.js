@@ -57,11 +57,12 @@ const OLLAMA_URL = `${OLLAMA_BASE_URL}/api/generate`;
 const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen3:8b";
 const OLLAMA_REQUEST_RETRIES = Number(process.env.OLLAMA_REQUEST_RETRIES || 0);
-const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 15000);
+const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 90000);
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
 const OLLAMA_HEALTH_INTERVAL_MS = Number(process.env.OLLAMA_HEALTH_INTERVAL_MS || 240000);
 const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS || 8000);
-const OLLAMA_PROBE_TIMEOUT_MS = Number(process.env.OLLAMA_PROBE_TIMEOUT_MS || Math.min(OLLAMA_GENERATE_TIMEOUT_MS, 20000));
+const OLLAMA_PROBE_TIMEOUT_MS = Number(process.env.OLLAMA_PROBE_TIMEOUT_MS || Math.min(OLLAMA_GENERATE_TIMEOUT_MS, 30000));
+const OLLAMA_OPTIONS_BASE = { num_ctx: 2048, temperature: 0.2 };
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOllamaBaseUrl = () => OLLAMA_BASE_URL;
 const formatOllamaHttpError = (status, raw, context = "Ollama") => {
@@ -100,8 +101,9 @@ async function probeOllamaGenerate() {
         model: OLLAMA_MODEL,
         prompt: "/no_think\nResponda apenas OK.",
         stream: false,
+        think: false,
         keep_alive: OLLAMA_KEEP_ALIVE,
-        options: { num_predict: 8, temperature: 0 },
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 8, temperature: 0 },
       }),
     });
     const raw = await resp.text();
@@ -135,8 +137,9 @@ export async function perguntarIA(texto) {
           model: OLLAMA_MODEL,
           prompt: texto,
           stream: false,
+          think: false,
           keep_alive: OLLAMA_KEEP_ALIVE,
-          options: { num_predict: 260, temperature: 0.2 },
+          options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
         }),
       });
       const raw = await resposta.text();
