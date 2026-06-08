@@ -1081,17 +1081,27 @@ app.post("/api/generate", async (req, res) => {
     let data;
     try { data = JSON.parse(raw); } catch { data = { response: raw }; }
     if (!upstream.ok) {
-      return res.status(upstream.status).json({
+      return res.status(200).json({
         ok: false,
+        fallback: true,
         error: formatOllamaHttpError(upstream.status, raw, "Ollama"),
+        upstream: data,
+      });
+    }
+    if (!String(data?.response || "").trim()) {
+      return res.status(200).json({
+        ok: false,
+        fallback: true,
+        error: "Ollama retornou resposta vazia.",
         upstream: data,
       });
     }
     res.json(data);
   } catch (err) {
     const aborted = err?.name === "AbortError";
-    res.status(aborted ? 504 : 502).json({
+    res.status(200).json({
       ok: false,
+      fallback: true,
       error: aborted
         ? `Timeout (${OLLAMA_GENERATE_TIMEOUT_MS}ms) ao chamar ${OLLAMA_URL}.`
         : `Falha ao chamar Ollama: ${err?.message || err}`,
