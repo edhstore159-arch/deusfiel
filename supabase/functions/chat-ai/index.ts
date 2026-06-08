@@ -563,6 +563,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
         : isHandoffRequest(userMessage)
           ? buildHandoffReply()
+        : isResumeRequest(userMessage)
+          ? buildResumeReply(history)
         : await callOllama(messages, fmtDate, fmtTime);
     } catch (err) {
       console.error("Erro ao chamar Ollama llama3.2:3b:", err);
