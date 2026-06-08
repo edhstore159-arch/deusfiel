@@ -201,18 +201,17 @@ async function refreshOllamaStatus() {
       signal: controller.signal,
     });
     if (!resp.ok) throw new Error(formatOllamaHttpError(resp.status, await resp.text(), "Ollama health"));
-    const generate = await probeOllamaGenerate();
     ollamaStatus = {
       ...ollamaStatus,
-      ok: generate.ok,
+      ok: true,
       tags_ok: true,
-      generate_ok: generate.ok,
-      generate_latency_ms: generate.latency_ms,
-      generate_response_preview: generate.response_preview || null,
+      generate_ok: null,
+      generate_latency_ms: null,
+      generate_response_preview: null,
       last_checked_at: new Date().toISOString(),
-      last_success_at: generate.ok ? new Date().toISOString() : ollamaStatus.last_success_at,
-      last_error: generate.ok ? null : generate.error,
-      last_generate_error: generate.ok ? null : generate.error,
+      last_success_at: new Date().toISOString(),
+      last_error: null,
+      last_generate_error: null,
     };
   } catch (e) {
     const message = e?.name === "AbortError" ? `health timeout ${OLLAMA_HEALTH_TIMEOUT_MS}ms` : e?.message || String(e);
