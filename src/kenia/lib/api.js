@@ -735,6 +735,18 @@ const staticPost = (url, body = {}) => {
             server_time: new Date().toISOString(),
           });
         }
+        if (isHandoffRequest(userText)) {
+          return response({
+            session_id: sessionId,
+            response: cleanInternalChatMarkers(buildHandoffReply()),
+            audio_base64: null,
+            appointment: null,
+            handoff: true,
+            speaker: "Dra. Kênia Garcia",
+            analysis: { acertividade: 100, qualificacao: "ok" },
+            server_time: new Date().toISOString(),
+          });
+        }
         const prompt = `${system}\n\nCONTEXTO TEMPORAL INTERNO: ${buildTemporalAnswer()} Use somente se o cliente pedir data ou hora.\n\n${history}\nCliente: ${userText}\nAssistente:`;
 
         const tryModel = async (modelName) => {
