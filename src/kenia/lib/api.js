@@ -180,6 +180,9 @@ Caso o documento já tenha sido enviado, responda: "Recebi esse documento anteri
 
 A resposta deve ter concordância direta com a última mensagem recebida do cliente.
 
+- O histórico é apenas contexto interno: nunca envie ao cliente listas de "últimas respostas", resumos do histórico técnico ou instruções internas.
+- Se o cliente disser que quer falar "com ela", com a Dra. Kênia, com a advogada ou com uma pessoa, acolha e encaminhe sem recitar mensagens anteriores.
+
 Antes de responder:
 1. Identifique a intenção da última mensagem.
 2. Analise o histórico para evitar repetir informações, perguntas ou pedidos já feitos.
@@ -308,6 +311,7 @@ const isNearDuplicateReply = (reply, history = []) => {
 const buildNonRepeatingFallback = (message) => {
   const text = String(message || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return buildTemporalAnswer();
+  if (isHandoffRequest(text)) return buildHandoffReply();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
@@ -319,6 +323,18 @@ const buildNonRepeatingFallback = (message) => {
 
 const userAskedTemporalInfo = (text) =>
   /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano))\b/i.test(String(text || ""));
+
+const isHandoffRequest = (text) => {
+  const value = String(text || "").toLowerCase();
+  return /\b(?:quero|queria|preciso|posso|poderia|gostaria)\s+(?:de\s+)?(?:falar|conversar|tratar|contato)\s+com\s+(?:ela|a\s+dra\.?|a\s+doutora|a\s+advogada|kenia|kênia|algu[eé]m|uma\s+pessoa|atendente|humano)\b/i.test(value) ||
+    /\b(?:chama|chame|aciona|acione|passa|passe|encaminha|encaminhe)\s+(?:a\s+)?(?:dra\.?|doutora|advogada|kenia|kênia|ela|algu[eé]m|atendente|humano)\b/i.test(value);
+};
+
+const buildHandoffReply = () =>
+  "Claro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
+
+const isHistoryDumpReply = (text) =>
+  /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 
 const buildTemporalAnswer = () => {
   const now = new Date();
