@@ -1247,7 +1247,7 @@ app.get("/api/whatsapp/ollama-status", async (_req, res) => {
     keep_alive: OLLAMA_KEEP_ALIVE,
     health_interval_ms: OLLAMA_HEALTH_INTERVAL_MS,
       probe_timeout_ms: OLLAMA_PROBE_TIMEOUT_MS,
-      hint: status.ok ? null : "O /api/tags pode responder mesmo quando /api/generate trava. Reinicie o Ollama/modelo local, confirme `ollama run qwen3:8b` no servidor do túnel e mantenha o ngrok apontando para a porta 11434.",
+        hint: status.ok ? null : "O status automático testa só /api/tags para não ocupar o modelo. O WhatsApp chama /api/generate em streaming e espera o Ollama pelo tempo necessário, sem fallback.",
   });
 });
 
@@ -1288,7 +1288,7 @@ app.get("/api/whatsapp/diagnostics", (_req, res) => {
           : `Desconectado: ${ollamaStatus.last_error || "ainda não testado"}`,
         hint: ollamaStatus.ok
           ? null
-          : "Atualize OLLAMA_URL no Render para o ngrok ativo do Ollama (porta 11434) e redeploy; enquanto isso, o robô usa fallback/local se disponível.",
+          : "Atualize OLLAMA_URL no Render para o ngrok ativo do Ollama (porta 11434) e redeploy. O robô não usa fallback/local; ele aguarda o Ollama.",
       },
     ],
   });
