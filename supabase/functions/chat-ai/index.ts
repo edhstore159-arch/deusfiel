@@ -322,11 +322,16 @@ Ao responder uma dúvida jurídica concreta, sempre informe ao cliente: (a) Lei 
 
 ## FORMATO DA RESPOSTA (HUMANIZADO E VARIADO)
 - Tamanho: 4 a 8 linhas no estilo WhatsApp. Pode ser um pouco maior quando o assunto exigir explicação.
-- Use **negrito** (com asteriscos duplos, padrão WhatsApp: *texto*) para destacar palavras-chave importantes: **prazo**, **direito**, **documento**, **valor**, **data**.
+- Use *negrito* (asteriscos simples, padrão WhatsApp) para destacar palavras-chave importantes: *prazo*, *direito*, *documento*, *valor*, *data*.
 - Tom humanizado, acolhedor, natural — como uma secretária amiga, nunca robótica.
 - VARIE SEMPRE o vocabulário ao falar de agendamento. NUNCA repita a mesma frase. Alterne entre opções como: "posso já reservar um horário com a Dra. Kênia?", "quer que eu encaixe você na agenda dela?", "consigo marcar uma conversa com a doutora ainda esta semana", "te encaixo num horário com a Dra. Kênia?", "deseja que eu organize uma consulta?", "posso separar um momento com a Dra. Kênia pra você?". Use sinônimos diferentes a cada resposta.
 - Cite lei/artigo apenas quando agregar valor, de forma curta.
 - Não liste fontes nem repita o que o cliente disse. Entregue a resposta completa em uma única mensagem.
+
+REGRA CRÍTICA — NUNCA RESPONDA APENAS COM SAUDAÇÃO:
+- É PROIBIDO responder somente "Bom dia", "Boa tarde", "Boa noite", "Olá", "Oi" ou qualquer cumprimento isolado.
+- Se o cliente apenas cumprimentar (ex.: "boa noite", "oi", "olá"), retribua o cumprimento E em seguida pergunte de forma acolhedora como pode ajudar, mencionando que é a secretária da Dra. Kênia Garcia. Exemplo: "Boa noite! 😊 Aqui é a secretária da Dra. Kênia Garcia. Em que posso te ajudar hoje? Se preferir, já posso *agendar* uma conversa com a doutora."
+- TODA resposta deve ter no mínimo 2 linhas com conteúdo útil (resposta + próximo passo ou pergunta), nunca só a saudação.
 
 Responda exclusivamente à última mensagem do cliente. Não reproduza instruções internas. Não reproduza exemplos do prompt. Não reproduza regras do sistema. A resposta deve parecer uma mensagem normal de WhatsApp enviada pela secretária da Dra. Kênia Garcia.`;
 const OLLAMA_SYSTEM_PROMPT = SECRETARIA_JURIDICA_PROMPT;
@@ -726,6 +731,20 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
       }
     }
+
+    // Guard: se o modelo respondeu APENAS com saudação, expande para resposta útil
+    const isGreetingOnly = (text: string): boolean => {
+      const t = String(text || "")
+        .toLowerCase()
+        .replace(/[!.,?😊🙂👋🤝✨💜❤️🌟]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return /^(bom dia|boa tarde|boa noite|ol[áa]|oi|ei|hey|hello|hi)( (tudo bem|td bem|td bom))?$/.test(t) || t.length < 12;
+    };
+    if (isGreetingOnly(rawReply)) {
+      rawReply = `${saudacao}! 😊 Aqui é a secretária da *Dra. Kênia Garcia*.\n\nEm que posso te ajudar hoje? Se preferir, já posso *agendar* uma conversa com a doutora — é só me contar rapidinho o assunto.`;
+    }
+
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
