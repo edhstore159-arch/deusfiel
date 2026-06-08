@@ -879,7 +879,10 @@ const fallbackToStaticGetPaths = new Set([
 const isEmptyPayload = (data) => {
   if (data == null) return true;
   if (Array.isArray(data)) return data.length === 0;
-  if (typeof data === "object" && "items" in data) return !data.items || data.items.length === 0;
+  if (typeof data === "object") {
+    if ("items" in data) return !data.items || data.items.length === 0;
+    if ("total" in data && Number(data.total) === 0) return true;
+  }
   return false;
 };
 
