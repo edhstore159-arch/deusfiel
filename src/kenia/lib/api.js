@@ -528,14 +528,14 @@ const staticPost = (url, body = {}) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
-          body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: "Você é um assistente jurídico brasileiro. Responda SEMPRE em português do Brasil. Nunca use inglês.", prompt: `/no_think\n${prompt}`, stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 180, temperature: 0.2 } }),
+          body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 220, temperature: 0.1 } }),
         }).finally(() => clearTimeout(timeout));
         if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
         const raw = await res.text();
         const data = JSON.parse(raw || "{}");
         if (data?.fallback || data?.error) throw new Error(data.error || "Ollama indisponível");
         const text = sanitizeOllamaReply(data?.response || "", body.message || body.text || "");
-        if (!text) throw new Error("Ollama retornou resposta vazia");
+        if (!text || isInvalidOllamaReply(text)) throw new Error("Ollama retornou raciocínio interno ou resposta inválida");
         const responseText = isNearDuplicateReply(text, body.history || [])
           ? buildNonRepeatingFallback(body.message || body.text || "")
           : cleanInternalChatMarkers(text);
