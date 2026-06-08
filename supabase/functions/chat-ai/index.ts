@@ -597,6 +597,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     try {
       rawReply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
+        : isThanksMessage(userMessage)
+          ? buildThanksReply(history)
         : isHandoffRequest(userMessage)
           ? buildHandoffReply()
         : isResumeRequest(userMessage)
