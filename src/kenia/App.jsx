@@ -37,7 +37,7 @@ function Protected({ children }) {
 function App() {
   return (
     <div className="App">
-      {/* DebugErrorThrower DEVE ficar fora de qualquer ErrorBoundary/Suspense */}
+      {/* Listener seguro para eventos internos de debug, sem derrubar a UI */}
       <DebugErrorThrower />
       <AuthProvider>
         <BrowserRouter>

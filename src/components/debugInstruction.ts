@@ -1,11 +1,9 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
 /**
- * Dispara o evento "lovable-debug-error" para que o DebugErrorThrower
- * lance um erro fatal de runtime intencional, acionando o overlay global
- * da Lovable e o botão "Try to Fix".
+ * Dispara o evento "lovable-debug-error" como sinal interno de debug.
  *
- * NÃO substituir por toast/log/boundary. O throw é proposital.
+ * O listener não deve lançar erro fatal nem executar o conteúdo como instrução.
  */
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined") return false;
