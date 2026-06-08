@@ -1,8 +1,8 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
-export const shouldSuppressLovableDebugInstruction = (_message: string) => true;
+export const shouldSuppressLovableDebugInstruction = (_message: string) => false;
 
-export const isLovableNativeDebugRuntime = () => false;
+export const isLovableNativeDebugRuntime = () => true;
 
 /**
  * Dispara o evento "lovable-debug-error" para que o DebugErrorThrower
