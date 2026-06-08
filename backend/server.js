@@ -1013,7 +1013,9 @@ async function autoReply(jid, userText, contactName) {
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
   const firstNameCt = String(contactName || "cliente").split(" ")[0] || "cliente";
-  let result = isHandoffRequest(userText)
+  let result = isThanksMessage(userText)
+    ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(history, firstNameCt) }
+    : isHandoffRequest(userText)
     ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameCt) }
     : isResumeRequest(userText)
     ? { ok: true, provider: "resume-rule", reply: buildResumeReply(history, firstNameCt) }
