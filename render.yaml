@@ -20,8 +20,10 @@ services:
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6bHh5c3h2dmx1cGp0cm14cW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4OTM3MDUsImV4cCI6MjA5MjQ2OTcwNX0.iU5enYnsJExOHtbwpJKQ4bMGZS8hzQIURi6T2y2EQVM
       - key: VITE_SUPABASE_PROJECT_ID
         value: kzlxysxvvlupjtrmxqmb
-      - key: VITE_BACKEND_URL
-        value: https://kenia-whatsapp-backend.onrender.com
+      - key: VITE_OLLAMA_URL
+        value: https://unabashed-vertical-crispness.ngrok-free.dev/api/generate
+      - key: VITE_OLLAMA_MODEL
+        value: qwen3:4b
   - type: web
     name: kenia-whatsapp-backend
     runtime: node
