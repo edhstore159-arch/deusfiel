@@ -543,7 +543,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       console.error("Erro ao chamar Ollama llama3.2:3b:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
-    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
