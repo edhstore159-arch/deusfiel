@@ -756,6 +756,7 @@ export default function ChatIA() {
         openScheduler(analysis?.area || "Atendimento jurídico");
         toast.error("Não consegui criar o agendamento automaticamente");
       }
+      sendingRef.current = false;
       return;
     }
     try {
