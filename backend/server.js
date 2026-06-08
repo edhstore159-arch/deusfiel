@@ -305,7 +305,7 @@ const appendMessage = (jid, msg) => {
   messagesStore.set(jid, list);
 };
 
-// ---- Atendente automático com IA (Gemini via Lovable AI Gateway primeiro; outras chaves como fallback) ----
+// ---- Atendente automático: somente Ollama llama3.2:3b responde no chat ----
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
@@ -724,7 +724,7 @@ async function processAutoReplyQueue() {
 }
 
 async function autoReply(jid, userText, contactName) {
-  recordAutoReply({ step: "trigger", jid, userText: String(userText || "").slice(0, 200), hasOpenAI: Boolean(OPENAI_API_KEY), hasEmergent: Boolean(EMERGENT_API_KEY), hasLovable: Boolean(LOVABLE_API_KEY), botEnabled: whatsappConfig.bot_enabled, connectionState });
+  recordAutoReply({ step: "trigger", jid, userText: String(userText || "").slice(0, 200), provider: "ollama", model: OLLAMA_MODEL, botEnabled: whatsappConfig.bot_enabled, connectionState });
   if (!sock || connectionState !== "open") {
     recordAutoReply({ step: "skip_socket", jid, connectionState });
     return;
@@ -741,8 +741,11 @@ async function autoReply(jid, userText, contactName) {
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
   let result = await callAI(messagesPayload, { temperature: 0.72, userText });
-  const usedFallback = !result.ok;
-  let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
+  if (!result.ok) {
+    recordAutoReply({ step: "ai_fail_no_reply", jid, result });
+    return;
+  }
+  let rawReply = result.reply;
   if (!usedFallback && isNearDuplicateReply(rawReply, history)) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
@@ -756,16 +759,15 @@ async function autoReply(jid, userText, contactName) {
     if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
   }
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
-  if (usedFallback) recordAutoReply({ step: "ai_fail_local_fallback", jid, result, reply: reply.slice(0, 200) });
   history.push({ role: "user", content: userText });
   history.push({ role: "assistant", content: reply });
   aiHistory.set(jid, history);
   try {
-    const sent = await sendBotText(jid, reply, { source: usedFallback ? "local_fallback" : result.provider });
-    recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: usedFallback ? "local_fallback" : result.provider, model: result.model || null, reply: reply.slice(0, 200) });
+    const sent = await sendBotText(jid, reply, { source: result.provider });
+    recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: result.provider, model: result.model || null, reply: reply.slice(0, 200) });
     if (shouldScheduleWaitFollowUp(reply)) scheduleWaitFollowUp(jid, contactName);
   } catch (e) {
-    queueAutoReply(jid, reply, { source: usedFallback ? "local_fallback" : result.provider, reason: e?.message || String(e) });
+    queueAutoReply(jid, reply, { source: result.provider, reason: e?.message || String(e) });
     recordAutoReply({ step: "send_queued_after_fail", jid, error: e?.message || String(e) });
   }
 }
@@ -1200,14 +1202,8 @@ app.get("/api/whatsapp/ai-test", async (_req, res) => {
   const ollama = await refreshOllamaStatus().catch(() => ollamaStatus);
   const info = {
     ollama,
-    has_openai_key: Boolean(OPENAI_API_KEY),
-    has_emergent_key: Boolean(EMERGENT_API_KEY),
-    has_lovable_key: Boolean(LOVABLE_API_KEY),
-    openai_base_url: OPENAI_BASE_URL,
-    openai_model: OPENAI_MODEL,
-    emergent_base_url: EMERGENT_BASE_URL,
-    emergent_model: EMERGENT_MODEL,
-    lovable_model: AI_MODEL,
+    chat_provider: "ollama",
+    chat_model: OLLAMA_MODEL,
     bot_enabled: whatsappConfig.bot_enabled,
   };
   const result = await callAI([
@@ -1229,9 +1225,8 @@ app.get("/api/whatsapp/ai-debug", (_req, res) => {
     qr_age_ms: status.qr_age_ms,
     qr_expires_in_s: status.qr_expires_in_s,
     qr_timeout_s: status.qr_timeout_s,
-    has_openai_key: Boolean(OPENAI_API_KEY),
-    has_emergent_key: Boolean(EMERGENT_API_KEY),
-    has_lovable_key: Boolean(LOVABLE_API_KEY),
+    chat_provider: "ollama",
+    chat_model: OLLAMA_MODEL,
     last: autoReplyDebug.last,
     history: autoReplyDebug.history,
     queue_size: pendingAutoReplies.length,
@@ -1289,7 +1284,7 @@ app.get("/api/whatsapp/diagnostics", (_req, res) => {
           : `Desconectado: ${ollamaStatus.last_error || "ainda não testado"}`,
         hint: ollamaStatus.ok
           ? null
-          : "Atualize OLLAMA_URL no Render para o ngrok ativo do Ollama (porta 11434) e redeploy; enquanto isso, o robô usa fallback/local se disponível.",
+          : "Atualize OLLAMA_URL no Render para o ngrok ativo do Ollama (porta 11434) e redeploy; enquanto isso, o robô não responderá por outro atendente ou modelo.",
       },
     ],
   });
@@ -1501,7 +1496,16 @@ app.post("/api/chat/message", async (req, res) => {
     ...normalizedHistory,
     { role: "user", content: message },
   ], { temperature: 0.72, userText: message });
-  let rawReply = result.ok ? result.reply : buildLocalLegalReply(req.body?.session_id || "web", message, req.body?.visitor_name || "Cliente");
+  if (!result.ok) {
+    return res.status(503).json({
+      ok: false,
+      error: "Ollama llama3.2:3b indisponível. Nenhum outro atendente ou modelo está autorizado a responder este chat.",
+      provider: "ollama",
+      model: OLLAMA_MODEL,
+      attempts: result.attempts || [],
+    });
+  }
+  let rawReply = result.reply;
   if (result.ok && isNearDuplicateReply(rawReply, normalizedHistory)) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
@@ -1522,7 +1526,7 @@ app.post("/api/chat/message", async (req, res) => {
     audio_base64: null,
     handoff,
     speaker: handoff ? "Dra. Kênia Garcia" : "Assistente virtual",
-    analysis: { acertividade: result.ok ? 90 : 70, qualificacao: result.ok ? "ok" : "fallback" },
+    analysis: { acertividade: 90, qualificacao: "ok", provider: "ollama", model: OLLAMA_MODEL },
   });
 });
 
