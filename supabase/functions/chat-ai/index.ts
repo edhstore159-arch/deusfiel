@@ -782,8 +782,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       console.error("Erro ao gerar análise:", err);
     }
 
-    // Gera áudio (TTS ElevenLabs) se o cliente pediu
-    const wantAudio = body.want_audio !== false; // default true
+    // Gera áudio (TTS ElevenLabs) somente quando solicitado, para não atrasar respostas em texto/WhatsApp.
+    const wantAudio = body.want_audio === true;
     const audio_base64 = wantAudio ? await synthesizeSpeech(reply) : null;
 
     // Salva conversa e agendamento no banco (não bloqueia resposta se falhar)
