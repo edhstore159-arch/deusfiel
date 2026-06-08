@@ -758,7 +758,9 @@ async function autoReply(jid, userText, contactName) {
       result = retry;
       rawReply = retry.reply;
     }
-    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
+    if (isNearDuplicateReply(rawReply, history)) {
+      recordAutoReply({ step: "ollama_duplicate_kept", jid, reason: "no_local_fallback_allowed" });
+    }
   }
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
   history.push({ role: "user", content: userText });
