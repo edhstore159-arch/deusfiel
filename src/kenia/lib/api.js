@@ -8,8 +8,8 @@ const DIRECT_OLLAMA_URL = (
   import.meta.env.VITE_OLLAMA_URL ||
   "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate"
 ).replace(/\/$/, "");
-const DIRECT_OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "qwen3:4b";
-const DIRECT_OLLAMA_FALLBACK_MODEL = import.meta.env.VITE_OLLAMA_FALLBACK_MODEL || "llama3.2:3b";
+const DIRECT_OLLAMA_MODEL = "llama3.2:3b";
+const DIRECT_OLLAMA_FALLBACK_MODEL = "";
 
 
 const nowIso = () => new Date().toISOString();
@@ -149,6 +149,7 @@ const isNearDuplicateReply = (reply, history = []) => {
 
 const buildNonRepeatingFallback = (message) => {
   const text = String(message || "").toLowerCase();
+  if (userAskedTemporalInfo(text)) return buildTemporalAnswer();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
@@ -156,6 +157,16 @@ const buildNonRepeatingFallback = (message) => {
     return "Entendi. Para direcionar melhor seu atendimento, me conte quando isso aconteceu, sua cidade/estado e se existe algum prazo ou audiência marcado.";
   }
   return "Entendi. Para seguir sem repetir informações, me conte em poucas palavras o que aconteceu e qual ajuda você precisa agora.";
+};
+
+const userAskedTemporalInfo = (text) =>
+  /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano))\b/i.test(String(text || ""));
+
+const buildTemporalAnswer = () => {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const time = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(now);
+  return `Hoje é ${date}, e agora são ${time}.`;
 };
 
 const defaultWhatsAppConfig = {
