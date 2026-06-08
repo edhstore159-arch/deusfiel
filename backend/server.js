@@ -363,6 +363,20 @@ Estrutura: organizada e lógica. Não repita perguntas já respondidas — mante
 Saudações: "Bom dia" → "Bom dia!"; "Boa tarde" → "Boa tarde!"; "Boa noite" → "Boa noite!". Não mencione data/hora salvo se o cliente pedir explicitamente.`;
 
 const OFFICIAL_GREETING = "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
+const OLLAMA_SYSTEM_PROMPT = `Você é um assistente jurídico brasileiro.
+Responda SEMPRE em português do Brasil.
+Nunca use inglês.
+Nunca exponha raciocínio, análise interna, planejamento, tags <think> ou frases como "Okay", "the user", "let me", "I need".
+Entregue somente a resposta final pronta para o cliente.`;
+
+const buildOllamaPrompt = (prompt) => `/no_think
+${OLLAMA_SYSTEM_PROMPT}
+
+INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
+
+${prompt}
+
+Resposta final em português do Brasil:`;
 
 // Mantém o comportamento do atendente fixo mesmo se existir prompt antigo salvo no ambiente.
 const AI_SYSTEM_PROMPT = SECRETARY_SYSTEM_PROMPT;
