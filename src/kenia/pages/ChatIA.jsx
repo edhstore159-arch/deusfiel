@@ -223,7 +223,6 @@ export default function ChatIA() {
   const [scheduling, setScheduling] = useState(false);
   const [leadId, setLeadId] = useState(null);
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(true);
-  const [activeSpeaker, setActiveSpeaker] = useState(ASSISTANT_SPEAKER);
   const audioRef = useRef(null);
   const scrollRef = useRef(null);
   const [recording, setRecording] = useState(false);
