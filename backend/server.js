@@ -841,6 +841,7 @@ function buildLocalLegalReply(jid, userText, contactName) {
   const name = String(contactName || "cliente").split(" ")[0];
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (isHandoffRequest(txt)) return buildHandoffReply(name);
   if (/urgente|pris[aã]o|audi[eê]ncia|prazo|intima[cç][aã]o|mandado|medida protetiva/.test(txt)) {
     return `${name}, entendi a urgência. Vou sinalizar seu caso para a equipe agora; por favor me envie sua cidade/estado e um resumo breve do que aconteceu.`;
   }
@@ -957,7 +958,7 @@ async function autoReply(jid, userText, contactName) {
   let result = await callAI(messagesPayload, { temperature: 0.72, userText });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
-  if (!usedFallback && isNearDuplicateReply(rawReply, history)) {
+  if (!usedFallback && (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history))) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...history,
@@ -967,7 +968,7 @@ async function autoReply(jid, userText, contactName) {
       result = retry;
       rawReply = retry.reply;
     }
-    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
+    if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
   }
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
   if (usedFallback) recordAutoReply({ step: "ai_fail_local_fallback", jid, result, reply: reply.slice(0, 200) });
