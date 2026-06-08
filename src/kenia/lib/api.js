@@ -333,6 +333,23 @@ const isHandoffRequest = (text) => {
 const buildHandoffReply = () =>
   "HANDOFF_KENIA\nClaro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
 
+const isResumeRequest = (text) => {
+  const value = String(text || "").toLowerCase();
+  return /\b(?:volt(?:ar|amos|emos)|retom(?:ar|amos|emos)|continu(?:ar|amos|emos)|seguir|prossegui[rm]?|relembr(?:ar|a)|lembr(?:ar|a))\b.*\b(?:conversa|assunto|t[oó]pico|onde\s+par(?:amos|ei)|do\s+in[ií]cio|antes)\b/i.test(value) ||
+    /\b(?:onde\s+par(?:amos|ei))\b/i.test(value) ||
+    /\b(?:do\s+que\s+(?:est[aá]vamos|t[aá]vamos|conversamos)|sobre\s+o\s+que\s+(?:est[aá]vamos|conversamos|falamos))\b/i.test(value);
+};
+
+const buildResumeReply = (history = []) => {
+  const lastUser = [...history].reverse().find((m) => m.role === "user" && String(m.content || "").trim());
+  const raw = String(lastUser?.content || "").replace(/\s+/g, " ").trim();
+  if (!raw) {
+    return "Claro, podemos continuar. Me diga em uma frase o ponto onde quer retomar e seguimos daí.";
+  }
+  const snippet = raw.length > 120 ? raw.slice(0, 117).trim() + "..." : raw;
+  return `Claro, podemos retomar. Estávamos tratando de: "${snippet}". Quer continuar desse ponto ou ajustar algo?`;
+};
+
 const isHistoryDumpReply = (text) =>
   /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 
@@ -744,6 +761,18 @@ const staticPost = (url, body = {}) => {
             handoff: true,
             speaker: "Dra. Kênia Garcia",
             analysis: { acertividade: 100, qualificacao: "ok" },
+            server_time: new Date().toISOString(),
+          });
+        }
+        if (isResumeRequest(userText)) {
+          return response({
+            session_id: sessionId,
+            response: cleanInternalChatMarkers(buildResumeReply(body.history || [])),
+            audio_base64: null,
+            appointment: null,
+            handoff: false,
+            speaker: null,
+            analysis: { acertividade: 90, qualificacao: "ok" },
             server_time: new Date().toISOString(),
           });
         }

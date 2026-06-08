@@ -727,6 +727,24 @@ function buildHandoffReply(name = "cliente") {
   return `HANDOFF_KENIA\n${name}, claro. Vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.`;
 }
 
+function isResumeRequest(text) {
+  const value = String(text || "").toLowerCase();
+  return /\b(?:volt(?:ar|amos|emos)|retom(?:ar|amos|emos)|continu(?:ar|amos|emos)|seguir|prossegui[rm]?|relembr(?:ar|a)|lembr(?:ar|a))\b.*\b(?:conversa|assunto|t[oó]pico|onde\s+par(?:amos|ei)|do\s+in[ií]cio|antes)\b/i.test(value) ||
+    /\b(?:onde\s+par(?:amos|ei))\b/i.test(value) ||
+    /\b(?:do\s+que\s+(?:est[aá]vamos|t[aá]vamos|conversamos)|sobre\s+o\s+que\s+(?:est[aá]vamos|conversamos|falamos))\b/i.test(value);
+}
+
+function buildResumeReply(history = [], name = "") {
+  const lastUser = [...history].reverse().find((m) => m.role === "user" && String(m.content || "").trim());
+  const raw = String(lastUser?.content || "").replace(/\s+/g, " ").trim();
+  const prefix = name ? `${name}, ` : "";
+  if (!raw) {
+    return `${prefix}claro, podemos continuar. Me diga em uma frase o ponto onde quer retomar e seguimos daí.`;
+  }
+  const snippet = raw.length > 120 ? raw.slice(0, 117).trim() + "..." : raw;
+  return `${prefix}claro, podemos retomar. Estávamos tratando de: "${snippet}". Quer continuar desse ponto ou ajustar algo?`;
+}
+
 function isHistoryDumpReply(text) {
   return /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 }
@@ -955,8 +973,11 @@ async function autoReply(jid, userText, contactName) {
     { role: "user", content: userText },
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
+  const firstNameCt = String(contactName || "cliente").split(" ")[0] || "cliente";
   let result = isHandoffRequest(userText)
-    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(String(contactName || "cliente").split(" ")[0] || "cliente") }
+    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameCt) }
+    : isResumeRequest(userText)
+    ? { ok: true, provider: "resume-rule", reply: buildResumeReply(history, firstNameCt) }
     : await callAI(messagesPayload, { temperature: 0.72, userText });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
@@ -1714,8 +1735,11 @@ app.post("/api/chat/message", async (req, res) => {
   const antiRepetitionContext = lastReplies.length
     ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
     : "";
+  const firstNameWeb = String(req.body?.visitor_name || "Cliente").split(" ")[0] || "Cliente";
   let result = isHandoffRequest(message)
-    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(String(req.body?.visitor_name || "Cliente").split(" ")[0] || "Cliente") }
+    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameWeb) }
+    : isResumeRequest(message)
+    ? { ok: true, provider: "resume-rule", reply: buildResumeReply(normalizedHistory, firstNameWeb) }
     : await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}${antiRepetitionContext}` },
       ...normalizedHistory,
