@@ -362,6 +362,31 @@ const buildResumeReply = (history = []) => {
   return `Claro, podemos retomar. Estávamos tratando de: "${snippet}". Quer continuar desse ponto ou ajustar algo?`;
 };
 
+const isThanksMessage = (text) => {
+  const value = String(text || "").trim().toLowerCase();
+  if (!value) return false;
+  // mensagem curta de agradecimento (até ~6 palavras)
+  if (value.split(/\s+/).length > 6) return false;
+  return /\b(obrigad[ao]s?|muito\s+obrigad[ao]s?|brigad[ao]s?|valeu|vlw|agrade[cç]o|grat[ao]s?|thanks?|thank\s*you|ty)\b/i.test(value);
+};
+
+const buildThanksReply = (history = []) => {
+  const replies = [
+    "Por nada! Fico feliz em ajudar. 😊",
+    "Imagina, estou aqui para isso!",
+    "De nada! Se precisar de mais alguma coisa é só me chamar.",
+  ];
+  const used = new Set(
+    history.filter((m) => m.role === "assistant").map((m) => String(m.content || "").trim())
+  );
+  const fresh = replies.find((r) => !used.has(r)) || replies[0];
+  const lastUser = [...history].reverse().find((m) => m.role === "user" && !isThanksMessage(m.content));
+  const topicHint = lastUser
+    ? " Quer continuar de onde paramos ou tem outra dúvida?"
+    : " Quer me contar em que posso te ajudar?";
+  return `${fresh}${topicHint}`;
+};
+
 const isHistoryDumpReply = (text) =>
   /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 
@@ -756,6 +781,18 @@ const staticPost = (url, body = {}) => {
           return response({
             session_id: sessionId,
             response: buildTemporalAnswer(),
+            audio_base64: null,
+            appointment: null,
+            handoff: false,
+            speaker: null,
+            analysis: { acertividade: 100, qualificacao: "ok" },
+            server_time: new Date().toISOString(),
+          });
+        }
+        if (isThanksMessage(userText)) {
+          return response({
+            session_id: sessionId,
+            response: cleanInternalChatMarkers(buildThanksReply(body.history || [])),
             audio_base64: null,
             appointment: null,
             handoff: false,

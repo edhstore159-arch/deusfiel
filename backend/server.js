@@ -708,6 +708,7 @@ function buildNonRepeatingFallback(userText, contactName = "cliente") {
   const firstName = String(contactName || "cliente").split(" ")[0] || "cliente";
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (isThanksMessage(txt)) return buildThanksReply([], firstName);
   if (isHandoffRequest(txt)) return buildHandoffReply(firstName);
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(txt)) {
     return `${firstName}, claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.`;
@@ -755,6 +756,31 @@ function buildResumeReply(history = [], name = "") {
   }
   const snippet = raw.length > 120 ? raw.slice(0, 117).trim() + "..." : raw;
   return `${prefix}claro, podemos retomar. Estávamos tratando de: "${snippet}". Quer continuar desse ponto ou ajustar algo?`;
+}
+
+function isThanksMessage(text) {
+  const value = String(text || "").trim().toLowerCase();
+  if (!value) return false;
+  if (value.split(/\s+/).length > 6) return false;
+  return /\b(obrigad[ao]s?|muito\s+obrigad[ao]s?|brigad[ao]s?|valeu|vlw|agrade[cç]o|grat[ao]s?|thanks?|thank\s*you|ty)\b/i.test(value);
+}
+
+function buildThanksReply(history = [], name = "") {
+  const replies = [
+    "Por nada! Fico feliz em ajudar. 😊",
+    "Imagina, estou aqui para isso!",
+    "De nada! Se precisar de mais alguma coisa é só me chamar.",
+  ];
+  const used = new Set(
+    history.filter((m) => m.role === "assistant").map((m) => String(m.content || "").trim())
+  );
+  const fresh = replies.find((r) => !used.has(r)) || replies[0];
+  const lastUser = [...history].reverse().find((m) => m.role === "user" && !isThanksMessage(String(m.content || "")));
+  const topicHint = lastUser
+    ? " Quer continuar de onde paramos ou tem outra dúvida?"
+    : " Quer me contar em que posso te ajudar?";
+  const prefix = name ? `${name}, ` : "";
+  return `${prefix}${fresh}${topicHint}`;
 }
 
 function isHistoryDumpReply(text) {
@@ -871,6 +897,7 @@ function buildLocalLegalReply(jid, userText, contactName) {
   const name = String(contactName || "cliente").split(" ")[0];
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (isThanksMessage(txt)) return buildThanksReply(history, name);
   if (isHandoffRequest(txt)) return buildHandoffReply(name);
   if (/urgente|pris[aã]o|audi[eê]ncia|prazo|intima[cç][aã]o|mandado|medida protetiva/.test(txt)) {
     return `${name}, entendi a urgência. Vou sinalizar seu caso para a equipe agora; por favor me envie sua cidade/estado e um resumo breve do que aconteceu.`;
@@ -986,7 +1013,9 @@ async function autoReply(jid, userText, contactName) {
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
   const firstNameCt = String(contactName || "cliente").split(" ")[0] || "cliente";
-  let result = isHandoffRequest(userText)
+  let result = isThanksMessage(userText)
+    ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(history, firstNameCt) }
+    : isHandoffRequest(userText)
     ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameCt) }
     : isResumeRequest(userText)
     ? { ok: true, provider: "resume-rule", reply: buildResumeReply(history, firstNameCt) }
@@ -1748,7 +1777,9 @@ app.post("/api/chat/message", async (req, res) => {
     ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
     : "";
   const firstNameWeb = String(req.body?.visitor_name || "Cliente").split(" ")[0] || "Cliente";
-  let result = isHandoffRequest(message)
+  let result = isThanksMessage(message)
+    ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(normalizedHistory, firstNameWeb) }
+    : isHandoffRequest(message)
     ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameWeb) }
     : isResumeRequest(message)
     ? { ok: true, provider: "resume-rule", reply: buildResumeReply(normalizedHistory, firstNameWeb) }
