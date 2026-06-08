@@ -973,8 +973,11 @@ async function autoReply(jid, userText, contactName) {
     { role: "user", content: userText },
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
+  const firstNameCt = String(contactName || "cliente").split(" ")[0] || "cliente";
   let result = isHandoffRequest(userText)
-    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(String(contactName || "cliente").split(" ")[0] || "cliente") }
+    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameCt) }
+    : isResumeRequest(userText)
+    ? { ok: true, provider: "resume-rule", reply: buildResumeReply(history, firstNameCt) }
     : await callAI(messagesPayload, { temperature: 0.72, userText });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
