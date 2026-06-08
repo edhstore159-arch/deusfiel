@@ -511,7 +511,7 @@ const staticPost = (url, body = {}) => {
         const raw = await res.text();
         const data = JSON.parse(raw || "{}");
         if (data?.fallback || data?.error) throw new Error(data.error || "Ollama indisponível");
-        const text = (data?.response || "").trim();
+        const text = sanitizeOllamaReply(data?.response || "", body.message || body.text || "");
         if (!text) throw new Error("Ollama retornou resposta vazia");
         const responseText = isNearDuplicateReply(text, body.history || [])
           ? buildNonRepeatingFallback(body.message || body.text || "")

@@ -477,7 +477,7 @@ async function callAI(messagesPayload, options = {}) {
   const attempts = [];
   try {
     const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`);
-    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: cleanRepeatedText(reply), attempts };
+    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
   } catch (e) {
     const timedOut = e?.name === "AbortError";
     const failed = {
