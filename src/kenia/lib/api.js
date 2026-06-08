@@ -935,7 +935,7 @@ const staticPost = (url, body = {}) => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,
-            body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 280, temperature: 0.1 } }),
+            body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 520, temperature: 0.1 } }),
           }).finally(() => clearTimeout(timeout));
           if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
           const raw = await res.text();
@@ -964,7 +964,7 @@ const staticPost = (url, body = {}) => {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               signal: controller.signal,
-              body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(retryPrompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 280, temperature: 0.9 } }),
+              body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(retryPrompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 520, temperature: 0.9 } }),
             }).finally(() => clearTimeout(timeout));
             if (res.ok) {
               const raw = await res.text();
