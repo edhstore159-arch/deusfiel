@@ -718,14 +718,21 @@ export default function ChatIA() {
     setPlayingIdx(null);
   };
 
+  const sendingRef = useRef(false);
   const send = async (text) => {
     const msg = (text ?? input).trim();
     if (!msg) return;
+    if (sendingRef.current || thinking) return;
+    sendingRef.current = true;
     if (waitFollowUpTimerRef.current) {
       clearTimeout(waitFollowUpTimerRef.current);
       waitFollowUpTimerRef.current = null;
     }
-    setMessages((prev) => [...prev, { role: "user", content: msg }]);
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === "user" && last.content === msg) return prev;
+      return [...prev, { role: "user", content: msg }];
+    });
     setInput("");
     setThinking(true);
     const scheduleIntent = extractScheduleIntent(msg);
@@ -749,6 +756,7 @@ export default function ChatIA() {
         openScheduler(analysis?.area || "Atendimento jurídico");
         toast.error("Não consegui criar o agendamento automaticamente");
       }
+      sendingRef.current = false;
       return;
     }
     try {
@@ -808,6 +816,7 @@ export default function ChatIA() {
       await typeAssistantMessage("Desculpe, tive uma instabilidade aqui. Pode repetir sua mensagem? 🙏");
     } finally {
       setThinking(false);
+      sendingRef.current = false;
     }
   };
 
