@@ -124,15 +124,15 @@ async function probeOllamaGenerate() {
 }
 
 export async function perguntarIA(texto) {
+  // IMPORTANTE: NÃO usar timeout/AbortController aqui.
+  // O usuário exigiu que o Baileys/WhatsApp espere o Ollama responder pelo
+  // tempo que for necessário, sem cair em fallback. Não reintroduzir timeout.
   let lastErrorForThrow = null;
   for (let attempt = 1; attempt <= OLLAMA_REQUEST_RETRIES + 1; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
     try {
       const resposta = await fetch(OLLAMA_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
-        signal: controller.signal,
         body: JSON.stringify({
           model: OLLAMA_MODEL,
           prompt: texto,
@@ -152,12 +152,9 @@ export async function perguntarIA(texto) {
       return reply;
     } catch (e) {
       lastErrorForThrow = e;
-      const timedOut = e?.name === "AbortError";
-      const message = timedOut ? `generate timeout ${OLLAMA_GENERATE_TIMEOUT_MS}ms` : e?.message || String(e);
+      const message = e?.message || String(e);
       ollamaStatus = { ...ollamaStatus, ok: false, last_checked_at: new Date().toISOString(), last_error: message };
       if (attempt <= OLLAMA_REQUEST_RETRIES) await delay(800 * attempt);
-    } finally {
-      clearTimeout(timeout);
     }
   }
   throw lastErrorForThrow || new Error("Falha ao consultar Ollama.");
