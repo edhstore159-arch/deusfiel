@@ -725,7 +725,7 @@ async function autoReply(jid, userText, contactName) {
     ...history,
     { role: "user", content: userText },
   ];
-  recordAutoReply({ step: "ai_request", jid, providers: ["ollama", OPENAI_API_KEY && "openai", EMERGENT_API_KEY && "emergent", LOVABLE_API_KEY && "lovable"].filter(Boolean) });
+  recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
   let result = await callAI(messagesPayload, { temperature: 0.72, userText });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
