@@ -7,6 +7,7 @@ import cors from "cors";
 import pino from "pino";
 import QRCode from "qrcode";
 import { Boom } from "@hapi/boom";
+import { createClient } from "@supabase/supabase-js";
 import { rm, mkdir } from "node:fs/promises";
 import {
   default as makeWASocket,
@@ -23,6 +24,11 @@ const SUPABASE_ANON_KEY =
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   process.env.VITE_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6Imt6bHh5c3h2dmx1cGp0cm14cW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4OTM3MDUsImV4cCI6MjA5MjQ2OTcwNX0.iU5enYnsJExOHtbwpJKQ4bMGZS8hzQIURi6T2y2EQVM";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const SUPABASE_DB_KEY = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+const supabaseDb = SUPABASE_URL && SUPABASE_DB_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_DB_KEY, { auth: { persistSession: false } })
+  : null;
 
 async function transcribeAudioBuffer(buffer, mimetype = "audio/ogg") {
   if (!SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY ausente no backend");
@@ -537,6 +543,56 @@ Resposta final em português do Brasil:`;
 const AI_SYSTEM_PROMPT = SECRETARY_SYSTEM_PROMPT;
 
 const aiHistory = new Map(); // jid -> [{role, content}]
+const AI_HISTORY_LIMIT = Number(process.env.AI_HISTORY_LIMIT || 20);
+
+function trimAiHistory(history, limit = AI_HISTORY_LIMIT) {
+  return (Array.isArray(history) ? history : [])
+    .filter((m) => (m.role === "user" || m.role === "assistant") && String(m.content || "").trim())
+    .slice(-limit);
+}
+
+async function loadPersistedAiHistory(jid) {
+  const cached = trimAiHistory(aiHistory.get(jid));
+  if (cached.length || !supabaseDb || !jid) return cached;
+  const sessionId = `whatsapp:${jid}`;
+  try {
+    const { data, error } = await supabaseDb
+      .from("conversations")
+      .select("message,response,created_at")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(Math.ceil(AI_HISTORY_LIMIT / 2));
+    if (error) throw error;
+    const restored = [];
+    for (const row of [...(data || [])].reverse()) {
+      if (row.message) restored.push({ role: "user", content: String(row.message) });
+      if (row.response) restored.push({ role: "assistant", content: String(row.response) });
+    }
+    const normalized = trimAiHistory(restored);
+    if (normalized.length) aiHistory.set(jid, normalized);
+    recordAutoReply({ step: "history_restored", jid, turns: normalized.length });
+    return normalized;
+  } catch (e) {
+    recordAutoReply({ step: "history_restore_error", jid, error: e?.message || String(e) });
+    return cached;
+  }
+}
+
+async function persistAiTurn(jid, userText, reply) {
+  if (!supabaseDb || !jid || !String(userText || "").trim()) return;
+  try {
+    const { error } = await supabaseDb.from("conversations").insert({
+      user_id: null,
+      session_id: `whatsapp:${jid}`,
+      message: String(userText || ""),
+      response: String(reply || ""),
+    });
+    if (error) throw error;
+    recordAutoReply({ step: "history_persisted", jid });
+  } catch (e) {
+    recordAutoReply({ step: "history_persist_error", jid, error: e?.message || String(e) });
+  }
+}
 
 function saoPauloTemporalContext() {
   const now = new Date();
@@ -855,7 +911,7 @@ async function autoReply(jid, userText, contactName) {
     recordAutoReply({ step: "skip_socket", jid, connectionState });
     return;
   }
-  const history = aiHistory.get(jid) || [];
+  const history = await loadPersistedAiHistory(jid);
   const lastReplies = recentAssistantReplies(history);
   const antiRepetitionContext = lastReplies.length
     ? `\nANTI-REPETIÇÃO OPERACIONAL:\nÚltimas respostas enviadas:\n${lastReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\nNão repita nenhuma delas; avance a conversa respondendo à última mensagem do cliente.`
@@ -885,7 +941,8 @@ async function autoReply(jid, userText, contactName) {
   if (usedFallback) recordAutoReply({ step: "ai_fail_local_fallback", jid, result, reply: reply.slice(0, 200) });
   history.push({ role: "user", content: userText });
   history.push({ role: "assistant", content: reply });
-  aiHistory.set(jid, history);
+  aiHistory.set(jid, trimAiHistory(history));
+  persistAiTurn(jid, userText, reply).catch(() => {});
   try {
     const sent = await sendBotText(jid, reply, { source: usedFallback ? "local_fallback" : result.provider });
     recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: usedFallback ? "local_fallback" : result.provider, model: result.model || null, reply: reply.slice(0, 200) });
