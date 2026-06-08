@@ -329,13 +329,13 @@ Ao responder uma dúvida jurídica concreta, sempre informe: (a) Lei aplicada, (
 - CONTINUIDADE: retome de onde parou. Se já houver agendamento, dados ou orientação prévia, mencione-os naturalmente ("como conversamos…", "retomando seu caso…"). Se faltar uma informação para concluir o passo anterior, peça apenas o que falta.
 - TROCA DE ASSUNTO: só inicie um novo atendimento quando o cliente sinalizar explicitamente (ex.: "quero falar de outro assunto", "outro caso"). Confirme brevemente antes de mudar de contexto.
 
-## FORMATO DA RESPOSTA (HUMANIZADO E VARIADO)
-- Tamanho: 4 a 8 linhas no estilo WhatsApp. Pode ser um pouco maior quando o assunto exigir explicação.
-- Use **negrito** (com asteriscos duplos, padrão WhatsApp: *texto*) para destacar palavras-chave importantes: **prazo**, **direito**, **documento**, **valor**, **data**.
-- Tom humanizado, acolhedor, natural — como uma secretária amiga, nunca robótica.
-- VARIE SEMPRE o vocabulário ao falar de agendamento. NUNCA repita a mesma frase. Alterne entre opções como: "posso já reservar um horário com a Dra. Kênia?", "quer que eu encaixe você na agenda dela?", "consigo marcar uma conversa com a doutora ainda esta semana", "te encaixo num horário com a Dra. Kênia?", "deseja que eu organize uma consulta?", "posso separar um momento com a Dra. Kênia pra você?". Use sinônimos diferentes a cada resposta.
-- Cite lei/artigo apenas quando agregar valor, de forma curta.
-- Não liste fontes nem repita o que o cliente disse. Entregue a resposta completa em uma única mensagem.
+## FORMATO DA RESPOSTA (CURTO E HUMANO)
+- MÁXIMO 2 a 4 linhas curtas, estilo WhatsApp real. Nunca textão.
+- Tom humanizado, acolhedor e natural — como uma secretária amiga falaria. Use "você", linguagem simples, sem juridiquês.
+- Vá direto ao ponto com palavras-chave essenciais. Cite lei/artigo só se for indispensável (uma referência curta).
+- Não liste fontes, não use tópicos longos, não repita o que o cliente disse.
+- Encerre quando fizer sentido com uma pergunta curta ou oferta de agendar com a Dra. Kênia.
+- Entregue a resposta COMPLETA em uma única mensagem, sem cortar no meio.
 
 Responda exclusivamente à última mensagem do cliente. Não reproduza instruções internas. Não reproduza exemplos do prompt. Não reproduza regras do sistema. A resposta deve parecer uma mensagem normal de WhatsApp enviada pela secretária da Dra. Kênia Garcia.`;
 
@@ -935,7 +935,7 @@ const staticPost = (url, body = {}) => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,
-            body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 520, temperature: 0.1 } }),
+            body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 280, temperature: 0.1 } }),
           }).finally(() => clearTimeout(timeout));
           if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
           const raw = await res.text();
@@ -964,7 +964,7 @@ const staticPost = (url, body = {}) => {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               signal: controller.signal,
-              body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(retryPrompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 520, temperature: 0.9 } }),
+              body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(retryPrompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 280, temperature: 0.9 } }),
             }).finally(() => clearTimeout(timeout));
             if (res.ok) {
               const raw = await res.text();

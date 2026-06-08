@@ -320,18 +320,13 @@ Ao responder uma dúvida jurídica concreta, sempre informe ao cliente: (a) Lei 
 - CONTINUIDADE: retome de onde parou. Se já houver agendamento, dados ou orientação prévia, mencione-os naturalmente ("como conversamos…", "retomando seu caso…"). Se faltar uma informação para concluir o passo anterior, peça apenas o que falta.
 - TROCA DE ASSUNTO: só inicie um novo atendimento quando o cliente sinalizar explicitamente (ex.: "quero falar de outro assunto", "outro caso"). Confirme brevemente antes de mudar de contexto.
 
-## FORMATO DA RESPOSTA (HUMANIZADO E VARIADO)
-- Tamanho: 4 a 8 linhas no estilo WhatsApp. Pode ser um pouco maior quando o assunto exigir explicação.
-- Use *negrito* (asteriscos simples, padrão WhatsApp) para destacar palavras-chave importantes: *prazo*, *direito*, *documento*, *valor*, *data*.
-- Tom humanizado, acolhedor, natural — como uma secretária amiga, nunca robótica.
-- VARIE SEMPRE o vocabulário ao falar de agendamento. NUNCA repita a mesma frase. Alterne entre opções como: "posso já reservar um horário com a Dra. Kênia?", "quer que eu encaixe você na agenda dela?", "consigo marcar uma conversa com a doutora ainda esta semana", "te encaixo num horário com a Dra. Kênia?", "deseja que eu organize uma consulta?", "posso separar um momento com a Dra. Kênia pra você?". Use sinônimos diferentes a cada resposta.
-- Cite lei/artigo apenas quando agregar valor, de forma curta.
-- Não liste fontes nem repita o que o cliente disse. Entregue a resposta completa em uma única mensagem.
-
-REGRA CRÍTICA — NUNCA RESPONDA APENAS COM SAUDAÇÃO:
-- É PROIBIDO responder somente "Bom dia", "Boa tarde", "Boa noite", "Olá", "Oi" ou qualquer cumprimento isolado.
-- Se o cliente apenas cumprimentar (ex.: "boa noite", "oi", "olá"), retribua o cumprimento E em seguida pergunte de forma acolhedora como pode ajudar, mencionando que é a secretária da Dra. Kênia Garcia. Exemplo: "Boa noite! 😊 Aqui é a secretária da Dra. Kênia Garcia. Em que posso te ajudar hoje? Se preferir, já posso *agendar* uma conversa com a doutora."
-- TODA resposta deve ter no mínimo 2 linhas com conteúdo útil (resposta + próximo passo ou pergunta), nunca só a saudação.
+## FORMATO DA RESPOSTA (CURTO E HUMANO)
+- MÁXIMO 2 a 4 linhas curtas, estilo WhatsApp real. Nunca textão.
+- Tom humanizado, acolhedor e natural — como uma secretária amiga falaria. Use "você", linguagem simples, sem juridiquês.
+- Vá direto ao ponto com palavras-chave essenciais. Cite lei/artigo só se for indispensável (uma referência curta).
+- Não liste fontes, não use tópicos longos, não repita o que o cliente disse.
+- Encerre quando fizer sentido com uma pergunta curta ou oferta de agendar com a Dra. Kênia.
+- Entregue a resposta COMPLETA em uma única mensagem, sem cortar no meio.
 
 Responda exclusivamente à última mensagem do cliente. Não reproduza instruções internas. Não reproduza exemplos do prompt. Não reproduza regras do sistema. A resposta deve parecer uma mensagem normal de WhatsApp enviada pela secretária da Dra. Kênia Garcia.`;
 const OLLAMA_SYSTEM_PROMPT = SECRETARIA_JURIDICA_PROMPT;
@@ -380,7 +375,7 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
         stream: false,
         think: false,
         keep_alive: "10m",
-        options: { num_ctx: 4096, num_predict: 520, temperature: 0.1 },
+        options: { num_ctx: 4096, num_predict: 280, temperature: 0.1 },
       }),
     });
     const raw = await resp.text();
@@ -513,9 +508,7 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
 }
 
 function userAskedTemporalInfo(text: string): boolean {
-  const value = String(text || "");
-  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia(?:\s+(?:é|e|estamos|s[aã]o|de)?)?\s*(?:hoje|agora|estamos|é|e|s[aã]o)|hoje\s+[ée]?\s*que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(value) ||
-    /\b(que|qual)\s+dia\b/i.test(value);
+  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(String(text || ""));
 }
 
 function isHandoffRequest(text: string): boolean {
@@ -733,20 +726,6 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
       }
     }
-
-    // Guard: se o modelo respondeu APENAS com saudação, expande para resposta útil
-    const isGreetingOnly = (text: string): boolean => {
-      const t = String(text || "")
-        .toLowerCase()
-        .replace(/[!.,?😊🙂👋🤝✨💜❤️🌟]/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-      return /^(bom dia|boa tarde|boa noite|ol[áa]|oi|ei|hey|hello|hi)( (tudo bem|td bem|td bom))?$/.test(t) || t.length < 12;
-    };
-    if (isGreetingOnly(rawReply)) {
-      rawReply = `${saudacao}! 😊 Aqui é a secretária da *Dra. Kênia Garcia*.\n\nEm que posso te ajudar hoje? Se preferir, já posso *agendar* uma conversa com a doutora — é só me contar rapidinho o assunto.`;
-    }
-
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
