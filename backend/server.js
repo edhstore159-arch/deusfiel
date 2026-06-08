@@ -738,7 +738,7 @@ async function autoReply(jid, userText, contactName) {
     { role: "user", content: userText },
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["ollama", OPENAI_API_KEY && "openai", EMERGENT_API_KEY && "emergent", LOVABLE_API_KEY && "lovable"].filter(Boolean) });
-  let result = await callAI(messagesPayload, { temperature: 0.72 });
+  let result = await callAI(messagesPayload, { temperature: 0.72, userText });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
   if (!usedFallback && isNearDuplicateReply(rawReply, history)) {
@@ -746,7 +746,7 @@ async function autoReply(jid, userText, contactName) {
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...history,
       { role: "user", content: userText },
-    ], { temperature: 0.9 });
+    ], { temperature: 0.9, userText });
     if (retry.ok) {
       result = retry;
       rawReply = retry.reply;
@@ -1492,14 +1492,14 @@ app.post("/api/chat/message", async (req, res) => {
     { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}${antiRepetitionContext}` },
     ...normalizedHistory,
     { role: "user", content: message },
-  ], { temperature: 0.72 });
+  ], { temperature: 0.72, userText: message });
   let rawReply = result.ok ? result.reply : buildLocalLegalReply(req.body?.session_id || "web", message, req.body?.visitor_name || "Cliente");
   if (result.ok && isNearDuplicateReply(rawReply, normalizedHistory)) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...normalizedHistory,
       { role: "user", content: message },
-    ], { temperature: 0.9 });
+    ], { temperature: 0.9, userText: message });
     if (retry.ok) {
       result = retry;
       rawReply = retry.reply;
