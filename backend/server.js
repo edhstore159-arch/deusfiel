@@ -356,6 +356,8 @@ Não informe horário ou data, exceto se o cliente pedir explicitamente.
 ## Estilo de Resposta
 Profissional, cordial, objetivo, humanizado, jurídico porém de fácil compreensão. Respostas curtas e diretas, evitando textos longos. Use o histórico para não repetir perguntas já respondidas e mantenha contexto sobre nome, telefone, e-mail, área jurídica, fatos principais, datas, documentos e status do atendimento.`;
 
+const OFFICIAL_GREETING = "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
+
 // Mantém o comportamento do atendente fixo mesmo se existir prompt antigo salvo no ambiente.
 const AI_SYSTEM_PROMPT = SECRETARY_SYSTEM_PROMPT;
 
@@ -386,6 +388,15 @@ function cleanRepeatedText(text) {
     if (normalized && normalized !== previous) uniqueLines.push(line);
   }
   return uniqueLines.join("\n").trim();
+}
+
+function sanitizeOllamaReply(reply, userText = "") {
+  const text = cleanRepeatedText(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  if (/Tudo bem\?\s*Sou a assistente virtual da Dra\.\s*K[êe]nia Garcia/i.test(text)) return OFFICIAL_GREETING;
+  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso)/i.test(text);
+  const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userText || "").trim());
+  if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
+  return text;
 }
 
 function normalizeForSimilarity(text) {
@@ -466,7 +477,7 @@ async function callAI(messagesPayload, options = {}) {
   const attempts = [];
   try {
     const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`);
-    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: cleanRepeatedText(reply), attempts };
+    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
   } catch (e) {
     const timedOut = e?.name === "AbortError";
     const failed = {
@@ -727,7 +738,7 @@ async function autoReply(jid, userText, contactName) {
     { role: "user", content: userText },
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["ollama", OPENAI_API_KEY && "openai", EMERGENT_API_KEY && "emergent", LOVABLE_API_KEY && "lovable"].filter(Boolean) });
-  let result = await callAI(messagesPayload, { temperature: 0.72 });
+  let result = await callAI(messagesPayload, { temperature: 0.72, userText });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
   if (!usedFallback && isNearDuplicateReply(rawReply, history)) {
@@ -735,7 +746,7 @@ async function autoReply(jid, userText, contactName) {
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...history,
       { role: "user", content: userText },
-    ], { temperature: 0.9 });
+    ], { temperature: 0.9, userText });
     if (retry.ok) {
       result = retry;
       rawReply = retry.reply;
@@ -1481,14 +1492,14 @@ app.post("/api/chat/message", async (req, res) => {
     { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}${antiRepetitionContext}` },
     ...normalizedHistory,
     { role: "user", content: message },
-  ], { temperature: 0.72 });
+  ], { temperature: 0.72, userText: message });
   let rawReply = result.ok ? result.reply : buildLocalLegalReply(req.body?.session_id || "web", message, req.body?.visitor_name || "Cliente");
   if (result.ok && isNearDuplicateReply(rawReply, normalizedHistory)) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...normalizedHistory,
       { role: "user", content: message },
-    ], { temperature: 0.9 });
+    ], { temperature: 0.9, userText: message });
     if (retry.ok) {
       result = retry;
       rawReply = retry.reply;
