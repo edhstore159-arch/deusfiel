@@ -63,6 +63,7 @@ const OLLAMA_HEALTH_INTERVAL_MS = Number(process.env.OLLAMA_HEALTH_INTERVAL_MS |
 const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS || 8000);
 const OLLAMA_PROBE_TIMEOUT_MS = Number(process.env.OLLAMA_PROBE_TIMEOUT_MS || Math.min(OLLAMA_GENERATE_TIMEOUT_MS, 30000));
 const OLLAMA_OPTIONS_BASE = { num_ctx: 2048, temperature: 0.2 };
+const OLLAMA_NUM_PREDICT = Number(process.env.OLLAMA_NUM_PREDICT || 420);
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOllamaBaseUrl = () => OLLAMA_BASE_URL;
 const formatOllamaHttpError = (status, raw, context = "Ollama") => {
@@ -135,11 +136,11 @@ export async function perguntarIA(texto) {
         signal: controller.signal,
         body: JSON.stringify({
           model: OLLAMA_MODEL,
-          prompt: texto,
+          prompt: `/no_think\n${texto}`,
           stream: false,
           think: false,
           keep_alive: OLLAMA_KEEP_ALIVE,
-          options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
+          options: { ...OLLAMA_OPTIONS_BASE, num_predict: OLLAMA_NUM_PREDICT },
         }),
       });
       const raw = await resposta.text();
@@ -320,14 +321,10 @@ Ao iniciar qualquer conversa, cumprimente assim:
 - Sugerir estratégias jurídicas de forma educativa.
 - Nunca substituir a atuação de um advogado habilitado.
 
-## MÉTODO DE RACIOCÍNIO (obrigatório — execute internamente antes de responder)
-Etapa 1 — Identificar o problema: área do Direito, fatos relevantes, partes envolvidas, objetivo do usuário.
-Etapa 2 — Levantar a base legal: Constituição Federal, códigos aplicáveis, leis especiais, jurisprudência, súmulas e precedentes.
-Etapa 3 — Analisar juridicamente: direitos, obrigações, riscos, interpretações possíveis.
-Etapa 4 — Concluir: resposta objetiva, fundamentação e próximos passos.
-Etapa 5 — Grau de confiança: alta / média / baixa.
-Se faltar informação, faça perguntas complementares ANTES de concluir.
-Nunca exponha as etapas internas, tags <think> ou raciocínio em voz alta — envie apenas a resposta final pronta.
+## RACIOCÍNIO JURÍDICO E CONTROLE DO OLLAMA
+Use raciocínio jurídico internamente, mas nunca mostre bastidores. Antes de responder, avalie: área do Direito, fatos relevantes, partes envolvidas, objetivo do cliente, base legal aplicável, riscos, documentos necessários e próximos passos.
+Se faltar informação essencial, faça perguntas complementares objetivas antes de concluir.
+Nunca exponha tags <think>, listas de etapas internas, frases como "vou analisar", "preciso raciocinar", "the user" ou qualquer raciocínio em voz alta. A resposta enviada ao cliente deve ser apenas a resposta final, como assistente virtual jurídica.
 
 ## FORMATO DA RESPOSTA (use sempre que houver dúvida jurídica)
 **Resumo:** resposta direta.
@@ -395,10 +392,25 @@ function cleanRepeatedText(text) {
   return uniqueLines.join("\n").trim();
 }
 
+function isThinkingLeak(text) {
+  const value = String(text || "").trim();
+  return /^(okay|ok,|let'?s|the user|the client|first,|i need|i should|we need|so i|wait,|vou analisar|preciso raciocinar|racioc[ií]nio|pensamento|an[aá]lise interna)\b/i.test(value) ||
+    /\b(i need to|i should|let me|the client|the user|brazilian labor laws|legal question|severance pay)\b/i.test(value);
+}
+
 function sanitizeOllamaReply(reply, userText = "") {
-  const text = cleanRepeatedText(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  const raw = cleanRepeatedText(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  const finalOnly = raw.match(/(?:resposta\s+final|resposta\s+ao\s+cliente|resposta)\s*[:\-]\s*([\s\S]+)$/iu)?.[1] || raw;
+  const text = finalOnly
+    .replace(/^(?:[\s\S]{0,1800}?)(?:resposta\s+final|resposta\s+ao\s+cliente)\s*[:\-]\s*/iu, "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => !/^(etapa\s*\d+|passo\s*\d+|an[aá]lise interna|racioc[ií]nio|pensamento|thinking|the user|i need|i should|vou analisar|preciso raciocinar)\b/i.test(line))
+    .join("\n")
+    .trim();
   if (/Tudo bem\?\s*Sou a assistente virtual da Dra\.\s*K[êe]nia Garcia/i.test(text)) return OFFICIAL_GREETING;
-  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso)/i.test(text);
+  if (isThinkingLeak(text)) return "";
+  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso|racioc[ií]nio|pensamento|an[aá]lise interna)/i.test(text);
   const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userText || "").trim());
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
   return text;
@@ -447,6 +459,9 @@ function buildNonRepeatingFallback(userText, contactName = "cliente") {
   const firstName = String(contactName || "cliente").split(" ")[0] || "cliente";
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return `Hoje é ${saoPauloTemporalContext().replace(/^.*referência\s+/i, "").replace(/,\s*America\/Sao_Paulo\..*$/i, ".")}`;
+  if (/\b(demitid|demiss[aã]o|rescis[aã]o|verbas rescis[oó]rias|fgts|seguro-desemprego|trabalhista)\b/i.test(txt)) {
+    return `${firstName}, em regra, na demissão sem justa causa devem ser verificadas verbas como saldo de salário, aviso-prévio, férias vencidas/proporcionais com 1/3, 13º proporcional, multa de 40% do FGTS e guias para saque/seguro-desemprego, quando cabíveis. Me envie a data da demissão, tempo de trabalho, último salário e se houve justa causa para eu direcionar a análise inicial. Esta resposta possui caráter informativo e não substitui a consulta com advogado regularmente inscrito na OAB. A análise final deve ser feita pela Dra. Kênia Garcia.`;
+  }
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(txt)) {
     return `${firstName}, claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.`;
   }
@@ -482,7 +497,9 @@ async function callAI(messagesPayload, options = {}) {
   const attempts = [];
   try {
     const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`);
-    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
+    const cleanedReply = sanitizeOllamaReply(reply, options.userText);
+    if (!cleanedReply) throw new Error("Ollama expôs raciocínio interno ou retornou resposta inválida.");
+    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: cleanedReply, attempts };
   } catch (e) {
     const timedOut = e?.name === "AbortError";
     const failed = {
@@ -490,7 +507,7 @@ async function callAI(messagesPayload, options = {}) {
       provider: "ollama",
       endpoint: OLLAMA_URL,
       model: OLLAMA_MODEL,
-      error: timedOut ? `Tempo esgotado após ${AI_REQUEST_TIMEOUT_MS}ms aguardando resposta do Ollama.` : e?.message || String(e),
+        error: timedOut ? `Tempo esgotado após ${AI_REQUEST_TIMEOUT_MS}ms aguardando resposta do Ollama.` : e?.message || String(e),
     };
     attempts.push(failed);
     recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
@@ -632,6 +649,9 @@ function buildLocalLegalReply(jid, userText, contactName) {
   const txt = String(userText || "").toLowerCase();
   if (/urgente|pris[aã]o|audi[eê]ncia|prazo|intima[cç][aã]o|mandado|medida protetiva/.test(txt)) {
     return `${name}, entendi a urgência. Vou sinalizar seu caso para a equipe agora; por favor me envie sua cidade/estado e um resumo breve do que aconteceu.`;
+  }
+  if (/\b(demitid|demiss[aã]o|rescis[aã]o|verbas rescis[oó]rias|fgts|seguro-desemprego|trabalhista)\b/i.test(txt)) {
+    return `${name}, entendi. Em uma demissão sem justa causa, normalmente é necessário conferir saldo de salário, aviso-prévio, férias vencidas/proporcionais acrescidas de 1/3, 13º proporcional, multa de 40% do FGTS e guias de saque/seguro-desemprego, se aplicáveis. Para uma triagem correta, me informe a data da demissão, há quanto tempo trabalhava, último salário e se a empresa alegou justa causa. Esta resposta possui caráter informativo e não substitui a consulta com advogado regularmente inscrito na OAB. A análise final deve ser feita pela Dra. Kênia Garcia.`;
   }
   if (userTurns <= 1) return "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
   if (userTurns === 2) return "Entendi. Quando isso aconteceu e qual foi o principal prejuízo ou preocupação para você?";
@@ -1081,13 +1101,16 @@ app.post("/api/generate", async (req, res) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
   try {
-    const body = {
+      const requestBody = req.body || {};
+      const rawPrompt = String(requestBody.prompt || "");
+      const body = {
       model: OLLAMA_MODEL,
       stream: false,
       think: false,
       keep_alive: OLLAMA_KEEP_ALIVE,
-      options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
-      ...(req.body || {}),
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: OLLAMA_NUM_PREDICT },
+        ...requestBody,
+        prompt: rawPrompt.startsWith("/no_think") ? rawPrompt : `/no_think\n${rawPrompt}`,
     };
     const upstream = await fetch(OLLAMA_URL, {
       method: "POST",
@@ -1114,7 +1137,7 @@ app.post("/api/generate", async (req, res) => {
         upstream: data,
       });
     }
-    res.json(data);
+    res.json({ ...data, response: sanitizeOllamaReply(data?.response || "", String(req.body?.prompt || "")) });
   } catch (err) {
     const aborted = err?.name === "AbortError";
     res.status(200).json({

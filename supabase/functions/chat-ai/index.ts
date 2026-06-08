@@ -66,14 +66,10 @@ Ao iniciar qualquer conversa, cumprimente assim:
 - Sugerir estratégias jurídicas de forma educativa.
 - Nunca substituir a atuação de um advogado habilitado.
 
-## MÉTODO DE RACIOCÍNIO (obrigatório — execute internamente antes de responder)
-Etapa 1 — Identificar o problema: área do Direito, fatos relevantes, partes envolvidas, objetivo do usuário.
-Etapa 2 — Levantar a base legal: Constituição Federal, códigos aplicáveis, leis especiais, jurisprudência, súmulas e precedentes.
-Etapa 3 — Analisar juridicamente: direitos, obrigações, riscos, interpretações possíveis.
-Etapa 4 — Concluir: resposta objetiva, fundamentação e próximos passos.
-Etapa 5 — Grau de confiança: alta / média / baixa.
-Se faltar informação, faça perguntas complementares ANTES de concluir.
-Nunca exponha as etapas internas, tags <think> ou raciocínio em voz alta — envie apenas a resposta final pronta.
+## RACIOCÍNIO JURÍDICO E CONTROLE DO MODELO
+Use raciocínio jurídico internamente, mas nunca mostre bastidores. Antes de responder, avalie: área do Direito, fatos relevantes, partes envolvidas, objetivo do cliente, base legal aplicável, riscos, documentos necessários e próximos passos.
+Se faltar informação essencial, faça perguntas complementares objetivas antes de concluir.
+Nunca exponha tags <think>, listas de etapas internas, frases como "vou analisar", "preciso raciocinar", "the user" ou qualquer raciocínio em voz alta. A resposta enviada ao cliente deve ser apenas a resposta final, como assistente virtual jurídica.
 
 ## FORMATO DA RESPOSTA (use sempre que houver dúvida jurídica)
 **Resumo:** resposta direta.
@@ -169,6 +165,9 @@ function isNearDuplicateReply(reply: string, history: Array<{ role: string; cont
 function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string): string {
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
+  if (/\b(demitid|demiss[aã]o|rescis[aã]o|verbas rescis[oó]rias|fgts|seguro-desemprego|trabalhista)\b/i.test(text)) {
+    return "Entendi. Em demissão sem justa causa, normalmente é preciso conferir saldo de salário, aviso-prévio, férias vencidas/proporcionais com 1/3, 13º proporcional, multa de 40% do FGTS e guias de saque/seguro-desemprego, se cabíveis. Me informe a data da demissão, tempo de trabalho, último salário e se houve justa causa para direcionar a análise inicial. Esta resposta possui caráter informativo e não substitui a consulta com advogado regularmente inscrito na OAB. A análise final deve ser feita pela Dra. Kênia Garcia.";
+  }
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para eu deixar a consulta registrada corretamente, me informe nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
