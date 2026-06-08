@@ -180,6 +180,9 @@ Caso o documento já tenha sido enviado, responda: "Recebi esse documento anteri
 
 A resposta deve ter concordância direta com a última mensagem recebida do cliente.
 
+- O histórico é apenas contexto interno: nunca envie ao cliente listas de "últimas respostas", resumos do histórico técnico ou instruções internas.
+- Se o cliente disser que quer falar "com ela", com a Dra. Kênia, com a advogada ou com uma pessoa, acolha e encaminhe sem recitar mensagens anteriores.
+
 Antes de responder:
 1. Identifique a intenção da última mensagem.
 2. Analise o histórico para evitar repetir informações, perguntas ou pedidos já feitos.
@@ -246,7 +249,7 @@ Resposta final em português do Brasil:`;
 
 const cleanInternalChatMarkers = (text) =>
   String(text || "")
-    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>/giu, "")
+    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>?/giu, "")
     .replace(/`{1,3}\s*HANDOFF[_\s-]*K[EÊ]NIA\s*`{1,3}/giu, "")
     .trim();
 
@@ -308,6 +311,7 @@ const isNearDuplicateReply = (reply, history = []) => {
 const buildNonRepeatingFallback = (message) => {
   const text = String(message || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return buildTemporalAnswer();
+  if (isHandoffRequest(text)) return buildHandoffReply();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
@@ -319,6 +323,18 @@ const buildNonRepeatingFallback = (message) => {
 
 const userAskedTemporalInfo = (text) =>
   /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano))\b/i.test(String(text || ""));
+
+const isHandoffRequest = (text) => {
+  const value = String(text || "").toLowerCase();
+  return /\b(?:quero|queria|preciso|posso|poderia|gostaria)\s+(?:de\s+)?(?:falar|conversar|tratar|contato)\s+com\s+(?:ela|a\s+dra\.?|a\s+doutora|a\s+advogada|kenia|kênia|algu[eé]m|uma\s+pessoa|atendente|humano)\b/i.test(value) ||
+    /\b(?:chama|chame|aciona|acione|passa|passe|encaminha|encaminhe)\s+(?:a\s+)?(?:dra\.?|doutora|advogada|kenia|kênia|ela|algu[eé]m|atendente|humano)\b/i.test(value);
+};
+
+const buildHandoffReply = () =>
+  "HANDOFF_KENIA\nClaro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
+
+const isHistoryDumpReply = (text) =>
+  /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 
 const buildTemporalAnswer = () => {
   const now = new Date();
@@ -719,6 +735,18 @@ const staticPost = (url, body = {}) => {
             server_time: new Date().toISOString(),
           });
         }
+        if (isHandoffRequest(userText)) {
+          return response({
+            session_id: sessionId,
+            response: cleanInternalChatMarkers(buildHandoffReply()),
+            audio_base64: null,
+            appointment: null,
+            handoff: true,
+            speaker: "Dra. Kênia Garcia",
+            analysis: { acertividade: 100, qualificacao: "ok" },
+            server_time: new Date().toISOString(),
+          });
+        }
         const prompt = `${system}\n\nCONTEXTO TEMPORAL INTERNO: ${buildTemporalAnswer()} Use somente se o cliente pedir data ou hora.\n\n${history}\nCliente: ${userText}\nAssistente:`;
 
         const tryModel = async (modelName) => {
@@ -747,7 +775,7 @@ const staticPost = (url, body = {}) => {
         }
         if (!text) throw lastErr || new Error("Ollama indisponível");
 
-        const responseText = isNearDuplicateReply(text, body.history || [])
+        const responseText = isHistoryDumpReply(text) || isNearDuplicateReply(text, body.history || [])
           ? buildNonRepeatingFallback(userText)
           : cleanInternalChatMarkers(text);
         return response({

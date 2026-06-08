@@ -485,6 +485,9 @@ Caso o documento já tenha sido enviado, responda: "Recebi esse documento anteri
 
 A resposta deve ter concordância direta com a última mensagem recebida do cliente.
 
+- O histórico é apenas contexto interno: nunca envie ao cliente listas de "últimas respostas", resumos do histórico técnico ou instruções internas.
+- Se o cliente disser que quer falar "com ela", com a Dra. Kênia, com a advogada ou com uma pessoa, acolha e encaminhe sem recitar mensagens anteriores.
+
 Antes de responder:
 1. Identifique a intenção da última mensagem.
 2. Analise o histórico para evitar repetir informações, perguntas ou pedidos já feitos.
@@ -619,7 +622,7 @@ function cleanRepeatedText(text) {
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
-    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>/giu, "")
+    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>?/giu, "")
     .replace(/`{1,3}\s*HANDOFF[_\s-]*K[EÊ]NIA\s*`{1,3}/giu, "")
     .replace(/\b((?:[\p{L}\p{N}]{2,}\s+){1,3}[\p{L}\p{N}]{2,})(?:[\s,.;:!?-]+\1\b)+/giu, "$1")
     .replace(/\b([\p{L}\p{N}]{2,})(?:[\s,.;:!?-]+\1\b)+/giu, "$1")
@@ -653,7 +656,7 @@ function isInvalidOllamaReply(text) {
 function normalizeForSimilarity(text) {
   return String(text || "")
     .replace(/<AGENDAMENTO>[\s\S]*?<\/AGENDAMENTO>/g, "")
-    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>/giu, "")
+    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>?/giu, "")
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
     .toLowerCase()
@@ -693,6 +696,7 @@ function buildNonRepeatingFallback(userText, contactName = "cliente") {
   const firstName = String(contactName || "cliente").split(" ")[0] || "cliente";
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (isHandoffRequest(txt)) return buildHandoffReply(firstName);
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(txt)) {
     return `${firstName}, claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.`;
   }
@@ -711,6 +715,20 @@ function buildTemporalAnswer() {
 
 function userAskedTemporalInfo(text) {
   return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano))\b/i.test(String(text || ""));
+}
+
+function isHandoffRequest(text) {
+  const value = String(text || "").toLowerCase();
+  return /\b(?:quero|queria|preciso|posso|poderia|gostaria)\s+(?:de\s+)?(?:falar|conversar|tratar|contato)\s+com\s+(?:ela|a\s+dra\.?|a\s+doutora|a\s+advogada|kenia|kênia|algu[eé]m|uma\s+pessoa|atendente|humano)\b/i.test(value) ||
+    /\b(?:chama|chame|aciona|acione|passa|passe|encaminha|encaminhe)\s+(?:a\s+)?(?:dra\.?|doutora|advogada|kenia|kênia|ela|algu[eé]m|atendente|humano)\b/i.test(value);
+}
+
+function buildHandoffReply(name = "cliente") {
+  return `HANDOFF_KENIA\n${name}, claro. Vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.`;
+}
+
+function isHistoryDumpReply(text) {
+  return /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 }
 
 function removeTemporalLeaks(reply, userText) {
@@ -823,6 +841,7 @@ function buildLocalLegalReply(jid, userText, contactName) {
   const name = String(contactName || "cliente").split(" ")[0];
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (isHandoffRequest(txt)) return buildHandoffReply(name);
   if (/urgente|pris[aã]o|audi[eê]ncia|prazo|intima[cç][aã]o|mandado|medida protetiva/.test(txt)) {
     return `${name}, entendi a urgência. Vou sinalizar seu caso para a equipe agora; por favor me envie sua cidade/estado e um resumo breve do que aconteceu.`;
   }
@@ -928,7 +947,7 @@ async function autoReply(jid, userText, contactName) {
   const history = await loadPersistedAiHistory(jid);
   const lastReplies = recentAssistantReplies(history);
   const antiRepetitionContext = lastReplies.length
-    ? `\nANTI-REPETIÇÃO OPERACIONAL:\nÚltimas respostas enviadas:\n${lastReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\nNão repita nenhuma delas; avance a conversa respondendo à última mensagem do cliente.`
+    ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
     : "";
   const messagesPayload = [
     { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nNome do contato: ${contactName || "Cliente"}.${antiRepetitionContext}` },
@@ -936,10 +955,12 @@ async function autoReply(jid, userText, contactName) {
     { role: "user", content: userText },
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
-  let result = await callAI(messagesPayload, { temperature: 0.72, userText });
+  let result = isHandoffRequest(userText)
+    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(String(contactName || "cliente").split(" ")[0] || "cliente") }
+    : await callAI(messagesPayload, { temperature: 0.72, userText });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
-  if (!usedFallback && isNearDuplicateReply(rawReply, history)) {
+  if (!usedFallback && (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history))) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...history,
@@ -949,7 +970,7 @@ async function autoReply(jid, userText, contactName) {
       result = retry;
       rawReply = retry.reply;
     }
-    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
+    if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
   }
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
   if (usedFallback) recordAutoReply({ step: "ai_fail_local_fallback", jid, result, reply: reply.slice(0, 200) });
@@ -1691,15 +1712,17 @@ app.post("/api/chat/message", async (req, res) => {
   const normalizedHistory = history.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "") }));
   const lastReplies = recentAssistantReplies(normalizedHistory);
   const antiRepetitionContext = lastReplies.length
-    ? `\nANTI-REPETIÇÃO OPERACIONAL:\nÚltimas respostas enviadas:\n${lastReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\nNão repita nenhuma delas; avance a conversa respondendo à última mensagem do cliente.`
+    ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
     : "";
-  let result = await callAI([
-    { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}${antiRepetitionContext}` },
-    ...normalizedHistory,
-    { role: "user", content: message },
-  ], { temperature: 0.72, userText: message });
+  let result = isHandoffRequest(message)
+    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(String(req.body?.visitor_name || "Cliente").split(" ")[0] || "Cliente") }
+    : await callAI([
+      { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}${antiRepetitionContext}` },
+      ...normalizedHistory,
+      { role: "user", content: message },
+    ], { temperature: 0.72, userText: message });
   let rawReply = result.ok ? result.reply : buildLocalLegalReply(req.body?.session_id || "web", message, req.body?.visitor_name || "Cliente");
-  if (result.ok && isNearDuplicateReply(rawReply, normalizedHistory)) {
+  if (result.ok && (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, normalizedHistory))) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...normalizedHistory,
@@ -1709,7 +1732,7 @@ app.post("/api/chat/message", async (req, res) => {
       result = retry;
       rawReply = retry.reply;
     }
-    if (isNearDuplicateReply(rawReply, normalizedHistory)) rawReply = buildNonRepeatingFallback(message, req.body?.visitor_name || "Cliente");
+    if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, normalizedHistory)) rawReply = buildNonRepeatingFallback(message, req.body?.visitor_name || "Cliente");
   }
   const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, message)).trim();

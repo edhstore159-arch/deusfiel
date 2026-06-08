@@ -171,6 +171,9 @@ Caso o documento já tenha sido enviado, responda: "Recebi esse documento anteri
 
 A resposta deve ter concordância direta com a última mensagem recebida do cliente.
 
+- O histórico é apenas contexto interno: nunca envie ao cliente listas de "últimas respostas", resumos do histórico técnico ou instruções internas.
+- Se o cliente disser que quer falar "com ela", com a Dra. Kênia, com a advogada ou com uma pessoa, acolha e encaminhe sem recitar mensagens anteriores.
+
 Antes de responder:
 1. Identifique a intenção da última mensagem.
 2. Analise o histórico para evitar repetir informações, perguntas ou pedidos já feitos.
@@ -206,7 +209,7 @@ Antes de responder:
 - É PROIBIDO usar tags HTML como <font>, <span>, <div>, <b>, <i>, <u>, <color>, <br>, etc.
 - É PROIBIDO usar atributos como color="...", style="...", class="...".
 - Não use cores, fontes, tamanhos ou qualquer marcação visual via HTML/CSS.
-- Para ênfase no WhatsApp, use apenas a formatação nativa: *negrito*, _itálico_, ~tachado~, ```código```.
+- Para ênfase no WhatsApp, use apenas a formatação nativa: *negrito*, _itálico_ e ~tachado~.
 - Quebre linhas com \n simples, sem <br>.
 - Nunca envolva nomes, saudações ou frases em tags coloridas (ex.: <font color="blue">...</font>). Escreva o texto cru.
 
@@ -320,7 +323,7 @@ const DEFAULT_PROMPT = SECRETARIA_JURIDICA_PROMPT;
 function stripAppointmentBlock(text: string): string {
   return String(text || "")
     .replace(/<AGENDAMENTO>[\s\S]*?<\/AGENDAMENTO>/g, "")
-    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>/giu, "")
+    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>?/giu, "")
     .replace(/`{1,3}\s*HANDOFF[_\s-]*K[EÊ]NIA\s*`{1,3}/giu, "")
     .trim();
 }
@@ -387,6 +390,7 @@ function isNearDuplicateReply(reply: string, history: Array<{ role: string; cont
 function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string): string {
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
+  if (isHandoffRequest(text)) return buildHandoffReply();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para eu deixar a consulta registrada corretamente, me informe nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
@@ -398,6 +402,20 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
 
 function userAskedTemporalInfo(text: string): boolean {
   return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(String(text || ""));
+}
+
+function isHandoffRequest(text: string): boolean {
+  const value = String(text || "").toLowerCase();
+  return /\b(?:quero|queria|preciso|posso|poderia|gostaria)\s+(?:de\s+)?(?:falar|conversar|tratar|contato)\s+com\s+(?:ela|a\s+dra\.?|a\s+doutora|a\s+advogada|kenia|kênia|algu[eé]m|uma\s+pessoa|atendente|humano)\b/i.test(value) ||
+    /\b(?:chama|chame|aciona|acione|passa|passe|encaminha|encaminhe)\s+(?:a\s+)?(?:dra\.?|doutora|advogada|kenia|kênia|ela|algu[eé]m|atendente|humano)\b/i.test(value);
+}
+
+function buildHandoffReply(): string {
+  return "HANDOFF_KENIA\nClaro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
+}
+
+function isHistoryDumpReply(text: string): boolean {
+  return /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 }
 
 function removeTemporalLeaks(reply: string, userMessage: string): string {
@@ -487,7 +505,7 @@ Deno.serve(async (req) => {
 
     const assistantReplies = recentAssistantReplies(history);
     const antiRepetitionContext = assistantReplies.length
-      ? `\n\nANTI-REPETIÇÃO OPERACIONAL:\n- As últimas respostas da secretária foram:\n${assistantReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n- Não repita nenhuma delas, nem a mesma saudação, nem a mesma pergunta. Responda diretamente à última mensagem do cliente com avanço real na conversa.`
+      ? `\n\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\n- Use o histórico apenas para saber o que já foi dito.\n- Não copie, liste ou recite respostas anteriores.\n- Responda somente à última mensagem do cliente, avançando a conversa.`
       : "";
 
     const systemContent = `${extraPrompt}
@@ -520,12 +538,14 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     try {
       rawReply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
+        : isHandoffRequest(userMessage)
+          ? buildHandoffReply()
         : await callOllama(messages, fmtDate, fmtTime);
     } catch (err) {
       console.error("Erro ao chamar Ollama llama3.2:3b:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
-    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
