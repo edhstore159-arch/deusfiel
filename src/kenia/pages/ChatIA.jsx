@@ -829,6 +829,9 @@ export default function ChatIA() {
     ]);
     setSessionId(null);
     setAnalysis(null);
+    setLeadId(null);
+    setActiveSpeaker(ASSISTANT_SPEAKER);
+    try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
     stopAudio();
   };
 
