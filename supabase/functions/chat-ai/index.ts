@@ -349,7 +349,7 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
         stream: false,
         think: false,
         keep_alive: "10m",
-        options: { num_ctx: 2048, num_predict: 220, temperature: 0.1 },
+        options: { num_ctx: 4096, num_predict: 1024, temperature: 0.1 },
       }),
     });
     const raw = await resp.text();
