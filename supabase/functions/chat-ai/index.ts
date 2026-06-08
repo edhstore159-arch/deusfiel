@@ -657,6 +657,17 @@ Deno.serve(async (req) => {
     }).format(now);
     const isoSp = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).toISOString();
 
+    const weekdaySp = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      weekday: "long",
+    }).format(now);
+    const dateOnlySp = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }).format(now);
+
     const hourSp = parseInt(
       new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now),
       10,
@@ -672,12 +683,17 @@ Deno.serve(async (req) => {
     const systemContent = `${extraPrompt}
 
 CONTEXTO TEMPORAL INTERNO (fuso America/Sao_Paulo):
-- Data/hora atual: ${fmtDate}, ${fmtTime} (ISO ${isoSp})
+- DIA DA SEMANA HOJE: ${weekdaySp}
+- DATA HOJE: ${dateOnlySp}
+- HORA AGORA: ${fmtTime}
+- Referência ISO completa: ${isoSp}
 - Saudação adequada agora: "${saudacao}"
 
-REGRA OBRIGATÓRIA SOBRE DATA E HORA:
-- Se o cliente perguntar a data, o dia, o dia da semana, o mês, o ano ou as horas (ex.: "que dia é hoje?", "que horas são?", "qual a data de hoje?", "estamos em que dia da semana?"), RESPONDA com clareza usando EXATAMENTE os valores acima. Exemplo: "Hoje é ${fmtDate}, e agora são ${fmtTime}."
-- Nunca diga que não sabe a data ou a hora, e nunca invente outro valor.
+REGRA OBRIGATÓRIA SOBRE DATA, DIA DA SEMANA E HORA:
+- Se o cliente perguntar "que dia da semana é hoje?", "hoje é sábado?", "é domingo?", "é segunda?" etc., RESPONDA usando EXATAMENTE o valor de "DIA DA SEMANA HOJE" acima (${weekdaySp}). Confirme ou corrija o cliente com base nesse valor — nunca chute.
+- Se o cliente perguntar a data ou "que dia é hoje", responda com "${dateOnlySp} (${weekdaySp})".
+- Se o cliente perguntar a hora, responda "${fmtTime}".
+- Nunca diga que não sabe a data, o dia da semana ou a hora, e nunca invente outro valor.
 - Se o cliente NÃO perguntar, não mencione data nem hora.
 - Para "hoje", "amanhã", "próxima sexta" em agendamentos, calcule a partir da referência acima.
 
