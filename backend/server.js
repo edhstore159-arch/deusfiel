@@ -55,7 +55,7 @@ const normalizeOllamaBaseUrl = (value) => {
 const OLLAMA_BASE_URL = normalizeOllamaBaseUrl(OLLAMA_RAW_URL);
 const OLLAMA_URL = `${OLLAMA_BASE_URL}/api/generate`;
 const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen3:8b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen3:4b";
 const OLLAMA_REQUEST_RETRIES = Number(process.env.OLLAMA_REQUEST_RETRIES || 0);
 const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 90000);
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
