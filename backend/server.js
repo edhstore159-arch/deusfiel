@@ -947,7 +947,7 @@ async function autoReply(jid, userText, contactName) {
   const history = await loadPersistedAiHistory(jid);
   const lastReplies = recentAssistantReplies(history);
   const antiRepetitionContext = lastReplies.length
-    ? `\nANTI-REPETIÇÃO OPERACIONAL:\nÚltimas respostas enviadas:\n${lastReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\nNão repita nenhuma delas; avance a conversa respondendo à última mensagem do cliente.`
+    ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
     : "";
   const messagesPayload = [
     { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nNome do contato: ${contactName || "Cliente"}.${antiRepetitionContext}` },
@@ -955,7 +955,9 @@ async function autoReply(jid, userText, contactName) {
     { role: "user", content: userText },
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
-  let result = await callAI(messagesPayload, { temperature: 0.72, userText });
+  let result = isHandoffRequest(userText)
+    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(String(contactName || "cliente").split(" ")[0] || "cliente") }
+    : await callAI(messagesPayload, { temperature: 0.72, userText });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
   if (!usedFallback && (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history))) {
