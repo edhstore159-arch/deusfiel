@@ -755,9 +755,10 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
 
-    // Análise técnica do caso (chamada paralela à IA pedindo JSON estruturado)
+    // Análise técnica do caso (opcional; não bloqueia atendimento rápido quando não solicitada)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
-    try {
+    const shouldReturnAnalysis = body.return_analysis === true;
+    if (shouldReturnAnalysis) try {
       const convoText = [...history, { role: "user", content: userMessage }, { role: "assistant", content: reply }]
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n");
