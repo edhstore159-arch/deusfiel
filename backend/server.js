@@ -75,6 +75,38 @@ const formatOllamaHttpError = (status, raw, context = "Ollama") => {
   }
   return `${context} ${status}: ${body.slice(0, 500)}`;
 };
+const readOllamaStream = async (resp) => {
+  const reader = resp.body?.getReader?.();
+  if (!reader) {
+    const data = await resp.json().catch(() => ({}));
+    return String(data?.response || "").trim();
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let reply = "";
+  const consumeLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    const data = JSON.parse(trimmed);
+    if (data?.error) throw new Error(String(data.error));
+    if (typeof data?.response === "string") reply += data.response;
+    return Boolean(data?.done);
+  };
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx = buffer.indexOf("\n");
+    while (idx >= 0) {
+      if (consumeLine(buffer.slice(0, idx))) return reply.trim();
+      buffer = buffer.slice(idx + 1);
+      idx = buffer.indexOf("\n");
+    }
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) consumeLine(buffer);
+  return reply.trim();
+};
 let ollamaStatus = {
   ok: false,
   generate_ok: false,
@@ -127,37 +159,35 @@ export async function perguntarIA(texto) {
   // IMPORTANTE: NÃO usar timeout/AbortController aqui.
   // O usuário exigiu que o Baileys/WhatsApp espere o Ollama responder pelo
   // tempo que for necessário, sem cair em fallback. Não reintroduzir timeout.
-  let lastErrorForThrow = null;
-  for (let attempt = 1; attempt <= OLLAMA_REQUEST_RETRIES + 1; attempt++) {
+  let attempt = 0;
+  while (true) {
+    attempt += 1;
     try {
       const resposta = await fetch(OLLAMA_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
         body: JSON.stringify({
           model: OLLAMA_MODEL,
-          prompt: texto,
-          stream: false,
+          prompt: `/no_think\n${texto}`,
+          stream: true,
           think: false,
           keep_alive: OLLAMA_KEEP_ALIVE,
           options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
         }),
       });
-      const raw = await resposta.text();
-      let data = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch {}
+      const raw = resposta.ok ? "" : await resposta.text();
       if (!resposta.ok) throw new Error(formatOllamaHttpError(resposta.status, raw));
-      const reply = String(data?.response || "").trim();
+      const reply = await readOllamaStream(resposta);
       if (!reply) throw new Error("Resposta vazia do Ollama.");
       ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null };
       return reply;
     } catch (e) {
-      lastErrorForThrow = e;
       const message = e?.message || String(e);
       ollamaStatus = { ...ollamaStatus, ok: false, last_checked_at: new Date().toISOString(), last_error: message };
-      if (attempt <= OLLAMA_REQUEST_RETRIES) await delay(800 * attempt);
+      recordAutoReply({ step: "ollama_wait_retry", attempt, error: message });
+      await delay(Math.min(30000, 2000 * attempt));
     }
   }
-  throw lastErrorForThrow || new Error("Falha ao consultar Ollama.");
 }
 
 async function refreshOllamaStatus() {
@@ -169,18 +199,17 @@ async function refreshOllamaStatus() {
       signal: controller.signal,
     });
     if (!resp.ok) throw new Error(formatOllamaHttpError(resp.status, await resp.text(), "Ollama health"));
-    const generate = await probeOllamaGenerate();
     ollamaStatus = {
       ...ollamaStatus,
-      ok: generate.ok,
+      ok: true,
       tags_ok: true,
-      generate_ok: generate.ok,
-      generate_latency_ms: generate.latency_ms,
-      generate_response_preview: generate.response_preview || null,
+      generate_ok: null,
+      generate_latency_ms: null,
+      generate_response_preview: null,
       last_checked_at: new Date().toISOString(),
-      last_success_at: generate.ok ? new Date().toISOString() : ollamaStatus.last_success_at,
-      last_error: generate.ok ? null : generate.error,
-      last_generate_error: generate.ok ? null : generate.error,
+      last_success_at: new Date().toISOString(),
+      last_error: null,
+      last_generate_error: null,
     };
   } catch (e) {
     const message = e?.name === "AbortError" ? `health timeout ${OLLAMA_HEALTH_TIMEOUT_MS}ms` : e?.message || String(e);
@@ -286,7 +315,7 @@ const appendMessage = (jid, msg) => {
   messagesStore.set(jid, list);
 };
 
-// ---- Atendente automático com IA (Gemini via Lovable AI Gateway primeiro; outras chaves como fallback) ----
+// ---- Atendente automático com IA local (Ollama obrigatório, sem fallback) ----
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
@@ -712,11 +741,14 @@ async function autoReply(jid, userText, contactName) {
     ...history,
     { role: "user", content: userText },
   ];
-  recordAutoReply({ step: "ai_request", jid, providers: ["ollama", OPENAI_API_KEY && "openai", EMERGENT_API_KEY && "emergent", LOVABLE_API_KEY && "lovable"].filter(Boolean) });
+  recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], policy: "wait_forever_no_fallback" });
   let result = await callAI(messagesPayload, { temperature: 0.72 });
-  const usedFallback = !result.ok;
-  let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
-  if (!usedFallback && isNearDuplicateReply(rawReply, history)) {
+  if (!result.ok) {
+    recordAutoReply({ step: "ollama_no_reply_no_fallback", jid, result });
+    return;
+  }
+  let rawReply = result.reply;
+  if (isNearDuplicateReply(rawReply, history)) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...history,
@@ -726,19 +758,20 @@ async function autoReply(jid, userText, contactName) {
       result = retry;
       rawReply = retry.reply;
     }
-    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
+    if (isNearDuplicateReply(rawReply, history)) {
+      recordAutoReply({ step: "ollama_duplicate_kept", jid, reason: "no_local_fallback_allowed" });
+    }
   }
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
-  if (usedFallback) recordAutoReply({ step: "ai_fail_local_fallback", jid, result, reply: reply.slice(0, 200) });
   history.push({ role: "user", content: userText });
   history.push({ role: "assistant", content: reply });
   aiHistory.set(jid, history);
   try {
-    const sent = await sendBotText(jid, reply, { source: usedFallback ? "local_fallback" : result.provider });
-    recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: usedFallback ? "local_fallback" : result.provider, model: result.model || null, reply: reply.slice(0, 200) });
+    const sent = await sendBotText(jid, reply, { source: result.provider });
+    recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: result.provider, model: result.model || null, reply: reply.slice(0, 200) });
     if (shouldScheduleWaitFollowUp(reply)) scheduleWaitFollowUp(jid, contactName);
   } catch (e) {
-    queueAutoReply(jid, reply, { source: usedFallback ? "local_fallback" : result.provider, reason: e?.message || String(e) });
+    queueAutoReply(jid, reply, { source: result.provider, reason: e?.message || String(e) });
     recordAutoReply({ step: "send_queued_after_fail", jid, error: e?.message || String(e) });
   }
 }
@@ -1048,12 +1081,10 @@ app.get("/api/health", (_req, res) => res.json(ok({ state: connectionState })));
 
 // ---- Proxy direto para Ollama (/api/generate) ----
 app.post("/api/generate", async (req, res) => {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
   try {
     const body = {
       model: OLLAMA_MODEL,
-      stream: false,
+      stream: true,
       think: false,
       keep_alive: OLLAMA_KEEP_ALIVE,
       options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
@@ -1063,39 +1094,30 @@ app.post("/api/generate", async (req, res) => {
       method: "POST",
       headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
       body: JSON.stringify(body),
-      signal: controller.signal,
     });
-    const raw = await upstream.text();
-    let data;
-    try { data = JSON.parse(raw); } catch { data = { response: raw }; }
+    const raw = upstream.ok ? "" : await upstream.text();
     if (!upstream.ok) {
       return res.status(200).json({
         ok: false,
-        fallback: true,
+        fallback: false,
         error: formatOllamaHttpError(upstream.status, raw, "Ollama"),
-        upstream: data,
       });
     }
-    if (!String(data?.response || "").trim()) {
+    const reply = await readOllamaStream(upstream);
+    if (!reply) {
       return res.status(200).json({
         ok: false,
-        fallback: true,
+        fallback: false,
         error: "Ollama retornou resposta vazia.",
-        upstream: data,
       });
     }
-    res.json(data);
+    res.json({ ok: true, model: OLLAMA_MODEL, response: reply, done: true });
   } catch (err) {
-    const aborted = err?.name === "AbortError";
     res.status(200).json({
       ok: false,
-      fallback: true,
-      error: aborted
-        ? `Timeout (${OLLAMA_GENERATE_TIMEOUT_MS}ms) ao chamar ${OLLAMA_URL}.`
-        : `Falha ao chamar Ollama: ${err?.message || err}`,
+      fallback: false,
+      error: `Falha ao chamar Ollama: ${err?.message || err}`,
     });
-  } finally {
-    clearTimeout(timer);
   }
 });
 
@@ -1214,7 +1236,7 @@ app.get("/api/whatsapp/ollama-status", async (_req, res) => {
     keep_alive: OLLAMA_KEEP_ALIVE,
     health_interval_ms: OLLAMA_HEALTH_INTERVAL_MS,
       probe_timeout_ms: OLLAMA_PROBE_TIMEOUT_MS,
-      hint: status.ok ? null : "O /api/tags pode responder mesmo quando /api/generate trava. Reinicie o Ollama/modelo local, confirme `ollama run qwen3:8b` no servidor do túnel e mantenha o ngrok apontando para a porta 11434.",
+        hint: status.ok ? null : "O status automático testa só /api/tags para não ocupar o modelo. O WhatsApp chama /api/generate em streaming e espera o Ollama pelo tempo necessário, sem fallback.",
   });
 });
 
@@ -1255,7 +1277,7 @@ app.get("/api/whatsapp/diagnostics", (_req, res) => {
           : `Desconectado: ${ollamaStatus.last_error || "ainda não testado"}`,
         hint: ollamaStatus.ok
           ? null
-          : "Atualize OLLAMA_URL no Render para o ngrok ativo do Ollama (porta 11434) e redeploy; enquanto isso, o robô usa fallback/local se disponível.",
+          : "Atualize OLLAMA_URL no Render para o ngrok ativo do Ollama (porta 11434) e redeploy. O robô não usa fallback/local; ele aguarda o Ollama.",
       },
     ],
   });
