@@ -75,6 +75,38 @@ const formatOllamaHttpError = (status, raw, context = "Ollama") => {
   }
   return `${context} ${status}: ${body.slice(0, 500)}`;
 };
+const readOllamaStream = async (resp) => {
+  const reader = resp.body?.getReader?.();
+  if (!reader) {
+    const data = await resp.json().catch(() => ({}));
+    return String(data?.response || "").trim();
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let reply = "";
+  const consumeLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    const data = JSON.parse(trimmed);
+    if (data?.error) throw new Error(String(data.error));
+    if (typeof data?.response === "string") reply += data.response;
+    return Boolean(data?.done);
+  };
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx = buffer.indexOf("\n");
+    while (idx >= 0) {
+      if (consumeLine(buffer.slice(0, idx))) return reply.trim();
+      buffer = buffer.slice(idx + 1);
+      idx = buffer.indexOf("\n");
+    }
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) consumeLine(buffer);
+  return reply.trim();
+};
 let ollamaStatus = {
   ok: false,
   generate_ok: false,
