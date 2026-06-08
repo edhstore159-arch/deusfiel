@@ -505,7 +505,7 @@ Deno.serve(async (req) => {
 
     const assistantReplies = recentAssistantReplies(history);
     const antiRepetitionContext = assistantReplies.length
-      ? `\n\nANTI-REPETIÇÃO OPERACIONAL:\n- As últimas respostas da secretária foram:\n${assistantReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n- Não repita nenhuma delas, nem a mesma saudação, nem a mesma pergunta. Responda diretamente à última mensagem do cliente com avanço real na conversa.`
+      ? `\n\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\n- Use o histórico apenas para saber o que já foi dito.\n- Não copie, liste ou recite respostas anteriores.\n- Responda somente à última mensagem do cliente, avançando a conversa.`
       : "";
 
     const systemContent = `${extraPrompt}
@@ -538,6 +538,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     try {
       rawReply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
+        : isHandoffRequest(userMessage)
+          ? buildHandoffReply()
         : await callOllama(messages, fmtDate, fmtTime);
     } catch (err) {
       console.error("Erro ao chamar Ollama llama3.2:3b:", err);
