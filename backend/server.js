@@ -897,6 +897,7 @@ function buildLocalLegalReply(jid, userText, contactName) {
   const name = String(contactName || "cliente").split(" ")[0];
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (isThanksMessage(txt)) return buildThanksReply(history, name);
   if (isHandoffRequest(txt)) return buildHandoffReply(name);
   if (/urgente|pris[aã]o|audi[eê]ncia|prazo|intima[cç][aã]o|mandado|medida protetiva/.test(txt)) {
     return `${name}, entendi a urgência. Vou sinalizar seu caso para a equipe agora; por favor me envie sua cidade/estado e um resumo breve do que aconteceu.`;
