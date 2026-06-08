@@ -816,6 +816,7 @@ export default function ChatIA() {
       await typeAssistantMessage("Desculpe, tive uma instabilidade aqui. Pode repetir sua mensagem? 🙏");
     } finally {
       setThinking(false);
+      sendingRef.current = false;
     }
   };
 
