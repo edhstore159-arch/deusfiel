@@ -200,30 +200,54 @@ const QUAL_META = {
   },
 };
 
+const STORAGE_KEY = "kenia.chatia.session.v1";
+
+const loadPersistedSession = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return null;
+    if (!Array.isArray(data.messages) || data.messages.length === 0) return null;
+    // Limpa flags transitórios
+    data.messages = data.messages.map((m) => ({ ...m, typing: false }));
+    return data;
+  } catch {
+    return null;
+  }
+};
+
 export default function ChatIA() {
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content: ASSISTANT_GREETING,
-      audio_base64: null,
-    },
-  ]);
+  const persisted = typeof window !== "undefined" ? loadPersistedSession() : null;
+
+  const [messages, setMessages] = useState(
+    persisted?.messages?.length
+      ? persisted.messages
+      : [
+          {
+            role: "assistant",
+            content: ASSISTANT_GREETING,
+            audio_base64: null,
+          },
+        ]
+  );
   const [input, setInput] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [voice, setVoice] = useState("nova");
+  const [name, setName] = useState(persisted?.name || "");
+  const [phone, setPhone] = useState(persisted?.phone || "");
+  const [voice, setVoice] = useState(persisted?.voice || "nova");
   const [autoplay, setAutoplay] = useState(true);
   const [thinking, setThinking] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
-  const [analysis, setAnalysis] = useState(null);
+  const [sessionId, setSessionId] = useState(persisted?.sessionId || null);
+  const [analysis, setAnalysis] = useState(persisted?.analysis || null);
   const [legDate, setLegDate] = useState("");
   const [legBrief, setLegBrief] = useState("");
   const [playingIdx, setPlayingIdx] = useState(null);
   const [scheduler, setScheduler] = useState(null);
   const [scheduling, setScheduling] = useState(false);
-  const [leadId, setLeadId] = useState(null);
+  const [leadId, setLeadId] = useState(persisted?.leadId || null);
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(true);
-  const [activeSpeaker, setActiveSpeaker] = useState(ASSISTANT_SPEAKER);
+  const [activeSpeaker, setActiveSpeaker] = useState(persisted?.activeSpeaker || ASSISTANT_SPEAKER);
   const audioRef = useRef(null);
   const scrollRef = useRef(null);
   const [recording, setRecording] = useState(false);
@@ -234,6 +258,25 @@ export default function ChatIA() {
   const waitFollowUpTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  // Persiste a conversa para sobreviver a desconexões/refresh
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const payload = {
+        messages,
+        sessionId,
+        name,
+        phone,
+        voice,
+        analysis,
+        leadId,
+        activeSpeaker,
+        savedAt: Date.now(),
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch {}
+  }, [messages, sessionId, name, phone, voice, analysis, leadId, activeSpeaker]);
 
   const sanitizeFolder = (s) =>
     String(s || "anonimo").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "anonimo";
@@ -786,6 +829,9 @@ export default function ChatIA() {
     ]);
     setSessionId(null);
     setAnalysis(null);
+    setLeadId(null);
+    setActiveSpeaker(ASSISTANT_SPEAKER);
+    try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
     stopAudio();
   };
 
