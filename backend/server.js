@@ -111,6 +111,7 @@ async function probeOllamaGenerate() {
     const data = JSON.parse(raw || "{}");
     const reply = String(data?.response || "").trim();
     if (!reply) throw new Error("Ollama generate retornou resposta vazia.");
+    if (isInvalidOllamaReply(reply)) throw new Error(`Ollama generate retornou raciocínio interno: ${reply.slice(0, 160)}`);
     return { ok: true, latency_ms: Date.now() - startedAt, response_preview: reply.slice(0, 80) };
   } catch (e) {
     return {
@@ -149,6 +150,7 @@ export async function perguntarIA(texto) {
       if (!resposta.ok) throw new Error(formatOllamaHttpError(resposta.status, raw));
       const reply = String(data?.response || "").trim();
       if (!reply) throw new Error("Resposta vazia do Ollama.");
+      if (isInvalidOllamaReply(reply)) throw new Error(`Ollama retornou raciocínio interno ou resposta inválida: ${reply.slice(0, 160)}`);
       ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null };
       return reply;
     } catch (e) {
