@@ -841,6 +841,7 @@ export const api = HAS_BACKEND
         const [path] = String(url).split("?");
         if (path.startsWith("/legal-deadlines/")) return staticPost(url, body);
         if (cloudFirstPostPaths.has(path)) return staticPost(url, body);
+        if (path === "/chat/message") return staticPost(url, body);
         if (liveFirstWithStaticFallbackPostPaths.has(path)) {
           return liveApi.post(url, body, config).catch(() => staticPost(url, body));
         }
