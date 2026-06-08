@@ -414,6 +414,29 @@ function buildHandoffReply(): string {
   return "HANDOFF_KENIA\nClaro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
 }
 
+function isResumeRequest(text: string): boolean {
+  const value = String(text || "").toLowerCase();
+  return /\b(?:volt(?:ar|amos|emos)|retom(?:ar|amos|emos)|continu(?:ar|amos|emos)|seguir|prossegui[rm]?|relembr(?:ar|a)|lembr(?:ar|a))\b.*\b(?:conversa|assunto|t[oó]pico|onde\s+par(?:amos|ei)|do\s+in[ií]cio|antes)\b/i.test(value) ||
+    /\b(?:onde\s+par(?:amos|ei))\b/i.test(value) ||
+    /\b(?:do\s+que\s+(?:est[aá]vamos|t[aá]vamos|conversamos)|sobre\s+o\s+que\s+(?:est[aá]vamos|conversamos|falamos))\b/i.test(value);
+}
+
+function summarizeTopicFromHistory(history: Array<{ role: string; content: string }>): string {
+  const lastUser = [...history].reverse().find((m) => m.role === "user" && String(m.content || "").trim());
+  const raw = stripAppointmentBlock(String(lastUser?.content || "")).replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+  const snippet = raw.length > 120 ? raw.slice(0, 117).trim() + "..." : raw;
+  return snippet;
+}
+
+function buildResumeReply(history: Array<{ role: string; content: string }>): string {
+  const topic = summarizeTopicFromHistory(history);
+  if (!topic) {
+    return "Claro, podemos continuar. Me diga em uma frase o ponto onde quer retomar e seguimos daí.";
+  }
+  return `Claro, podemos retomar. Estávamos tratando de: "${topic}". Quer continuar desse ponto ou ajustar algo?`;
+}
+
 function isHistoryDumpReply(text: string): boolean {
   return /\b(?:anti-repeti[cç][aã]o operacional|últimas respostas enviadas|ultimas respostas enviadas|as últimas respostas|as ultimas respostas|referência interna|referencia interna)\b/i.test(String(text || ""));
 }
