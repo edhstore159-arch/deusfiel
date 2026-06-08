@@ -23,6 +23,60 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+function isInvalidOllamaReply(text: string): boolean {
+  const value = String(text || "").trim();
+  return /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i)\b/i.test(value) ||
+    /\b(the user|let me|i need to|i should|instructions)\b/i.test(value.slice(0, 260));
+}
+
+function buildOllamaPrompt(prompt: string, fmtDate: string, fmtTime: string): string {
+  return `/no_think
+${OLLAMA_SYSTEM_PROMPT}
+
+CONTEXTO TEMPORAL INTERNO (America/Sao_Paulo): hoje é ${fmtDate}, agora são ${fmtTime}.
+Se o cliente pedir data, dia da semana ou hora atual, responda exatamente com esses valores.
+
+INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
+
+${prompt}
+
+Resposta final em português do Brasil:`;
+}
+
+async function callOllama(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+  const prompt = messages
+    .map((message) => `${message.role === "system" ? "Instruções" : message.role === "assistant" ? "Assistente" : "Cliente"}: ${message.content}`)
+    .join("\n\n");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
+  try {
+    const resp = await fetch(OLLAMA_GENERATE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        system: OLLAMA_SYSTEM_PROMPT,
+        prompt: buildOllamaPrompt(prompt, fmtDate, fmtTime),
+        stream: false,
+        think: false,
+        keep_alive: "10m",
+        options: { num_ctx: 2048, num_predict: 220, temperature: 0.1 },
+      }),
+    });
+    const raw = await resp.text();
+    let data: any = {};
+    try { data = raw ? JSON.parse(raw) : {}; } catch { data = { response: raw }; }
+    if (!resp.ok) throw new Error(`Ollama ${resp.status}: ${raw.slice(0, 500)}`);
+    const reply = String(data?.response || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+    if (!reply) throw new Error("Ollama retornou resposta vazia.");
+    if (isInvalidOllamaReply(reply)) throw new Error(`Ollama retornou raciocínio interno: ${reply.slice(0, 160)}`);
+    return reply;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function synthesizeSpeech(text: string): Promise<string | null> {
   if (!ELEVENLABS_API_KEY || !text?.trim()) return null;
   try {
