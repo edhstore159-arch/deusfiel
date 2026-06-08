@@ -756,7 +756,6 @@ async function autoReply(jid, userText, contactName) {
       result = retry;
       rawReply = retry.reply;
     }
-    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
   }
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
   history.push({ role: "user", content: userText });
@@ -1516,7 +1515,6 @@ app.post("/api/chat/message", async (req, res) => {
       result = retry;
       rawReply = retry.reply;
     }
-    if (isNearDuplicateReply(rawReply, normalizedHistory)) rawReply = buildNonRepeatingFallback(message, req.body?.visitor_name || "Cliente");
   }
   const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, message)).trim();

@@ -563,7 +563,7 @@ const staticPost = (url, body = {}) => {
           const timeout = setTimeout(() => controller.abort(), 45000);
           const res = await fetch(DIRECT_OLLAMA_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
             signal: controller.signal,
             body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 220, temperature: 0.1 } }),
           }).finally(() => clearTimeout(timeout));
@@ -584,9 +584,7 @@ const staticPost = (url, body = {}) => {
         }
         if (!text) throw lastErr || new Error("Ollama indisponível");
 
-        const responseText = isNearDuplicateReply(text, body.history || [])
-          ? buildNonRepeatingFallback(userText)
-          : cleanInternalChatMarkers(text);
+        const responseText = cleanInternalChatMarkers(text);
         return response({
             session_id: sessionId,
             response: responseText,

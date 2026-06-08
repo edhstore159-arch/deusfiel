@@ -760,9 +760,8 @@ export default function ChatIA() {
       }
     } catch (err) {
       console.error("Erro ao conversar com a IA:", err);
-      toast.error("Erro ao conversar com a IA. Tente novamente.");
+      toast.error(err?.response?.data?.error || err?.message || "Ollama indisponível no momento.");
       setThinking(false);
-      await typeAssistantMessage("Desculpe, tive uma instabilidade aqui. Pode repetir sua mensagem? 🙏");
     } finally {
       setThinking(false);
     }

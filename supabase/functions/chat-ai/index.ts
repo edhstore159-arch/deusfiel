@@ -375,7 +375,6 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));

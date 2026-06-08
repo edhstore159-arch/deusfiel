@@ -220,8 +220,8 @@ export default function Dashboard() {
         } catch {}
       }
 
-    } catch {
-      setAiMessages((m) => [...m, { role: "assistant", content: "Desculpe, não consegui processar agora." }]);
+    } catch (e) {
+      toast.error(e?.response?.data?.error || e?.message || "Ollama indisponível no momento.");
     } finally {
       setAiThinking(false);
     }
