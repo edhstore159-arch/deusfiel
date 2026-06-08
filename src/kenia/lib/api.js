@@ -538,8 +538,6 @@ const staticPost = (url, body = {}) => {
   if (path === "/chat/message") {
     return (async () => {
       const sessionId = body.session_id || nextId("session");
-      const fallbackReply =
-        "Tive uma instabilidade momentânea. Estou aqui para te ajudar; pode me contar o que aconteceu em uma frase curta?";
       try {
         const history = (body.history || [])
           .map((m) => `${m.role === "user" ? "Cliente" : "Assistente"}: ${m.content}`)
@@ -553,7 +551,7 @@ const staticPost = (url, body = {}) => {
             audio_base64: null,
             appointment: null,
             handoff: false,
-            speaker: null,
+            speaker: "Assistente virtual",
             analysis: { acertividade: 100, qualificacao: "ok" },
             server_time: new Date().toISOString(),
           });
@@ -565,7 +563,7 @@ const staticPost = (url, body = {}) => {
           const timeout = setTimeout(() => controller.abort(), 45000);
           const res = await fetch(DIRECT_OLLAMA_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
             signal: controller.signal,
             body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 220, temperature: 0.1 } }),
           }).finally(() => clearTimeout(timeout));
@@ -586,28 +584,21 @@ const staticPost = (url, body = {}) => {
         }
         if (!text) throw lastErr || new Error("Ollama indisponível");
 
-        const responseText = isNearDuplicateReply(text, body.history || [])
-          ? buildNonRepeatingFallback(userText)
-          : cleanInternalChatMarkers(text);
+        const responseText = cleanInternalChatMarkers(text);
         return response({
             session_id: sessionId,
             response: responseText,
             audio_base64: null,
             appointment: null,
             handoff: false,
-            speaker: null,
+            speaker: "Assistente virtual",
             analysis: { acertividade: 80, qualificacao: "ok" },
             server_time: null,
           });
       } catch (e) {
         console.warn("Ollama llama3.2:3b falhou no chat", e);
       }
-      return response({
-          session_id: sessionId,
-          response: fallbackReply,
-          audio_base64: null,
-          analysis: { acertividade: 40, qualificacao: "fallback" },
-        });
+      throw new Error("Ollama llama3.2:3b indisponível. Nenhum outro atendente ou modelo está autorizado a responder este chat.");
     })();
   }
 
@@ -796,7 +787,6 @@ liveApi.interceptors.response.use(
 
 const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today"]);
 const cloudFirstPostPaths = new Set(["/creatives/generate", "/creatives/fuse-images", "/appointments", "/legal-deadlines", "/legal-deadlines/sync"]);
-const liveFirstWithStaticFallbackPostPaths = new Set(["/chat/message"]);
 const fallbackToStaticPostPaths = new Set(["/debug/instruction"]);
 
 // Caminhos que, quando o backend live (Render) falha ou devolve lista vazia,
@@ -854,10 +844,7 @@ export const api = HAS_BACKEND
         const [path] = String(url).split("?");
         if (path.startsWith("/legal-deadlines/")) return staticPost(url, body);
         if (cloudFirstPostPaths.has(path)) return staticPost(url, body);
-        if (path === "/chat/message") return staticPost(url, body);
-        if (liveFirstWithStaticFallbackPostPaths.has(path)) {
-          return liveApi.post(url, body, config).catch(() => staticPost(url, body));
-        }
+        if (path === "/chat/message") return liveApi.post(url, body, config);
         if (fallbackToStaticPostPaths.has(path)) {
           return liveApi.post(url, body, config).catch(() => staticPost(url, body));
         }

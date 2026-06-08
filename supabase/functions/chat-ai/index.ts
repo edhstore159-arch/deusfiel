@@ -1,9 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { chatCompletion } from "../_shared/llm.ts";
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY");
 const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const ELEVENLABS_VOICE_ID = Deno.env.get("ELEVENLABS_VOICE_ID") || "EXAVITQu4vr4xnSDxMaL"; // Sarah (PT-BR natural)
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -298,13 +295,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (!LOVABLE_API_KEY && !EMERGENT_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "Nenhuma chave de IA configurada (LOVABLE_API_KEY ou EMERGENT_API_KEY)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
     const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
@@ -380,38 +370,15 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         : await callOllama(messages, fmtDate, fmtTime);
     } catch (err) {
       console.error("Erro ao chamar Ollama llama3.2:3b:", err);
-      rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+      return new Response(
+        JSON.stringify({ ok: false, error: "Ollama llama3.2:3b indisponível. Nenhum outro atendente ou modelo está autorizado a responder este chat." }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
-    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
-    const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
 
-    // Análise técnica do caso (chamada paralela à IA pedindo JSON estruturado)
-    let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
-    try {
-      const convoText = [...history, { role: "user", content: userMessage }, { role: "assistant", content: reply }]
-        .map((m) => `${m.role}: ${m.content}`)
-        .join("\n");
-      const aResp = await chatCompletion({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content:
-              "Você analisa conversas jurídicas e responde APENAS um JSON válido (sem markdown) com os campos: area (string), resumo (string curta), motivo (string), acertividade (0-100), chance_exito (0-100), qualificacao (\"qualificado\"|\"necessita_mais_info\"|\"desqualificado\"), proxima_pergunta (string), fundamentos (array de strings com base legal).",
-          },
-          { role: "user", content: `Conversa:\n${convoText}\n\nGere o JSON de análise.` },
-        ],
-        response_format: { type: "json_object" },
-      });
-      if (aResp.ok) {
-        const parsed = JSON.parse(aResp.data?.choices?.[0]?.message?.content || "{}");
-        analysis = { ...analysis, ...parsed };
-      }
-    } catch (err) {
-      console.error("Erro ao gerar análise:", err);
-    }
+    const analysis: any = { acertividade: 90, qualificacao: "ok", provider: "ollama", model: OLLAMA_MODEL };
 
     // Gera áudio (TTS ElevenLabs) se o cliente pediu
     const wantAudio = body.want_audio !== false; // default true
@@ -459,8 +426,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         response: reply,
         appointment,
         audio_base64,
-        handoff,
-        speaker: handoff ? "Dra. Kênia Garcia" : "Assistente virtual",
+        handoff: false,
+        speaker: "Assistente virtual",
         analysis,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
