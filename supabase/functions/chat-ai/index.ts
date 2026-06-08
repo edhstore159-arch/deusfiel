@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
 
     const assistantReplies = recentAssistantReplies(history);
     const antiRepetitionContext = assistantReplies.length
-      ? `\n\nANTI-REPETIÇÃO OPERACIONAL:\n- As últimas respostas da secretária foram:\n${assistantReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n- Não repita nenhuma delas, nem a mesma saudação, nem a mesma pergunta. Responda diretamente à última mensagem do cliente com avanço real na conversa.`
+      ? `\n\nANTI-REPETIÇÃO OPERACIONAL:\n- As últimas respostas da assistente virtual foram:\n${assistantReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n- Não repita nenhuma delas, nem a mesma saudação, nem a mesma pergunta. Responda diretamente à última mensagem do cliente com avanço real na conversa.`
       : "";
 
     const systemContent = `${extraPrompt}
