@@ -8,6 +8,14 @@ const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const ELEVENLABS_VOICE_ID = Deno.env.get("ELEVENLABS_VOICE_ID") || "EXAVITQu4vr4xnSDxMaL"; // Sarah (PT-BR natural)
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const OLLAMA_BASE_URL = (Deno.env.get("OLLAMA_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev").replace(/\/+$/g, "").replace(/\/api\/(?:generate|chat|tags|show)$/i, "");
+const OLLAMA_GENERATE_URL = `${OLLAMA_BASE_URL}/api/generate`;
+const OLLAMA_MODEL = "llama3.2:3b";
+const OLLAMA_SYSTEM_PROMPT = `Você é um assistente jurídico brasileiro.
+Responda SEMPRE em português do Brasil.
+Nunca use inglês.
+Nunca exponha raciocínio, análise interna, planejamento, tags <think> ou frases como "Okay", "the user", "let me", "I need".
+Entregue somente a resposta final pronta para o cliente.`;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
