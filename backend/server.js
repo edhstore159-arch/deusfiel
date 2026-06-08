@@ -63,6 +63,7 @@ const OLLAMA_HEALTH_INTERVAL_MS = Number(process.env.OLLAMA_HEALTH_INTERVAL_MS |
 const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS || 8000);
 const OLLAMA_PROBE_TIMEOUT_MS = Number(process.env.OLLAMA_PROBE_TIMEOUT_MS || Math.min(OLLAMA_GENERATE_TIMEOUT_MS, 30000));
 const OLLAMA_OPTIONS_BASE = { num_ctx: 2048, temperature: 0.2 };
+const OLLAMA_NUM_PREDICT = Number(process.env.OLLAMA_NUM_PREDICT || 420);
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOllamaBaseUrl = () => OLLAMA_BASE_URL;
 const formatOllamaHttpError = (status, raw, context = "Ollama") => {
@@ -135,11 +136,11 @@ export async function perguntarIA(texto) {
         signal: controller.signal,
         body: JSON.stringify({
           model: OLLAMA_MODEL,
-          prompt: texto,
+          prompt: `/no_think\n${texto}`,
           stream: false,
           think: false,
           keep_alive: OLLAMA_KEEP_ALIVE,
-          options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
+          options: { ...OLLAMA_OPTIONS_BASE, num_predict: OLLAMA_NUM_PREDICT },
         }),
       });
       const raw = await resposta.text();
