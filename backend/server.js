@@ -69,7 +69,7 @@ const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
 const OLLAMA_HEALTH_INTERVAL_MS = Number(process.env.OLLAMA_HEALTH_INTERVAL_MS || 240000);
 const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS || 8000);
 const OLLAMA_PROBE_TIMEOUT_MS = Number(process.env.OLLAMA_PROBE_TIMEOUT_MS || Math.min(OLLAMA_GENERATE_TIMEOUT_MS, 30000));
-const OLLAMA_OPTIONS_BASE = { num_ctx: 2048, temperature: 0.2 };
+const OLLAMA_OPTIONS_BASE = { num_ctx: 4096, temperature: 0.2 };
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const getOllamaBaseUrl = () => OLLAMA_BASE_URL;
 const formatOllamaHttpError = (status, raw, context = "Ollama") => {
@@ -146,7 +146,7 @@ async function callOllamaModel(modelName, texto) {
         stream: false,
         think: false,
         keep_alive: OLLAMA_KEEP_ALIVE,
-        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 1024, temperature: 0.1 },
       }),
     });
     const raw = await resposta.text();
@@ -1443,7 +1443,7 @@ app.post("/api/generate", async (req, res) => {
         think: false,
         keep_alive: OLLAMA_KEEP_ALIVE,
         system: OLLAMA_SYSTEM_PROMPT,
-        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 1024, temperature: 0.1 },
         ...(req.body || {}),
         model: modelName,
       };
