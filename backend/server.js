@@ -135,12 +135,12 @@ export async function perguntarIA(texto) {
         signal: controller.signal,
         body: JSON.stringify({
           model: OLLAMA_MODEL,
-          system: "Você é um assistente jurídico brasileiro. Responda SEMPRE em português do Brasil. Nunca use inglês.",
-          prompt: texto,
+          system: OLLAMA_SYSTEM_PROMPT,
+          prompt: buildOllamaPrompt(texto),
           stream: false,
           think: false,
           keep_alive: OLLAMA_KEEP_ALIVE,
-          options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
+          options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
         }),
       });
       const raw = await resposta.text();
