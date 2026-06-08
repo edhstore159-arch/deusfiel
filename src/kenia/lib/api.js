@@ -775,9 +775,33 @@ const staticPost = (url, body = {}) => {
         }
         if (!text) throw lastErr || new Error("Ollama indisponível");
 
-        const responseText = isHistoryDumpReply(text) || isNearDuplicateReply(text, body.history || [])
+        let finalText = text;
+        if (isHistoryDumpReply(finalText) || isNearDuplicateReply(finalText, body.history || [])) {
+          try {
+            const retryPrompt = `${system}\n\nCONTEXTO TEMPORAL INTERNO: ${buildTemporalAnswer()} Use somente se o cliente pedir data ou hora.\n\nCORREÇÃO OBRIGATÓRIA: a última resposta candidata repetiu uma mensagem anterior. Gere uma resposta NOVA, curta, útil, sem saudação inicial e sem repetir nenhuma frase, pergunta ou tópico já enviado no histórico. Avance a conversa com uma informação ou pergunta diferente.\n\n${history}\nCliente: ${userText}\nAssistente:`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 45000);
+            const res = await fetch(DIRECT_OLLAMA_URL, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              signal: controller.signal,
+              body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(retryPrompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 220, temperature: 0.9 } }),
+            }).finally(() => clearTimeout(timeout));
+            if (res.ok) {
+              const raw = await res.text();
+              const data = JSON.parse(raw || "{}");
+              const retry = sanitizeOllamaReply(data?.response || "", userText);
+              if (retry && !isInvalidOllamaReply(retry) && !isHistoryDumpReply(retry) && !isNearDuplicateReply(retry, body.history || [])) {
+                finalText = retry;
+              }
+            }
+          } catch (retryErr) {
+            console.warn("Retry anti-repetição falhou", retryErr);
+          }
+        }
+        const responseText = isHistoryDumpReply(finalText) || isNearDuplicateReply(finalText, body.history || [])
           ? buildNonRepeatingFallback(userText)
-          : cleanInternalChatMarkers(text);
+          : cleanInternalChatMarkers(finalText);
         return response({
             session_id: sessionId,
             response: responseText,
