@@ -537,11 +537,28 @@ const staticGet = async (url, config = {}) => {
   if (path === "/whatsapp/bot-delivery-stats") return response({ total_bot: 1, total_failures: 0, recent_failures: [] });
   if (path === "/debug/instructions") return response(read("debug_instructions", []));
   if (path === "/admin/case-analyses") {
-    const items = read("case_analyses", seedAnalyses);
-    return response({ total: items.length, qualificados: items.filter((i) => i.qualificacao === "qualificado").length, nao_qualificados: items.filter((i) => i.qualificacao === "nao_qualificado").length, necessita_mais_info: items.filter((i) => i.qualificacao === "necessita_mais_info").length, avg_acertividade: items.length ? Math.round(items.reduce((s, i) => s + i.acertividade, 0) / items.length) : 0, items });
+    let items = read("case_analyses", seedAnalyses);
+    if (!Array.isArray(items) || items.length === 0) {
+      items = clone(seedAnalyses);
+      write("case_analyses", items);
+    }
+    const qs = String(url).includes("?") ? String(url).split("?")[1] : "";
+    const params = new URLSearchParams(qs);
+    const qualif = params.get("qualificacao");
+    const filtered = qualif ? items.filter((i) => i.qualificacao === qualif) : items;
+    return response({
+      total: items.length,
+      qualificados: items.filter((i) => i.qualificacao === "qualificado").length,
+      nao_qualificados: items.filter((i) => i.qualificacao === "nao_qualificado").length,
+      necessita_mais_info: items.filter((i) => i.qualificacao === "necessita_mais_info").length,
+      avg_acertividade: items.length ? Math.round(items.reduce((s, i) => s + i.acertividade, 0) / items.length) : 0,
+      items: filtered,
+    });
   }
   if (path.startsWith("/admin/case-analyses/")) {
-    const analysis = read("case_analyses", seedAnalyses).find((i) => i.id === path.split("/").pop()) || seedAnalyses[0];
+    let items = read("case_analyses", seedAnalyses);
+    if (!Array.isArray(items) || items.length === 0) items = clone(seedAnalyses);
+    const analysis = items.find((i) => i.id === path.split("/").pop()) || items[0] || seedAnalyses[0];
     return response({ analysis, messages: seedMessages["contact-1"] || [] });
   }
   if (path === "/legislation/today") {
