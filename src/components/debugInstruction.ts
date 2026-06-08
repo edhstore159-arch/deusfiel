@@ -1,11 +1,5 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
-const isFatalDebugEnabled = () => {
-  if (typeof window === "undefined") return false;
-  const params = new URLSearchParams(window.location.search);
-  return params.get("fatalDebug") === "1" || window.localStorage.getItem("fatalDebug") === "1";
-};
-
 /**
  * Dispara o evento "lovable-debug-error" para que o DebugErrorThrower
  * lance um erro fatal de runtime intencional, acionando o overlay global
@@ -15,7 +9,6 @@ const isFatalDebugEnabled = () => {
  */
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined") return false;
-  if (!isFatalDebugEnabled()) return false;
   window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
   return true;
 };
