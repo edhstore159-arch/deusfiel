@@ -417,7 +417,7 @@ const isThanksMessage = (text) => {
   if (!value) return false;
   // mensagem curta de agradecimento (até ~6 palavras)
   if (value.split(/\s+/).length > 6) return false;
-  return /\b(obrigad[ao]s?|muito\s+obrigad[ao]s?|brigad[ao]s?|valeu|vlw|agrade[cç]o|grat[ao]s?|thanks?|thank\s*you|ty)\b/i.test(value);
+  return /\b(obrigad[ao]s?|muito\s+obrigad[ao]s?|brigad[ao]s?|valeu|vlw|agrade[cç]o|grat[ao]s?|grati[dt][aã]o|perfeito|perfeita|certo|ok|okay|entendi|thanks?|thank\s*you|ty)\b/i.test(value);
 };
 
 const buildThanksReply = (history = []) => {
