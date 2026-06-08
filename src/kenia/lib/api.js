@@ -72,11 +72,22 @@ Não informe horário ou data, exceto se o cliente pedir explicitamente.
 ## Estilo de Resposta
 Profissional, cordial, objetivo, humanizado, jurídico porém de fácil compreensão. Respostas curtas e diretas, evitando textos longos. Use o histórico para não repetir perguntas já respondidas.`;
 
+const OFFICIAL_GREETING = "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
+
 const cleanInternalChatMarkers = (text) =>
   String(text || "")
     .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>/giu, "")
     .replace(/`{1,3}\s*HANDOFF[_\s-]*K[EÊ]NIA\s*`{1,3}/giu, "")
     .trim();
+
+const sanitizeOllamaReply = (reply, userMessage = "") => {
+  const text = cleanInternalChatMarkers(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  if (/Tudo bem\?\s*Sou a assistente virtual da Dra\.\s*K[êe]nia Garcia/i.test(text)) return OFFICIAL_GREETING;
+  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso)/i.test(text);
+  const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userMessage || "").trim());
+  if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
+  return text;
+};
 
 const normalizeForSimilarity = (text) =>
   cleanInternalChatMarkers(text)

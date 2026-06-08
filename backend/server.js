@@ -356,6 +356,8 @@ Não informe horário ou data, exceto se o cliente pedir explicitamente.
 ## Estilo de Resposta
 Profissional, cordial, objetivo, humanizado, jurídico porém de fácil compreensão. Respostas curtas e diretas, evitando textos longos. Use o histórico para não repetir perguntas já respondidas e mantenha contexto sobre nome, telefone, e-mail, área jurídica, fatos principais, datas, documentos e status do atendimento.`;
 
+const OFFICIAL_GREETING = "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
+
 // Mantém o comportamento do atendente fixo mesmo se existir prompt antigo salvo no ambiente.
 const AI_SYSTEM_PROMPT = SECRETARY_SYSTEM_PROMPT;
 
@@ -386,6 +388,15 @@ function cleanRepeatedText(text) {
     if (normalized && normalized !== previous) uniqueLines.push(line);
   }
   return uniqueLines.join("\n").trim();
+}
+
+function sanitizeOllamaReply(reply, userText = "") {
+  const text = cleanRepeatedText(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  if (/Tudo bem\?\s*Sou a assistente virtual da Dra\.\s*K[êe]nia Garcia/i.test(text)) return OFFICIAL_GREETING;
+  const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso)/i.test(text);
+  const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userText || "").trim());
+  if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
+  return text;
 }
 
 function normalizeForSimilarity(text) {
