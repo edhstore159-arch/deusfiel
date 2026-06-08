@@ -18,6 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 const SCHEDULE_REGEX = /\b(agendar|agendamento|marcar|marca[cç][aã]o|hor[aá]rio|consulta|reuni[aã]o|atendimento|appointment|schedule)\b/i;
 const WAIT_FOLLOW_UP_MS = 65000;
+const ASSISTANT_GREETING = "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
+const ASSISTANT_SPEAKER = "Assistente virtual";
 
 // Gera link de videoconferência (Jitsi — funciona como Google Meet, sem necessidade de login)
 // Pode ser substituído por integração oficial com Google Calendar API no futuro.
@@ -202,8 +204,7 @@ export default function ChatIA() {
   const [messages, setMessages] = useState([
     {
       role: "assistant",
-      content:
-        "Olá! Sou a secretária da Kênia Garcia. Como posso ajudar?",
+      content: ASSISTANT_GREETING,
       audio_base64: null,
     },
   ]);
@@ -222,7 +223,7 @@ export default function ChatIA() {
   const [scheduling, setScheduling] = useState(false);
   const [leadId, setLeadId] = useState(null);
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(true);
-  const [activeSpeaker, setActiveSpeaker] = useState("Secretária");
+  const [activeSpeaker, setActiveSpeaker] = useState(ASSISTANT_SPEAKER);
   const audioRef = useRef(null);
   const scrollRef = useRef(null);
   const [recording, setRecording] = useState(false);
