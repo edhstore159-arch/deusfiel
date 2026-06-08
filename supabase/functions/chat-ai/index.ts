@@ -503,7 +503,7 @@ function isThanksMessage(text: string): boolean {
   const value = String(text || "").trim().toLowerCase();
   if (!value) return false;
   if (value.split(/\s+/).length > 6) return false;
-  return /\b(obrigad[ao]s?|muito\s+obrigad[ao]s?|brigad[ao]s?|valeu|vlw|agrade[cç]o|grat[ao]s?|thanks?|thank\s*you|ty)\b/i.test(value);
+  return /\b(obrigad[ao]s?|muito\s+obrigad[ao]s?|brigad[ao]s?|valeu|vlw|agrade[cç]o|grat[ao]s?|grati[dt][aã]o|perfeito|perfeita|certo|ok|okay|entendi|thanks?|thank\s*you|ty)\b/i.test(value);
 }
 
 function buildThanksReply(history: Array<{ role: string; content: string }> = []): string {
