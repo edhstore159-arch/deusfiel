@@ -731,6 +731,20 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
       }
     }
+
+    // Guard: se o modelo respondeu APENAS com saudação, expande para resposta útil
+    const isGreetingOnly = (text: string): boolean => {
+      const t = String(text || "")
+        .toLowerCase()
+        .replace(/[!.,?😊🙂👋🤝✨💜❤️🌟]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return /^(bom dia|boa tarde|boa noite|ol[áa]|oi|ei|hey|hello|hi)( (tudo bem|td bem|td bom))?$/.test(t) || t.length < 12;
+    };
+    if (isGreetingOnly(rawReply)) {
+      rawReply = `${saudacao}! 😊 Aqui é a secretária da *Dra. Kênia Garcia*.\n\nEm que posso te ajudar hoje? Se preferir, já posso *agendar* uma conversa com a doutora — é só me contar rapidinho o assunto.`;
+    }
+
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
