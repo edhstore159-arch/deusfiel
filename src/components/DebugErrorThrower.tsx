@@ -1,31 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 /**
  * DebugErrorThrower
  *
- * Escuta "lovable-debug-error" e lança um erro fatal intencional em render
- * para acionar o overlay global da Lovable e o botão "Try to Fix".
- *
- * NÃO envolver em ErrorBoundary/Suspense. NÃO substituir por toast/log.
- * O throw é proposital — é o mecanismo da feature.
+ * Escuta "lovable-debug-error" sem derrubar a aplicação. Antes este
+ * componente lançava um erro fatal intencional e causava tela branca quando
+ * uma instrução de debug era enviada a partir do app.
  */
 export const DebugErrorThrower = () => {
-  const [message, setMessage] = useState<string | null>(null);
-
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
       if (typeof detail === "string" && detail.length > 0) {
-        setMessage(detail);
+        console.info("lovable-debug-error suprimido para evitar tela branca:", detail);
       }
     };
     window.addEventListener("lovable-debug-error", handler as EventListener);
     return () => window.removeEventListener("lovable-debug-error", handler as EventListener);
   }, []);
-
-  if (message) {
-    throw new Error(message);
-  }
 
   return null;
 };
