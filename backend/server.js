@@ -421,6 +421,12 @@ function sanitizeOllamaReply(reply, userText = "") {
   return text;
 }
 
+function isInvalidOllamaReply(text) {
+  const value = String(text || "").trim();
+  return /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i)\b/i.test(value) ||
+    /\b(the user|let me|i need to|i should|instructions)\b/i.test(value.slice(0, 260));
+}
+
 function normalizeForSimilarity(text) {
   return String(text || "")
     .replace(/<AGENDAMENTO>[\s\S]*?<\/AGENDAMENTO>/g, "")
