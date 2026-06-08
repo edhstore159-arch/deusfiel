@@ -1516,14 +1516,13 @@ app.post("/api/chat/message", async (req, res) => {
       rawReply = retry.reply;
     }
   }
-  const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, message)).trim();
   res.json({
     session_id: req.body?.session_id || `session-${Date.now()}`,
     response: reply,
     audio_base64: null,
-    handoff,
-    speaker: handoff ? "Dra. Kênia Garcia" : "Assistente virtual",
+    handoff: false,
+    speaker: "Assistente virtual",
     analysis: { acertividade: 90, qualificacao: "ok", provider: "ollama", model: OLLAMA_MODEL },
   });
 });

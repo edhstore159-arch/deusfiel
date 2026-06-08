@@ -375,7 +375,6 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
 
@@ -427,8 +426,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         response: reply,
         appointment,
         audio_base64,
-        handoff,
-        speaker: handoff ? "Dra. Kênia Garcia" : "Assistente virtual",
+        handoff: false,
+        speaker: "Assistente virtual",
         analysis,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },

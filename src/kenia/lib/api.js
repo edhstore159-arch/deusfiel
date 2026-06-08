@@ -551,7 +551,7 @@ const staticPost = (url, body = {}) => {
             audio_base64: null,
             appointment: null,
             handoff: false,
-            speaker: null,
+            speaker: "Assistente virtual",
             analysis: { acertividade: 100, qualificacao: "ok" },
             server_time: new Date().toISOString(),
           });
@@ -591,7 +591,7 @@ const staticPost = (url, body = {}) => {
             audio_base64: null,
             appointment: null,
             handoff: false,
-            speaker: null,
+            speaker: "Assistente virtual",
             analysis: { acertividade: 80, qualificacao: "ok" },
             server_time: null,
           });

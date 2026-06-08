@@ -730,23 +730,8 @@ export default function ChatIA() {
       if (data.analysis) setAnalysis(data.analysis);
       upsertLead({ description: msg });
       setThinking(false);
-      if (data.handoff) {
-        setActiveSpeaker("Dra. Kênia Garcia");
-        try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.connect(g); g.connect(ctx.destination);
-          o.type = "sine"; o.frequency.value = 880;
-          g.gain.setValueAtTime(0.0001, ctx.currentTime);
-          g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
-          o.start(); o.stop(ctx.currentTime + 0.5);
-        } catch {}
-        toast.success("Dra. Kênia foi notificada e está entrando na conversa", { duration: 4000 });
-      }
       const responseText = cleanRepeatedText(data.response);
-      const speaker = data.handoff || activeSpeaker === "Dra. Kênia Garcia" ? "Dra. Kênia Garcia" : data.speaker || null;
+      const speaker = data.speaker || ASSISTANT_SPEAKER;
       await typeAssistantMessage(responseText, data.audio_base64 || null, speaker);
       if (shouldScheduleWaitFollowUp(data.response)) {
         if (waitFollowUpTimerRef.current) clearTimeout(waitFollowUpTimerRef.current);
