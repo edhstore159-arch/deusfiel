@@ -494,7 +494,9 @@ async function callAI(messagesPayload, options = {}) {
   const attempts = [];
   try {
     const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`);
-    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
+    const cleanedReply = sanitizeOllamaReply(reply, options.userText);
+    if (!cleanedReply) throw new Error("Ollama expôs raciocínio interno ou retornou resposta inválida.");
+    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: cleanedReply, attempts };
   } catch (e) {
     const timedOut = e?.name === "AbortError";
     const failed = {
@@ -502,7 +504,7 @@ async function callAI(messagesPayload, options = {}) {
       provider: "ollama",
       endpoint: OLLAMA_URL,
       model: OLLAMA_MODEL,
-      error: timedOut ? `Tempo esgotado após ${AI_REQUEST_TIMEOUT_MS}ms aguardando resposta do Ollama.` : e?.message || String(e),
+        error: timedOut ? `Tempo esgotado após ${AI_REQUEST_TIMEOUT_MS}ms aguardando resposta do Ollama.` : e?.message || String(e),
     };
     attempts.push(failed);
     recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
