@@ -1109,9 +1109,12 @@ app.post("/api/generate", async (req, res) => {
       stream: false,
       think: false,
       keep_alive: OLLAMA_KEEP_ALIVE,
-      options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
+      system: OLLAMA_SYSTEM_PROMPT,
+      options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
       ...(req.body || {}),
     };
+    body.system = OLLAMA_SYSTEM_PROMPT;
+    if (body.prompt) body.prompt = buildOllamaPrompt(body.prompt);
     const upstream = await fetch(OLLAMA_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
@@ -1134,6 +1137,14 @@ app.post("/api/generate", async (req, res) => {
         ok: false,
         fallback: true,
         error: "Ollama retornou resposta vazia.",
+        upstream: data,
+      });
+    }
+    if (isInvalidOllamaReply(data.response)) {
+      return res.status(200).json({
+        ok: false,
+        fallback: true,
+        error: "Ollama retornou raciocínio interno ou resposta inválida.",
         upstream: data,
       });
     }
