@@ -327,6 +327,12 @@ function stripAppointmentBlock(text: string): string {
 
 function cleanRepeatedText(text: string): string {
   const noRepeatedWords = String(text || "")
+    .replace(/<\/?[a-zA-Z][^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
     .replace(/\b((?:[\p{L}\p{N}]{2,}\s+){1,3}[\p{L}\p{N}]{2,})(?:[\s,.;:!?-]+\1\b)+/giu, "$1")
     .replace(/\b([\p{L}\p{N}]{2,})(?:[\s,.;:!?-]+\1\b)+/giu, "$1")
     .replace(/([^.!?\n]{8,}[.!?])(?:\s+\1)+/giu, "$1")
