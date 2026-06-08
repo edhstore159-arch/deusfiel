@@ -751,7 +751,7 @@ export default function ChatIA() {
       if (shouldScheduleWaitFollowUp(data.response)) {
         if (waitFollowUpTimerRef.current) clearTimeout(waitFollowUpTimerRef.current);
         waitFollowUpTimerRef.current = setTimeout(() => {
-          typeAssistantMessage(buildWaitFollowUpText(name), null, speaker || "Secretária");
+          typeAssistantMessage(buildWaitFollowUpText(name), null, speaker || ASSISTANT_SPEAKER);
           waitFollowUpTimerRef.current = null;
         }, WAIT_FOLLOW_UP_MS);
       }
@@ -780,8 +780,7 @@ export default function ChatIA() {
     setMessages([
       {
         role: "assistant",
-        content:
-          "Olá! Sou a secretária da Kênia Garcia. Como posso ajudar?",
+        content: ASSISTANT_GREETING,
         audio_base64: null,
       },
     ]);
@@ -925,7 +924,7 @@ export default function ChatIA() {
                       {m.role === "assistant" && (m.speaker || i === 0) && (
                         <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold tracking-widest uppercase text-gold-600">
                           <Sparkles className="w-3 h-3" />
-                          {m.speaker ? m.speaker : "Ana · secretária"}
+                          {m.speaker ? m.speaker : ASSISTANT_SPEAKER}
                         </div>
                       )}
                       <div className="text-sm leading-relaxed whitespace-pre-wrap">{renderMessageContent(m.content)}</div>
