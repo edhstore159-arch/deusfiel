@@ -411,7 +411,7 @@ function isHandoffRequest(text: string): boolean {
 }
 
 function buildHandoffReply(): string {
-  return "Claro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
+  return "HANDOFF_KENIA\nClaro, vou chamar a Dra. Kênia para dar continuidade ao atendimento. Enquanto isso, me diga em uma frase qual ponto você quer tratar com ela.";
 }
 
 function isHistoryDumpReply(text: string): boolean {
