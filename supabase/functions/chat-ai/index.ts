@@ -498,12 +498,18 @@ function isResumeRequest(text: string): boolean {
 }
 
 function summarizeTopicFromHistory(history: Array<{ role: string; content: string }>): string {
-  const lastUser = [...history].reverse().find((m) => m.role === "user" && String(m.content || "").trim());
+  const lastUser = [...history].reverse().find((m) =>
+    m.role === "user" &&
+    String(m.content || "").trim() &&
+    !isThanksMessage(String(m.content || "")) &&
+    !isResumeRequest(String(m.content || ""))
+  );
   const raw = stripAppointmentBlock(String(lastUser?.content || "")).replace(/\s+/g, " ").trim();
   if (!raw) return "";
   const snippet = raw.length > 120 ? raw.slice(0, 117).trim() + "..." : raw;
   return snippet;
 }
+
 
 function buildResumeReply(history: Array<{ role: string; content: string }>): string {
   const topic = summarizeTopicFromHistory(history);

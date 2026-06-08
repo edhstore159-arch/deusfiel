@@ -417,7 +417,12 @@ const isResumeRequest = (text) => {
 };
 
 const buildResumeReply = (history = []) => {
-  const lastUser = [...history].reverse().find((m) => m.role === "user" && String(m.content || "").trim());
+  const lastUser = [...history].reverse().find((m) =>
+    m.role === "user" &&
+    String(m.content || "").trim() &&
+    !isThanksMessage(m.content) &&
+    !isResumeRequest(m.content)
+  );
   const raw = String(lastUser?.content || "").replace(/\s+/g, " ").trim();
   if (!raw) {
     return "Claro, podemos continuar. Me diga em uma frase o ponto onde quer retomar e seguimos daí.";
@@ -425,6 +430,7 @@ const buildResumeReply = (history = []) => {
   const snippet = raw.length > 120 ? raw.slice(0, 117).trim() + "..." : raw;
   return `Claro, podemos retomar. Estávamos tratando de: "${snippet}". Quer continuar desse ponto ou ajustar algo?`;
 };
+
 
 const isThanksMessage = (text) => {
   const value = String(text || "").trim().toLowerCase();
