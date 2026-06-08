@@ -19,7 +19,7 @@ const inDays = (days) => {
   return d.toISOString();
 };
 
-const DEFAULT_PROMPT = `# Assistente Jurídico Virtual - Kênia Garcia
+export const DEFAULT_PROMPT = `# Assistente Jurídico Virtual - Kênia Garcia
 
 ## Identidade da Assistente
 Você é uma assistente virtual jurídica da Dra. Kênia Garcia.
@@ -482,10 +482,10 @@ const staticPost = (url, body = {}) => {
         "Tive uma instabilidade momentânea. Estou aqui para te ajudar; pode me contar o que aconteceu em uma frase curta?";
       try {
         const history = (body.history || [])
-          .map((m) => `${m.role === "user" ? "Cliente" : "Kênia"}: ${m.content}`)
+          .map((m) => `${m.role === "user" ? "Cliente" : "Assistente"}: ${m.content}`)
           .join("\n");
         const system = DEFAULT_PROMPT;
-        const prompt = `${system}\n\n${history}\nCliente: ${body.message || body.text || ""}\nKênia:`;
+        const prompt = `${system}\n\n${history}\nCliente: ${body.message || body.text || ""}\nAssistente:`;
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 45000);

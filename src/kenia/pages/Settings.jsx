@@ -238,11 +238,11 @@ export default function Settings() {
             <h3 className="font-display font-semibold text-base">Persona do robô WhatsApp</h3>
           </div>
           <p className="text-sm text-nude-500 mb-3">
-            O atendente virtual se apresenta como <strong>Kênia Garcia</strong> e nunca revela ser IA. Para editar o prompt, acesse <a href="/app/whatsapp" className="text-gold-600 hover:underline">WhatsApp → Robô Atendente IA</a>.
+            O atendente virtual se apresenta como <strong>assistente virtual da Dra. Kênia Garcia</strong>. Para editar o prompt, acesse <a href="/app/whatsapp" className="text-gold-600 hover:underline">WhatsApp → Robô Atendente IA</a>.
           </p>
           <div className="text-xs space-y-1 text-nude-600">
-            <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-gold-600" /> Se apresenta como Kênia Garcia</div>
-            <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-gold-600" /> Nunca diz que é robô/IA</div>
+            <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-gold-600" /> Usa a saudação oficial da assistente virtual</div>
+            <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-gold-600" /> Responde sempre em português do Brasil</div>
             <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-gold-600" /> Detecta estilo do cliente (visual/auditivo/cinestésico)</div>
             <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-gold-600" /> Adapta linguagem automaticamente</div>
             <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-gold-600" /> Classifica área + urgência + score de cada lead</div>

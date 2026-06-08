@@ -259,7 +259,7 @@ Deno.serve(async (req) => {
 
     const assistantReplies = recentAssistantReplies(history);
     const antiRepetitionContext = assistantReplies.length
-      ? `\n\nANTI-REPETIÇÃO OPERACIONAL:\n- As últimas respostas da secretária foram:\n${assistantReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n- Não repita nenhuma delas, nem a mesma saudação, nem a mesma pergunta. Responda diretamente à última mensagem do cliente com avanço real na conversa.`
+      ? `\n\nANTI-REPETIÇÃO OPERACIONAL:\n- As últimas respostas da assistente virtual foram:\n${assistantReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n- Não repita nenhuma delas, nem a mesma saudação, nem a mesma pergunta. Responda diretamente à última mensagem do cliente com avanço real na conversa.`
       : "";
 
     const systemContent = `${extraPrompt}
@@ -279,7 +279,7 @@ VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 2. Identifique o objetivo principal da mensagem (dúvida jurídica, agendamento, informação prática, desabafo etc.).
 3. Verifique se a sua resposta realmente atende ao que foi perguntado — se não atender, refaça.
 4. Confirme se a resposta é coerente com o histórico da conversa, não contradiz informações já dadas e não repete saudação/pergunta anterior.
-5. Garanta que a resposta seja direta, em português, no tom de secretária da Kênia Garcia, e avance a conversa (não devolva a mesma pergunta).
+5. Garanta que a resposta seja direta, em português, no tom de assistente virtual jurídica da Dra. Kênia Garcia, e avance a conversa (não devolva a mesma pergunta).
 Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitionContext}`;
 
     const messages = [
@@ -394,7 +394,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         appointment,
         audio_base64,
         handoff,
-        speaker: handoff ? "Dra. Kênia Garcia" : "Secretária",
+        speaker: handoff ? "Dra. Kênia Garcia" : "Assistente virtual",
         analysis,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },

@@ -1174,6 +1174,7 @@ app.post("/api/legal-deadlines/:id/notify", async (req, res) => {
 });
 
 app.get("/api/whatsapp/config", (_req, res) => res.json({ ...whatsappConfig, bot_prompt: AI_SYSTEM_PROMPT }));
+app.get("/api/whatsapp/default-prompt", (_req, res) => res.json({ prompt: AI_SYSTEM_PROMPT }));
 
 // Teste rapido da chave de IA configurada no servidor
 app.get("/api/whatsapp/ai-test", async (_req, res) => {
@@ -1501,7 +1502,7 @@ app.post("/api/chat/message", async (req, res) => {
     response: reply,
     audio_base64: null,
     handoff,
-    speaker: handoff ? "Dra. Kênia Garcia" : "Secretária",
+    speaker: handoff ? "Dra. Kênia Garcia" : "Assistente virtual",
     analysis: { acertividade: result.ok ? 90 : 70, qualificacao: result.ok ? "ok" : "fallback" },
   });
 });
