@@ -89,6 +89,7 @@ const buildOllamaPrompt = (prompt) => `/no_think
 ${OLLAMA_SYSTEM_PROMPT}
 
 INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
+Se o cliente pedir data, dia da semana ou hora atual, responda com a data/hora de America/Sao_Paulo informada no prompt.
 
 ${prompt}
 
@@ -531,7 +532,20 @@ const staticPost = (url, body = {}) => {
           .map((m) => `${m.role === "user" ? "Cliente" : "Assistente"}: ${m.content}`)
           .join("\n");
         const system = DEFAULT_PROMPT;
-        const prompt = `${system}\n\n${history}\nCliente: ${body.message || body.text || ""}\nAssistente:`;
+        const userText = body.message || body.text || "";
+        if (userAskedTemporalInfo(userText)) {
+          return response({
+            session_id: sessionId,
+            response: buildTemporalAnswer(),
+            audio_base64: null,
+            appointment: null,
+            handoff: false,
+            speaker: null,
+            analysis: { acertividade: 100, qualificacao: "ok" },
+            server_time: new Date().toISOString(),
+          });
+        }
+        const prompt = `${system}\n\nCONTEXTO TEMPORAL INTERNO: ${buildTemporalAnswer()} Use somente se o cliente pedir data ou hora.\n\n${history}\nCliente: ${userText}\nAssistente:`;
 
         const tryModel = async (modelName) => {
           const controller = new AbortController();
@@ -546,14 +560,12 @@ const staticPost = (url, body = {}) => {
           const raw = await res.text();
           const data = JSON.parse(raw || "{}");
           if (data?.fallback || data?.error) throw new Error(data.error || "Ollama indisponível");
-          const text = sanitizeOllamaReply(data?.response || "", body.message || body.text || "");
+          const text = sanitizeOllamaReply(data?.response || "", userText);
           if (!text || isInvalidOllamaReply(text)) throw new Error("Ollama retornou raciocínio interno ou resposta inválida");
           return text;
         };
 
-        const candidates = DIRECT_OLLAMA_FALLBACK_MODEL && DIRECT_OLLAMA_FALLBACK_MODEL !== DIRECT_OLLAMA_MODEL
-          ? [DIRECT_OLLAMA_MODEL, DIRECT_OLLAMA_FALLBACK_MODEL]
-          : [DIRECT_OLLAMA_MODEL];
+        const candidates = [DIRECT_OLLAMA_MODEL];
         let text = null;
         let lastErr = null;
         for (const m of candidates) {
@@ -562,7 +574,7 @@ const staticPost = (url, body = {}) => {
         if (!text) throw lastErr || new Error("Ollama indisponível");
 
         const responseText = isNearDuplicateReply(text, body.history || [])
-          ? buildNonRepeatingFallback(body.message || body.text || "")
+          ? buildNonRepeatingFallback(userText)
           : cleanInternalChatMarkers(text);
         return response({
             session_id: sessionId,
@@ -575,36 +587,7 @@ const staticPost = (url, body = {}) => {
             server_time: null,
           });
       } catch (e) {
-        console.warn("Ollama direto falhou, tentando chat-ai como fallback", e);
-      }
-      try {
-        const { data, error } = await supabase.functions.invoke("chat-ai", {
-          body: {
-            message: body.message || body.text || "",
-            history: body.history || [],
-            session_id: sessionId,
-            user_id: body.user_id || null,
-            want_audio: false,
-          },
-        });
-        if (!error && data?.response) {
-          const cleanedResponse = cleanInternalChatMarkers(data.response);
-          const responseText = isNearDuplicateReply(cleanedResponse, body.history || [])
-            ? buildNonRepeatingFallback(body.message || body.text || "")
-            : cleanedResponse;
-          return response({
-            session_id: data.session_id || sessionId,
-            response: responseText,
-            audio_base64: data.audio_base64 || null,
-            appointment: data.appointment || null,
-            handoff: Boolean(data.handoff),
-            speaker: data.speaker || null,
-            analysis: data.analysis || { acertividade: 80, qualificacao: "ok" },
-            server_time: null,
-          });
-        }
-      } catch (e) {
-        console.warn("chat-ai fallback falhou", e);
+        console.warn("Ollama llama3.2:3b falhou no chat", e);
       }
       return response({
           session_id: sessionId,
