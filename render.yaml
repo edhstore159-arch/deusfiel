@@ -23,7 +23,7 @@ services:
       - key: VITE_OLLAMA_URL
         value: https://unabashed-vertical-crispness.ngrok-free.dev/api/generate
       - key: VITE_OLLAMA_MODEL
-        value: qwen3:4b
+        value: llama3.2:3b
   - type: web
     name: kenia-whatsapp-backend
     runtime: node
@@ -50,7 +50,7 @@ services:
       - key: OLLAMA_URL
         value: https://unabashed-vertical-crispness.ngrok-free.dev
       - key: OLLAMA_MODEL
-        value: qwen3:4b
+        value: llama3.2:3b
       - key: AI_REQUEST_TIMEOUT_MS
         value: "90000"
       - key: OLLAMA_GENERATE_TIMEOUT_MS
