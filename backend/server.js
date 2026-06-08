@@ -392,9 +392,16 @@ function cleanRepeatedText(text) {
   return uniqueLines.join("\n").trim();
 }
 
+function isThinkingLeak(text) {
+  const value = String(text || "").trim();
+  return /^(okay|ok,|let'?s|the user|the client|first,|i need|i should|we need|so i|wait,|vou analisar|preciso raciocinar|racioc[ií]nio|pensamento|an[aá]lise interna)\b/i.test(value) ||
+    /\b(i need to|i should|let me|the client|the user|brazilian labor laws|legal question|severance pay)\b/i.test(value);
+}
+
 function sanitizeOllamaReply(reply, userText = "") {
-  const text = cleanRepeatedText(reply)
-    .replace(/<think>[\s\S]*?<\/think>/giu, "")
+  const raw = cleanRepeatedText(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  const finalOnly = raw.match(/(?:resposta\s+final|resposta\s+ao\s+cliente|resposta)\s*[:\-]\s*([\s\S]+)$/iu)?.[1] || raw;
+  const text = finalOnly
     .replace(/^(?:[\s\S]{0,1800}?)(?:resposta\s+final|resposta\s+ao\s+cliente)\s*[:\-]\s*/iu, "")
     .split(/\n+/)
     .map((line) => line.trim())
@@ -402,6 +409,7 @@ function sanitizeOllamaReply(reply, userText = "") {
     .join("\n")
     .trim();
   if (/Tudo bem\?\s*Sou a assistente virtual da Dra\.\s*K[êe]nia Garcia/i.test(text)) return OFFICIAL_GREETING;
+  if (isThinkingLeak(text)) return "";
   const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso|racioc[ií]nio|pensamento|an[aá]lise interna)/i.test(text);
   const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userText || "").trim());
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;

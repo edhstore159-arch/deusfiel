@@ -81,9 +81,14 @@ const cleanInternalChatMarkers = (text) =>
     .replace(/`{1,3}\s*HANDOFF[_\s-]*K[EÊ]NIA\s*`{1,3}/giu, "")
     .trim();
 
+const isThinkingLeak = (text) =>
+  /^(okay|ok,|let'?s|the user|the client|first,|i need|i should|we need|so i|wait,|vou analisar|preciso raciocinar|racioc[ií]nio|pensamento|an[aá]lise interna)\b/i.test(String(text || "").trim()) ||
+  /\b(i need to|i should|let me|the client|the user|brazilian labor laws|legal question|severance pay)\b/i.test(String(text || ""));
+
 const sanitizeOllamaReply = (reply, userMessage = "") => {
-  const text = cleanInternalChatMarkers(reply)
-    .replace(/<think>[\s\S]*?<\/think>/giu, "")
+  const raw = cleanInternalChatMarkers(reply).replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  const finalOnly = raw.match(/(?:resposta\s+final|resposta\s+ao\s+cliente|resposta)\s*[:\-]\s*([\s\S]+)$/iu)?.[1] || raw;
+  const text = finalOnly
     .replace(/^(?:[\s\S]{0,1800}?)(?:resposta\s+final|resposta\s+ao\s+cliente)\s*[:\-]\s*/iu, "")
     .split(/\n+/)
     .map((line) => line.trim())
@@ -91,6 +96,7 @@ const sanitizeOllamaReply = (reply, userMessage = "") => {
     .join("\n")
     .trim();
   if (/Tudo bem\?\s*Sou a assistente virtual da Dra\.\s*K[êe]nia Garcia/i.test(text)) return OFFICIAL_GREETING;
+  if (isThinkingLeak(text)) return "";
   const looksLikeThinking = /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i|a resposta|vou analisar|preciso|racioc[ií]nio|pensamento|an[aá]lise interna)/i.test(text);
   const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userMessage || "").trim());
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
