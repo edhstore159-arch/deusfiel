@@ -615,6 +615,12 @@ function parseAppointmentBlock(text: string) {
   }
 }
 
+function compactHistory(history: Array<{ role: string; content: string }>, maxItems = 8) {
+  return (Array.isArray(history) ? history : [])
+    .slice(-maxItems)
+    .map((m) => ({ role: m.role, content: String(m.content || "").slice(0, 900) }));
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -629,7 +635,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
-    const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
+    const history: Array<{ role: string; content: string }> = compactHistory(Array.isArray(body.history) ? body.history : []);
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
     const sessionId: string | null = body.session_id ? String(body.session_id) : null;
