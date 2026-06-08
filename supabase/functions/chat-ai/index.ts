@@ -360,35 +360,16 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       { role: "user", content: userMessage },
     ];
 
-    let aiResult = await chatCompletion({
-      model: "google/gemini-3-flash-preview",
-      messages,
-      temperature: 0.72,
-    });
-
-    let data: any = aiResult.ok ? aiResult.data : null;
-    let rawReply: string = aiResult.ok
-      ? data?.choices?.[0]?.message?.content ?? ""
-      : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
-    if (aiResult.ok && isNearDuplicateReply(rawReply, history)) {
-      const retryResult = await chatCompletion({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content: `${systemContent}\n\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta e útil, sem saudação inicial e sem repetir perguntas já feitas.`,
-          },
-          ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.9,
-      });
-      if (retryResult.ok) {
-        data = retryResult.data;
-        rawReply = data?.choices?.[0]?.message?.content ?? rawReply;
-      }
-      if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    let rawReply: string;
+    try {
+      rawReply = userAskedTemporalInfo(userMessage)
+        ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
+        : await callOllama(messages, fmtDate, fmtTime);
+    } catch (err) {
+      console.error("Erro ao chamar Ollama llama3.2:3b:", err);
+      rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
+    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
