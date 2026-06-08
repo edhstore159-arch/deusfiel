@@ -127,8 +127,9 @@ export async function perguntarIA(texto) {
   // IMPORTANTE: NÃO usar timeout/AbortController aqui.
   // O usuário exigiu que o Baileys/WhatsApp espere o Ollama responder pelo
   // tempo que for necessário, sem cair em fallback. Não reintroduzir timeout.
-  let lastErrorForThrow = null;
-  for (let attempt = 1; attempt <= OLLAMA_REQUEST_RETRIES + 1; attempt++) {
+  let attempt = 0;
+  while (true) {
+    attempt += 1;
     try {
       const resposta = await fetch(OLLAMA_URL, {
         method: "POST",
@@ -151,13 +152,12 @@ export async function perguntarIA(texto) {
       ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null };
       return reply;
     } catch (e) {
-      lastErrorForThrow = e;
       const message = e?.message || String(e);
       ollamaStatus = { ...ollamaStatus, ok: false, last_checked_at: new Date().toISOString(), last_error: message };
-      if (attempt <= OLLAMA_REQUEST_RETRIES) await delay(800 * attempt);
+      recordAutoReply({ step: "ollama_wait_retry", attempt, error: message });
+      await delay(Math.min(30000, 2000 * attempt));
     }
   }
-  throw lastErrorForThrow || new Error("Falha ao consultar Ollama.");
 }
 
 async function refreshOllamaStatus() {
@@ -712,11 +712,14 @@ async function autoReply(jid, userText, contactName) {
     ...history,
     { role: "user", content: userText },
   ];
-  recordAutoReply({ step: "ai_request", jid, providers: ["ollama", OPENAI_API_KEY && "openai", EMERGENT_API_KEY && "emergent", LOVABLE_API_KEY && "lovable"].filter(Boolean) });
+  recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], policy: "wait_forever_no_fallback" });
   let result = await callAI(messagesPayload, { temperature: 0.72 });
-  const usedFallback = !result.ok;
-  let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
-  if (!usedFallback && isNearDuplicateReply(rawReply, history)) {
+  if (!result.ok) {
+    recordAutoReply({ step: "ollama_no_reply_no_fallback", jid, result });
+    return;
+  }
+  let rawReply = result.reply;
+  if (isNearDuplicateReply(rawReply, history)) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...history,
@@ -729,16 +732,15 @@ async function autoReply(jid, userText, contactName) {
     if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
   }
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
-  if (usedFallback) recordAutoReply({ step: "ai_fail_local_fallback", jid, result, reply: reply.slice(0, 200) });
   history.push({ role: "user", content: userText });
   history.push({ role: "assistant", content: reply });
   aiHistory.set(jid, history);
   try {
-    const sent = await sendBotText(jid, reply, { source: usedFallback ? "local_fallback" : result.provider });
-    recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: usedFallback ? "local_fallback" : result.provider, model: result.model || null, reply: reply.slice(0, 200) });
+    const sent = await sendBotText(jid, reply, { source: result.provider });
+    recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: result.provider, model: result.model || null, reply: reply.slice(0, 200) });
     if (shouldScheduleWaitFollowUp(reply)) scheduleWaitFollowUp(jid, contactName);
   } catch (e) {
-    queueAutoReply(jid, reply, { source: usedFallback ? "local_fallback" : result.provider, reason: e?.message || String(e) });
+    queueAutoReply(jid, reply, { source: result.provider, reason: e?.message || String(e) });
     recordAutoReply({ step: "send_queued_after_fail", jid, error: e?.message || String(e) });
   }
 }
