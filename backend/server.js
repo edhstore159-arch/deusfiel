@@ -1085,13 +1085,16 @@ app.post("/api/generate", async (req, res) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
   try {
-    const body = {
+      const requestBody = req.body || {};
+      const rawPrompt = String(requestBody.prompt || "");
+      const body = {
       model: OLLAMA_MODEL,
       stream: false,
       think: false,
       keep_alive: OLLAMA_KEEP_ALIVE,
-      options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
-      ...(req.body || {}),
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: OLLAMA_NUM_PREDICT },
+        ...requestBody,
+        prompt: rawPrompt.startsWith("/no_think") ? rawPrompt : `/no_think\n${rawPrompt}`,
     };
     const upstream = await fetch(OLLAMA_URL, {
       method: "POST",
@@ -1118,7 +1121,7 @@ app.post("/api/generate", async (req, res) => {
         upstream: data,
       });
     }
-    res.json(data);
+    res.json({ ...data, response: sanitizeOllamaReply(data?.response || "", String(req.body?.prompt || "")) });
   } catch (err) {
     const aborted = err?.name === "AbortError";
     res.status(200).json({

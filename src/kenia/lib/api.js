@@ -513,7 +513,7 @@ const staticPost = (url, body = {}) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
-          body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, prompt: `/no_think\n${prompt}`, stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 180, temperature: 0.2 } }),
+          body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, prompt: `/no_think\n${prompt}`, stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 420, temperature: 0.2 } }),
         }).finally(() => clearTimeout(timeout));
         if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
         const raw = await res.text();
