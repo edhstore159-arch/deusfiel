@@ -459,6 +459,9 @@ function buildNonRepeatingFallback(userText, contactName = "cliente") {
   const firstName = String(contactName || "cliente").split(" ")[0] || "cliente";
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return `Hoje é ${saoPauloTemporalContext().replace(/^.*referência\s+/i, "").replace(/,\s*America\/Sao_Paulo\..*$/i, ".")}`;
+  if (/\b(demitid|demiss[aã]o|rescis[aã]o|verbas rescis[oó]rias|fgts|seguro-desemprego|trabalhista)\b/i.test(txt)) {
+    return `${firstName}, em regra, na demissão sem justa causa devem ser verificadas verbas como saldo de salário, aviso-prévio, férias vencidas/proporcionais com 1/3, 13º proporcional, multa de 40% do FGTS e guias para saque/seguro-desemprego, quando cabíveis. Me envie a data da demissão, tempo de trabalho, último salário e se houve justa causa para eu direcionar a análise inicial. Esta resposta possui caráter informativo e não substitui a consulta com advogado regularmente inscrito na OAB. A análise final deve ser feita pela Dra. Kênia Garcia.`;
+  }
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(txt)) {
     return `${firstName}, claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.`;
   }
@@ -646,6 +649,9 @@ function buildLocalLegalReply(jid, userText, contactName) {
   const txt = String(userText || "").toLowerCase();
   if (/urgente|pris[aã]o|audi[eê]ncia|prazo|intima[cç][aã]o|mandado|medida protetiva/.test(txt)) {
     return `${name}, entendi a urgência. Vou sinalizar seu caso para a equipe agora; por favor me envie sua cidade/estado e um resumo breve do que aconteceu.`;
+  }
+  if (/\b(demitid|demiss[aã]o|rescis[aã]o|verbas rescis[oó]rias|fgts|seguro-desemprego|trabalhista)\b/i.test(txt)) {
+    return `${name}, entendi. Em uma demissão sem justa causa, normalmente é necessário conferir saldo de salário, aviso-prévio, férias vencidas/proporcionais acrescidas de 1/3, 13º proporcional, multa de 40% do FGTS e guias de saque/seguro-desemprego, se aplicáveis. Para uma triagem correta, me informe a data da demissão, há quanto tempo trabalhava, último salário e se a empresa alegou justa causa. Esta resposta possui caráter informativo e não substitui a consulta com advogado regularmente inscrito na OAB. A análise final deve ser feita pela Dra. Kênia Garcia.`;
   }
   if (userTurns <= 1) return "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
   if (userTurns === 2) return "Entendi. Quando isso aconteceu e qual foi o principal prejuízo ou preocupação para você?";

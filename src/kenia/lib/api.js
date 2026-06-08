@@ -139,6 +139,9 @@ const isNearDuplicateReply = (reply, history = []) => {
 
 const buildNonRepeatingFallback = (message) => {
   const text = String(message || "").toLowerCase();
+  if (/\b(demitid|demiss[aã]o|rescis[aã]o|verbas rescis[oó]rias|fgts|seguro-desemprego|trabalhista)\b/i.test(text)) {
+    return "Entendi. Em demissão sem justa causa, normalmente é preciso conferir saldo de salário, aviso-prévio, férias vencidas/proporcionais com 1/3, 13º proporcional, multa de 40% do FGTS e guias de saque/seguro-desemprego, se cabíveis. Me informe a data da demissão, tempo de trabalho, último salário e se houve justa causa para direcionar a análise inicial. Esta resposta possui caráter informativo e não substitui a consulta com advogado regularmente inscrito na OAB. A análise final deve ser feita pela Dra. Kênia Garcia.";
+  }
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
