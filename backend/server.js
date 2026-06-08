@@ -1718,7 +1718,7 @@ app.post("/api/chat/message", async (req, res) => {
     { role: "user", content: message },
   ], { temperature: 0.72, userText: message });
   let rawReply = result.ok ? result.reply : buildLocalLegalReply(req.body?.session_id || "web", message, req.body?.visitor_name || "Cliente");
-  if (result.ok && isNearDuplicateReply(rawReply, normalizedHistory)) {
+  if (result.ok && (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, normalizedHistory))) {
     const retry = await callAI([
       { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...normalizedHistory,
@@ -1728,7 +1728,7 @@ app.post("/api/chat/message", async (req, res) => {
       result = retry;
       rawReply = retry.reply;
     }
-    if (isNearDuplicateReply(rawReply, normalizedHistory)) rawReply = buildNonRepeatingFallback(message, req.body?.visitor_name || "Cliente");
+    if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, normalizedHistory)) rawReply = buildNonRepeatingFallback(message, req.body?.visitor_name || "Cliente");
   }
   const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, message)).trim();
