@@ -299,7 +299,7 @@ const EMERGENT_BASE_URL =
 const EMERGENT_MODEL = process.env.EMERGENT_MODEL || "gpt-4o-mini";
 const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY || process.env.VITE_LOVABLE_API_KEY || "";
 const AI_MODEL = process.env.AI_MODEL || "google/gemini-3-flash-preview";
-const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS || 45000);
+const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS || 90000);
 const AUTO_REPLY_SEND_TIMEOUT_MS = Number(process.env.AUTO_REPLY_SEND_TIMEOUT_MS || 20000);
 const AUTO_REPLY_RETRY_EVERY_MS = Number(process.env.AUTO_REPLY_RETRY_EVERY_MS || 10000);
 const AUTO_REPLY_QUEUE_MAX = Number(process.env.AUTO_REPLY_QUEUE_MAX || 50);
@@ -1066,7 +1066,9 @@ app.post("/api/generate", async (req, res) => {
     const body = {
       model: OLLAMA_MODEL,
       stream: false,
-      options: { num_predict: 260, temperature: 0.2 },
+      think: false,
+      keep_alive: OLLAMA_KEEP_ALIVE,
+      options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
       ...(req.body || {}),
     };
     const upstream = await fetch(OLLAMA_URL, {
