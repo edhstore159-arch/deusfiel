@@ -55,8 +55,8 @@ const normalizeOllamaBaseUrl = (value) => {
 const OLLAMA_BASE_URL = normalizeOllamaBaseUrl(OLLAMA_RAW_URL);
 const OLLAMA_URL = `${OLLAMA_BASE_URL}/api/generate`;
 const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen3:4b";
-const OLLAMA_FALLBACK_MODEL = process.env.OLLAMA_FALLBACK_MODEL || "llama3.2:3b";
+const OLLAMA_MODEL = "llama3.2:3b";
+const OLLAMA_FALLBACK_MODEL = "";
 const OLLAMA_REQUEST_RETRIES = Number(process.env.OLLAMA_REQUEST_RETRIES || 0);
 const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 90000);
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
@@ -388,6 +388,7 @@ const buildOllamaPrompt = (prompt) => `/no_think
 ${OLLAMA_SYSTEM_PROMPT}
 
 INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
+Se o cliente pedir data, dia da semana ou hora atual, use obrigatoriamente este contexto: ${saoPauloTemporalContext()}
 
 ${prompt}
 
@@ -482,7 +483,7 @@ function isNearDuplicateReply(reply, history) {
 function buildNonRepeatingFallback(userText, contactName = "cliente") {
   const firstName = String(contactName || "cliente").split(" ")[0] || "cliente";
   const txt = String(userText || "").toLowerCase();
-  if (userAskedTemporalInfo(txt)) return `Hoje é ${saoPauloTemporalContext().replace(/^.*referência\s+/i, "").replace(/,\s*America\/Sao_Paulo\..*$/i, ".")}`;
+  if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(txt)) {
     return `${firstName}, claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.`;
   }
@@ -492,8 +493,15 @@ function buildNonRepeatingFallback(userText, contactName = "cliente") {
   return `${firstName}, entendi. Para eu avançar no atendimento, me conte em uma frase o que aconteceu e qual orientação você precisa agora.`;
 }
 
+function buildTemporalAnswer() {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const time = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(now);
+  return `Hoje é ${date}, e agora são ${time}.`;
+}
+
 function userAskedTemporalInfo(text) {
-  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|data\s+de\s+hoje|que\s+dia\s+(?:é|estamos)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana)\b/i.test(String(text || ""));
+  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano))\b/i.test(String(text || ""));
 }
 
 function removeTemporalLeaks(reply, userText) {
@@ -508,6 +516,10 @@ function removeTemporalLeaks(reply, userText) {
 }
 
 async function callAI(messagesPayload, options = {}) {
+  if (userAskedTemporalInfo(options.userText)) {
+    return { ok: true, provider: "ollama-temporal", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: buildTemporalAnswer(), attempts: [] };
+  }
+
   const ollamaPrompt = messagesPayload
     .map((message) => {
       const role = message.role === "system" ? "Instruções" : message.role === "assistant" ? "Atendente" : "Cliente";
@@ -532,72 +544,7 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
   }
 
-  const providers = [
-    LOVABLE_API_KEY && {
-      provider: "lovable-gemini",
-      endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      model: AI_MODEL,
-      headers: { "Lovable-API-Key": LOVABLE_API_KEY, "Content-Type": "application/json" },
-    },
-    OPENAI_API_KEY && {
-      provider: "openai",
-      endpoint: `${OPENAI_BASE_URL.replace(/\/$/, "")}/chat/completions`,
-      model: OPENAI_MODEL,
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    },
-    EMERGENT_API_KEY && {
-      provider: "emergent",
-      endpoint: `${EMERGENT_BASE_URL.replace(/\/$/, "")}/chat/completions`,
-      model: EMERGENT_MODEL,
-      headers: { Authorization: `Bearer ${EMERGENT_API_KEY}`, "Content-Type": "application/json" },
-    },
-  ].filter(Boolean);
-
-  if (!providers.length) {
-    return { ok: false, error: "Ollama falhou e nenhuma chave alternativa de IA está configurada (OPENAI_API_KEY, EMERGENT_API_KEY ou LOVABLE_API_KEY).", attempts, ...attempts[attempts.length - 1] };
-  }
-
-  for (const cfg of providers) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
-    try {
-      const resp = await fetch(cfg.endpoint, {
-        method: "POST",
-        headers: cfg.headers,
-        signal: controller.signal,
-          body: JSON.stringify({
-            model: cfg.model,
-            messages: messagesPayload,
-            ...(typeof options.temperature === "number" ? { temperature: options.temperature } : {}),
-          }),
-      });
-      if (!resp.ok) {
-        const errText = await resp.text();
-        const failed = { ok: false, provider: cfg.provider, endpoint: cfg.endpoint, model: cfg.model, status: resp.status, error: errText.slice(0, 500) };
-        attempts.push(failed);
-        recordAutoReply({ step: "ai_provider_fail", provider: cfg.provider, status: resp.status, error: failed.error });
-        continue;
-      }
-      const data = await resp.json();
-      const reply = data?.choices?.[0]?.message?.content?.trim();
-      if (!reply) {
-        const failed = { ok: false, provider: cfg.provider, endpoint: cfg.endpoint, model: cfg.model, error: "Resposta vazia da IA.", raw: data };
-        attempts.push(failed);
-        recordAutoReply({ step: "ai_provider_fail", provider: cfg.provider, error: failed.error });
-        continue;
-      }
-      return { ok: true, provider: cfg.provider, endpoint: cfg.endpoint, model: cfg.model, reply: cleanRepeatedText(reply), attempts };
-    } catch (e) {
-      const timedOut = e?.name === "AbortError";
-      const failed = { ok: false, provider: cfg.provider, endpoint: cfg.endpoint, model: cfg.model, error: timedOut ? `Tempo esgotado após ${AI_REQUEST_TIMEOUT_MS}ms aguardando resposta da IA.` : e?.message || String(e) };
-      attempts.push(failed);
-      recordAutoReply({ step: "ai_provider_fail", provider: cfg.provider, error: failed.error });
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  return { ok: false, error: "Todos os provedores de IA configurados falharam.", attempts, ...attempts[attempts.length - 1] };
+  return { ok: false, error: "Ollama llama3.2:3b falhou e o chat não usa outro modelo de IA.", attempts, ...attempts[attempts.length - 1] };
 }
 
 async function generateCreativeImage(prompt) {
@@ -666,6 +613,7 @@ function buildLocalLegalReply(jid, userText, contactName) {
   const userTurns = history.filter((m) => m.role === "user").length + 1;
   const name = String(contactName || "cliente").split(" ")[0];
   const txt = String(userText || "").toLowerCase();
+  if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
   if (/urgente|pris[aã]o|audi[eê]ncia|prazo|intima[cç][aã]o|mandado|medida protetiva/.test(txt)) {
     return `${name}, entendi a urgência. Vou sinalizar seu caso para a equipe agora; por favor me envie sua cidade/estado e um resumo breve do que aconteceu.`;
   }
@@ -778,7 +726,7 @@ async function autoReply(jid, userText, contactName) {
     ...history,
     { role: "user", content: userText },
   ];
-  recordAutoReply({ step: "ai_request", jid, providers: ["ollama", OPENAI_API_KEY && "openai", EMERGENT_API_KEY && "emergent", LOVABLE_API_KEY && "lovable"].filter(Boolean) });
+  recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
   let result = await callAI(messagesPayload, { temperature: 0.72, userText });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;

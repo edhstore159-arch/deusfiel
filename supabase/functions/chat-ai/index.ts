@@ -8,11 +8,73 @@ const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const ELEVENLABS_VOICE_ID = Deno.env.get("ELEVENLABS_VOICE_ID") || "EXAVITQu4vr4xnSDxMaL"; // Sarah (PT-BR natural)
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const OLLAMA_BASE_URL = (Deno.env.get("OLLAMA_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev").replace(/\/+$/g, "").replace(/\/api\/(?:generate|chat|tags|show)$/i, "");
+const OLLAMA_GENERATE_URL = `${OLLAMA_BASE_URL}/api/generate`;
+const OLLAMA_MODEL = "llama3.2:3b";
+const OLLAMA_SYSTEM_PROMPT = `Você é um assistente jurídico brasileiro.
+Responda SEMPRE em português do Brasil.
+Nunca use inglês.
+Nunca exponha raciocínio, análise interna, planejamento, tags <think> ou frases como "Okay", "the user", "let me", "I need".
+Entregue somente a resposta final pronta para o cliente.`;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
+}
+
+function isInvalidOllamaReply(text: string): boolean {
+  const value = String(text || "").trim();
+  return /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i)\b/i.test(value) ||
+    /\b(the user|let me|i need to|i should|instructions)\b/i.test(value.slice(0, 260));
+}
+
+function buildOllamaPrompt(prompt: string, fmtDate: string, fmtTime: string): string {
+  return `/no_think
+${OLLAMA_SYSTEM_PROMPT}
+
+CONTEXTO TEMPORAL INTERNO (America/Sao_Paulo): hoje é ${fmtDate}, agora são ${fmtTime}.
+Se o cliente pedir data, dia da semana ou hora atual, responda exatamente com esses valores.
+
+INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
+
+${prompt}
+
+Resposta final em português do Brasil:`;
+}
+
+async function callOllama(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+  const prompt = messages
+    .map((message) => `${message.role === "system" ? "Instruções" : message.role === "assistant" ? "Assistente" : "Cliente"}: ${message.content}`)
+    .join("\n\n");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
+  try {
+    const resp = await fetch(OLLAMA_GENERATE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        system: OLLAMA_SYSTEM_PROMPT,
+        prompt: buildOllamaPrompt(prompt, fmtDate, fmtTime),
+        stream: false,
+        think: false,
+        keep_alive: "10m",
+        options: { num_ctx: 2048, num_predict: 220, temperature: 0.1 },
+      }),
+    });
+    const raw = await resp.text();
+    let data: any = {};
+    try { data = raw ? JSON.parse(raw) : {}; } catch { data = { response: raw }; }
+    if (!resp.ok) throw new Error(`Ollama ${resp.status}: ${raw.slice(0, 500)}`);
+    const reply = String(data?.response || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+    if (!reply) throw new Error("Ollama retornou resposta vazia.");
+    if (isInvalidOllamaReply(reply)) throw new Error(`Ollama retornou raciocínio interno: ${reply.slice(0, 160)}`);
+    return reply;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function synthesizeSpeech(text: string): Promise<string | null> {
@@ -298,35 +360,16 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       { role: "user", content: userMessage },
     ];
 
-    let aiResult = await chatCompletion({
-      model: "google/gemini-3-flash-preview",
-      messages,
-      temperature: 0.72,
-    });
-
-    let data: any = aiResult.ok ? aiResult.data : null;
-    let rawReply: string = aiResult.ok
-      ? data?.choices?.[0]?.message?.content ?? ""
-      : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
-    if (aiResult.ok && isNearDuplicateReply(rawReply, history)) {
-      const retryResult = await chatCompletion({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content: `${systemContent}\n\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta e útil, sem saudação inicial e sem repetir perguntas já feitas.`,
-          },
-          ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.9,
-      });
-      if (retryResult.ok) {
-        data = retryResult.data;
-        rawReply = data?.choices?.[0]?.message?.content ?? rawReply;
-      }
-      if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    let rawReply: string;
+    try {
+      rawReply = userAskedTemporalInfo(userMessage)
+        ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
+        : await callOllama(messages, fmtDate, fmtTime);
+    } catch (err) {
+      console.error("Erro ao chamar Ollama llama3.2:3b:", err);
+      rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
+    if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));

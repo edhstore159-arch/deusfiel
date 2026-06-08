@@ -8,8 +8,8 @@ const DIRECT_OLLAMA_URL = (
   import.meta.env.VITE_OLLAMA_URL ||
   "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate"
 ).replace(/\/$/, "");
-const DIRECT_OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "qwen3:4b";
-const DIRECT_OLLAMA_FALLBACK_MODEL = import.meta.env.VITE_OLLAMA_FALLBACK_MODEL || "llama3.2:3b";
+const DIRECT_OLLAMA_MODEL = "llama3.2:3b";
+const DIRECT_OLLAMA_FALLBACK_MODEL = "";
 
 
 const nowIso = () => new Date().toISOString();
@@ -89,6 +89,7 @@ const buildOllamaPrompt = (prompt) => `/no_think
 ${OLLAMA_SYSTEM_PROMPT}
 
 INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
+Se o cliente pedir data, dia da semana ou hora atual, responda com a data/hora de America/Sao_Paulo informada no prompt.
 
 ${prompt}
 
@@ -149,6 +150,7 @@ const isNearDuplicateReply = (reply, history = []) => {
 
 const buildNonRepeatingFallback = (message) => {
   const text = String(message || "").toLowerCase();
+  if (userAskedTemporalInfo(text)) return buildTemporalAnswer();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para registrar a consulta, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
@@ -156,6 +158,16 @@ const buildNonRepeatingFallback = (message) => {
     return "Entendi. Para direcionar melhor seu atendimento, me conte quando isso aconteceu, sua cidade/estado e se existe algum prazo ou audiência marcado.";
   }
   return "Entendi. Para seguir sem repetir informações, me conte em poucas palavras o que aconteceu e qual ajuda você precisa agora.";
+};
+
+const userAskedTemporalInfo = (text) =>
+  /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano))\b/i.test(String(text || ""));
+
+const buildTemporalAnswer = () => {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const time = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(now);
+  return `Hoje é ${date}, e agora são ${time}.`;
 };
 
 const defaultWhatsAppConfig = {
@@ -520,7 +532,20 @@ const staticPost = (url, body = {}) => {
           .map((m) => `${m.role === "user" ? "Cliente" : "Assistente"}: ${m.content}`)
           .join("\n");
         const system = DEFAULT_PROMPT;
-        const prompt = `${system}\n\n${history}\nCliente: ${body.message || body.text || ""}\nAssistente:`;
+        const userText = body.message || body.text || "";
+        if (userAskedTemporalInfo(userText)) {
+          return response({
+            session_id: sessionId,
+            response: buildTemporalAnswer(),
+            audio_base64: null,
+            appointment: null,
+            handoff: false,
+            speaker: null,
+            analysis: { acertividade: 100, qualificacao: "ok" },
+            server_time: new Date().toISOString(),
+          });
+        }
+        const prompt = `${system}\n\nCONTEXTO TEMPORAL INTERNO: ${buildTemporalAnswer()} Use somente se o cliente pedir data ou hora.\n\n${history}\nCliente: ${userText}\nAssistente:`;
 
         const tryModel = async (modelName) => {
           const controller = new AbortController();
@@ -535,14 +560,12 @@ const staticPost = (url, body = {}) => {
           const raw = await res.text();
           const data = JSON.parse(raw || "{}");
           if (data?.fallback || data?.error) throw new Error(data.error || "Ollama indisponível");
-          const text = sanitizeOllamaReply(data?.response || "", body.message || body.text || "");
+          const text = sanitizeOllamaReply(data?.response || "", userText);
           if (!text || isInvalidOllamaReply(text)) throw new Error("Ollama retornou raciocínio interno ou resposta inválida");
           return text;
         };
 
-        const candidates = DIRECT_OLLAMA_FALLBACK_MODEL && DIRECT_OLLAMA_FALLBACK_MODEL !== DIRECT_OLLAMA_MODEL
-          ? [DIRECT_OLLAMA_MODEL, DIRECT_OLLAMA_FALLBACK_MODEL]
-          : [DIRECT_OLLAMA_MODEL];
+        const candidates = [DIRECT_OLLAMA_MODEL];
         let text = null;
         let lastErr = null;
         for (const m of candidates) {
@@ -551,7 +574,7 @@ const staticPost = (url, body = {}) => {
         if (!text) throw lastErr || new Error("Ollama indisponível");
 
         const responseText = isNearDuplicateReply(text, body.history || [])
-          ? buildNonRepeatingFallback(body.message || body.text || "")
+          ? buildNonRepeatingFallback(userText)
           : cleanInternalChatMarkers(text);
         return response({
             session_id: sessionId,
@@ -564,36 +587,7 @@ const staticPost = (url, body = {}) => {
             server_time: null,
           });
       } catch (e) {
-        console.warn("Ollama direto falhou, tentando chat-ai como fallback", e);
-      }
-      try {
-        const { data, error } = await supabase.functions.invoke("chat-ai", {
-          body: {
-            message: body.message || body.text || "",
-            history: body.history || [],
-            session_id: sessionId,
-            user_id: body.user_id || null,
-            want_audio: false,
-          },
-        });
-        if (!error && data?.response) {
-          const cleanedResponse = cleanInternalChatMarkers(data.response);
-          const responseText = isNearDuplicateReply(cleanedResponse, body.history || [])
-            ? buildNonRepeatingFallback(body.message || body.text || "")
-            : cleanedResponse;
-          return response({
-            session_id: data.session_id || sessionId,
-            response: responseText,
-            audio_base64: data.audio_base64 || null,
-            appointment: data.appointment || null,
-            handoff: Boolean(data.handoff),
-            speaker: data.speaker || null,
-            analysis: data.analysis || { acertividade: 80, qualificacao: "ok" },
-            server_time: null,
-          });
-        }
-      } catch (e) {
-        console.warn("chat-ai fallback falhou", e);
+        console.warn("Ollama llama3.2:3b falhou no chat", e);
       }
       return response({
           session_id: sessionId,
@@ -847,6 +841,7 @@ export const api = HAS_BACKEND
         const [path] = String(url).split("?");
         if (path.startsWith("/legal-deadlines/")) return staticPost(url, body);
         if (cloudFirstPostPaths.has(path)) return staticPost(url, body);
+        if (path === "/chat/message") return staticPost(url, body);
         if (liveFirstWithStaticFallbackPostPaths.has(path)) {
           return liveApi.post(url, body, config).catch(() => staticPost(url, body));
         }
