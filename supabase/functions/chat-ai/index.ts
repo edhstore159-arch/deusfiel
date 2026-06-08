@@ -545,7 +545,23 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       console.error("Erro ao chamar Ollama llama3.2:3b:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
-    if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) {
+      try {
+        const retryMessages = [
+          { role: "system", content: `${systemContent}\n\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta NOVA, curta, útil, sem saudação inicial e sem repetir nenhuma frase, pergunta ou tópico já enviado no histórico. Avance a conversa com uma informação ou pergunta diferente.` },
+          ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
+          { role: "user", content: userMessage },
+        ];
+        const retryReply = await callOllama(retryMessages, fmtDate, fmtTime);
+        if (retryReply && !isHistoryDumpReply(retryReply) && !isNearDuplicateReply(retryReply, history)) {
+          rawReply = retryReply;
+        } else {
+          rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+        }
+      } catch {
+        rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+      }
+    }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
     const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
