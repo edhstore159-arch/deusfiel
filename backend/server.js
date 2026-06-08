@@ -1777,7 +1777,9 @@ app.post("/api/chat/message", async (req, res) => {
     ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
     : "";
   const firstNameWeb = String(req.body?.visitor_name || "Cliente").split(" ")[0] || "Cliente";
-  let result = isHandoffRequest(message)
+  let result = isThanksMessage(message)
+    ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(normalizedHistory, firstNameWeb) }
+    : isHandoffRequest(message)
     ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameWeb) }
     : isResumeRequest(message)
     ? { ok: true, provider: "resume-rule", reply: buildResumeReply(normalizedHistory, firstNameWeb) }
