@@ -78,6 +78,20 @@ Estrutura: organizada e lógica. Não repita perguntas já respondidas — use o
 Saudações: "Bom dia" → "Bom dia!"; "Boa tarde" → "Boa tarde!"; "Boa noite" → "Boa noite!". Não mencione data/hora salvo se o cliente pedir explicitamente.`;
 
 const OFFICIAL_GREETING = "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
+const OLLAMA_SYSTEM_PROMPT = `Você é um assistente jurídico brasileiro.
+Responda SEMPRE em português do Brasil.
+Nunca use inglês.
+Nunca exponha raciocínio, análise interna, planejamento, tags <think> ou frases como "Okay", "the user", "let me", "I need".
+Entregue somente a resposta final pronta para o cliente.`;
+
+const buildOllamaPrompt = (prompt) => `/no_think
+${OLLAMA_SYSTEM_PROMPT}
+
+INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
+
+${prompt}
+
+Resposta final em português do Brasil:`;
 
 const cleanInternalChatMarkers = (text) =>
   String(text || "")
@@ -93,6 +107,10 @@ const sanitizeOllamaReply = (reply, userMessage = "") => {
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
   return text;
 };
+
+const isInvalidOllamaReply = (text) =>
+  /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i)\b/i.test(String(text || "").trim()) ||
+  /\b(the user|let me|i need to|i should|instructions)\b/i.test(String(text || "").slice(0, 260));
 
 const normalizeForSimilarity = (text) =>
   cleanInternalChatMarkers(text)
@@ -510,14 +528,14 @@ const staticPost = (url, body = {}) => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
-          body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: "Você é um assistente jurídico brasileiro. Responda SEMPRE em português do Brasil. Nunca use inglês.", prompt: `/no_think\n${prompt}`, stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 180, temperature: 0.2 } }),
+          body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 2048, num_predict: 220, temperature: 0.1 } }),
         }).finally(() => clearTimeout(timeout));
         if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
         const raw = await res.text();
         const data = JSON.parse(raw || "{}");
         if (data?.fallback || data?.error) throw new Error(data.error || "Ollama indisponível");
         const text = sanitizeOllamaReply(data?.response || "", body.message || body.text || "");
-        if (!text) throw new Error("Ollama retornou resposta vazia");
+        if (!text || isInvalidOllamaReply(text)) throw new Error("Ollama retornou raciocínio interno ou resposta inválida");
         const responseText = isNearDuplicateReply(text, body.history || [])
           ? buildNonRepeatingFallback(body.message || body.text || "")
           : cleanInternalChatMarkers(text);

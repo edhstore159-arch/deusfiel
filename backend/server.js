@@ -111,6 +111,7 @@ async function probeOllamaGenerate() {
     const data = JSON.parse(raw || "{}");
     const reply = String(data?.response || "").trim();
     if (!reply) throw new Error("Ollama generate retornou resposta vazia.");
+    if (isInvalidOllamaReply(reply)) throw new Error(`Ollama generate retornou raciocínio interno: ${reply.slice(0, 160)}`);
     return { ok: true, latency_ms: Date.now() - startedAt, response_preview: reply.slice(0, 80) };
   } catch (e) {
     return {
@@ -135,12 +136,12 @@ export async function perguntarIA(texto) {
         signal: controller.signal,
         body: JSON.stringify({
           model: OLLAMA_MODEL,
-          system: "Você é um assistente jurídico brasileiro. Responda SEMPRE em português do Brasil. Nunca use inglês.",
-          prompt: texto,
+          system: OLLAMA_SYSTEM_PROMPT,
+          prompt: buildOllamaPrompt(texto),
           stream: false,
           think: false,
           keep_alive: OLLAMA_KEEP_ALIVE,
-          options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
+          options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
         }),
       });
       const raw = await resposta.text();
@@ -149,6 +150,7 @@ export async function perguntarIA(texto) {
       if (!resposta.ok) throw new Error(formatOllamaHttpError(resposta.status, raw));
       const reply = String(data?.response || "").trim();
       if (!reply) throw new Error("Resposta vazia do Ollama.");
+      if (isInvalidOllamaReply(reply)) throw new Error(`Ollama retornou raciocínio interno ou resposta inválida: ${reply.slice(0, 160)}`);
       ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null };
       return reply;
     } catch (e) {
@@ -363,6 +365,20 @@ Estrutura: organizada e lógica. Não repita perguntas já respondidas — mante
 Saudações: "Bom dia" → "Bom dia!"; "Boa tarde" → "Boa tarde!"; "Boa noite" → "Boa noite!". Não mencione data/hora salvo se o cliente pedir explicitamente.`;
 
 const OFFICIAL_GREETING = "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
+const OLLAMA_SYSTEM_PROMPT = `Você é um assistente jurídico brasileiro.
+Responda SEMPRE em português do Brasil.
+Nunca use inglês.
+Nunca exponha raciocínio, análise interna, planejamento, tags <think> ou frases como "Okay", "the user", "let me", "I need".
+Entregue somente a resposta final pronta para o cliente.`;
+
+const buildOllamaPrompt = (prompt) => `/no_think
+${OLLAMA_SYSTEM_PROMPT}
+
+INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
+
+${prompt}
+
+Resposta final em português do Brasil:`;
 
 // Mantém o comportamento do atendente fixo mesmo se existir prompt antigo salvo no ambiente.
 const AI_SYSTEM_PROMPT = SECRETARY_SYSTEM_PROMPT;
@@ -403,6 +419,12 @@ function sanitizeOllamaReply(reply, userText = "") {
   const isInitialGreeting = /^(ol[aá]|oi|bom dia|boa tarde|boa noite|hello|hi)\b/i.test(String(userText || "").trim());
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
   return text;
+}
+
+function isInvalidOllamaReply(text) {
+  const value = String(text || "").trim();
+  return /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i)\b/i.test(value) ||
+    /\b(the user|let me|i need to|i should|instructions)\b/i.test(value.slice(0, 260));
 }
 
 function normalizeForSimilarity(text) {
@@ -1087,9 +1109,12 @@ app.post("/api/generate", async (req, res) => {
       stream: false,
       think: false,
       keep_alive: OLLAMA_KEEP_ALIVE,
-      options: { ...OLLAMA_OPTIONS_BASE, num_predict: 180 },
+      system: OLLAMA_SYSTEM_PROMPT,
+      options: { ...OLLAMA_OPTIONS_BASE, num_predict: 220, temperature: 0.1 },
       ...(req.body || {}),
     };
+    body.system = OLLAMA_SYSTEM_PROMPT;
+    if (body.prompt) body.prompt = buildOllamaPrompt(body.prompt);
     const upstream = await fetch(OLLAMA_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
@@ -1112,6 +1137,14 @@ app.post("/api/generate", async (req, res) => {
         ok: false,
         fallback: true,
         error: "Ollama retornou resposta vazia.",
+        upstream: data,
+      });
+    }
+    if (isInvalidOllamaReply(data.response)) {
+      return res.status(200).json({
+        ok: false,
+        fallback: true,
+        error: "Ollama retornou raciocínio interno ou resposta inválida.",
         upstream: data,
       });
     }
