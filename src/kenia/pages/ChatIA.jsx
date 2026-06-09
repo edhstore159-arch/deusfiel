@@ -769,7 +769,7 @@ export default function ChatIA() {
           visitor_name: name || null,
           visitor_phone: phone || null,
           voice,
-          want_audio: true,
+          want_audio: autoplay,
           return_analysis: true,
         },
         { timeout: 90000 }
