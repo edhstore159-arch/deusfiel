@@ -779,8 +779,8 @@ export default function ChatIA() {
     }
     setMessages((prev) => {
       const last = prev[prev.length - 1];
-      if (last && last.role === "user" && last.content === msg) return prev;
-      return [...prev, { role: "user", content: msg }];
+      if (last && last.role === "user" && normalizeMessageForDedupe(last.content) === normalizeMessageForDedupe(msg)) return dedupeChatMessages(prev);
+      return dedupeChatMessages([...prev, { role: "user", content: msg }]);
     });
     setInput("");
     setThinking(true);
@@ -813,7 +813,7 @@ export default function ChatIA() {
         "/chat/message",
         {
           message: msg,
-          history: messages.map((m) => ({ role: m.role, content: m.content })),
+          history: dedupeChatMessages(messagesRef.current).map((m) => ({ role: m.role, content: m.content })),
           session_id: sessionId,
           visitor_name: name || null,
           visitor_phone: phone || null,
@@ -894,6 +894,7 @@ export default function ChatIA() {
   };
 
   const QM = analysis ? QUAL_META[analysis.qualificacao] || QUAL_META.necessita_mais_info : null;
+  const visibleMessages = dedupeChatMessages(messages);
 
   return (
     <div className="min-h-full flex flex-col bg-background" data-testid="chat-ia-page">
@@ -1012,7 +1013,7 @@ export default function ChatIA() {
             {/* messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5 bg-gradient-to-b from-nude-50/40 to-background">
               <div className="space-y-4 max-w-3xl mx-auto">
-                {messages.map((m, i) => (
+                {visibleMessages.map((m, i) => (
                   <div
                     key={i}
                     className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
