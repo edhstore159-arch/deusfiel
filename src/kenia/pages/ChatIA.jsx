@@ -359,7 +359,6 @@ export default function ChatIA() {
   // com pequenas pausas naturais em pontuação. Resolve quando termina.
   const typeAssistantMessage = (fullText, audioB64 = null, speaker = null) =>
     new Promise((resolve) => {
-      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       const text = cleanRepeatedText(fullText);
       if (!text) { resolve(); return; }
       const normalizedText = normalizeMessageForDedupe(text);
@@ -368,6 +367,11 @@ export default function ChatIA() {
         .find((m) => m.role === "assistant" && !m.typing && normalizeMessageForDedupe(m.content) === normalizedText);
       if (existingReply) { resolve(); return; }
       if (assistantTypingTextRef.current.has(normalizedText)) { resolve(); return; }
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+        assistantTypingTextRef.current.clear();
+      }
       assistantTypingTextRef.current.add(normalizedText);
       const isKenia = speaker && /k[eê]nia/i.test(speaker);
       const baseDelay = isKenia ? 38 : 22;
