@@ -61,7 +61,7 @@ const normalizeOllamaBaseUrl = (value) => {
 const OLLAMA_BASE_URL = normalizeOllamaBaseUrl(OLLAMA_RAW_URL);
 const OLLAMA_URL = `${OLLAMA_BASE_URL}/api/generate`;
 const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
-const OLLAMA_MODEL = "qwen2.5:3b-instruct";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5-coder:7b";
 const OLLAMA_FALLBACK_MODEL = "";
 const OLLAMA_REQUEST_RETRIES = Number(process.env.OLLAMA_REQUEST_RETRIES || 0);
 const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 45000);
@@ -930,7 +930,7 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
   }
 
-  return { ok: false, error: "Ollama qwen2.5:3b-instruct falhou e o chat não usa outro modelo de IA.", attempts, ...attempts[attempts.length - 1] };
+  return { ok: false, error: `Ollama ${OLLAMA_MODEL} falhou e o chat não usa outro modelo de IA.`, attempts, ...attempts[attempts.length - 1] };
 }
 
 async function generateCreativeImage(prompt) {
