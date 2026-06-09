@@ -638,8 +638,10 @@ function buildOfficeInfoReply(): string {
 }
 
 function userAskedTemporalInfo(text: string): boolean {
-  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+e\s+hora|dia\s+e\s+hora|hora\s+e\s+data|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(String(text || ""));
+  const t = String(text || "");
+  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+e\s+hora|dia\s+e\s+hora|hora\s+e\s+data|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia|qual\s+(?:o\s+)?dia|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data)|\bdia\s+hoje\b|\bhoje\b\s*\??\s*$)/i.test(t);
 }
+
 
 function isHandoffRequest(text: string): boolean {
   const value = String(text || "").toLowerCase();
