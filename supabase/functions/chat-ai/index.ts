@@ -656,6 +656,10 @@ function isHistoryDumpReply(text: string): boolean {
 
 function removeTemporalLeaks(reply: string, userMessage: string): string {
   if (userAskedTemporalInfo(userMessage)) return reply;
+  // Não remover dias da semana quando o cliente está agendando ou a resposta lista horários
+  const isScheduling = /\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento|disponibilidade|dispon[ií]vel|agenda)\b/i.test(String(userMessage || ""));
+  const replyHasSlots = /\b\d{2}:\d{2}\b/.test(String(reply || "")) && /(segunda|ter[cç]a|quarta|quinta|sexta)-feira/i.test(String(reply || ""));
+  if (isScheduling || replyHasSlots) return reply;
   return String(reply || "")
     .split(/(?<=[.!?])\s+|\n+/)
     .map((part) => part.trim())
@@ -790,6 +794,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
 
     // === Agenda real da Dra. Kênia (slots disponíveis a partir do dashboard) ===
     let availabilityBlock = "";
+    let availabilityDays: { weekday: string; iso: string; br: string; hours: string[] }[] = [];
     try {
       const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       const startISO = now.toISOString().slice(0, 10);
@@ -808,14 +813,18 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         const dow = d.getDay();
         if (dow === 0 || dow === 6) continue;
         const iso = d.toISOString().slice(0, 10);
+        const [yy, mm, dd] = iso.split("-");
+        const br = `${dd}/${mm}/${yy}`;
         const free = WORK_HOURS.filter((h) => !taken.has(`${iso} ${h}`));
         if (i === 0) {
           const curH = parseInt(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now), 10);
           const futureFree = free.filter((h) => parseInt(h.slice(0, 2), 10) > curH);
           if (futureFree.length === 0) continue;
           days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${futureFree.join(", ")}`);
+          availabilityDays.push({ weekday: WEEKDAY_NAMES[dow], iso, br, hours: futureFree });
         } else if (free.length > 0) {
           days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${free.join(", ")}`);
+          availabilityDays.push({ weekday: WEEKDAY_NAMES[dow], iso, br, hours: free });
         }
       }
       availabilityBlock = days.length
@@ -824,6 +833,15 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     } catch (err) {
       console.error("Falha ao consultar agenda:", err);
     }
+
+    function buildSlotsReply(): string {
+      if (!availabilityDays.length) {
+        return "No momento não temos horários livres nos próximos dias. Posso anotar seu contato para a Dra. Kênia retornar?";
+      }
+      const top = availabilityDays.slice(0, 3).map((d) => `• ${d.weekday} (${d.br.slice(0, 5)}) — ${d.hours.slice(0, 4).join(", ")}`).join("\n");
+      return `Claro! A Dra. Kênia tem estes horários livres:\n${top}\n\nAlgum desses te atende?`;
+    }
+
 
     // Atalho determinístico para perguntas de data/hora
     const normalizedUser = String(userMessage || "")
@@ -857,11 +875,21 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       { role: "user", content: userMessage },
     ];
 
+    const isScheduling = /\b(agendar|marcar|consulta|consultar|reuni[aã]o|hor[aá]rio|hor[aá]rios|atendimento|quando\s+(?:posso|tem|d[aá])|disponibilidade|dispon[ií]vel|dispon[ií]veis|agenda)\b/i.test(String(userMessage || ""));
+
+    // Detecta se o cliente já escolheu data/horário (ex.: "10:00", "às 14h", "10/06")
+    const userPickedSlot = /\b(\d{1,2}[:h]\d{0,2}|\d{1,2}\s*horas?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/i.test(String(userMessage || ""));
+    const shouldOfferSlots = isScheduling && !userPickedSlot;
+    // Pular shortcut de info do escritório se o cliente está agendando OU já forneceu dados de marcação
+    const skipOfficeShortcut = isScheduling || userPickedSlot || /\b(meu\s+nome|telefone|email|e-mail|whats|cidade|estado|@)\b/i.test(String(userMessage || ""));
+
     let rawReply: string;
     try {
       rawReply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
-        : userAskedOfficeInfo(userMessage)
+        : shouldOfferSlots
+          ? buildSlotsReply()
+        : (!skipOfficeShortcut && userAskedOfficeInfo(userMessage))
           ? buildOfficeInfoReply()
         : isThanksMessage(userMessage)
           ? buildThanksReply(history)
