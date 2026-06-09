@@ -290,6 +290,7 @@ export default function ChatIA() {
   const fileInputRef = useRef(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const messagesRef = useRef(messages);
+  const assistantTypingTextRef = useRef(new Set());
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -366,14 +367,14 @@ export default function ChatIA() {
         .reverse()
         .find((m) => m.role === "assistant" && !m.typing && normalizeMessageForDedupe(m.content) === normalizedText);
       if (existingReply) { resolve(); return; }
+      if (assistantTypingTextRef.current.has(normalizedText)) { resolve(); return; }
+      assistantTypingTextRef.current.add(normalizedText);
       const isKenia = speaker && /k[eê]nia/i.test(speaker);
       const baseDelay = isKenia ? 38 : 22;
       let idx = 0;
       const typingId = `typing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
       setMessages((prev) => {
-        const lastDone = [...prev].reverse().find((m) => m.role === "assistant" && !m.typing);
-        if (lastDone && normalizeMessageForDedupe(lastDone.content) === normalizedText) return dedupeChatMessages(prev);
         // Reaproveita um placeholder de digitação pendente, se existir
         const lastIdx = prev.length - 1;
         if (lastIdx >= 0 && prev[lastIdx].role === "assistant" && prev[lastIdx].typing) {
@@ -390,7 +391,7 @@ export default function ChatIA() {
           if (i < 0) return prev;
           const copy = [...prev];
           copy[i] = updater(copy[i]);
-          return copy;
+          return dedupeChatMessages(copy);
         });
       };
 
@@ -401,6 +402,7 @@ export default function ChatIA() {
 
         if (idx >= text.length) {
           updateTyping((m) => ({ ...m, content: text, audio_base64: audioB64, typing: false, speaker, _typingId: undefined }));
+          assistantTypingTextRef.current.delete(normalizedText);
           typingTimerRef.current = null;
           resolve();
           return;
