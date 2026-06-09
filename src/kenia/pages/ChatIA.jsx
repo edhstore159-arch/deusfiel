@@ -861,7 +861,8 @@ export default function ChatIA() {
       const responseText = cleanRepeatedText(data.response);
       const speaker = data.handoff || activeSpeaker === "Dra. Kênia Garcia" ? "Dra. Kênia Garcia" : data.speaker || null;
       await typeAssistantMessage(responseText, data.audio_base64 || null, speaker);
-      if (shouldScheduleWaitFollowUp(data.response)) {
+      const wantsKenia = data.handoff || speaker === "Dra. Kênia Garcia";
+      if (wantsKenia && shouldScheduleWaitFollowUp(data.response)) {
         if (waitFollowUpTimerRef.current) clearTimeout(waitFollowUpTimerRef.current);
         waitFollowUpTimerRef.current = setTimeout(() => {
           typeAssistantMessage(buildWaitFollowUpText(name), null, speaker || ASSISTANT_SPEAKER);
