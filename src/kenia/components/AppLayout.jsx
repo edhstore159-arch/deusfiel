@@ -27,6 +27,7 @@ const NAV = [
   { to: "/app/image-fusion", label: "Fusão de Imagens", icon: Combine, testid: "nav-image-fusion" },
   { to: "/app/analytics", label: "Métricas", icon: BarChart3, testid: "nav-analytics" },
   { to: "/app/whatsapp", label: "WhatsApp", icon: MessageSquare, testid: "nav-whatsapp" },
+  { to: "/app/whatsapp-connection", label: "WhatsApp Connection", icon: Smartphone, testid: "nav-whatsapp-connection" },
   { to: "/app/whatsapp-logs", label: "Logs WhatsApp", icon: Radio, testid: "nav-whatsapp-logs" },
   { to: "/app/settings", label: "Configurações", icon: SettingsIcon, testid: "nav-settings" },
   { to: "/app/debug", label: "Debug Tool", icon: Wrench, testid: "nav-debug" },
