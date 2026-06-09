@@ -930,7 +930,7 @@ const staticPost = (url, body = {}) => {
             },
           });
           if (error) throw error;
-          const cloudReply = cleanInternalChatMarkers(data?.response || "");
+          const cloudReply = sanitizeAssistantReply(data?.response || "", userText);
           if (cloudReply) {
             const responseText = isHistoryDumpReply(cloudReply) || isNearDuplicateReply(cloudReply, body.history || [])
               ? buildNonRepeatingFallback(userText)
