@@ -10,7 +10,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OLLAMA_BASE_URL = (Deno.env.get("OLLAMA_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev").replace(/\/+$/g, "").replace(/\/api\/(?:generate|chat|tags|show)$/i, "");
 const OLLAMA_GENERATE_URL = `${OLLAMA_BASE_URL}/api/generate`;
-const OLLAMA_MODEL = "llama3.2:3b";
+const OLLAMA_MODEL = "qwen2.5:3b-instruct";
 const SECRETARIA_JURIDICA_PROMPT = `# SECRETÁRIA JURÍDICA DA DRA. KÊNIA GARCIA
 
 Você é a secretária pessoal da Dra. Kênia Garcia e realiza atendimento pelo WhatsApp.
@@ -749,7 +749,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ? buildResumeReply(history)
         : await callAssistantLLM(messages, fmtDate, fmtTime);
     } catch (err) {
-      console.error("Erro ao chamar Ollama llama3.2:3b:", err);
+      console.error("Erro ao chamar Ollama qwen2.5:3b-instruct:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
     if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) {
