@@ -69,6 +69,7 @@ function App() {
               <Route path="/app/image-fusion" element={<ImageFusion />} />
               <Route path="/app/analytics" element={<Analytics />} />
               <Route path="/app/whatsapp" element={<WhatsAppSettings />} />
+              <Route path="/app/whatsapp-connection" element={<WhatsAppConnection />} />
               <Route path="/app/whatsapp-logs" element={<WhatsAppLogs />} />
               <Route path="/app/settings" element={<Settings />} />
               <Route path="/app/debug" element={<DebugTool />} />
