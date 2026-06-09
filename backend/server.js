@@ -64,7 +64,7 @@ const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
 const OLLAMA_MODEL = "llama3.2:3b";
 const OLLAMA_FALLBACK_MODEL = "";
 const OLLAMA_REQUEST_RETRIES = Number(process.env.OLLAMA_REQUEST_RETRIES || 0);
-const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 90000);
+const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 45000);
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
 const OLLAMA_HEALTH_INTERVAL_MS = Number(process.env.OLLAMA_HEALTH_INTERVAL_MS || 240000);
 const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS || 8000);
@@ -131,7 +131,7 @@ async function probeOllamaGenerate() {
   }
 }
 
-async function callOllamaModel(modelName, texto) {
+async function callOllamaModel(modelName, texto, systemPrompt = OLLAMA_SYSTEM_PROMPT) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
   try {
@@ -141,12 +141,12 @@ async function callOllamaModel(modelName, texto) {
       signal: controller.signal,
       body: JSON.stringify({
         model: modelName,
-        system: OLLAMA_SYSTEM_PROMPT,
+        system: systemPrompt,
         prompt: buildOllamaPrompt(texto),
         stream: false,
         think: false,
         keep_alive: OLLAMA_KEEP_ALIVE,
-        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 280, temperature: 0.1 },
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 200, temperature: 0.1 },
       }),
     });
     const raw = await resposta.text();
@@ -162,7 +162,7 @@ async function callOllamaModel(modelName, texto) {
   }
 }
 
-export async function perguntarIA(texto) {
+export async function perguntarIA(texto, systemPrompt = OLLAMA_SYSTEM_PROMPT) {
   let lastErrorForThrow = null;
   const models = OLLAMA_FALLBACK_MODEL && OLLAMA_FALLBACK_MODEL !== OLLAMA_MODEL
     ? [OLLAMA_MODEL, OLLAMA_FALLBACK_MODEL]
@@ -170,7 +170,7 @@ export async function perguntarIA(texto) {
   for (const modelName of models) {
     for (let attempt = 1; attempt <= OLLAMA_REQUEST_RETRIES + 1; attempt++) {
       try {
-        const reply = await callOllamaModel(modelName, texto);
+        const reply = await callOllamaModel(modelName, texto, systemPrompt);
         ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null, last_model: modelName };
         return reply;
       } catch (e) {
@@ -649,8 +649,6 @@ const OFFICIAL_GREETING = "Olá! Sou a secretária da Dra. Kênia Garcia. Como p
 const OLLAMA_SYSTEM_PROMPT = SECRETARY_SYSTEM_PROMPT;
 
 const buildOllamaPrompt = (prompt) => `/no_think
-${OLLAMA_SYSTEM_PROMPT}
-
 INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
 Se o cliente pedir data, dia da semana ou hora atual, use obrigatoriamente este contexto: ${saoPauloTemporalContext()}
 
@@ -662,12 +660,13 @@ Resposta final em português do Brasil:`;
 const AI_SYSTEM_PROMPT = SECRETARY_SYSTEM_PROMPT;
 
 const aiHistory = new Map(); // jid -> [{role, content}]
-const AI_HISTORY_LIMIT = Number(process.env.AI_HISTORY_LIMIT || 20);
+const AI_HISTORY_LIMIT = Number(process.env.AI_HISTORY_LIMIT || 8);
 
 function trimAiHistory(history, limit = AI_HISTORY_LIMIT) {
   return (Array.isArray(history) ? history : [])
     .filter((m) => (m.role === "user" || m.role === "assistant") && String(m.content || "").trim())
-    .slice(-limit);
+    .slice(-limit)
+    .map((m) => ({ role: m.role, content: String(m.content || "").slice(0, 900) }));
 }
 
 async function loadPersistedAiHistory(jid) {
@@ -905,7 +904,9 @@ async function callAI(messagesPayload, options = {}) {
     return { ok: true, provider: "ollama-temporal", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: buildTemporalAnswer(), attempts: [] };
   }
 
+  const systemPrompt = messagesPayload.find((message) => message.role === "system")?.content || OLLAMA_SYSTEM_PROMPT;
   const ollamaPrompt = messagesPayload
+    .filter((message) => message.role !== "system")
     .map((message) => {
       const role = message.role === "system" ? "Instruções" : message.role === "assistant" ? "Atendente" : "Cliente";
       return `${role}: ${message.content}`;
@@ -914,7 +915,7 @@ async function callAI(messagesPayload, options = {}) {
 
   const attempts = [];
   try {
-    const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`);
+    const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`, systemPrompt);
     return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
   } catch (e) {
     const timedOut = e?.name === "AbortError";
@@ -1020,7 +1021,7 @@ function queueAutoReply(jid, reply, meta = {}) {
 async function sendBotText(jid, reply, meta = {}) {
   try { await sock?.presenceSubscribe?.(jid); } catch {}
   try { await sock?.sendPresenceUpdate?.("composing", jid); } catch {}
-  await new Promise((r) => setTimeout(r, 600));
+  await new Promise((r) => setTimeout(r, 150));
   try { await sock?.sendPresenceUpdate?.("paused", jid); } catch {}
 
   let lastSendErr = null;

@@ -346,8 +346,6 @@ const OFFICIAL_GREETING = "Olá! Sou a secretária da Dra. Kênia Garcia. Como p
 const OLLAMA_SYSTEM_PROMPT = SECRETARIA_JURIDICA_PROMPT;
 
 const buildOllamaPrompt = (prompt) => `/no_think
-${OLLAMA_SYSTEM_PROMPT}
-
 INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
 Se o cliente pedir data, dia da semana ou hora atual, responda com a data/hora de America/Sao_Paulo informada no prompt.
 
@@ -936,7 +934,7 @@ const staticPost = (url, body = {}) => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,
-            body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 280, temperature: 0.1 } }),
+            body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 200, temperature: 0.1 } }),
           }).finally(() => clearTimeout(timeout));
           if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
           const raw = await res.text();
@@ -965,7 +963,7 @@ const staticPost = (url, body = {}) => {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               signal: controller.signal,
-              body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(retryPrompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 280, temperature: 0.9 } }),
+              body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(retryPrompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 200, temperature: 0.9 } }),
             }).finally(() => clearTimeout(timeout));
             if (res.ok) {
               const raw = await res.text();

@@ -346,8 +346,6 @@ function isInvalidOllamaReply(text: string): boolean {
 
 function buildOllamaPrompt(prompt: string, fmtDate: string, fmtTime: string): string {
   return `/no_think
-${OLLAMA_SYSTEM_PROMPT}
-
 CONTEXTO TEMPORAL INTERNO (America/Sao_Paulo): hoje é ${fmtDate}, agora são ${fmtTime}.
 Se o cliente pedir data, dia da semana ou hora atual, responda exatamente com esses valores.
 
@@ -359,11 +357,13 @@ Resposta final em português do Brasil:`;
 }
 
 async function callOllama(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+  const system = messages.find((message) => message.role === "system")?.content || OLLAMA_SYSTEM_PROMPT;
   const prompt = messages
+    .filter((message) => message.role !== "system")
     .map((message) => `${message.role === "system" ? "Instruções" : message.role === "assistant" ? "Assistente" : "Cliente"}: ${message.content}`)
     .join("\n\n");
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90000);
+  const timeout = setTimeout(() => controller.abort(), 45000);
   try {
     const resp = await fetch(OLLAMA_GENERATE_URL, {
       method: "POST",
@@ -371,12 +371,12 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
       signal: controller.signal,
       body: JSON.stringify({
         model: OLLAMA_MODEL,
-        system: OLLAMA_SYSTEM_PROMPT,
+        system,
         prompt: buildOllamaPrompt(prompt, fmtDate, fmtTime),
         stream: false,
         think: false,
         keep_alive: "10m",
-        options: { num_ctx: 4096, num_predict: 280, temperature: 0.1 },
+        options: { num_ctx: 4096, num_predict: 200, temperature: 0.1 },
       }),
     });
     const raw = await resp.text();
@@ -390,6 +390,24 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+  try {
+    const response = await chatCompletion({
+      model: "google/gemini-3-flash-preview",
+      messages,
+      temperature: 0.2,
+    });
+    const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
+      .replace(/<think>[\s\S]*?<\/think>/giu, "")
+      .trim();
+    if (reply && !isInvalidOllamaReply(reply)) return reply;
+    if (!response.ok) console.warn("Gateway IA falhou, usando Ollama:", response.error || response.status);
+  } catch (err) {
+    console.warn("Gateway IA indisponível, usando Ollama:", err);
+  }
+  return callOllama(messages, fmtDate, fmtTime);
 }
 
 async function synthesizeSpeech(text: string): Promise<string | null> {
@@ -509,7 +527,7 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
 }
 
 function userAskedTemporalInfo(text: string): boolean {
-  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(String(text || ""));
+  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+e\s+hora|dia\s+e\s+hora|hora\s+e\s+data|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(String(text || ""));
 }
 
 function isHandoffRequest(text: string): boolean {
@@ -615,6 +633,12 @@ function parseAppointmentBlock(text: string) {
   }
 }
 
+function compactHistory(history: Array<{ role: string; content: string }>, maxItems = 8) {
+  return (Array.isArray(history) ? history : [])
+    .slice(-maxItems)
+    .map((m) => ({ role: m.role, content: String(m.content || "").slice(0, 900) }));
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -629,7 +653,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
-    const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
+    const history: Array<{ role: string; content: string }> = compactHistory(Array.isArray(body.history) ? body.history : []);
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
     const sessionId: string | null = body.session_id ? String(body.session_id) : null;
@@ -723,7 +747,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ? buildHandoffReply()
         : isResumeRequest(userMessage)
           ? buildResumeReply(history)
-        : await callOllama(messages, fmtDate, fmtTime);
+        : await callAssistantLLM(messages, fmtDate, fmtTime);
     } catch (err) {
       console.error("Erro ao chamar Ollama llama3.2:3b:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
@@ -735,7 +759,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
           { role: "user", content: userMessage },
         ];
-        const retryReply = await callOllama(retryMessages, fmtDate, fmtTime);
+        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime);
         if (retryReply && !isHistoryDumpReply(retryReply) && !isNearDuplicateReply(retryReply, history)) {
           rawReply = retryReply;
         } else {
@@ -747,11 +771,13 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
-    const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    const cleanedReply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    const reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
 
-    // Análise técnica do caso (chamada paralela à IA pedindo JSON estruturado)
+    // Análise técnica do caso (opcional; não bloqueia atendimento rápido quando não solicitada)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
-    try {
+    const shouldReturnAnalysis = body.return_analysis === true;
+    if (shouldReturnAnalysis) try {
       const convoText = [...history, { role: "user", content: userMessage }, { role: "assistant", content: reply }]
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n");
@@ -775,8 +801,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       console.error("Erro ao gerar análise:", err);
     }
 
-    // Gera áudio (TTS ElevenLabs) se o cliente pediu
-    const wantAudio = body.want_audio !== false; // default true
+    // Gera áudio (TTS ElevenLabs) somente quando solicitado, para não atrasar respostas em texto/WhatsApp.
+    const wantAudio = body.want_audio === true;
     const audio_base64 = wantAudio ? await synthesizeSpeech(reply) : null;
 
     // Salva conversa e agendamento no banco (não bloqueia resposta se falhar)
