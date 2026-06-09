@@ -63,7 +63,11 @@ export default function WhatsAppConnection() {
   }, [callApi]);
 
   const saveConfig = () => {
-    localStorage.setItem(LS_BASE, baseUrl);
+    if (!/^https?:\/\//i.test(baseUrl.trim())) {
+      toast.error("URL base inválida. Use o endereço completo do backend, ex.: https://meu-backend.onrender.com");
+      return;
+    }
+    localStorage.setItem(LS_BASE, baseUrl.trim());
     localStorage.setItem(LS_TOKEN, token);
     toast.success("Configuração salva");
   };
