@@ -963,7 +963,11 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply) || inferAppointmentFromConversation(userMessage, history, now);
     const cleanedReply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
-    const reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    let reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    if (appointment?.raw_payload?.inferred_from_conversation && !/\b(agendad|confirmad|registrad)\w*\b/i.test(reply)) {
+      const [yy, mm, dd] = appointment.appointment_date.split("-");
+      reply = `Perfeito, deixei sua consulta registrada para ${dd}/${mm}/${yy} às ${appointment.appointment_time}. Ela aparecerá na agenda da Dra. Kênia no painel.`;
+    }
 
     // Análise técnica do caso (opcional; não bloqueia atendimento rápido quando não solicitada)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
