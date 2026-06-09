@@ -202,6 +202,37 @@ const QUAL_META = {
 
 const STORAGE_KEY = "kenia.chatia.session.v1";
 
+const normalizeMessageForDedupe = (value) =>
+  cleanRepeatedText(value)
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const dedupeChatMessages = (list = []) => {
+  const output = [];
+  const assistantSinceLastUser = new Set();
+  for (const item of Array.isArray(list) ? list : []) {
+    const role = item?.role === "user" ? "user" : "assistant";
+    const content = role === "assistant" ? cleanRepeatedText(item?.content) : String(item?.content || "").trim();
+    const normalized = normalizeMessageForDedupe(content);
+    const typing = Boolean(item?.typing);
+    if (!normalized && !typing) continue;
+
+    if (role === "user") assistantSinceLastUser.clear();
+    const last = output[output.length - 1];
+    const lastNormalized = last ? normalizeMessageForDedupe(last.content) : "";
+    if (last?.role === role && lastNormalized && lastNormalized === normalized) continue;
+    if (role === "assistant" && normalized && assistantSinceLastUser.has(normalized)) continue;
+
+    if (role === "assistant" && normalized) assistantSinceLastUser.add(normalized);
+    output.push({ ...item, role, content, typing, _typingId: item?._typingId });
+  }
+  return output;
+};
+
 const loadPersistedSession = () => {
   if (typeof window === "undefined") return null;
   try {
@@ -210,8 +241,8 @@ const loadPersistedSession = () => {
     const data = JSON.parse(raw);
     if (!data || typeof data !== "object") return null;
     if (!Array.isArray(data.messages) || data.messages.length === 0) return null;
-    // Limpa flags transitórios
-    data.messages = data.messages.map((m) => ({ ...m, typing: false }));
+    // Limpa flags transitórias e remove duplicações salvas de versões anteriores.
+    data.messages = dedupeChatMessages(data.messages.map((m) => ({ ...m, typing: false, _typingId: undefined })));
     return data;
   } catch {
     return null;
@@ -258,13 +289,18 @@ export default function ChatIA() {
   const waitFollowUpTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const messagesRef = useRef(messages);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Persiste a conversa para sobreviver a desconexões/refresh
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const payload = {
-        messages,
+        messages: dedupeChatMessages(messages).map(({ _typingId, ...message }) => message),
         sessionId,
         name,
         phone,
