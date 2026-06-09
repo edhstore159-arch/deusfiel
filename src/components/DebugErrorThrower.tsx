@@ -12,9 +12,7 @@ export const DebugErrorThrower = () => {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
-      const fatalEnabled = new URLSearchParams(window.location.search).get("lovableDebugThrow") === "1";
-
-      if (fatalEnabled && typeof detail === "string" && detail.length > 0) {
+      if (typeof detail === "string" && detail.length > 0) {
         setMessage(detail);
       }
     };
