@@ -700,7 +700,9 @@ function inferAppointmentFromConversation(userMessage: string, history: Array<{ 
     .map((m) => String(m.content || ""))
     .join("\n");
   const text = userTurns.replace(/\s+/g, " ").trim();
-  const timeMatch = text.match(/\b(?:às?|as|hor[áa]rio)?\s*(\d{1,2})(?:[:h](\d{0,2}))?\s*(?:horas?)?\b/i);
+  const timeMatch = text.match(/\b(?:às?|as|hor[áa]rio)\s*(\d{1,2})(?:[:h](\d{0,2}))?\s*(?:horas?)?\b/i)
+    || text.match(/\b(\d{1,2})[:h](\d{0,2})\b/i)
+    || text.match(/\b(\d{1,2})\s*horas?\b/i);
   const dateMatch = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
   if (!timeMatch || !dateMatch) return null;
   const hour = Number(timeMatch[1]);
@@ -710,6 +712,8 @@ function inferAppointmentFromConversation(userMessage: string, history: Array<{ 
   const month = Number(dateMatch[2]);
   let year = dateMatch[3] ? Number(dateMatch[3]) : Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(now));
   if (year < 100) year += 2000;
+  const validDate = new Date(Date.UTC(year, month - 1, day));
+  if (validDate.getUTCFullYear() !== year || validDate.getUTCMonth() !== month - 1 || validDate.getUTCDate() !== day) return null;
   const date = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null;
