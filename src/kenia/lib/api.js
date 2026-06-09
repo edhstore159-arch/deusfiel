@@ -903,9 +903,12 @@ const staticPost = (url, body = {}) => {
           if (error) throw error;
           const cloudReply = cleanInternalChatMarkers(data?.response || "");
           if (cloudReply) {
+            const responseText = isHistoryDumpReply(cloudReply) || isNearDuplicateReply(cloudReply, body.history || [])
+              ? buildNonRepeatingFallback(userText)
+              : cloudReply;
             return response({
               session_id: data?.session_id || sessionId,
-              response: cloudReply,
+              response: responseText,
               audio_base64: data?.audio_base64 || null,
               appointment: data?.appointment || null,
               handoff: data?.handoff || false,
