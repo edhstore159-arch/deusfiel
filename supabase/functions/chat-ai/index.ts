@@ -743,8 +743,45 @@ VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 5. Garanta que a resposta seja direta, em português, no tom de secretária jurídica da Dra. Kênia Garcia, e avance a conversa (não devolva a mesma pergunta).
 Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitionContext}`;
 
+    // === Agenda real da Dra. Kênia (slots disponíveis a partir do dashboard) ===
+    let availabilityBlock = "";
+    try {
+      const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const startISO = now.toISOString().slice(0, 10);
+      const endDate = new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10);
+      const { data: booked } = await sb
+        .from("appointments")
+        .select("appointment_date, appointment_time")
+        .gte("appointment_date", startISO)
+        .lte("appointment_date", endDate);
+      const taken = new Set((booked || []).map((b: any) => `${b.appointment_date} ${String(b.appointment_time).slice(0, 5)}`));
+      const WORK_HOURS = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00"];
+      const WEEKDAY_NAMES = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+      const days: string[] = [];
+      for (let i = 0; i < 14 && days.length < 7; i++) {
+        const d = new Date(now.getTime() + i * 86400000);
+        const dow = d.getDay();
+        if (dow === 0 || dow === 6) continue;
+        const iso = d.toISOString().slice(0, 10);
+        const free = WORK_HOURS.filter((h) => !taken.has(`${iso} ${h}`));
+        if (i === 0) {
+          const curH = parseInt(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now), 10);
+          const futureFree = free.filter((h) => parseInt(h.slice(0, 2), 10) > curH);
+          if (futureFree.length === 0) continue;
+          days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${futureFree.join(", ")}`);
+        } else if (free.length > 0) {
+          days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${free.join(", ")}`);
+        }
+      }
+      availabilityBlock = days.length
+        ? `\n\nAGENDA REAL DA DRA. KÊNIA (consultada agora no dashboard de agendamentos — use APENAS estes horários ao oferecer/confirmar consultas; nunca invente outros):\n${days.join("\n")}\n- Horário de atendimento: seg–sex, 09:00–11:00 e 14:00–17:00 (consultas de 1h).\n- Se o cliente pedir um horário fora desta lista, diga que está ocupado e ofereça as opções acima.`
+        : "\n\nAGENDA REAL DA DRA. KÊNIA: nenhum horário livre nos próximos 14 dias úteis — peça ao cliente para aguardar contato.";
+    } catch (err) {
+      console.error("Falha ao consultar agenda:", err);
+    }
+
     const messages = [
-      { role: "system", content: systemContent },
+      { role: "system", content: systemContent + availabilityBlock },
       ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
       { role: "user", content: userMessage },
     ];
