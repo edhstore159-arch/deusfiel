@@ -761,7 +761,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ? buildResumeReply(history)
         : await callAssistantLLM(messages, fmtDate, fmtTime);
     } catch (err) {
-      console.error("Erro ao chamar Ollama qwen2.5:3b-instruct:", err);
+      console.error(`Erro ao chamar Ollama ${OLLAMA_MODEL}:`, err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
     if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) {
