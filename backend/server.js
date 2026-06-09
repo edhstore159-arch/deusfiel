@@ -649,8 +649,6 @@ const OFFICIAL_GREETING = "Olá! Sou a secretária da Dra. Kênia Garcia. Como p
 const OLLAMA_SYSTEM_PROMPT = SECRETARY_SYSTEM_PROMPT;
 
 const buildOllamaPrompt = (prompt) => `/no_think
-${OLLAMA_SYSTEM_PROMPT}
-
 INSTRUÇÃO CRÍTICA: se você começar a raciocinar em voz alta, pare e responda apenas a resposta final em português.
 Se o cliente pedir data, dia da semana ou hora atual, use obrigatoriamente este contexto: ${saoPauloTemporalContext()}
 
@@ -905,7 +903,9 @@ async function callAI(messagesPayload, options = {}) {
     return { ok: true, provider: "ollama-temporal", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: buildTemporalAnswer(), attempts: [] };
   }
 
+  const systemPrompt = messagesPayload.find((message) => message.role === "system")?.content || OLLAMA_SYSTEM_PROMPT;
   const ollamaPrompt = messagesPayload
+    .filter((message) => message.role !== "system")
     .map((message) => {
       const role = message.role === "system" ? "Instruções" : message.role === "assistant" ? "Atendente" : "Cliente";
       return `${role}: ${message.content}`;
@@ -914,7 +914,7 @@ async function callAI(messagesPayload, options = {}) {
 
   const attempts = [];
   try {
-    const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`);
+    const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`, systemPrompt);
     return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
   } catch (e) {
     const timedOut = e?.name === "AbortError";
