@@ -346,8 +346,6 @@ function isInvalidOllamaReply(text: string): boolean {
 
 function buildOllamaPrompt(prompt: string, fmtDate: string, fmtTime: string): string {
   return `/no_think
-${OLLAMA_SYSTEM_PROMPT}
-
 CONTEXTO TEMPORAL INTERNO (America/Sao_Paulo): hoje é ${fmtDate}, agora são ${fmtTime}.
 Se o cliente pedir data, dia da semana ou hora atual, responda exatamente com esses valores.
 
@@ -359,7 +357,9 @@ Resposta final em português do Brasil:`;
 }
 
 async function callOllama(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+  const system = messages.find((message) => message.role === "system")?.content || OLLAMA_SYSTEM_PROMPT;
   const prompt = messages
+    .filter((message) => message.role !== "system")
     .map((message) => `${message.role === "system" ? "Instruções" : message.role === "assistant" ? "Assistente" : "Cliente"}: ${message.content}`)
     .join("\n\n");
   const controller = new AbortController();
@@ -371,7 +371,7 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
       signal: controller.signal,
       body: JSON.stringify({
         model: OLLAMA_MODEL,
-        system: OLLAMA_SYSTEM_PROMPT,
+        system,
         prompt: buildOllamaPrompt(prompt, fmtDate, fmtTime),
         stream: false,
         think: false,
