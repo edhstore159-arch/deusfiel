@@ -4,9 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
 export const HAS_BACKEND = Boolean(BACKEND_URL);
 export const API = HAS_BACKEND ? `${BACKEND_URL}/api` : "";
+const DEFAULT_OLLAMA_URL = HAS_BACKEND
+  ? `${API}/generate`
+  : "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate";
 const DIRECT_OLLAMA_URL = (
   import.meta.env.VITE_OLLAMA_URL ||
-  "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate"
+  DEFAULT_OLLAMA_URL
 ).replace(/\/$/, "");
 const DIRECT_OLLAMA_MODEL = "qwen2.5:3b-instruct";
 const DIRECT_OLLAMA_FALLBACK_MODEL = "";
@@ -963,7 +966,7 @@ const staticPost = (url, body = {}) => {
           const timeout = setTimeout(() => controller.abort(), 45000);
           const res = await fetch(DIRECT_OLLAMA_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
             signal: controller.signal,
             body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 200, temperature: 0.1 } }),
           }).finally(() => clearTimeout(timeout));
@@ -992,7 +995,7 @@ const staticPost = (url, body = {}) => {
             const timeout = setTimeout(() => controller.abort(), 45000);
             const res = await fetch(DIRECT_OLLAMA_URL, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
               signal: controller.signal,
               body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(retryPrompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 200, temperature: 0.9 } }),
             }).finally(() => clearTimeout(timeout));
