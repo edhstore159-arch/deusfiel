@@ -889,6 +889,34 @@ const staticPost = (url, body = {}) => {
             server_time: new Date().toISOString(),
           });
         }
+        try {
+          const { data, error } = await supabase.functions.invoke("chat-ai", {
+            body: {
+              message: userText,
+              history: body.history || [],
+              session_id: sessionId,
+              user_id: body.user_id || null,
+              want_audio: body.want_audio === true,
+              return_analysis: body.return_analysis === true,
+            },
+          });
+          if (error) throw error;
+          const cloudReply = cleanInternalChatMarkers(data?.response || "");
+          if (cloudReply) {
+            return response({
+              session_id: data?.session_id || sessionId,
+              response: cloudReply,
+              audio_base64: data?.audio_base64 || null,
+              appointment: data?.appointment || null,
+              handoff: data?.handoff || false,
+              speaker: data?.speaker || null,
+              analysis: data?.analysis || { acertividade: 80, qualificacao: "ok" },
+              server_time: new Date().toISOString(),
+            });
+          }
+        } catch (cloudErr) {
+          console.warn("chat-ai backend indisponível, tentando Ollama direto", cloudErr);
+        }
         if (isThanksMessage(userText)) {
           return response({
             session_id: sessionId,

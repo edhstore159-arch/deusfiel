@@ -382,7 +382,13 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
     const raw = await resp.text();
     let data: any = {};
     try { data = raw ? JSON.parse(raw) : {}; } catch { data = { response: raw }; }
-    if (!resp.ok) throw new Error(`Ollama ${resp.status}: ${raw.slice(0, 500)}`);
+    if (!resp.ok) {
+      const upstreamError = String(data?.error || raw || "").replace(/\s+/g, " ").trim();
+      if (/llama-server binary not found/i.test(upstreamError)) {
+        throw new Error("Ollama conectado, mas a instalação local está quebrada: llama-server binary not found. Reinstale o Ollama no computador que está rodando o túnel e teste: ollama run qwen2.5:3b-instruct \"oi\".");
+      }
+      throw new Error(`Ollama ${resp.status}: ${upstreamError.slice(0, 500)}`);
+    }
     const reply = String(data?.response || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
     if (!reply) throw new Error("Ollama retornou resposta vazia.");
     if (isInvalidOllamaReply(reply)) throw new Error(`Ollama retornou raciocínio interno: ${reply.slice(0, 160)}`);
@@ -394,6 +400,12 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
 
 async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
   try {
+    return await callOllama(messages, fmtDate, fmtTime);
+  } catch (err) {
+    console.warn("Ollama indisponível, usando Gateway IA:", err);
+  }
+
+  try {
     const response = await chatCompletion({
       model: "google/gemini-3-flash-preview",
       messages,
@@ -403,11 +415,11 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
       .replace(/<think>[\s\S]*?<\/think>/giu, "")
       .trim();
     if (reply && !isInvalidOllamaReply(reply)) return reply;
-    if (!response.ok) console.warn("Gateway IA falhou, usando Ollama:", response.error || response.status);
+    if (!response.ok) console.warn("Gateway IA falhou:", response.error || response.status);
   } catch (err) {
-    console.warn("Gateway IA indisponível, usando Ollama:", err);
+    console.warn("Gateway IA indisponível:", err);
   }
-  return callOllama(messages, fmtDate, fmtTime);
+  return buildNonRepeatingFallback(messages.at(-1)?.content || "", fmtDate, fmtTime);
 }
 
 async function synthesizeSpeech(text: string): Promise<string | null> {
@@ -844,6 +856,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
 
     return new Response(
       JSON.stringify({
+        session_id: sessionId,
         response: reply,
         appointment,
         audio_base64,
