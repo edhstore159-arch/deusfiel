@@ -361,29 +361,28 @@ export default function ChatIA() {
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       const text = cleanRepeatedText(fullText);
       if (!text) { resolve(); return; }
+      const normalizedText = normalizeMessageForDedupe(text);
+      const existingReply = [...messagesRef.current]
+        .reverse()
+        .find((m) => m.role === "assistant" && !m.typing && normalizeMessageForDedupe(m.content) === normalizedText);
+      if (existingReply) { resolve(); return; }
       const isKenia = speaker && /k[eê]nia/i.test(speaker);
       const baseDelay = isKenia ? 38 : 22;
       let idx = 0;
       const typingId = `typing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      let skip = false;
       setMessages((prev) => {
-        // Evita duplicar: se a última mensagem do assistente (já concluída) tem o mesmo texto, não insere
         const lastDone = [...prev].reverse().find((m) => m.role === "assistant" && !m.typing);
-        if (lastDone && String(lastDone.content || "").trim() === text.trim()) {
-          skip = true;
-          return prev;
-        }
+        if (lastDone && normalizeMessageForDedupe(lastDone.content) === normalizedText) return dedupeChatMessages(prev);
         // Reaproveita um placeholder de digitação pendente, se existir
         const lastIdx = prev.length - 1;
         if (lastIdx >= 0 && prev[lastIdx].role === "assistant" && prev[lastIdx].typing) {
           const copy = [...prev];
           copy[lastIdx] = { ...copy[lastIdx], _typingId: typingId, content: "", speaker };
-          return copy;
+          return dedupeChatMessages(copy);
         }
-        return [...prev, { role: "assistant", content: "", audio_base64: null, typing: true, speaker, _typingId: typingId }];
+        return dedupeChatMessages([...prev, { role: "assistant", content: "", audio_base64: null, typing: true, speaker, _typingId: typingId }]);
       });
-      if (skip) { resolve(); return; }
 
       const updateTyping = (updater) => {
         setMessages((prev) => {
