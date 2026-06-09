@@ -132,7 +132,7 @@ export default function WhatsAppConnection() {
 
   // Polling QR a cada 20s enquanto desconectado
   useEffect(() => {
-    if (!baseUrl || !token) return;
+    if (!baseUrl) return;
     if (status?.connected) return;
     const t = setInterval(fetchQr, 20000);
     return () => clearInterval(t);
@@ -140,7 +140,7 @@ export default function WhatsAppConnection() {
 
   // Monitor de status a cada 30s
   useEffect(() => {
-    if (!baseUrl || !token) return;
+    if (!baseUrl) return;
     fetchStatus();
     const t = setInterval(async () => {
       const s = await fetchStatus();
@@ -232,7 +232,7 @@ export default function WhatsAppConnection() {
           </div>
         ) : (
           <div className="space-y-3">
-            <Button onClick={generateQr} disabled={restarting || !baseUrl || !token}>
+            <Button onClick={generateQr} disabled={restarting || !baseUrl}>
               {restarting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Gerando...</> : <><QrCode className="w-4 h-4 mr-2" />Gerar Novo QR Code</>}
             </Button>
             {qr && (
