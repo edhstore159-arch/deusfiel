@@ -89,6 +89,17 @@ Quando o cliente trouxer uma dúvida ou problema jurídico:
 
 Use como referência de abordagem ferramentas jurídicas brasileiras como JusAI, Lexias, JusExpertia, LEIA Solutions e LexValia: pesquisa legal cuidadosa, linguagem acessível, organização de fatos, análise preliminar e indicação de próximos passos sem substituir a análise da advogada.
 
+## INFORMAÇÕES DO ESCRITÓRIO E DA DRA. KÊNIA GARCIA
+- Dra. Kênia Garcia atua há mais de 15 anos no mercado jurídico, com atendimento humanizado, fé, compaixão, dignidade, respeito e empatia.
+- O escritório Kênia Garcia Advocacia atende online em todo o Brasil e também presencialmente quando aplicável.
+- Áreas principais: Direito de Família e Sucessões, Direito Previdenciário e Direito Bancário.
+- Família e Sucessões: divórcio consensual ou litigioso, inventário e herança, pensão alimentícia, planejamento sucessório, guarda e visitas, união estável.
+- Direito Bancário: revisão de contratos bancários, fraudes bancárias, negativação indevida, superendividamento e repetição de indébito.
+- Previdenciário: aposentadorias, auxílio-doença, benefícios assistenciais, pensão por morte, revisão de benefício e planejamento previdenciário.
+- Diferenciais: estratégia técnica com legislação e jurisprudência atualizadas, escuta ativa, acompanhamento próximo, transparência sobre custos/prazos/possibilidades e busca por soluções ágeis.
+- Contatos oficiais: WhatsApp (64) 99988-1043 e e-mail keniagarcia.advocacia@gmail.com.
+- Alerta importante: o escritório avisa sobre o golpe do falso advogado; se houver suspeita, confirme pelos contatos oficiais antes de qualquer pagamento.
+
 ---
 
 # AGENDAMENTOS
@@ -528,6 +539,7 @@ function isNearDuplicateReply(reply: string, history: Array<{ role: string; cont
 function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string): string {
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
+  if (userAskedOfficeInfo(text)) return buildOfficeInfoReply();
   if (isHandoffRequest(text)) return buildHandoffReply();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para eu deixar a consulta registrada corretamente, me informe nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
@@ -536,6 +548,14 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
     return "Entendi. Para eu direcionar melhor seu atendimento, me conte quando isso aconteceu, sua cidade/estado e se existe algum prazo ou audiência marcado.";
   }
   return "Entendi. Para seguir sem repetir informações, me conte em poucas palavras o que aconteceu e qual ajuda você precisa agora.";
+}
+
+function userAskedOfficeInfo(text: string): boolean {
+  return /\b(áreas?|areas?|atua(?:ção|cao)?|atende|especialidades?|advogada|dra\.?\s*k[êe]nia|kenia\s+garcia|escrit[óo]rio|contato|whatsapp|email|telefone|previdenci[áa]rio|banc[áa]rio|fam[ií]lia|sucess[õo]es|invent[áa]rio)\b/i.test(String(text || ""));
+}
+
+function buildOfficeInfoReply(): string {
+  return "A Dra. Kênia Garcia atua há mais de 15 anos, com atendimento humanizado online em todo o Brasil. As principais áreas são Família e Sucessões, Previdenciário e Bancário: divórcio, guarda, pensão, inventário, aposentadorias, benefícios do INSS, fraudes bancárias, revisão de contratos e negativação indevida. Contatos oficiais: WhatsApp (64) 99988-1043 e keniagarcia.advocacia@gmail.com.";
 }
 
 function userAskedTemporalInfo(text: string): boolean {
@@ -790,6 +810,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     try {
       rawReply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
+        : userAskedOfficeInfo(userMessage)
+          ? buildOfficeInfoReply()
         : isThanksMessage(userMessage)
           ? buildThanksReply(history)
         : isHandoffRequest(userMessage)

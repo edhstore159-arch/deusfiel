@@ -224,13 +224,13 @@ function startOllamaKeepAlive() {
 
 const PORT = Number(process.env.PORT) || 8080;
 const AUTH_DIR = process.env.AUTH_DIR || "./auth";
-const QR_TIMEOUT_MS = Number(process.env.QR_TIMEOUT_MS || 300000);
-const QR_RENEW_AFTER_MS = Number(process.env.QR_RENEW_AFTER_MS || 70000);
+const QR_TIMEOUT_MS = Number(process.env.QR_TIMEOUT_MS || 900000);
+const QR_RENEW_AFTER_MS = Number(process.env.QR_RENEW_AFTER_MS || 240000);
 const QR_ENSURE_COOLDOWN_MS = Number(process.env.QR_ENSURE_COOLDOWN_MS || 6000);
-const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS || 60000);
-const KEEP_ALIVE_INTERVAL_MS = Number(process.env.KEEP_ALIVE_INTERVAL_MS || 20000);
+const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS || 120000);
+const KEEP_ALIVE_INTERVAL_MS = Number(process.env.KEEP_ALIVE_INTERVAL_MS || 15000);
 const RECONNECT_DELAY_MS = Number(process.env.RECONNECT_DELAY_MS || 2000);
-const RECONNECT_MAX_DELAY_MS = Number(process.env.RECONNECT_MAX_DELAY_MS || 60000);
+const RECONNECT_MAX_DELAY_MS = Number(process.env.RECONNECT_MAX_DELAY_MS || 300000);
 const SERVER_STARTED_AT = Date.now();
 const AUTO_REPLY_RECENT_WINDOW_MS = Number(process.env.AUTO_REPLY_RECENT_WINDOW_MS || 180000);
 const logger = pino({ level: "warn" });
@@ -402,6 +402,17 @@ Quando o cliente trouxer uma dúvida ou problema jurídico:
 - Quando o caso exigir análise aprofundada, ofereça encaminhar ou agendar consulta com a Dra. Kênia Garcia.
 
 Use como referência de abordagem ferramentas jurídicas brasileiras como JusAI, Lexias, JusExpertia, LEIA Solutions e LexValia: pesquisa legal cuidadosa, linguagem acessível, organização de fatos, análise preliminar e indicação de próximos passos sem substituir a análise da advogada.
+
+## INFORMAÇÕES DO ESCRITÓRIO E DA DRA. KÊNIA GARCIA
+- Dra. Kênia Garcia atua há mais de 15 anos no mercado jurídico, com atendimento humanizado, fé, compaixão, dignidade, respeito e empatia.
+- O escritório Kênia Garcia Advocacia atende online em todo o Brasil e também presencialmente quando aplicável.
+- Áreas principais: Direito de Família e Sucessões, Direito Previdenciário e Direito Bancário.
+- Família e Sucessões: divórcio consensual ou litigioso, inventário e herança, pensão alimentícia, planejamento sucessório, guarda e visitas, união estável.
+- Direito Bancário: revisão de contratos bancários, fraudes bancárias, negativação indevida, superendividamento e repetição de indébito.
+- Previdenciário: aposentadorias, auxílio-doença, benefícios assistenciais, pensão por morte, revisão de benefício e planejamento previdenciário.
+- Diferenciais: estratégia técnica com legislação e jurisprudência atualizadas, escuta ativa, acompanhamento próximo, transparência sobre custos/prazos/possibilidades e busca por soluções ágeis.
+- Contatos oficiais: WhatsApp (64) 99988-1043 e e-mail keniagarcia.advocacia@gmail.com.
+- Alerta importante: o escritório avisa sobre o golpe do falso advogado; se houver suspeita, confirme pelos contatos oficiais antes de qualquer pagamento.
 
 ---
 
@@ -803,6 +814,7 @@ function buildNonRepeatingFallback(userText, contactName = "cliente") {
   const firstName = String(contactName || "cliente").split(" ")[0] || "cliente";
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (userAskedOfficeInfo(txt)) return buildOfficeInfoReply();
   if (isThanksMessage(txt)) return buildThanksReply([], firstName);
   if (isHandoffRequest(txt)) return buildHandoffReply(firstName);
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(txt)) {
@@ -819,6 +831,14 @@ function buildTemporalAnswer() {
   const date = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
   const time = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(now);
   return `Hoje é ${date}, e agora são ${time}.`;
+}
+
+function userAskedOfficeInfo(text) {
+  return /\b(áreas?|areas?|atua(?:ção|cao)?|atende|especialidades?|advogada|dra\.?\s*k[êe]nia|kenia\s+garcia|escrit[óo]rio|contato|whatsapp|email|telefone|previdenci[áa]rio|banc[áa]rio|fam[ií]lia|sucess[õo]es|invent[áa]rio)\b/i.test(String(text || ""));
+}
+
+function buildOfficeInfoReply() {
+  return "A Dra. Kênia Garcia atua há mais de 15 anos, com atendimento humanizado online em todo o Brasil. As principais áreas são Família e Sucessões, Previdenciário e Bancário: divórcio, guarda, pensão, inventário, aposentadorias, benefícios do INSS, fraudes bancárias, revisão de contratos e negativação indevida. Contatos oficiais: WhatsApp (64) 99988-1043 e keniagarcia.advocacia@gmail.com.";
 }
 
 function userAskedTemporalInfo(text) {
@@ -1000,6 +1020,7 @@ function buildLocalLegalReply(jid, userText, contactName) {
   const name = String(contactName || "cliente").split(" ")[0];
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (userAskedOfficeInfo(txt)) return buildOfficeInfoReply();
   if (isThanksMessage(txt)) return buildThanksReply(history, name);
   if (isHandoffRequest(txt)) return buildHandoffReply(name);
   if (/urgente|pris[aã]o|audi[eê]ncia|prazo|intima[cç][aã]o|mandado|medida protetiva/.test(txt)) {
@@ -1118,6 +1139,8 @@ async function autoReply(jid, userText, contactName) {
   const firstNameCt = String(contactName || "cliente").split(" ")[0] || "cliente";
   let result = isThanksMessage(userText)
     ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(history, firstNameCt) }
+    : userAskedOfficeInfo(userText)
+    ? { ok: true, provider: "office-info-rule", reply: buildOfficeInfoReply() }
     : isHandoffRequest(userText)
     ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameCt) }
     : isResumeRequest(userText)
@@ -1235,13 +1258,16 @@ async function startSock() {
       lastDisconnectCode = code || null;
       const loggedOut = code === DisconnectReason.loggedOut;
       const replaced = code === DisconnectReason.connectionReplaced;
-      const transientLoggedOut = loggedOut && !manualLogoutRequested && lastOpenAt && Date.now() - lastOpenAt < 30000;
-      const needsFreshPairing = loggedOut && !manualLogoutRequested && !transientLoggedOut;
-      const shouldReconnect = !manualLogoutRequested && (!loggedOut || transientLoggedOut || needsFreshPairing);
+      const recoverLoggedOut = loggedOut && !manualLogoutRequested && reconnectAttempts < 3;
+      const needsFreshPairing = loggedOut && !manualLogoutRequested && !recoverLoggedOut;
+      const shouldReconnect = !manualLogoutRequested && (!loggedOut || recoverLoggedOut || needsFreshPairing);
       reconnectAttempts = shouldReconnect ? reconnectAttempts + 1 : 0;
       if (shouldReconnect && !reconnectingSince) reconnectingSince = Date.now();
       const backoff = Math.min(RECONNECT_DELAY_MS * Math.max(1, reconnectAttempts), RECONNECT_MAX_DELAY_MS);
-      const delay = needsFreshPairing ? 1500 : code === DisconnectReason.restartRequired ? 250 : replaced ? 5000 : backoff;
+      if (recoverLoggedOut) {
+        lastError = `${lastError || "WhatsApp fechou a sessão"} — tentando reconectar sem apagar o pareamento.`;
+      }
+      const delay = needsFreshPairing ? 1500 : code === DisconnectReason.restartRequired ? 250 : replaced ? 15000 : backoff;
       await closeSock();
       starting = false;
       connectionState = shouldReconnect ? "disconnected" : "logged_out";
@@ -1249,16 +1275,15 @@ async function startSock() {
       currentQRAt = null;
       if (needsFreshPairing) {
         try {
-          const fs = await import("node:fs/promises");
-          await fs.rm(AUTH_DIR, { recursive: true, force: true });
-          await fs.mkdir(AUTH_DIR, { recursive: true });
+          await rm(AUTH_DIR, { recursive: true, force: true });
+          await mkdir(AUTH_DIR, { recursive: true });
         } catch {}
       }
       if (shouldReconnect && !reconnectTimer) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           startSock().catch((e) => { lastError = e?.message || String(e); });
-        }, replaced ? 5000 : delay);
+        }, delay);
       }
     }
   });
@@ -1882,6 +1907,8 @@ app.post("/api/chat/message", async (req, res) => {
   const firstNameWeb = String(req.body?.visitor_name || "Cliente").split(" ")[0] || "Cliente";
   let result = isThanksMessage(message)
     ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(normalizedHistory, firstNameWeb) }
+    : userAskedOfficeInfo(message)
+    ? { ok: true, provider: "office-info-rule", reply: buildOfficeInfoReply() }
     : isHandoffRequest(message)
     ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameWeb) }
     : isResumeRequest(message)

@@ -34,3 +34,13 @@ services:
         value: "30000"
       - key: OLLAMA_REQUEST_RETRIES
         value: "0"
+      - key: QR_TIMEOUT_MS
+        value: "900000"
+      - key: QR_RENEW_AFTER_MS
+        value: "240000"
+      - key: CONNECT_TIMEOUT_MS
+        value: "120000"
+      - key: KEEP_ALIVE_INTERVAL_MS
+        value: "15000"
+      - key: RECONNECT_MAX_DELAY_MS
+        value: "300000"
