@@ -486,7 +486,7 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
   }
 }
 
-async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string, fallbackHistory: Array<{ role: string; content: string }> = []): Promise<string> {
   try {
     return await callOllama(messages, fmtDate, fmtTime);
   } catch (err) {
@@ -507,7 +507,7 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
   } catch (err) {
     console.warn("Gateway IA indisponível:", err);
   }
-  return buildNonRepeatingFallback(messages.at(-1)?.content || "", fmtDate, fmtTime);
+  return buildNonRepeatingFallback(messages.at(-1)?.content || "", fmtDate, fmtTime, fallbackHistory);
 }
 
 async function synthesizeSpeech(text: string): Promise<string | null> {
