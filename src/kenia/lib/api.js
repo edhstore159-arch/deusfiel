@@ -8,7 +8,7 @@ const DIRECT_OLLAMA_URL = (
   import.meta.env.VITE_OLLAMA_URL ||
   "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate"
 ).replace(/\/$/, "");
-const DIRECT_OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "qwen2.5-coder:7b";
+const DIRECT_OLLAMA_MODEL = "qwen2.5:3b-instruct";
 const DIRECT_OLLAMA_FALLBACK_MODEL = "";
 
 
@@ -1019,7 +1019,7 @@ const staticPost = (url, body = {}) => {
             server_time: null,
           });
       } catch (e) {
-        console.warn(`Ollama ${DIRECT_OLLAMA_MODEL} falhou no chat`, e);
+        console.warn("Ollama qwen2.5:3b-instruct falhou no chat", e);
       }
       return response({
           session_id: sessionId,

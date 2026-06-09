@@ -10,7 +10,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OLLAMA_BASE_URL = (Deno.env.get("OLLAMA_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev").replace(/\/+$/g, "").replace(/\/api\/(?:generate|chat|tags|show)$/i, "");
 const OLLAMA_GENERATE_URL = `${OLLAMA_BASE_URL}/api/generate`;
-const OLLAMA_MODEL = Deno.env.get("OLLAMA_MODEL") || "qwen2.5-coder:7b";
+const OLLAMA_MODEL = "qwen2.5:3b-instruct";
 const SECRETARIA_JURIDICA_PROMPT = `# SECRETÁRIA JURÍDICA DA DRA. KÊNIA GARCIA
 
 Você é a secretária pessoal da Dra. Kênia Garcia e realiza atendimento pelo WhatsApp.
@@ -385,7 +385,7 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
     if (!resp.ok) {
       const upstreamError = String(data?.error || raw || "").replace(/\s+/g, " ").trim();
       if (/llama-server binary not found/i.test(upstreamError)) {
-        throw new Error(`Ollama conectado, mas a instalação local está quebrada: llama-server binary not found. Reinstale o Ollama no computador que está rodando o túnel e teste: ollama run ${OLLAMA_MODEL} "oi".`);
+        throw new Error("Ollama conectado, mas a instalação local está quebrada: llama-server binary not found. Reinstale o Ollama no computador que está rodando o túnel e teste: ollama run qwen2.5:3b-instruct \"oi\".");
       }
       throw new Error(`Ollama ${resp.status}: ${upstreamError.slice(0, 500)}`);
     }
@@ -761,7 +761,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ? buildResumeReply(history)
         : await callAssistantLLM(messages, fmtDate, fmtTime);
     } catch (err) {
-      console.error(`Erro ao chamar Ollama ${OLLAMA_MODEL}:`, err);
+      console.error("Erro ao chamar Ollama qwen2.5:3b-instruct:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
     if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) {
