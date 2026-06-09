@@ -1236,30 +1236,26 @@ async function startSock() {
       lastDisconnectCode = code || null;
       const loggedOut = code === DisconnectReason.loggedOut;
       const replaced = code === DisconnectReason.connectionReplaced;
-      const transientLoggedOut = loggedOut && !manualLogoutRequested && lastOpenAt && Date.now() - lastOpenAt < 30000;
-      const needsFreshPairing = loggedOut && !manualLogoutRequested && !transientLoggedOut;
-      const shouldReconnect = !manualLogoutRequested && (!loggedOut || transientLoggedOut || needsFreshPairing);
+      const transientLoggedOut = loggedOut && !manualLogoutRequested;
+      const needsFreshPairing = false;
+      const shouldReconnect = !manualLogoutRequested && (!loggedOut || transientLoggedOut);
       reconnectAttempts = shouldReconnect ? reconnectAttempts + 1 : 0;
       if (shouldReconnect && !reconnectingSince) reconnectingSince = Date.now();
       const backoff = Math.min(RECONNECT_DELAY_MS * Math.max(1, reconnectAttempts), RECONNECT_MAX_DELAY_MS);
-      const delay = needsFreshPairing ? 1500 : code === DisconnectReason.restartRequired ? 250 : replaced ? 5000 : backoff;
+      if (loggedOut && !manualLogoutRequested) {
+        lastError = `${lastError || "WhatsApp fechou a sessão"} — tentando reconectar sem apagar o pareamento.`;
+      }
+      const delay = code === DisconnectReason.restartRequired ? 250 : replaced ? 15000 : backoff;
       await closeSock();
       starting = false;
       connectionState = shouldReconnect ? "disconnected" : "logged_out";
       currentQR = null;
       currentQRAt = null;
-      if (needsFreshPairing) {
-        try {
-          const fs = await import("node:fs/promises");
-          await fs.rm(AUTH_DIR, { recursive: true, force: true });
-          await fs.mkdir(AUTH_DIR, { recursive: true });
-        } catch {}
-      }
       if (shouldReconnect && !reconnectTimer) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           startSock().catch((e) => { lastError = e?.message || String(e); });
-        }, replaced ? 5000 : delay);
+        }, delay);
       }
     }
   });
