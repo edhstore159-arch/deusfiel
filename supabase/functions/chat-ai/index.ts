@@ -747,7 +747,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ? buildHandoffReply()
         : isResumeRequest(userMessage)
           ? buildResumeReply(history)
-        : await callOllama(messages, fmtDate, fmtTime);
+        : await callAssistantLLM(messages, fmtDate, fmtTime);
     } catch (err) {
       console.error("Erro ao chamar Ollama llama3.2:3b:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
@@ -759,7 +759,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
           { role: "user", content: userMessage },
         ];
-        const retryReply = await callOllama(retryMessages, fmtDate, fmtTime);
+        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime);
         if (retryReply && !isHistoryDumpReply(retryReply) && !isNearDuplicateReply(retryReply, history)) {
           rawReply = retryReply;
         } else {
