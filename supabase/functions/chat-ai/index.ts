@@ -392,6 +392,24 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
   }
 }
 
+async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+  try {
+    const response = await chatCompletion({
+      model: "google/gemini-3-flash-preview",
+      messages,
+      temperature: 0.2,
+    });
+    const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
+      .replace(/<think>[\s\S]*?<\/think>/giu, "")
+      .trim();
+    if (reply && !isInvalidOllamaReply(reply)) return reply;
+    if (!response.ok) console.warn("Gateway IA falhou, usando Ollama:", response.error || response.status);
+  } catch (err) {
+    console.warn("Gateway IA indisponível, usando Ollama:", err);
+  }
+  return callOllama(messages, fmtDate, fmtTime);
+}
+
 async function synthesizeSpeech(text: string): Promise<string | null> {
   if (!ELEVENLABS_API_KEY || !text?.trim()) return null;
   try {
