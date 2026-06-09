@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import avatar from "@/assets/virtual-assistant.png";
-import { dispatchLovableDebugError } from "./debugInstruction";
 
 const NGROK_CMD = "pkill ngrok\nngrok http 11434";
 
 /**
  * Floating virtual-assistant bubble. Click → copies the ngrok commands to the
- * clipboard and dispatches the dev instruction so the Lovable AI executes them.
+ * clipboard without triggering the fatal debug-error overlay.
  */
 export const VirtualAssistantBubble = () => {
   const [busy, setBusy] = useState(false);
@@ -22,9 +21,6 @@ export const VirtualAssistantBubble = () => {
       } catch {
         toast.message("Execute no terminal:", { description: NGROK_CMD });
       }
-      dispatchLovableDebugError(
-        `Execute estes comandos no terminal automaticamente:\n\n${NGROK_CMD}`,
-      );
     } finally {
       setTimeout(() => setBusy(false), 800);
     }
