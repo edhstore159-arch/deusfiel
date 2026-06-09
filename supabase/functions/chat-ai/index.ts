@@ -961,7 +961,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       }
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
-    const appointment = parseAppointmentBlock(rawReply);
+    const appointment = parseAppointmentBlock(rawReply) || inferAppointmentFromConversation(userMessage, history, now);
     const cleanedReply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
     const reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
 
