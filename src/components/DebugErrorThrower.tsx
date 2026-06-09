@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 /**
  * DebugErrorThrower
  *
- * Escuta "lovable-debug-error" e lança um erro fatal intencional durante o
- * render, para acionar o overlay global da Lovable e o botão "Try to Fix".
- *
- * NÃO envolver em ErrorBoundary. NÃO substituir o throw por log/toast.
+ * Escuta "lovable-debug-error" sem derrubar a aplicação. Antes este componente
+ * lançava um erro fatal intencional, mas isso causava tela branca em produção.
  */
 export const DebugErrorThrower = () => {
   const [message, setMessage] = useState<string | null>(null);
@@ -16,15 +15,13 @@ export const DebugErrorThrower = () => {
       const detail = (e as CustomEvent<string>).detail;
       if (typeof detail === "string" && detail.length > 0) {
         setMessage(detail);
+        console.info("Instrução de desenvolvimento registrada:", detail);
+        toast.success("Instrução registrada para análise");
       }
     };
     window.addEventListener("lovable-debug-error", handler as EventListener);
     return () => window.removeEventListener("lovable-debug-error", handler as EventListener);
   }, []);
-
-  if (message) {
-    throw new Error(message);
-  }
 
   return null;
 };
