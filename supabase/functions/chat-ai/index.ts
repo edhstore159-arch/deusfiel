@@ -800,6 +800,32 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       console.error("Falha ao consultar agenda:", err);
     }
 
+    // Atalho determinístico para perguntas de data/hora
+    const normalizedUser = String(userMessage || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    const askDate = /(que dia (e|eh|é) (hoje|hj))|(qual( e| eh| é)? a data)|(data de hoje)|(dia de hoje)|(que dia da semana)|(estamos em que dia)|(\bhoje e\b)|(hj e )|(qdia)/.test(normalizedUser);
+    const askTime = /(que hora)|(qhora)|(ke hora)|(hora agora)|(horario agora)|(me diz a hora)|(que horas sao)/.test(normalizedUser);
+    if (askDate || askTime) {
+      let quick = "";
+      if (askDate && askTime) quick = `Hoje é ${weekdaySp}, ${dateOnlySp}, e agora são ${fmtTime}.`;
+      else if (askDate) quick = `Hoje é ${weekdaySp}, ${dateOnlySp}.`;
+      else quick = `Agora são ${fmtTime}.`;
+      return new Response(
+        JSON.stringify({
+          response: quick,
+          analysis: { acertividade: 100, qualificacao: "informacao_direta" },
+          appointment: null,
+          audio_base64: null,
+          handoff: false,
+          session_id: null,
+          speaker: "Assistente virtual",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const messages = [
       { role: "system", content: systemContent + availabilityBlock },
       ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
