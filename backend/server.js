@@ -932,6 +932,9 @@ function isHistoryDumpReply(text) {
 
 function removeTemporalLeaks(reply, userText) {
   if (userAskedTemporalInfo(userText)) return reply;
+  const isScheduling = /\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|hor[aá]rios|atendimento|disponibilidade|dispon[ií]vel|agenda)\b/i.test(String(userText || ""));
+  const replyHasSlots = /\b\d{2}:\d{2}\b/.test(String(reply || "")) && /(segunda|ter[cç]a|quarta|quinta|sexta)-feira/i.test(String(reply || ""));
+  if (isScheduling || replyHasSlots) return reply;
   return String(reply || "")
     .split(/(?<=[.!?])\s+|\n+/)
     .map((part) => part.trim())
