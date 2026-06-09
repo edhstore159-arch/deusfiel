@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
  * DebugErrorThrower
  *
  * Escuta "lovable-debug-error" apenas quando o modo fatal estiver habilitado
- * explicitamente por query/localStorage: lovableDebugThrow=1.
+ * explicitamente por query string: lovableDebugThrow=1.
  */
 export const DebugErrorThrower = () => {
   const [message, setMessage] = useState<string | null>(null);
@@ -12,9 +12,7 @@ export const DebugErrorThrower = () => {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
-      const fatalEnabled =
-        new URLSearchParams(window.location.search).get("lovableDebugThrow") === "1" ||
-        window.localStorage.getItem("lovableDebugThrow") === "1";
+      const fatalEnabled = new URLSearchParams(window.location.search).get("lovableDebugThrow") === "1";
 
       if (fatalEnabled && typeof detail === "string" && detail.length > 0) {
         setMessage(detail);

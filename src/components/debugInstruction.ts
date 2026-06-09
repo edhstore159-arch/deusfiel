@@ -4,10 +4,7 @@ const isFatalDebugInstructionEnabled = () => {
   if (typeof window === "undefined") return false;
 
   const params = new URLSearchParams(window.location.search);
-  return (
-    params.get("lovableDebugThrow") === "1" ||
-    window.localStorage.getItem("lovableDebugThrow") === "1"
-  );
+  return params.get("lovableDebugThrow") === "1";
 };
 
 /**
