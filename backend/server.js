@@ -131,7 +131,7 @@ async function probeOllamaGenerate() {
   }
 }
 
-async function callOllamaModel(modelName, texto) {
+async function callOllamaModel(modelName, texto, systemPrompt = OLLAMA_SYSTEM_PROMPT) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OLLAMA_GENERATE_TIMEOUT_MS);
   try {
@@ -141,12 +141,12 @@ async function callOllamaModel(modelName, texto) {
       signal: controller.signal,
       body: JSON.stringify({
         model: modelName,
-        system: OLLAMA_SYSTEM_PROMPT,
+        system: systemPrompt,
         prompt: buildOllamaPrompt(texto),
         stream: false,
         think: false,
         keep_alive: OLLAMA_KEEP_ALIVE,
-        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 280, temperature: 0.1 },
+        options: { ...OLLAMA_OPTIONS_BASE, num_predict: 200, temperature: 0.1 },
       }),
     });
     const raw = await resposta.text();
@@ -162,7 +162,7 @@ async function callOllamaModel(modelName, texto) {
   }
 }
 
-export async function perguntarIA(texto) {
+export async function perguntarIA(texto, systemPrompt = OLLAMA_SYSTEM_PROMPT) {
   let lastErrorForThrow = null;
   const models = OLLAMA_FALLBACK_MODEL && OLLAMA_FALLBACK_MODEL !== OLLAMA_MODEL
     ? [OLLAMA_MODEL, OLLAMA_FALLBACK_MODEL]
@@ -170,7 +170,7 @@ export async function perguntarIA(texto) {
   for (const modelName of models) {
     for (let attempt = 1; attempt <= OLLAMA_REQUEST_RETRIES + 1; attempt++) {
       try {
-        const reply = await callOllamaModel(modelName, texto);
+        const reply = await callOllamaModel(modelName, texto, systemPrompt);
         ollamaStatus = { ...ollamaStatus, ok: true, last_checked_at: new Date().toISOString(), last_success_at: new Date().toISOString(), last_error: null, last_model: modelName };
         return reply;
       } catch (e) {
