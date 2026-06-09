@@ -1258,21 +1258,27 @@ async function startSock() {
       lastDisconnectCode = code || null;
       const loggedOut = code === DisconnectReason.loggedOut;
       const replaced = code === DisconnectReason.connectionReplaced;
-      const transientLoggedOut = loggedOut && !manualLogoutRequested;
-      const needsFreshPairing = false;
-      const shouldReconnect = !manualLogoutRequested && (!loggedOut || transientLoggedOut);
+      const recoverLoggedOut = loggedOut && !manualLogoutRequested && reconnectAttempts < 3;
+      const needsFreshPairing = loggedOut && !manualLogoutRequested && !recoverLoggedOut;
+      const shouldReconnect = !manualLogoutRequested && (!loggedOut || recoverLoggedOut || needsFreshPairing);
       reconnectAttempts = shouldReconnect ? reconnectAttempts + 1 : 0;
       if (shouldReconnect && !reconnectingSince) reconnectingSince = Date.now();
       const backoff = Math.min(RECONNECT_DELAY_MS * Math.max(1, reconnectAttempts), RECONNECT_MAX_DELAY_MS);
-      if (loggedOut && !manualLogoutRequested) {
+      if (recoverLoggedOut) {
         lastError = `${lastError || "WhatsApp fechou a sessão"} — tentando reconectar sem apagar o pareamento.`;
       }
-      const delay = code === DisconnectReason.restartRequired ? 250 : replaced ? 15000 : backoff;
+      const delay = needsFreshPairing ? 1500 : code === DisconnectReason.restartRequired ? 250 : replaced ? 15000 : backoff;
       await closeSock();
       starting = false;
       connectionState = shouldReconnect ? "disconnected" : "logged_out";
       currentQR = null;
       currentQRAt = null;
+      if (needsFreshPairing) {
+        try {
+          await rm(AUTH_DIR, { recursive: true, force: true });
+          await mkdir(AUTH_DIR, { recursive: true });
+        } catch {}
+      }
       if (shouldReconnect && !reconnectTimer) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
