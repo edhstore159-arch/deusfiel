@@ -403,6 +403,17 @@ Quando o cliente trouxer uma dúvida ou problema jurídico:
 
 Use como referência de abordagem ferramentas jurídicas brasileiras como JusAI, Lexias, JusExpertia, LEIA Solutions e LexValia: pesquisa legal cuidadosa, linguagem acessível, organização de fatos, análise preliminar e indicação de próximos passos sem substituir a análise da advogada.
 
+## INFORMAÇÕES DO ESCRITÓRIO E DA DRA. KÊNIA GARCIA
+- Dra. Kênia Garcia atua há mais de 15 anos no mercado jurídico, com atendimento humanizado, fé, compaixão, dignidade, respeito e empatia.
+- O escritório Kênia Garcia Advocacia atende online em todo o Brasil e também presencialmente quando aplicável.
+- Áreas principais: Direito de Família e Sucessões, Direito Previdenciário e Direito Bancário.
+- Família e Sucessões: divórcio consensual ou litigioso, inventário e herança, pensão alimentícia, planejamento sucessório, guarda e visitas, união estável.
+- Direito Bancário: revisão de contratos bancários, fraudes bancárias, negativação indevida, superendividamento e repetição de indébito.
+- Previdenciário: aposentadorias, auxílio-doença, benefícios assistenciais, pensão por morte, revisão de benefício e planejamento previdenciário.
+- Diferenciais: estratégia técnica com legislação e jurisprudência atualizadas, escuta ativa, acompanhamento próximo, transparência sobre custos/prazos/possibilidades e busca por soluções ágeis.
+- Contatos oficiais: WhatsApp (64) 99988-1043 e e-mail keniagarcia.advocacia@gmail.com.
+- Alerta importante: o escritório avisa sobre o golpe do falso advogado; se houver suspeita, confirme pelos contatos oficiais antes de qualquer pagamento.
+
 ---
 
 # AGENDAMENTOS
