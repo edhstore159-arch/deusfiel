@@ -833,6 +833,7 @@ export default function ChatIA() {
         },
         { timeout: 90000 }
       );
+      if (msg !== input.trim()) return;
       setSessionId(data.session_id);
       if (data.appointment) {
         toast.success("Consulta salva automaticamente na Agenda");
