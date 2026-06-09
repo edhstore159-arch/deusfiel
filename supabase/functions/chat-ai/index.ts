@@ -527,7 +527,7 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
 }
 
 function userAskedTemporalInfo(text: string): boolean {
-  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(String(text || ""));
+  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+e\s+hora|dia\s+e\s+hora|hora\s+e\s+data|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(String(text || ""));
 }
 
 function isHandoffRequest(text: string): boolean {
@@ -771,7 +771,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
-    const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    const cleanedReply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    const reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
 
     // Análise técnica do caso (opcional; não bloqueia atendimento rápido quando não solicitada)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
