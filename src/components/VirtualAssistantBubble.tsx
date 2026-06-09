@@ -40,9 +40,9 @@ export const VirtualAssistantBubble = () => {
         // Agente local não está rodando → fallback: copia para clipboard.
         try {
           await navigator.clipboard.writeText(FALLBACK_CMD);
-          toast.warning("Agente local offline", {
+          toast.info("Comandos copiados", {
             description:
-              "Rode `node local-agent/server.mjs`. Comandos copiados para colar no terminal.",
+              "Cole no terminal para reiniciar o ngrok. O navegador não consegue executar comandos sozinho.",
           });
         } catch {
           toast.message("Execute no terminal:", { description: FALLBACK_CMD });
