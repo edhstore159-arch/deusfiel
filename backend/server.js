@@ -64,7 +64,7 @@ const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
 const OLLAMA_MODEL = "llama3.2:3b";
 const OLLAMA_FALLBACK_MODEL = "";
 const OLLAMA_REQUEST_RETRIES = Number(process.env.OLLAMA_REQUEST_RETRIES || 0);
-const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 90000);
+const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 45000);
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
 const OLLAMA_HEALTH_INTERVAL_MS = Number(process.env.OLLAMA_HEALTH_INTERVAL_MS || 240000);
 const OLLAMA_HEALTH_TIMEOUT_MS = Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS || 8000);
@@ -1020,7 +1020,7 @@ function queueAutoReply(jid, reply, meta = {}) {
 async function sendBotText(jid, reply, meta = {}) {
   try { await sock?.presenceSubscribe?.(jid); } catch {}
   try { await sock?.sendPresenceUpdate?.("composing", jid); } catch {}
-  await new Promise((r) => setTimeout(r, 600));
+  await new Promise((r) => setTimeout(r, 150));
   try { await sock?.sendPresenceUpdate?.("paused", jid); } catch {}
 
   let lastSendErr = null;
