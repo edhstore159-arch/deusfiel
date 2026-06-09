@@ -12,8 +12,16 @@ import {
 const LS_BASE = "wa_conn_base_url";
 const LS_TOKEN = "wa_conn_token";
 
+// Endpoints reais do backend Kenia (backend/server.js)
+const EP_STATUS = "/api/whatsapp/baileys/status";
+const EP_QR = "/api/whatsapp/qr";
+const EP_RESTART = "/api/whatsapp/baileys/restart";
+const EP_LOGOUT = "/api/whatsapp/logout";
+
+const DEFAULT_BASE = import.meta.env.VITE_BACKEND_URL || "";
+
 export default function WhatsAppConnection() {
-  const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(LS_BASE) || "");
+  const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(LS_BASE) || DEFAULT_BASE);
   const [token, setToken] = useState(() => localStorage.getItem(LS_TOKEN) || "");
   const [status, setStatus] = useState(null); // { connected, ... }
   const [qr, setQr] = useState(null);
