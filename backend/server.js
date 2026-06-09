@@ -814,6 +814,7 @@ function buildNonRepeatingFallback(userText, contactName = "cliente") {
   const firstName = String(contactName || "cliente").split(" ")[0] || "cliente";
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (userAskedOfficeInfo(txt)) return buildOfficeInfoReply();
   if (isThanksMessage(txt)) return buildThanksReply([], firstName);
   if (isHandoffRequest(txt)) return buildHandoffReply(firstName);
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(txt)) {
@@ -1019,6 +1020,7 @@ function buildLocalLegalReply(jid, userText, contactName) {
   const name = String(contactName || "cliente").split(" ")[0];
   const txt = String(userText || "").toLowerCase();
   if (userAskedTemporalInfo(txt)) return buildTemporalAnswer();
+  if (userAskedOfficeInfo(txt)) return buildOfficeInfoReply();
   if (isThanksMessage(txt)) return buildThanksReply(history, name);
   if (isHandoffRequest(txt)) return buildHandoffReply(name);
   if (/urgente|pris[aã]o|audi[eê]ncia|prazo|intima[cç][aã]o|mandado|medida protetiva/.test(txt)) {
