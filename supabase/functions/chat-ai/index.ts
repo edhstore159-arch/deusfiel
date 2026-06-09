@@ -857,11 +857,13 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       { role: "user", content: userMessage },
     ];
 
+    const isScheduling = /\b(agendar|marcar|consulta|consultar|reuni[aã]o|hor[aá]rio|hor[aá]rios|atendimento|quando\s+(?:posso|tem|d[aá])|disponibilidade|dispon[ií]vel|dispon[ií]veis|agenda)\b/i.test(String(userMessage || ""));
+
     let rawReply: string;
     try {
       rawReply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
-        : userAskedOfficeInfo(userMessage)
+        : (!isScheduling && userAskedOfficeInfo(userMessage))
           ? buildOfficeInfoReply()
         : isThanksMessage(userMessage)
           ? buildThanksReply(history)
