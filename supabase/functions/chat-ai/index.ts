@@ -1018,10 +1018,10 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ? buildHandoffReply()
         : isResumeRequest(userMessage)
           ? buildResumeReply(history)
-        : await callAssistantLLM(messages, fmtDate, fmtTime);
+        : await callAssistantLLM(messages, fmtDate, fmtTime, history);
     } catch (err) {
       console.error("Erro ao chamar Ollama qwen2.5:3b-instruct:", err);
-      rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+      rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime, history);
     }
     if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) {
       try {
@@ -1030,20 +1030,20 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
           { role: "user", content: userMessage },
         ];
-        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime);
+        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime, history);
         if (retryReply && !isHistoryDumpReply(retryReply) && !isNearDuplicateReply(retryReply, history)) {
           rawReply = retryReply;
         } else {
-          rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+          rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime, history);
         }
       } catch {
-        rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+        rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime, history);
       }
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply) || inferAppointmentFromConversation(userMessage, history, now);
     const cleanedReply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
-    let reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    let reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime, history);
     if (appointment?.raw_payload?.inferred_from_conversation && !/\b(agendad|confirmad|registrad)\w*\b/i.test(reply)) {
       const [yy, mm, dd] = appointment.appointment_date.split("-");
       reply = `Perfeito, deixei sua consulta registrada para ${dd}/${mm}/${yy} às ${appointment.appointment_time}. Ela aparecerá na agenda da Dra. Kênia no painel.`;
