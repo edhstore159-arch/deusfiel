@@ -363,7 +363,7 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
     .map((message) => `${message.role === "system" ? "Instruções" : message.role === "assistant" ? "Assistente" : "Cliente"}: ${message.content}`)
     .join("\n\n");
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90000);
+  const timeout = setTimeout(() => controller.abort(), 45000);
   try {
     const resp = await fetch(OLLAMA_GENERATE_URL, {
       method: "POST",
@@ -376,7 +376,7 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
         stream: false,
         think: false,
         keep_alive: "10m",
-        options: { num_ctx: 4096, num_predict: 280, temperature: 0.1 },
+        options: { num_ctx: 4096, num_predict: 200, temperature: 0.1 },
       }),
     });
     const raw = await resp.text();
