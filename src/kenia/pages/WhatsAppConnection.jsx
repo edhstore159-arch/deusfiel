@@ -77,16 +77,24 @@ export default function WhatsAppConnection() {
       toast.error("Informe URL base e token primeiro");
       return;
     }
+    if (!/^https?:\/\//i.test(baseUrl)) {
+      toast.error("URL base inválida — deve começar com http(s)://");
+      return;
+    }
     setRestarting(true);
     setQr(null);
     try {
       await callApi("/restart", "POST");
       toast.success("Reinício solicitado — aguardando QR...");
-      await new Promise((r) => setTimeout(r, 5000));
-      const qrData = await fetchQr();
-      if (!qrData?.qr) toast.warning("QR ainda não disponível, será atualizado em breve.");
+      // tenta buscar o QR por até ~25s (5 tentativas a cada 5s)
+      let got = null;
+      for (let i = 0; i < 5 && !got?.qr; i++) {
+        await new Promise((r) => setTimeout(r, 5000));
+        got = await fetchQr();
+      }
+      if (!got?.qr) toast.warning("QR ainda não disponível. Verifique se o backend Baileys está rodando e tente novamente.");
     } catch (e) {
-      toast.error(e.message);
+      toast.error(`Falha ao reiniciar: ${e.message}`);
     } finally {
       setRestarting(false);
     }
