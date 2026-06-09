@@ -30,6 +30,29 @@ const supabaseDb = SUPABASE_URL && SUPABASE_DB_KEY
   ? createClient(SUPABASE_URL, SUPABASE_DB_KEY, { auth: { persistSession: false } })
   : null;
 
+async function callChatAiFunction({ message, history = [], sessionId = null, userId = null, wantAudio = false, returnAnalysis = false }) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error("chat-ai indisponível: credenciais do backend ausentes");
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat-ai`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({
+      message,
+      history,
+      session_id: sessionId,
+      user_id: userId,
+      want_audio: wantAudio,
+      return_analysis: returnAnalysis,
+    }),
+  });
+  const data = await resp.json().catch(async () => ({ error: await resp.text().catch(() => "Erro desconhecido") }));
+  if (!resp.ok) throw new Error(`chat-ai ${resp.status}: ${data?.error || JSON.stringify(data)}`);
+  return data;
+}
+
 async function transcribeAudioBuffer(buffer, mimetype = "audio/ogg") {
   if (!SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY ausente no backend");
   const b64 = Buffer.from(buffer).toString("base64");
