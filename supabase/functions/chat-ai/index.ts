@@ -856,6 +856,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
 
     return new Response(
       JSON.stringify({
+        session_id: sessionId,
         response: reply,
         appointment,
         audio_base64,
