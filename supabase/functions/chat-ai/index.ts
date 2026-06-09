@@ -873,10 +873,16 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
 
     const isScheduling = /\b(agendar|marcar|consulta|consultar|reuni[aã]o|hor[aá]rio|hor[aá]rios|atendimento|quando\s+(?:posso|tem|d[aá])|disponibilidade|dispon[ií]vel|dispon[ií]veis|agenda)\b/i.test(String(userMessage || ""));
 
+    // Detecta se o cliente já escolheu data/horário (ex.: "10:00", "às 14h", "10/06")
+    const userPickedSlot = /\b(\d{1,2}[:h]\d{0,2}|\d{1,2}\s*horas?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/i.test(String(userMessage || ""));
+    const shouldOfferSlots = isScheduling && !userPickedSlot;
+
     let rawReply: string;
     try {
       rawReply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
+        : shouldOfferSlots
+          ? buildSlotsReply()
         : (!isScheduling && userAskedOfficeInfo(userMessage))
           ? buildOfficeInfoReply()
         : isThanksMessage(userMessage)
