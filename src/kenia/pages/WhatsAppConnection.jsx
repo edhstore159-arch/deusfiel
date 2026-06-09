@@ -12,8 +12,16 @@ import {
 const LS_BASE = "wa_conn_base_url";
 const LS_TOKEN = "wa_conn_token";
 
+// Endpoints reais do backend Kenia (backend/server.js)
+const EP_STATUS = "/api/whatsapp/baileys/status";
+const EP_QR = "/api/whatsapp/qr";
+const EP_RESTART = "/api/whatsapp/baileys/restart";
+const EP_LOGOUT = "/api/whatsapp/logout";
+
+const DEFAULT_BASE = import.meta.env.VITE_BACKEND_URL || "";
+
 export default function WhatsAppConnection() {
-  const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(LS_BASE) || "");
+  const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(LS_BASE) || DEFAULT_BASE);
   const [token, setToken] = useState(() => localStorage.getItem(LS_TOKEN) || "");
   const [status, setStatus] = useState(null); // { connected, ... }
   const [qr, setQr] = useState(null);
@@ -34,18 +42,24 @@ export default function WhatsAppConnection() {
       const url = `${baseUrl.replace(/\/$/, "")}${path}`;
       const res = await fetch(url, { method, headers: headers() });
       const ct = res.headers.get("content-type") || "";
-      const data = ct.includes("application/json") ? await res.json() : await res.text();
-      if (!res.ok) throw new Error(typeof data === "string" ? data : data?.error || `HTTP ${res.status}`);
-      return data;
+      const raw = ct.includes("application/json") ? await res.json() : await res.text();
+      if (!res.ok) {
+        if (typeof raw === "string" && /Cannot (POST|GET)/i.test(raw)) {
+          throw new Error(`Endpoint ${method} ${path} não existe no backend (${res.status}). Verifique se a URL base aponta para o servidor Kenia WhatsApp.`);
+        }
+        throw new Error(typeof raw === "string" ? raw.slice(0, 180) : raw?.error || `HTTP ${res.status}`);
+      }
+      return raw;
     },
     [baseUrl, headers]
   );
 
   const fetchStatus = useCallback(async () => {
     try {
-      const data = await callApi("/status", "GET");
-      setStatus(data);
-      return data;
+      const data = await callApi(EP_STATUS, "GET");
+      const connected = !!(data?.connected ?? data?.state?.connected ?? data?.ready);
+      setStatus({ ...(data || {}), connected });
+      return { ...(data || {}), connected };
     } catch (e) {
       setStatus({ connected: false, error: e.message });
       return null;
@@ -54,9 +68,10 @@ export default function WhatsAppConnection() {
 
   const fetchQr = useCallback(async () => {
     try {
-      const data = await callApi("/qr", "GET");
-      if (data?.ok && data?.qr) setQr(data.qr);
-      return data;
+      const data = await callApi(EP_QR, "GET");
+      const qrVal = data?.qr || data?.dataURL || null;
+      if (qrVal) setQr(qrVal);
+      return { qr: qrVal };
     } catch {
       return null;
     }
@@ -73,8 +88,8 @@ export default function WhatsAppConnection() {
   };
 
   const generateQr = async () => {
-    if (!baseUrl || !token) {
-      toast.error("Informe URL base e token primeiro");
+    if (!baseUrl) {
+      toast.error("Informe a URL base do backend primeiro");
       return;
     }
     if (!/^https?:\/\//i.test(baseUrl)) {
@@ -84,9 +99,8 @@ export default function WhatsAppConnection() {
     setRestarting(true);
     setQr(null);
     try {
-      await callApi("/restart", "POST");
+      await callApi(EP_RESTART, "POST");
       toast.success("Reinício solicitado — aguardando QR...");
-      // tenta buscar o QR por até ~25s (5 tentativas a cada 5s)
       let got = null;
       for (let i = 0; i < 5 && !got?.qr; i++) {
         await new Promise((r) => setTimeout(r, 5000));
@@ -104,7 +118,7 @@ export default function WhatsAppConnection() {
     if (!window.confirm("Deseja realmente desconectar o WhatsApp?")) return;
     setLoggingOut(true);
     try {
-      await callApi("/logout", "POST");
+      await callApi(EP_LOGOUT, "POST");
       toast.success("WhatsApp desconectado");
       setStatus({ connected: false });
       setQr(null);
@@ -115,9 +129,10 @@ export default function WhatsAppConnection() {
     }
   };
 
+
   // Polling QR a cada 20s enquanto desconectado
   useEffect(() => {
-    if (!baseUrl || !token) return;
+    if (!baseUrl) return;
     if (status?.connected) return;
     const t = setInterval(fetchQr, 20000);
     return () => clearInterval(t);
@@ -125,7 +140,7 @@ export default function WhatsAppConnection() {
 
   // Monitor de status a cada 30s
   useEffect(() => {
-    if (!baseUrl || !token) return;
+    if (!baseUrl) return;
     fetchStatus();
     const t = setInterval(async () => {
       const s = await fetchStatus();
@@ -217,7 +232,7 @@ export default function WhatsAppConnection() {
           </div>
         ) : (
           <div className="space-y-3">
-            <Button onClick={generateQr} disabled={restarting || !baseUrl || !token}>
+            <Button onClick={generateQr} disabled={restarting || !baseUrl}>
               {restarting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Gerando...</> : <><QrCode className="w-4 h-4 mr-2" />Gerar Novo QR Code</>}
             </Button>
             {qr && (
