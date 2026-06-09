@@ -3,10 +3,8 @@ import { useEffect, useState } from "react";
 /**
  * DebugErrorThrower
  *
- * Escuta "lovable-debug-error" e lança um erro fatal intencional durante o
- * render, para acionar o overlay global da Lovable e o botão "Try to Fix".
- *
- * NÃO envolver em ErrorBoundary. NÃO substituir o throw por log/toast.
+ * Escuta "lovable-debug-error" apenas quando o modo fatal estiver habilitado
+ * explicitamente por query string: lovableDebugThrow=1.
  */
 export const DebugErrorThrower = () => {
   const [message, setMessage] = useState<string | null>(null);
@@ -14,7 +12,9 @@ export const DebugErrorThrower = () => {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
-      if (typeof detail === "string" && detail.length > 0) {
+      const fatalEnabled = new URLSearchParams(window.location.search).get("lovableDebugThrow") === "1";
+
+      if (fatalEnabled && typeof detail === "string" && detail.length > 0) {
         setMessage(detail);
       }
     };
