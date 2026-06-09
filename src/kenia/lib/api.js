@@ -381,7 +381,7 @@ const sanitizeOllamaReply = (reply, userMessage = "") => {
 
 const removeAssistantMetaPreamble = (reply) =>
   cleanInternalChatMarkers(reply)
-    .replace(/^\s*(?:claro[,!.]?\s*)?(?:aqui\s+est[áa]|segue|vou\s+te\s+enviar)\s+(?:uma\s+)?(?:resposta|mensagem|orienta[cç][aã]o)[^:\n]{0,140}:\s*/iu, "")
+    .replace(/^\s*(?:claro[,!.]?\s*)?(?:aqui\s+est[áa]|segue|vou\s+te\s+enviar)\s+(?:(?:uma|sua)\s+)?(?:resposta|mensagem|orienta[cç][aã]o)[^:\n]{0,140}:\s*/iu, "")
     .replace(/^\s*(?:resposta\s+final|mensagem\s+ao\s+cliente)\s*:\s*/iu, "")
     .replace(/^["“”'`]+|["“”'`]+$/g, "")
     .trim();
