@@ -486,7 +486,7 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
   }
 }
 
-async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string, fallbackHistory: Array<{ role: string; content: string }> = []): Promise<string> {
   try {
     return await callOllama(messages, fmtDate, fmtTime);
   } catch (err) {
@@ -507,7 +507,7 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
   } catch (err) {
     console.warn("Gateway IA indisponível:", err);
   }
-  return buildNonRepeatingFallback(messages.at(-1)?.content || "", fmtDate, fmtTime);
+  return buildNonRepeatingFallback(messages.at(-1)?.content || "", fmtDate, fmtTime, fallbackHistory);
 }
 
 async function synthesizeSpeech(text: string): Promise<string | null> {
@@ -602,6 +602,13 @@ function recentAssistantReplies(history: Array<{ role: string; content: string }
     .slice(-4);
 }
 
+function pickFreshReply(options: string[], history: Array<{ role: string; content: string }> = []): string {
+  const previousReplies = recentAssistantReplies(history);
+  return options.find((option) => !isNearDuplicateReply(option, history) && !previousReplies.some((previous) => similarityScore(option, previous) >= 0.68))
+    || options.find((option) => !previousReplies.includes(option))
+    || options[0];
+}
+
 function isNearDuplicateReply(reply: string, history: Array<{ role: string; content: string }>): boolean {
   const normalizedReply = normalizeForSimilarity(reply);
   if (!normalizedReply) return false;
@@ -613,18 +620,30 @@ function isNearDuplicateReply(reply: string, history: Array<{ role: string; cont
   });
 }
 
-function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string): string {
+function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string, history: Array<{ role: string; content: string }> = []): string {
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
   if (userAskedOfficeInfo(text)) return buildOfficeInfoReply();
   if (isHandoffRequest(text)) return buildHandoffReply();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
-    return "Claro. Para eu deixar a consulta registrada corretamente, me informe nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
+    return pickFreshReply([
+      "Claro. Para registrar a consulta corretamente, me envie nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.",
+      "Consigo organizar isso. Me passe os dados do atendimento e o melhor dia/horário para a consulta.",
+      "Vamos agendar. Me informe seus dados de contato e o horário que prefere, que eu deixo tudo encaminhado.",
+    ], history);
   }
   if (/\b(div[oó]rcio|guarda|pens[aã]o|fam[ií]lia|invent[aá]rio|trabalhista|demiss[aã]o|rescis[aã]o|inss|aposentadoria|consumidor|cobran[cç]a|audi[eê]ncia|intima[cç][aã]o)\b/i.test(text)) {
-    return "Entendi. Para eu direcionar melhor seu atendimento, me conte quando isso aconteceu, sua cidade/estado e se existe algum prazo ou audiência marcado.";
+    return pickFreshReply([
+      "Para avançarmos com segurança, me diga quando isso aconteceu, sua cidade/estado e se há algum prazo ou audiência marcado.",
+      "Me conte só os pontos principais: data do ocorrido, cidade/estado e se existe algum documento, prazo ou audiência em andamento.",
+      "Consigo te orientar melhor com três informações: quando aconteceu, onde você está e se já recebeu alguma intimação ou prazo.",
+    ], history);
   }
-  return "Entendi. Para seguir sem repetir informações, me conte em poucas palavras o que aconteceu e qual ajuda você precisa agora.";
+  return pickFreshReply([
+    "Pode me contar, em poucas palavras, qual é o ponto principal que você precisa resolver agora?",
+    "Me diga qual ajuda você precisa neste momento, que sigo a partir daí sem retomar o que já foi tratado.",
+    "Certo. Qual é o próximo ponto que você quer resolver no atendimento?",
+  ], history);
 }
 
 function userAskedOfficeInfo(text: string): boolean {
@@ -999,10 +1018,10 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ? buildHandoffReply()
         : isResumeRequest(userMessage)
           ? buildResumeReply(history)
-        : await callAssistantLLM(messages, fmtDate, fmtTime);
+        : await callAssistantLLM(messages, fmtDate, fmtTime, history);
     } catch (err) {
       console.error("Erro ao chamar Ollama qwen2.5:3b-instruct:", err);
-      rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+      rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime, history);
     }
     if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) {
       try {
@@ -1011,20 +1030,20 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
           { role: "user", content: userMessage },
         ];
-        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime);
+        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime, history);
         if (retryReply && !isHistoryDumpReply(retryReply) && !isNearDuplicateReply(retryReply, history)) {
           rawReply = retryReply;
         } else {
-          rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+          rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime, history);
         }
       } catch {
-        rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+        rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime, history);
       }
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply) || inferAppointmentFromConversation(userMessage, history, now);
     const cleanedReply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
-    let reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    let reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime, history);
     if (appointment?.raw_payload?.inferred_from_conversation && !/\b(agendad|confirmad|registrad)\w*\b/i.test(reply)) {
       const [yy, mm, dd] = appointment.appointment_date.split("-");
       reply = `Perfeito, deixei sua consulta registrada para ${dd}/${mm}/${yy} às ${appointment.appointment_time}. Ela aparecerá na agenda da Dra. Kênia no painel.`;
