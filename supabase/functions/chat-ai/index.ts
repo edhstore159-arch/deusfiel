@@ -880,6 +880,8 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     // Detecta se o cliente já escolheu data/horário (ex.: "10:00", "às 14h", "10/06")
     const userPickedSlot = /\b(\d{1,2}[:h]\d{0,2}|\d{1,2}\s*horas?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/i.test(String(userMessage || ""));
     const shouldOfferSlots = isScheduling && !userPickedSlot;
+    // Pular shortcut de info do escritório se o cliente está agendando OU já forneceu dados de marcação
+    const skipOfficeShortcut = isScheduling || userPickedSlot || /\b(meu\s+nome|telefone|email|e-mail|whats|cidade|estado|@)\b/i.test(String(userMessage || ""));
 
     let rawReply: string;
     try {
