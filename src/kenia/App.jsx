@@ -15,6 +15,7 @@ import Creatives from "@/kenia/pages/Creatives";
 import ImageFusion from "@/kenia/pages/ImageFusion";
 import Analytics from "@/kenia/pages/Analytics";
 import WhatsAppSettings from "@/kenia/pages/WhatsAppSettings";
+import WhatsAppConnection from "@/kenia/pages/WhatsAppConnection";
 import WhatsAppLogs from "@/kenia/pages/WhatsAppLogs";
 import Agenda from "@/kenia/pages/Agenda";
 import Onboarding from "@/kenia/pages/Onboarding";
@@ -68,6 +69,7 @@ function App() {
               <Route path="/app/image-fusion" element={<ImageFusion />} />
               <Route path="/app/analytics" element={<Analytics />} />
               <Route path="/app/whatsapp" element={<WhatsAppSettings />} />
+              <Route path="/app/whatsapp-connection" element={<WhatsAppConnection />} />
               <Route path="/app/whatsapp-logs" element={<WhatsAppLogs />} />
               <Route path="/app/settings" element={<Settings />} />
               <Route path="/app/debug" element={<DebugTool />} />
