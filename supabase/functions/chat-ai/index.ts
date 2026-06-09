@@ -694,6 +694,47 @@ function parseAppointmentBlock(text: string) {
   }
 }
 
+function inferAppointmentFromConversation(userMessage: string, history: Array<{ role: string; content: string }>, now: Date) {
+  const userTurns = [...history.filter((m) => m.role === "user"), { role: "user", content: userMessage }]
+    .slice(-6)
+    .map((m) => String(m.content || ""))
+    .join("\n");
+  const text = userTurns.replace(/\s+/g, " ").trim();
+  const timeMatch = text.match(/\b(?:às?|as|hor[áa]rio)\s*(\d{1,2})(?:[:h](\d{0,2}))?\s*(?:horas?)?\b/i)
+    || text.match(/\b(\d{1,2})[:h](\d{0,2})\b/i)
+    || text.match(/\b(\d{1,2})\s*horas?\b/i);
+  const dateMatch = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if (!timeMatch || !dateMatch) return null;
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2] || "0");
+  if (!Number.isFinite(hour) || hour < 0 || hour > 23 || !Number.isFinite(minute) || minute > 59) return null;
+  const day = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  let year = dateMatch[3] ? Number(dateMatch[3]) : Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(now));
+  if (year < 100) year += 2000;
+  const validDate = new Date(Date.UTC(year, month - 1, day));
+  if (validDate.getUTCFullYear() !== year || validDate.getUTCMonth() !== month - 1 || validDate.getUTCDate() !== day) return null;
+  const date = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || null;
+  const phone = text.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}/)?.[0]?.trim() || null;
+  const name = text.match(/(?:meu nome (?:é|e)|sou|me chamo)\s+([^,.;\n]+)/i)?.[1]?.trim() || "Cliente do chat";
+  if (!phone && !email && name === "Cliente do chat") return null;
+  const city = text.match(/\b([A-ZÁÀÂÃÉÊÍÓÔÕÚÇ][\p{L}\s'.-]{2,}\/\s*[A-Z]{2})\b/u)?.[1]?.trim() || null;
+  const legalArea = text.match(/\b(div[oó]rcio|fam[ií]lia|guarda|pens[aã]o|invent[aá]rio|previdenci[aá]rio|aposentadoria|inss|banc[aá]rio|trabalhista|consumidor|civil)\b/i)?.[1] || "Atendimento jurídico";
+  return {
+    client_name: name,
+    phone,
+    email,
+    city,
+    legal_area: legalArea,
+    case_summary: text.slice(0, 500),
+    appointment_date: date,
+    appointment_time: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+    raw_payload: { inferred_from_conversation: true, source_text: text.slice(0, 1000) },
+  };
+}
+
 function compactHistory(history: Array<{ role: string; content: string }>, maxItems = 8) {
   return (Array.isArray(history) ? history : [])
     .slice(-maxItems)
@@ -920,9 +961,13 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       }
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
-    const appointment = parseAppointmentBlock(rawReply);
+    const appointment = parseAppointmentBlock(rawReply) || inferAppointmentFromConversation(userMessage, history, now);
     const cleanedReply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
-    const reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    let reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    if (appointment?.raw_payload?.inferred_from_conversation && !/\b(agendad|confirmad|registrad)\w*\b/i.test(reply)) {
+      const [yy, mm, dd] = appointment.appointment_date.split("-");
+      reply = `Perfeito, deixei sua consulta registrada para ${dd}/${mm}/${yy} às ${appointment.appointment_time}. Ela aparecerá na agenda da Dra. Kênia no painel.`;
+    }
 
     // Análise técnica do caso (opcional; não bloqueia atendimento rápido quando não solicitada)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };

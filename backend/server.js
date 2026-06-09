@@ -30,6 +30,29 @@ const supabaseDb = SUPABASE_URL && SUPABASE_DB_KEY
   ? createClient(SUPABASE_URL, SUPABASE_DB_KEY, { auth: { persistSession: false } })
   : null;
 
+async function callChatAiFunction({ message, history = [], sessionId = null, userId = null, wantAudio = false, returnAnalysis = false }) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error("chat-ai indisponível: credenciais do backend ausentes");
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat-ai`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({
+      message,
+      history,
+      session_id: sessionId,
+      user_id: userId,
+      want_audio: wantAudio,
+      return_analysis: returnAnalysis,
+    }),
+  });
+  const data = await resp.json().catch(async () => ({ error: await resp.text().catch(() => "Erro desconhecido") }));
+  if (!resp.ok) throw new Error(`chat-ai ${resp.status}: ${data?.error || JSON.stringify(data)}`);
+  return data;
+}
+
 async function transcribeAudioBuffer(buffer, mimetype = "audio/ogg") {
   if (!SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY ausente no backend");
   const b64 = Buffer.from(buffer).toString("base64");
@@ -418,17 +441,16 @@ Use como referência de abordagem ferramentas jurídicas brasileiras como JusAI,
 
 # AGENDAMENTOS
 
-Quando o cliente quiser marcar consulta, audiência, reunião, prazo ou retorno, pergunte de forma natural, exatamente nesta ordem antes de confirmar:
-1. Dia da semana desejado (ex: segunda, terça...)
-2. Data desejada (dd/mm/aaaa)
-3. Horário desejado (HH:MM)
-4. Nome completo
-5. Telefone
-6. E-mail
-7. Cidade/estado
-8. Área jurídica
-9. Breve resumo do caso
-10. Modalidade (online/presencial)
+Quando o cliente mencionar consulta, agendamento, marcar horário, falar com a Dra. Kênia, ou perguntar "quando posso ir/falar/marcar", IMEDIATAMENTE ofereça dias e horários reais disponíveis da agenda. Nunca responda só informações do escritório quando a intenção for agendar.
+
+Depois que o cliente escolher dia/horário, colete naturalmente, uma pergunta por vez:
+1. Nome completo
+2. Telefone
+3. E-mail
+4. Cidade/estado
+5. Área jurídica
+6. Breve resumo do caso
+7. Modalidade (online/presencial)
 
 Ao ter todos os dados, confirme em linguagem natural repetindo o dia da semana, a data e a hora escolhidos (ex.: "Confirmado: quarta-feira, 10/06/2026 às 14:00") e inclua na mesma mensagem, ao final, o bloco JSON exato entre as marcações abaixo, sem markdown e sem crases. O agendamento será automaticamente registrado no painel/dashboard.
 
@@ -910,6 +932,9 @@ function isHistoryDumpReply(text) {
 
 function removeTemporalLeaks(reply, userText) {
   if (userAskedTemporalInfo(userText)) return reply;
+  const isScheduling = /\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|hor[aá]rios|atendimento|disponibilidade|dispon[ií]vel|agenda)\b/i.test(String(userText || ""));
+  const replyHasSlots = /\b\d{2}:\d{2}\b/.test(String(reply || "")) && /(segunda|ter[cç]a|quarta|quinta|sexta)-feira/i.test(String(reply || ""));
+  if (isScheduling || replyHasSlots) return reply;
   return String(reply || "")
     .split(/(?<=[.!?])\s+|\n+/)
     .map((part) => part.trim())
@@ -1126,6 +1151,26 @@ async function autoReply(jid, userText, contactName) {
     return;
   }
   const history = await loadPersistedAiHistory(jid);
+  try {
+    const data = await callChatAiFunction({ message: userText, history, sessionId: `whatsapp:${jid}` });
+    const reply = cleanRepeatedText(removeTemporalLeaks(String(data?.response || ""), userText));
+    if (reply) {
+      history.push({ role: "user", content: userText });
+      history.push({ role: "assistant", content: reply });
+      aiHistory.set(jid, trimAiHistory(history));
+      try {
+        const sent = await sendBotText(jid, reply, { source: "chat_ai" });
+        recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: "chat_ai", appointment: Boolean(data?.appointment), reply: reply.slice(0, 200) });
+        if (shouldScheduleWaitFollowUp(reply)) scheduleWaitFollowUp(jid, contactName);
+      } catch (e) {
+        queueAutoReply(jid, reply, { source: "chat_ai", reason: e?.message || String(e) });
+        recordAutoReply({ step: "send_queued_after_fail", jid, error: e?.message || String(e) });
+      }
+      return;
+    }
+  } catch (e) {
+    recordAutoReply({ step: "chat_ai_bridge_fail", jid, error: e?.message || String(e) });
+  }
   const lastReplies = recentAssistantReplies(history);
   const antiRepetitionContext = lastReplies.length
     ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
