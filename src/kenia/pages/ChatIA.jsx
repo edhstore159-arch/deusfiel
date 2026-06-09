@@ -202,6 +202,41 @@ const QUAL_META = {
 
 const STORAGE_KEY = "kenia.chatia.session.v1";
 
+const normalizeMessageForDedupe = (value) =>
+  cleanRepeatedText(value)
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const dedupeChatMessages = (list = []) => {
+  const output = [];
+  const assistantSinceLastUser = new Set();
+  for (const item of Array.isArray(list) ? list : []) {
+    const role = item?.role === "user" ? "user" : "assistant";
+    const content = role === "assistant" ? cleanRepeatedText(item?.content) : String(item?.content || "").trim();
+    const normalized = normalizeMessageForDedupe(content);
+    const typing = Boolean(item?.typing);
+    if (!normalized && !typing) continue;
+
+    if (role === "user") assistantSinceLastUser.clear();
+    const last = output[output.length - 1];
+    const lastNormalized = last ? normalizeMessageForDedupe(last.content) : "";
+    if (typing) {
+      output.push({ ...item, role, content, typing, _typingId: item?._typingId });
+      continue;
+    }
+    if (last?.role === role && lastNormalized && lastNormalized === normalized) continue;
+    if (role === "assistant" && normalized && assistantSinceLastUser.has(normalized)) continue;
+
+    if (role === "assistant" && normalized) assistantSinceLastUser.add(normalized);
+    output.push({ ...item, role, content, typing, _typingId: item?._typingId });
+  }
+  return output;
+};
+
 const loadPersistedSession = () => {
   if (typeof window === "undefined") return null;
   try {
@@ -210,8 +245,8 @@ const loadPersistedSession = () => {
     const data = JSON.parse(raw);
     if (!data || typeof data !== "object") return null;
     if (!Array.isArray(data.messages) || data.messages.length === 0) return null;
-    // Limpa flags transitórios
-    data.messages = data.messages.map((m) => ({ ...m, typing: false }));
+    // Limpa flags transitórias e remove duplicações salvas de versões anteriores.
+    data.messages = dedupeChatMessages(data.messages.map((m) => ({ ...m, typing: false, _typingId: undefined })));
     return data;
   } catch {
     return null;
@@ -258,13 +293,19 @@ export default function ChatIA() {
   const waitFollowUpTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const messagesRef = useRef(messages);
+  const assistantTypingTextRef = useRef(new Set());
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Persiste a conversa para sobreviver a desconexões/refresh
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const payload = {
-        messages,
+        messages: dedupeChatMessages(messages).map(({ _typingId, ...message }) => message),
         sessionId,
         name,
         phone,
@@ -322,32 +363,35 @@ export default function ChatIA() {
   // com pequenas pausas naturais em pontuação. Resolve quando termina.
   const typeAssistantMessage = (fullText, audioB64 = null, speaker = null) =>
     new Promise((resolve) => {
-      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       const text = cleanRepeatedText(fullText);
       if (!text) { resolve(); return; }
+      const normalizedText = normalizeMessageForDedupe(text);
+      const existingReply = [...messagesRef.current]
+        .reverse()
+        .find((m) => m.role === "assistant" && !m.typing && normalizeMessageForDedupe(m.content) === normalizedText);
+      if (existingReply) { resolve(); return; }
+      if (assistantTypingTextRef.current.has(normalizedText)) { resolve(); return; }
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+        assistantTypingTextRef.current.clear();
+      }
+      assistantTypingTextRef.current.add(normalizedText);
       const isKenia = speaker && /k[eê]nia/i.test(speaker);
       const baseDelay = isKenia ? 38 : 22;
       let idx = 0;
       const typingId = `typing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      let skip = false;
       setMessages((prev) => {
-        // Evita duplicar: se a última mensagem do assistente (já concluída) tem o mesmo texto, não insere
-        const lastDone = [...prev].reverse().find((m) => m.role === "assistant" && !m.typing);
-        if (lastDone && String(lastDone.content || "").trim() === text.trim()) {
-          skip = true;
-          return prev;
-        }
         // Reaproveita um placeholder de digitação pendente, se existir
         const lastIdx = prev.length - 1;
         if (lastIdx >= 0 && prev[lastIdx].role === "assistant" && prev[lastIdx].typing) {
           const copy = [...prev];
           copy[lastIdx] = { ...copy[lastIdx], _typingId: typingId, content: "", speaker };
-          return copy;
+          return dedupeChatMessages(copy);
         }
-        return [...prev, { role: "assistant", content: "", audio_base64: null, typing: true, speaker, _typingId: typingId }];
+        return dedupeChatMessages([...prev, { role: "assistant", content: "", audio_base64: null, typing: true, speaker, _typingId: typingId }]);
       });
-      if (skip) { resolve(); return; }
 
       const updateTyping = (updater) => {
         setMessages((prev) => {
@@ -355,7 +399,7 @@ export default function ChatIA() {
           if (i < 0) return prev;
           const copy = [...prev];
           copy[i] = updater(copy[i]);
-          return copy;
+          return dedupeChatMessages(copy);
         });
       };
 
@@ -366,6 +410,7 @@ export default function ChatIA() {
 
         if (idx >= text.length) {
           updateTyping((m) => ({ ...m, content: text, audio_base64: audioB64, typing: false, speaker, _typingId: undefined }));
+          assistantTypingTextRef.current.delete(normalizedText);
           typingTimerRef.current = null;
           resolve();
           return;
@@ -744,8 +789,8 @@ export default function ChatIA() {
     }
     setMessages((prev) => {
       const last = prev[prev.length - 1];
-      if (last && last.role === "user" && last.content === msg) return prev;
-      return [...prev, { role: "user", content: msg }];
+      if (last && last.role === "user" && normalizeMessageForDedupe(last.content) === normalizeMessageForDedupe(msg)) return dedupeChatMessages(prev);
+      return dedupeChatMessages([...prev, { role: "user", content: msg }]);
     });
     setInput("");
     setThinking(true);
@@ -778,7 +823,7 @@ export default function ChatIA() {
         "/chat/message",
         {
           message: msg,
-          history: messages.map((m) => ({ role: m.role, content: m.content })),
+          history: dedupeChatMessages(messagesRef.current).map((m) => ({ role: m.role, content: m.content })),
           session_id: sessionId,
           visitor_name: name || null,
           visitor_phone: phone || null,
@@ -859,6 +904,7 @@ export default function ChatIA() {
   };
 
   const QM = analysis ? QUAL_META[analysis.qualificacao] || QUAL_META.necessita_mais_info : null;
+  const visibleMessages = dedupeChatMessages(messages);
 
   return (
     <div className="min-h-full flex flex-col bg-background" data-testid="chat-ia-page">
@@ -977,7 +1023,7 @@ export default function ChatIA() {
             {/* messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5 bg-gradient-to-b from-nude-50/40 to-background">
               <div className="space-y-4 max-w-3xl mx-auto">
-                {messages.map((m, i) => (
+                {visibleMessages.map((m, i) => (
                   <div
                     key={i}
                     className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
