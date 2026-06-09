@@ -539,6 +539,7 @@ function isNearDuplicateReply(reply: string, history: Array<{ role: string; cont
 function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string): string {
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
+  if (userAskedOfficeInfo(text)) return buildOfficeInfoReply();
   if (isHandoffRequest(text)) return buildHandoffReply();
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para eu deixar a consulta registrada corretamente, me informe nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
@@ -547,6 +548,14 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
     return "Entendi. Para eu direcionar melhor seu atendimento, me conte quando isso aconteceu, sua cidade/estado e se existe algum prazo ou audiência marcado.";
   }
   return "Entendi. Para seguir sem repetir informações, me conte em poucas palavras o que aconteceu e qual ajuda você precisa agora.";
+}
+
+function userAskedOfficeInfo(text: string): boolean {
+  return /\b(áreas?|areas?|atua(?:ção|cao)?|atende|especialidades?|advogada|dra\.?\s*k[êe]nia|kenia\s+garcia|escrit[óo]rio|contato|whatsapp|email|telefone|previdenci[áa]rio|banc[áa]rio|fam[ií]lia|sucess[õo]es|invent[áa]rio)\b/i.test(String(text || ""));
+}
+
+function buildOfficeInfoReply(): string {
+  return "A Dra. Kênia Garcia atua há mais de 15 anos, com atendimento humanizado online em todo o Brasil. As principais áreas são Família e Sucessões, Previdenciário e Bancário: divórcio, guarda, pensão, inventário, aposentadorias, benefícios do INSS, fraudes bancárias, revisão de contratos e negativação indevida. Contatos oficiais: WhatsApp (64) 99988-1043 e keniagarcia.advocacia@gmail.com.";
 }
 
 function userAskedTemporalInfo(text: string): boolean {
