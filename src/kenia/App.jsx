@@ -15,6 +15,7 @@ import Creatives from "@/kenia/pages/Creatives";
 import ImageFusion from "@/kenia/pages/ImageFusion";
 import Analytics from "@/kenia/pages/Analytics";
 import WhatsAppSettings from "@/kenia/pages/WhatsAppSettings";
+import WhatsAppConnection from "@/kenia/pages/WhatsAppConnection";
 import WhatsAppLogs from "@/kenia/pages/WhatsAppLogs";
 import Agenda from "@/kenia/pages/Agenda";
 import Onboarding from "@/kenia/pages/Onboarding";
