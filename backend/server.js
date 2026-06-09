@@ -1139,6 +1139,8 @@ async function autoReply(jid, userText, contactName) {
   const firstNameCt = String(contactName || "cliente").split(" ")[0] || "cliente";
   let result = isThanksMessage(userText)
     ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(history, firstNameCt) }
+    : userAskedOfficeInfo(userText)
+    ? { ok: true, provider: "office-info-rule", reply: buildOfficeInfoReply() }
     : isHandoffRequest(userText)
     ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameCt) }
     : isResumeRequest(userText)
@@ -1899,6 +1901,8 @@ app.post("/api/chat/message", async (req, res) => {
   const firstNameWeb = String(req.body?.visitor_name || "Cliente").split(" ")[0] || "Cliente";
   let result = isThanksMessage(message)
     ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(normalizedHistory, firstNameWeb) }
+    : userAskedOfficeInfo(message)
+    ? { ok: true, provider: "office-info-rule", reply: buildOfficeInfoReply() }
     : isHandoffRequest(message)
     ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameWeb) }
     : isResumeRequest(message)
