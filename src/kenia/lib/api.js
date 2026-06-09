@@ -363,7 +363,7 @@ const cleanInternalChatMarkers = (text) =>
     .trim();
 
 const sanitizeOllamaReply = (reply, userMessage = "") => {
-  const text = cleanInternalChatMarkers(reply)
+  const text = sanitizeAssistantReply(reply, userMessage)
     .replace(/<think>[\s\S]*?<\/think>/giu, "")
     .replace(/<\/?[a-zA-Z][^>]*>/g, "")
     .replace(/&nbsp;/gi, " ")
@@ -378,6 +378,32 @@ const sanitizeOllamaReply = (reply, userMessage = "") => {
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
   return text;
 };
+
+const removeAssistantMetaPreamble = (reply) =>
+  cleanInternalChatMarkers(reply)
+    .replace(/^\s*(?:claro[,!.]?\s*)?(?:aqui\s+est[áa]|segue|vou\s+te\s+enviar)\s+(?:uma\s+)?(?:resposta|mensagem|orienta[cç][aã]o)[^:\n]{0,140}:\s*/iu, "")
+    .replace(/^\s*(?:resposta\s+final|mensagem\s+ao\s+cliente)\s*:\s*/iu, "")
+    .replace(/^["“”'`]+|["“”'`]+$/g, "")
+    .trim();
+
+const removeUnaskedTemporalLeaks = (reply, userMessage = "") => {
+  if (userAskedTemporalInfo(userMessage)) return reply;
+  const isScheduling = /\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|hor[aá]rios|atendimento|disponibilidade|dispon[ií]vel|agenda)\b/i.test(String(userMessage || ""));
+  const replyHasSlots = /\b\d{2}:\d{2}\b/.test(String(reply || "")) && /(segunda|ter[cç]a|quarta|quinta|sexta)-feira/i.test(String(reply || ""));
+  if (isScheduling || replyHasSlots) return reply;
+  return String(reply || "")
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !/\b(hoje\s+[ée]|agora\s+s[aã]o|s[aã]o\s+\d{1,2}:\d{2}|hora\s+atual|data\s+de\s+hoje|segunda-feira|terça-feira|ter[cç]a-feira|quarta-feira|quinta-feira|sexta-feira|s[áa]bado|domingo)\b/i.test(part))
+    .join(" ")
+    .trim();
+};
+
+const sanitizeAssistantReply = (reply, userMessage = "") =>
+  removeUnaskedTemporalLeaks(removeAssistantMetaPreamble(reply), userMessage)
+    .replace(/^["“”'`]+|["“”'`]+$/g, "")
+    .trim();
 
 const isInvalidOllamaReply = (text) =>
   /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i)\b/i.test(String(text || "").trim()) ||
