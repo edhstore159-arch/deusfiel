@@ -224,6 +224,10 @@ const dedupeChatMessages = (list = []) => {
     if (role === "user") assistantSinceLastUser.clear();
     const last = output[output.length - 1];
     const lastNormalized = last ? normalizeMessageForDedupe(last.content) : "";
+    if (typing) {
+      output.push({ ...item, role, content, typing, _typingId: item?._typingId });
+      continue;
+    }
     if (last?.role === role && lastNormalized && lastNormalized === normalized) continue;
     if (role === "assistant" && normalized && assistantSinceLastUser.has(normalized)) continue;
 
