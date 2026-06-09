@@ -656,6 +656,10 @@ function isHistoryDumpReply(text: string): boolean {
 
 function removeTemporalLeaks(reply: string, userMessage: string): string {
   if (userAskedTemporalInfo(userMessage)) return reply;
+  // Não remover dias da semana quando o cliente está agendando ou a resposta lista horários
+  const isScheduling = /\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento|disponibilidade|dispon[ií]vel|agenda)\b/i.test(String(userMessage || ""));
+  const replyHasSlots = /\b\d{2}:\d{2}\b/.test(String(reply || "")) && /(segunda|ter[cç]a|quarta|quinta|sexta)-feira/i.test(String(reply || ""));
+  if (isScheduling || replyHasSlots) return reply;
   return String(reply || "")
     .split(/(?<=[.!?])\s+|\n+/)
     .map((part) => part.trim())
