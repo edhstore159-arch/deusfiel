@@ -778,11 +778,13 @@ export default function ChatIA() {
   };
 
   const sendingRef = useRef(false);
+  const activeRequestIdRef = useRef(0);
   const send = async (text) => {
     const msg = (text ?? input).trim();
     if (!msg) return;
     if (sendingRef.current || thinking) return;
     sendingRef.current = true;
+    const requestId = ++activeRequestIdRef.current;
     if (waitFollowUpTimerRef.current) {
       clearTimeout(waitFollowUpTimerRef.current);
       waitFollowUpTimerRef.current = null;
@@ -833,6 +835,7 @@ export default function ChatIA() {
         },
         { timeout: 90000 }
       );
+      if (activeRequestIdRef.current !== requestId) return;
       setSessionId(data.session_id);
       if (data.appointment) {
         toast.success("Consulta salva automaticamente na Agenda");
@@ -872,10 +875,14 @@ export default function ChatIA() {
       console.error("Erro ao conversar com a IA:", err);
       toast.error("Erro ao conversar com a IA. Tente novamente.");
       setThinking(false);
-      await typeAssistantMessage("Desculpe, tive uma instabilidade aqui. Pode repetir sua mensagem? 🙏");
+      if (activeRequestIdRef.current === requestId) {
+        await typeAssistantMessage("Desculpe, tive uma instabilidade aqui. Pode repetir sua mensagem? 🙏");
+      }
     } finally {
-      setThinking(false);
-      sendingRef.current = false;
+      if (activeRequestIdRef.current === requestId) {
+        setThinking(false);
+        sendingRef.current = false;
+      }
     }
   };
 

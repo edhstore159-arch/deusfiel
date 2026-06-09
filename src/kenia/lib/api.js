@@ -4,9 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
 export const HAS_BACKEND = Boolean(BACKEND_URL);
 export const API = HAS_BACKEND ? `${BACKEND_URL}/api` : "";
+const DEFAULT_OLLAMA_URL = HAS_BACKEND
+  ? `${API}/generate`
+  : "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate";
 const DIRECT_OLLAMA_URL = (
   import.meta.env.VITE_OLLAMA_URL ||
-  "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate"
+  DEFAULT_OLLAMA_URL
 ).replace(/\/$/, "");
 const DIRECT_OLLAMA_MODEL = "qwen2.5:3b-instruct";
 const DIRECT_OLLAMA_FALLBACK_MODEL = "";
@@ -360,7 +363,7 @@ const cleanInternalChatMarkers = (text) =>
     .trim();
 
 const sanitizeOllamaReply = (reply, userMessage = "") => {
-  const text = cleanInternalChatMarkers(reply)
+  const text = sanitizeAssistantReply(reply, userMessage)
     .replace(/<think>[\s\S]*?<\/think>/giu, "")
     .replace(/<\/?[a-zA-Z][^>]*>/g, "")
     .replace(/&nbsp;/gi, " ")
@@ -375,6 +378,32 @@ const sanitizeOllamaReply = (reply, userMessage = "") => {
   if (looksLikeThinking && isInitialGreeting) return OFFICIAL_GREETING;
   return text;
 };
+
+const removeAssistantMetaPreamble = (reply) =>
+  cleanInternalChatMarkers(reply)
+    .replace(/^\s*(?:claro[,!.]?\s*)?(?:aqui\s+est[áa]|segue|vou\s+te\s+enviar)\s+(?:(?:uma|sua)\s+)?(?:resposta|mensagem|orienta[cç][aã]o)[^:\n]{0,140}:\s*/iu, "")
+    .replace(/^\s*(?:resposta\s+final|mensagem\s+ao\s+cliente)\s*:\s*/iu, "")
+    .replace(/^["“”'`]+|["“”'`]+$/g, "")
+    .trim();
+
+const removeUnaskedTemporalLeaks = (reply, userMessage = "") => {
+  if (userAskedTemporalInfo(userMessage)) return reply;
+  const isScheduling = /\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|hor[aá]rios|atendimento|disponibilidade|dispon[ií]vel|agenda)\b/i.test(String(userMessage || ""));
+  const replyHasSlots = /\b\d{2}:\d{2}\b/.test(String(reply || "")) && /(segunda|ter[cç]a|quarta|quinta|sexta)-feira/i.test(String(reply || ""));
+  if (isScheduling || replyHasSlots) return reply;
+  return String(reply || "")
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => !/\b(hoje\s+[ée]|agora\s+s[aã]o|s[aã]o\s+\d{1,2}:\d{2}|hora\s+atual|data\s+de\s+hoje|segunda-feira|terça-feira|ter[cç]a-feira|quarta-feira|quinta-feira|sexta-feira|s[áa]bado|domingo)\b/i.test(part))
+    .join(" ")
+    .trim();
+};
+
+const sanitizeAssistantReply = (reply, userMessage = "") =>
+  removeUnaskedTemporalLeaks(removeAssistantMetaPreamble(reply), userMessage)
+    .replace(/^["“”'`]+|["“”'`]+$/g, "")
+    .trim();
 
 const isInvalidOllamaReply = (text) =>
   /^(okay|ok,|the user|let me|i need|i should|we need|first,|so i)\b/i.test(String(text || "").trim()) ||
@@ -901,7 +930,7 @@ const staticPost = (url, body = {}) => {
             },
           });
           if (error) throw error;
-          const cloudReply = cleanInternalChatMarkers(data?.response || "");
+          const cloudReply = sanitizeAssistantReply(data?.response || "", userText);
           if (cloudReply) {
             const responseText = isHistoryDumpReply(cloudReply) || isNearDuplicateReply(cloudReply, body.history || [])
               ? buildNonRepeatingFallback(userText)
@@ -963,7 +992,7 @@ const staticPost = (url, body = {}) => {
           const timeout = setTimeout(() => controller.abort(), 45000);
           const res = await fetch(DIRECT_OLLAMA_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
             signal: controller.signal,
             body: JSON.stringify({ model: modelName, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(prompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 200, temperature: 0.1 } }),
           }).finally(() => clearTimeout(timeout));
@@ -992,7 +1021,7 @@ const staticPost = (url, body = {}) => {
             const timeout = setTimeout(() => controller.abort(), 45000);
             const res = await fetch(DIRECT_OLLAMA_URL, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
               signal: controller.signal,
               body: JSON.stringify({ model: DIRECT_OLLAMA_MODEL, system: OLLAMA_SYSTEM_PROMPT, prompt: buildOllamaPrompt(retryPrompt), stream: false, think: false, keep_alive: "10m", options: { num_ctx: 4096, num_predict: 200, temperature: 0.9 } }),
             }).finally(() => clearTimeout(timeout));

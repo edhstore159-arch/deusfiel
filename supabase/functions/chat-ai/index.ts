@@ -705,6 +705,14 @@ function removeTemporalLeaks(reply: string, userMessage: string): string {
     .trim();
 }
 
+function removeAssistantMetaPreamble(reply: string): string {
+  return String(reply || "")
+    .replace(/^\s*(?:claro[,!.]?\s*)?(?:aqui\s+est[áa]|segue|vou\s+te\s+enviar)\s+(?:(?:uma|sua)\s+)?(?:resposta|mensagem|orienta[cç][aã]o)[^:\n]{0,140}:\s*/iu, "")
+    .replace(/^\s*(?:resposta\s+final|mensagem\s+ao\s+cliente)\s*:\s*/iu, "")
+    .replace(/^["“”'`]+|["“”'`]+$/g, "")
+    .trim();
+}
+
 function parseAppointmentBlock(text: string) {
   const match = String(text || "").match(/<AGENDAMENTO>([\s\S]*?)<\/AGENDAMENTO>/);
   if (!match) return null;
@@ -1007,7 +1015,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply) || inferAppointmentFromConversation(userMessage, history, now);
-    const cleanedReply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    const cleanedReply = cleanRepeatedText(removeAssistantMetaPreamble(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage)));
     let reply = cleanedReply || buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     if (appointment?.raw_payload?.inferred_from_conversation && !/\b(agendad|confirmad|registrad)\w*\b/i.test(reply)) {
       const [yy, mm, dd] = appointment.appointment_date.split("-");
