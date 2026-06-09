@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 
 /**
@@ -8,13 +8,10 @@ import { toast } from "sonner";
  * lançava um erro fatal intencional, mas isso causava tela branca em produção.
  */
 export const DebugErrorThrower = () => {
-  const [message, setMessage] = useState<string | null>(null);
-
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
       if (typeof detail === "string" && detail.length > 0) {
-        setMessage(detail);
         console.info("Instrução de desenvolvimento registrada:", detail);
         toast.success("Instrução registrada para análise");
       }
