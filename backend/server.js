@@ -224,13 +224,14 @@ function startOllamaKeepAlive() {
 
 const PORT = Number(process.env.PORT) || 8080;
 const AUTH_DIR = process.env.AUTH_DIR || "./auth";
-const QR_TIMEOUT_MS = Number(process.env.QR_TIMEOUT_MS || 300000);
-const QR_RENEW_AFTER_MS = Number(process.env.QR_RENEW_AFTER_MS || 70000);
+const QR_TIMEOUT_MS = Number(process.env.QR_TIMEOUT_MS || 900000);
+const QR_RENEW_AFTER_MS = Number(process.env.QR_RENEW_AFTER_MS || 240000);
 const QR_ENSURE_COOLDOWN_MS = Number(process.env.QR_ENSURE_COOLDOWN_MS || 6000);
-const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS || 60000);
-const KEEP_ALIVE_INTERVAL_MS = Number(process.env.KEEP_ALIVE_INTERVAL_MS || 20000);
+const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS || 120000);
+const KEEP_ALIVE_INTERVAL_MS = Number(process.env.KEEP_ALIVE_INTERVAL_MS || 15000);
 const RECONNECT_DELAY_MS = Number(process.env.RECONNECT_DELAY_MS || 2000);
-const RECONNECT_MAX_DELAY_MS = Number(process.env.RECONNECT_MAX_DELAY_MS || 60000);
+const RECONNECT_MAX_DELAY_MS = Number(process.env.RECONNECT_MAX_DELAY_MS || 300000);
+const TRANSIENT_LOGGED_OUT_WINDOW_MS = Number(process.env.TRANSIENT_LOGGED_OUT_WINDOW_MS || 600000);
 const SERVER_STARTED_AT = Date.now();
 const AUTO_REPLY_RECENT_WINDOW_MS = Number(process.env.AUTO_REPLY_RECENT_WINDOW_MS || 180000);
 const logger = pino({ level: "warn" });
