@@ -889,7 +889,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime}.`
         : shouldOfferSlots
           ? buildSlotsReply()
-        : (!isScheduling && userAskedOfficeInfo(userMessage))
+        : (!skipOfficeShortcut && userAskedOfficeInfo(userMessage))
           ? buildOfficeInfoReply()
         : isThanksMessage(userMessage)
           ? buildThanksReply(history)
