@@ -1148,6 +1148,26 @@ async function autoReply(jid, userText, contactName) {
     return;
   }
   const history = await loadPersistedAiHistory(jid);
+  try {
+    const data = await callChatAiFunction({ message: userText, history, sessionId: `whatsapp:${jid}` });
+    const reply = cleanRepeatedText(removeTemporalLeaks(String(data?.response || ""), userText));
+    if (reply) {
+      history.push({ role: "user", content: userText });
+      history.push({ role: "assistant", content: reply });
+      aiHistory.set(jid, trimAiHistory(history));
+      try {
+        const sent = await sendBotText(jid, reply, { source: "chat_ai" });
+        recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: "chat_ai", appointment: Boolean(data?.appointment), reply: reply.slice(0, 200) });
+        if (shouldScheduleWaitFollowUp(reply)) scheduleWaitFollowUp(jid, contactName);
+      } catch (e) {
+        queueAutoReply(jid, reply, { source: "chat_ai", reason: e?.message || String(e) });
+        recordAutoReply({ step: "send_queued_after_fail", jid, error: e?.message || String(e) });
+      }
+      return;
+    }
+  } catch (e) {
+    recordAutoReply({ step: "chat_ai_bridge_fail", jid, error: e?.message || String(e) });
+  }
   const lastReplies = recentAssistantReplies(history);
   const antiRepetitionContext = lastReplies.length
     ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
