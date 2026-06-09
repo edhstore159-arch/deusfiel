@@ -832,6 +832,14 @@ function buildTemporalAnswer() {
   return `Hoje é ${date}, e agora são ${time}.`;
 }
 
+function userAskedOfficeInfo(text) {
+  return /\b(áreas?|areas?|atua(?:ção|cao)?|atende|especialidades?|advogada|dra\.?\s*k[êe]nia|kenia\s+garcia|escrit[óo]rio|contato|whatsapp|email|telefone|previdenci[áa]rio|banc[áa]rio|fam[ií]lia|sucess[õo]es|invent[áa]rio)\b/i.test(String(text || ""));
+}
+
+function buildOfficeInfoReply() {
+  return "A Dra. Kênia Garcia atua há mais de 15 anos, com atendimento humanizado online em todo o Brasil. As principais áreas são Família e Sucessões, Previdenciário e Bancário: divórcio, guarda, pensão, inventário, aposentadorias, benefícios do INSS, fraudes bancárias, revisão de contratos e negativação indevida. Contatos oficiais: WhatsApp (64) 99988-1043 e keniagarcia.advocacia@gmail.com.";
+}
+
 function userAskedTemporalInfo(text) {
   return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano))\b/i.test(String(text || ""));
 }
