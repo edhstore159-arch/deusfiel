@@ -790,6 +790,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
 
     // === Agenda real da Dra. Kênia (slots disponíveis a partir do dashboard) ===
     let availabilityBlock = "";
+    let availabilityDays: { weekday: string; iso: string; br: string; hours: string[] }[] = [];
     try {
       const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       const startISO = now.toISOString().slice(0, 10);
@@ -808,14 +809,18 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
         const dow = d.getDay();
         if (dow === 0 || dow === 6) continue;
         const iso = d.toISOString().slice(0, 10);
+        const [yy, mm, dd] = iso.split("-");
+        const br = `${dd}/${mm}/${yy}`;
         const free = WORK_HOURS.filter((h) => !taken.has(`${iso} ${h}`));
         if (i === 0) {
           const curH = parseInt(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now), 10);
           const futureFree = free.filter((h) => parseInt(h.slice(0, 2), 10) > curH);
           if (futureFree.length === 0) continue;
           days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${futureFree.join(", ")}`);
+          availabilityDays.push({ weekday: WEEKDAY_NAMES[dow], iso, br, hours: futureFree });
         } else if (free.length > 0) {
           days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${free.join(", ")}`);
+          availabilityDays.push({ weekday: WEEKDAY_NAMES[dow], iso, br, hours: free });
         }
       }
       availabilityBlock = days.length
@@ -824,6 +829,15 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     } catch (err) {
       console.error("Falha ao consultar agenda:", err);
     }
+
+    function buildSlotsReply(): string {
+      if (!availabilityDays.length) {
+        return "No momento não temos horários livres nos próximos dias. Posso anotar seu contato para a Dra. Kênia retornar?";
+      }
+      const top = availabilityDays.slice(0, 3).map((d) => `• ${d.weekday} (${d.br.slice(0, 5)}) — ${d.hours.slice(0, 4).join(", ")}`).join("\n");
+      return `Claro! A Dra. Kênia tem estes horários livres:\n${top}\n\nAlgum desses te atende?`;
+    }
+
 
     // Atalho determinístico para perguntas de data/hora
     const normalizedUser = String(userMessage || "")
