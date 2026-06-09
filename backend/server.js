@@ -660,12 +660,13 @@ Resposta final em português do Brasil:`;
 const AI_SYSTEM_PROMPT = SECRETARY_SYSTEM_PROMPT;
 
 const aiHistory = new Map(); // jid -> [{role, content}]
-const AI_HISTORY_LIMIT = Number(process.env.AI_HISTORY_LIMIT || 20);
+const AI_HISTORY_LIMIT = Number(process.env.AI_HISTORY_LIMIT || 8);
 
 function trimAiHistory(history, limit = AI_HISTORY_LIMIT) {
   return (Array.isArray(history) ? history : [])
     .filter((m) => (m.role === "user" || m.role === "assistant") && String(m.content || "").trim())
-    .slice(-limit);
+    .slice(-limit)
+    .map((m) => ({ role: m.role, content: String(m.content || "").slice(0, 900) }));
 }
 
 async function loadPersistedAiHistory(jid) {
