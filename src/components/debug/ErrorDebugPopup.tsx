@@ -92,7 +92,7 @@ export function ErrorDebugPopup() {
       const safeName = attachment.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const path = `${runId}/${safeName}`;
       const { error } = await supabase.storage
-        .from("debug-attachments")
+        .from("debug-large-attachments")
         .upload(path, attachment.file, {
           contentType: attachment.type || "application/octet-stream",
           upsert: false,
@@ -101,8 +101,14 @@ export function ErrorDebugPopup() {
         uploaded.push({ ...attachment, error: error.message });
         continue;
       }
-      const { data } = supabase.storage.from("debug-attachments").getPublicUrl(path);
-      uploaded.push({ ...attachment, uploadedUrl: data.publicUrl, uploadPath: path });
+      const { data, error: urlError } = await supabase.storage
+        .from("debug-large-attachments")
+        .createSignedUrl(path, 60 * 60 * 24 * 7);
+      if (urlError || !data?.signedUrl) {
+        uploaded.push({ ...attachment, uploadPath: path, error: urlError?.message ?? "Não foi possível gerar link assinado" });
+        continue;
+      }
+      uploaded.push({ ...attachment, uploadedUrl: data.signedUrl, uploadPath: path });
     }
     setAttachments(uploaded);
     return uploaded;
@@ -121,7 +127,7 @@ export function ErrorDebugPopup() {
         message += `\n[${f.name}] (${f.type || "unknown"}, ${f.size} bytes)\n`;
         if (f.uploadedUrl) {
           message += `Arquivo completo: ${f.uploadedUrl}\n`;
-          message += `Caminho no storage: debug-attachments/${f.uploadPath}\n`;
+          message += `Caminho no storage: debug-large-attachments/${f.uploadPath}\n`;
         }
         if (f.textPreview) {
           message += `Prévia:\n\`\`\`\n${f.textPreview}\n\`\`\`\n`;
