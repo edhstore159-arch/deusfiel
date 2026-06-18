@@ -137,7 +137,13 @@ export function ErrorDebugPopup() {
       message += `\n\n--- ARQUIVOS ANEXADOS (${currentAttachments.length}) ---\n`;
       for (const f of currentAttachments) {
         message += `\n[${f.name}] (${f.type || "unknown"}, ${f.size} bytes)\n`;
-        if (f.uploadedUrl) {
+        if (f.parts && f.parts.length > 1) {
+          message += `Arquivo dividido em ${f.parts.length} partes para upload completo. Baixe e concatene as partes em ordem.\n`;
+          for (const part of f.parts) {
+            message += `Parte ${part.index} (${part.size} bytes): ${part.url}\n`;
+            message += `Caminho: debug-large-attachments/${part.path}\n`;
+          }
+        } else if (f.uploadedUrl) {
           message += `Arquivo completo: ${f.uploadedUrl}\n`;
           message += `Caminho no storage: debug-large-attachments/${f.uploadPath}\n`;
         }
