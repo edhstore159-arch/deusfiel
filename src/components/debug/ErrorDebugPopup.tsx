@@ -187,17 +187,60 @@ export function ErrorDebugPopup() {
             style={{ resize: "both" }}
             className="min-h-[140px] w-full font-mono text-xs"
           />
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFiles}
+            className="hidden"
+          />
+          {attachments.length > 0 && (
+            <ul className="space-y-1 rounded border border-border bg-muted/30 p-2 text-xs">
+              {attachments.map((f, i) => (
+                <li key={i} className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 truncate">
+                    <FileText className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{f.name}</span>
+                    <span className="text-muted-foreground">({f.size}b)</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(i)}
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label="Remover"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="flex items-center justify-between gap-2">
-            <Button asChild size="sm" variant="outline">
-              <Link to="/image-gen">
-                <ImageIcon className="mr-2 h-4 w-4" />
-                Gerador de Imagens
-              </Link>
-            </Button>
-            <Button size="sm" onClick={trigger} disabled={!instruction.trim()}>
+            <div className="flex items-center gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link to="/image-gen">
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  Imagens
+                </Link>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip className="mr-2 h-4 w-4" />
+                Anexar
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              onClick={trigger}
+              disabled={!instruction.trim() && attachments.length === 0}
+            >
               Gerar Erro
             </Button>
           </div>
+
         </div>
       )}
     </div>
