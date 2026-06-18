@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
-import { Bug, Minus, Square, X, Image as ImageIcon } from "lucide-react";
+import { useEffect, useRef, useState, KeyboardEvent, MouseEvent as ReactMouseEvent, ChangeEvent } from "react";
+import { Bug, Minus, Square, X, Image as ImageIcon, Paperclip, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "react-router-dom";
