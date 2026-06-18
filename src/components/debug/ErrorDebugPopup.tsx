@@ -72,12 +72,48 @@ export function ErrorDebugPopup() {
 
   const trigger = () => {
     const text = instruction.trim();
-    if (!text) return;
-    const message = `${PREFIX}\n\n${text}`;
+    if (!text && attachments.length === 0) return;
+    let message = `${PREFIX}\n\n${text}`;
+    if (attachments.length > 0) {
+      message += `\n\n--- ARQUIVOS ANEXADOS (${attachments.length}) ---\n`;
+      for (const f of attachments) {
+        message += `\n[${f.name}] (${f.type || "unknown"}, ${f.size} bytes)\n`;
+        if (f.isText) {
+          message += `\`\`\`\n${f.content}\n\`\`\`\n`;
+        } else {
+          message += `(binário, data URL truncada): ${f.content.slice(0, 200)}...\n`;
+        }
+      }
+    }
     // Único canal permitido: CustomEvent local no navegador.
     window.dispatchEvent(
       new CustomEvent("lovable-debug-error", { detail: message }),
     );
+  };
+
+  const handleFiles = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    const next: typeof attachments = [];
+    for (const file of files) {
+      const isText =
+        file.type.startsWith("text/") ||
+        /\.(txt|md|json|csv|log|ts|tsx|js|jsx|html|css|yml|yaml|xml|svg)$/i.test(file.name) ||
+        file.type === "application/json";
+      const content = await (isText ? file.text() : fileToDataUrl(file));
+      next.push({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        content: isText ? content.slice(0, 50_000) : content,
+        isText,
+      });
+    }
+    setAttachments((prev) => [...prev, ...next]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeAttachment = (idx: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
