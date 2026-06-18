@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 const PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
+const MAX_UPLOAD_PART_SIZE = 18 * 1024 * 1024;
 
 /**
  * ErrorDebugPopup
@@ -22,6 +23,7 @@ type DebugAttachment = {
   textPreview?: string;
   uploadedUrl?: string;
   uploadPath?: string;
+  parts?: Array<{ index: number; path: string; url: string; size: number }>;
   error?: string;
 };
 
@@ -90,25 +92,35 @@ export function ErrorDebugPopup() {
         continue;
       }
       const safeName = attachment.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `${runId}/${safeName}`;
-      const { error } = await supabase.storage
-        .from("debug-large-attachments")
-        .upload(path, attachment.file, {
-          contentType: attachment.type || "application/octet-stream",
-          upsert: false,
-        });
-      if (error) {
-        uploaded.push({ ...attachment, error: error.message });
-        continue;
+      const totalParts = Math.ceil(attachment.file.size / MAX_UPLOAD_PART_SIZE);
+      const parts: DebugAttachment["parts"] = [];
+      for (let partIndex = 0; partIndex < totalParts; partIndex += 1) {
+        const start = partIndex * MAX_UPLOAD_PART_SIZE;
+        const end = Math.min(start + MAX_UPLOAD_PART_SIZE, attachment.file.size);
+        const blob = attachment.file.slice(start, end);
+        const path = totalParts === 1 ? `${runId}/${safeName}` : `${runId}/${safeName}.part-${String(partIndex + 1).padStart(3, "0")}-of-${String(totalParts).padStart(3, "0")}`;
+        const { error } = await supabase.storage
+          .from("debug-large-attachments")
+          .upload(path, blob, {
+            contentType: totalParts === 1 ? attachment.type || "application/octet-stream" : "application/octet-stream",
+            upsert: false,
+          });
+        if (error) {
+          uploaded.push({ ...attachment, parts, error: error.message });
+          break;
+        }
+        const { data, error: urlError } = await supabase.storage
+          .from("debug-large-attachments")
+          .createSignedUrl(path, 60 * 60 * 24 * 7);
+        if (urlError || !data?.signedUrl) {
+          uploaded.push({ ...attachment, parts, uploadPath: path, error: urlError?.message ?? "Não foi possível gerar link assinado" });
+          break;
+        }
+        parts.push({ index: partIndex + 1, path, url: data.signedUrl, size: blob.size });
       }
-      const { data, error: urlError } = await supabase.storage
-        .from("debug-large-attachments")
-        .createSignedUrl(path, 60 * 60 * 24 * 7);
-      if (urlError || !data?.signedUrl) {
-        uploaded.push({ ...attachment, uploadPath: path, error: urlError?.message ?? "Não foi possível gerar link assinado" });
-        continue;
+      if (parts.length === totalParts) {
+        uploaded.push({ ...attachment, uploadedUrl: parts[0]?.url, uploadPath: parts[0]?.path, parts });
       }
-      uploaded.push({ ...attachment, uploadedUrl: data.signedUrl, uploadPath: path });
     }
     setAttachments(uploaded);
     return uploaded;
