@@ -13,6 +13,15 @@ const PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA)
  * "lovable-debug-error". A instrução NÃO é enviada por chat, API, mutation
  * nem qualquer outro canal conversacional.
  */
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export function ErrorDebugPopup() {
   // Disponível em desenvolvimento (preview da Lovable e localhost).
   // Para liberar em produção também, basta remover essa checagem.
