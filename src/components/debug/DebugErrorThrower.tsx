@@ -13,11 +13,13 @@ import { useEffect, useState } from "react";
  */
 export function DebugErrorThrower() {
   const [message, setMessage] = useState<string | null>(null);
+  const [thrownMessage, setThrownMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (event: Event) => {
       const custom = event as CustomEvent<string>;
       if (typeof custom.detail === "string" && custom.detail.length > 0) {
+        setThrownMessage(null);
         setMessage(custom.detail);
       }
     };
@@ -28,7 +30,16 @@ export function DebugErrorThrower() {
     };
   }, []);
 
-  if (message) {
+  useEffect(() => {
+    if (!message) return;
+    const id = window.setTimeout(() => {
+      setMessage(null);
+      setThrownMessage(message);
+    }, 250);
+    return () => window.clearTimeout(id);
+  }, [message]);
+
+  if (message && thrownMessage !== message) {
     // Erro intencional: deve escapar para o overlay global da Lovable.
     throw new Error(message);
   }
