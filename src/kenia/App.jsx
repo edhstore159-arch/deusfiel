@@ -24,7 +24,6 @@ import DebugTool from "@/kenia/pages/DebugTool";
 import ChatIA from "@/kenia/pages/ChatIA";
 import AdminCases from "@/kenia/pages/AdminCases";
 import ResetPassword from "@/kenia/pages/ResetPassword";
-import Trust from "@/kenia/pages/Trust";
 import AppLayout from "@/kenia/components/AppLayout";
 import ScrollToTop from "@/kenia/components/ScrollToTop";
 
@@ -49,7 +48,6 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/consulta" element={<Consulta />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/trust" element={<Trust />} />
             <Route path="/admin/debug" element={<Protected><DebugTool /></Protected>} />
             <Route
               element={
