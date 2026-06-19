@@ -54,11 +54,17 @@ export default function AdminCases() {
   const openDetail = async (item) => {
     setSelected(item);
     setAdminNotes(item.admin_notes || "");
+    // mostra detalhe imediatamente com fallback local enquanto busca o backend
+    setDetail({ analysis: item, messages: [] });
     try {
       const { data } = await api.get(`/admin/case-analyses/${item.id}`);
-      setDetail(data);
-    } catch {
-      toast.error("Erro ao abrir detalhe");
+      setDetail({
+        analysis: data?.analysis || item,
+        messages: Array.isArray(data?.messages) ? data.messages : [],
+      });
+    } catch (err) {
+      console.error("openDetail failed", err);
+      toast.error("Não foi possível carregar a conversa — exibindo apenas a análise.");
     }
   };
 
