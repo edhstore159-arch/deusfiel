@@ -7,63 +7,48 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Layered descriptive template (no "orders" — pure description).
-const LAYERED_TEMPLATE = (tema: string) => `[MAIN SUBJECT]
-${tema}
-
-[APPEARANCE]
-well-groomed, elegant, confident expression, natural skin texture, realistic human anatomy
-
-[SCENE]
-contextual modern environment matching the theme, tidy and professional
-
-[LIGHTING]
-soft natural light, cinematic lighting, balanced highlights, studio-quality
-
-[FRAMING]
-medium shot, sharp focus on the subject, blurred background (bokeh, depth of field)
-
-[STYLE]
-photorealistic, ultra realistic, professional photography, 8k, real skin texture, premium advertising aesthetic, big-brand ad look, vibrant colors, high contrast
-
-[REINFORCEMENT]
-${tema}, ${tema}, photorealistic, ultra realistic, real skin texture, professional photography, cinematic lighting, depth of field
-
-[NEGATIVE]
-deformed face, wrong hands, low quality, artificial look, extra elements, text, letters, typography, watermark, logo, cartoon, 3d render, cgi, illustration`;
-
 const REALISM =
   "photorealistic, ultra-realistic, real skin texture, professional photography, cinematic lighting, " +
   "depth of field, vibrant colors, high contrast, sharp focus, 8k, premium advertising aesthetic";
 const NEG = "no text, no letters, no typography, no watermarks, no logos, no deformed faces, no wrong hands, no cartoon, no 3d render, no cgi, no illustration, no artificial look";
 
+// Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
+// NÃO injeta tema (advogada, escritório etc) — só adiciona realismo. O atalho "law"
+// só é usado se o usuário não descrever um sujeito próprio.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
-  const styleHint = style === "law"
-    ? "Context: realistic photographic social-media post for a Brazilian law firm. Subject: a professional female lawyer (30-40), elegant black blazer and white shirt, modern law office, law books in background."
-    : "Strictly describe the user's theme as if the final image already exists.";
-  const layered = LAYERED_TEMPLATE(userPrompt);
+  const userTheme = (userPrompt || "").trim();
+  const extraContext = style === "law"
+    ? "If — and only if — the user theme does not already specify a subject, you may set the scene in a modern Brazilian law-firm context. Never override or contradict the user's theme."
+    : "";
+
   try {
     const r = await chatCompletion({
-      temperature: 0.6,
+      temperature: 0.4,
       messages: [
         {
           role: "system",
           content:
             "You are an art director writing photorealistic image prompts. " +
-            "DESCRIBE the final image — never give orders to the model. " +
-            "Return ONE single-line English prompt using layered structure (subject, appearance, scene, lighting, framing, style) " +
-            "with repeated key concepts for emphasis, strong realism keywords (photorealistic, ultra realistic, real skin texture, " +
-            "professional photography, cinematic lighting, depth of field), and a negative section. No explanations.",
+            "Your job is to FAITHFULLY render what the user described — never replace, invert, or invent a new subject. " +
+            "Translate the user's theme to English if needed, keep every concrete element they mentioned (people, objects, place, mood, colors, action), " +
+            "and only add sensory detail (lighting, framing, lens, materials) that does NOT contradict it. " +
+            "Output ONE single-line English prompt describing the final image as if it already exists. " +
+            "Use realism keywords (photorealistic, ultra realistic, real skin texture, professional photography, cinematic lighting, depth of field) " +
+            "and finish with a short 'Negative:' section. No explanations, no markdown.",
         },
-        { role: "user", content: `${styleHint}\n\n${layered}` },
+        {
+          role: "user",
+          content: `USER THEME (render this faithfully, do not replace it):\n"""${userTheme}"""\n\n${extraContext}`.trim(),
+        },
       ],
     });
     if (r.ok) {
       const txt = r.data?.choices?.[0]?.message?.content?.trim();
-      if (txt && txt.length > 10) return `${txt}, ${REALISM}. Negative: ${NEG}`;
+      if (txt && txt.length > 10) return txt;
     }
-  } catch (_e) { /* fallback below */ }
-  return `${layered}\n\n${REALISM}. Negative: ${NEG}`;
+  } catch (_e) { /* fallback */ }
+
+  return `${userTheme}. ${REALISM}. Negative: ${NEG}`;
 }
 
 
