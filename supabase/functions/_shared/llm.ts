@@ -122,6 +122,7 @@ async function chatOllama(opts: ChatOptions) {
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
         ...(OLLAMA_API_KEY ? { Authorization: `Bearer ${OLLAMA_API_KEY}` } : {}),
       },
       body: JSON.stringify({
