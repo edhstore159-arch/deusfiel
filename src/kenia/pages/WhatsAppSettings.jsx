@@ -662,7 +662,11 @@ export default function WhatsAppSettings() {
                       ) : (
                         <div className="flex items-center gap-2 text-gold-700 font-medium">
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          {baileysStatus?.state === "connecting" ? "Aguardando leitura do QR..." : "Inicializando..."}
+                          {isBaileysWaitingForQr
+                            ? hasBaileysQr
+                              ? "QR disponível para leitura"
+                              : "Gerando QR Code..."
+                            : "Inicializando..."}
                         </div>
                       )}
                       <div className="text-xs text-nude-500 mt-1">
@@ -747,7 +751,25 @@ export default function WhatsAppSettings() {
                   </Card>
                 )}
 
-                {!baileysStatus?.connected && baileysQr?.qr && (
+                {baileysQrUnavailable && (
+                  <Card className="p-4 border-gold-200 bg-gold-50" data-testid="baileys-qr-unavailable">
+                    <div className="flex items-start gap-3 text-sm text-gold-900">
+                      <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <div className="font-medium">O backend está conectado, mas ainda não enviou a imagem do QR.</div>
+                        <div className="text-xs mt-1 text-gold-800">
+                          Clique em Reconectar serviço para renovar a sessão e gerar um novo QR Code.
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={baileysReconnect} disabled={baileysLoggingOut} data-testid="baileys-force-reconnect">
+                        {baileysLoggingOut ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
+                        Reconectar
+                      </Button>
+                    </div>
+                  </Card>
+                )}
+
+                {!baileysStatus?.connected && hasBaileysQr && (
                   <Card className="p-5 border-nude-200 flex flex-col md:flex-row gap-5 items-center md:items-start">
                     <div className="p-3 bg-white border border-nude-200 rounded-md shrink-0 relative">
                       <img src={baileysQr.qr} alt="QR Code" className="w-56 h-56" data-testid="baileys-qr-image" />
