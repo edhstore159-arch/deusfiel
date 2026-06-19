@@ -35,9 +35,13 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             "Your job is to FAITHFULLY render what the user described — never replace, invert, or invent a new subject. " +
             "Translate the user's theme to English if needed, keep every concrete element they mentioned (people, objects, place, mood, colors, action), " +
             "and only add sensory detail (lighting, framing, lens, materials) that does NOT contradict it. " +
+            "ALWAYS compose as a FULL-BODY wide shot when people are present: entire body visible from head to toe, correct human anatomy, " +
+            "natural proportions, realistic hands and fingers, 35mm or 50mm lens, cinematic lighting, shallow depth of field, photojournalism style. " +
+            "Never frame as close-up, portrait, or face-only unless the user explicitly requested it. " +
             "Output ONE single-line English prompt describing the final image as if it already exists. " +
-            "Use realism keywords (photorealistic, ultra realistic, real skin texture, professional photography, cinematic lighting, depth of field) " +
-            "and finish with a short 'Negative:' section. No explanations, no markdown.",
+            "Use realism keywords (RAW photo, photorealistic, ultra realistic, real skin texture, natural imperfections, skin pores, professional photography, cinematic lighting, depth of field) " +
+            "and finish with a 'Negative:' section listing: deformed body, bad proportions, extra limbs, bad hands, fused fingers, close-up, portrait, cropped body, cartoon, cgi, render, blurry. " +
+            "No explanations, no markdown.",
         },
         {
           role: "user",
