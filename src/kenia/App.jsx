@@ -49,6 +49,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/consulta" element={<Consulta />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/trust" element={<Trust />} />
             <Route path="/admin/debug" element={<Protected><DebugTool /></Protected>} />
             <Route
               element={
