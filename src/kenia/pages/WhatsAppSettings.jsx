@@ -532,11 +532,12 @@ export default function WhatsAppSettings() {
         <Card className="border-nude-200">
           <div className="p-5">
             <Tabs value={cfg.provider} onValueChange={(v) => up("provider", v)}>
-              <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+              <TabsList className="grid grid-cols-5 w-full max-w-3xl">
                 <TabsTrigger value="zapi" data-testid="tab-zapi"><Zap className="w-3.5 h-3.5 mr-1.5" />Z-API</TabsTrigger>
                 <TabsTrigger value="baileys" data-testid="tab-baileys"><Smartphone className="w-3.5 h-3.5 mr-1.5" />Baileys</TabsTrigger>
                 <TabsTrigger value="evolution" data-testid="tab-evolution"><Server className="w-3.5 h-3.5 mr-1.5" />Evolution</TabsTrigger>
                 <TabsTrigger value="meta" data-testid="tab-meta"><Building2 className="w-3.5 h-3.5 mr-1.5" />Meta Cloud</TabsTrigger>
+                <TabsTrigger value="twilio" data-testid="tab-twilio"><Send className="w-3.5 h-3.5 mr-1.5" />Twilio</TabsTrigger>
               </TabsList>
 
               <TabsContent value="zapi" className="mt-5 space-y-3">
