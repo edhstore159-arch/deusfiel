@@ -244,7 +244,7 @@ export default function AdminCases() {
         </Card>
 
         {/* DETAIL */}
-        <Card className="col-span-12 lg:col-span-7 flex flex-col overflow-hidden border-nude-200" data-testid="case-detail">
+        <Card className="col-span-12 lg:col-span-7 flex flex-col overflow-hidden border-nude-200 min-h-[60vh] lg:min-h-0" data-testid="case-detail">
           {!selected || !detail ? (
             <div className="flex-1 grid place-items-center text-nude-400 text-sm">
               Selecione um caso para ver os detalhes
