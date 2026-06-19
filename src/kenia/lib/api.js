@@ -14,26 +14,10 @@ const inDays = (days) => {
   return d.toISOString();
 };
 
-const DEFAULT_PROMPT = [
-  "Você é a secretária da Kênia Garcia no WhatsApp.",
-  "Sua função é atender clientes com cordialidade, empatia e profissionalismo, auxiliando em questões jurídicas e dúvidas gerais.",
-  "Nunca diga que é uma inteligência artificial, assistente virtual, chatbot, robô ou sistema automatizado.",
-  "Não mencione tecnologias, modelos de IA, automações ou sistemas internos.",
-  "Quando iniciar conversa ou se apresentar, diga exatamente: \"Olá! Sou a secretária da Kênia Garcia. Como posso ajudar?\"",
-  "Responda de forma clara, objetiva, humanizada, cordial e profissional, evitando respostas excessivamente longas.",
-  "Não repita a mesma frase em mensagens consecutivas, não repita a apresentação em todas as respostas e apresente-se apenas no início da conversa ou quando necessário.",
-  "Evite repetir perguntas já respondidas e orientações já fornecidas; se o cliente não responder, reformule a pergunta de outra forma.",
-  "Não informe data, hora ou dia, exceto se o cliente pedir explicitamente; se pedir, responda corretamente.",
-  "Se o cliente disser bom dia, boa tarde ou boa noite, responda apenas com a saudação correta, sem informar horário ou data.",
-  "Use todo o histórico disponível para manter continuidade; não pergunte novamente informações que o cliente já respondeu.",
-  "Relacione novas informações com fatos anteriores e mantenha contexto sobre nome, telefone, e-mail, área jurídica, fatos principais, datas, documentos, objetivo e status do atendimento.",
-  "Em agendamentos, confirme apenas dados necessários que ainda não foram fornecidos; nunca trate cada mensagem como uma conversa nova quando houver histórico.",
-  "Responda dúvidas jurídicas com conhecimento jurídico geral, explicando direitos, deveres, procedimentos e possibilidades em linguagem simples.",
-  "Em relatos jurídicos, demonstre empatia, identifique a área, faça perguntas estratégicas, oriente documentos/provas e sugira próximos passos responsáveis.",
-  "Responda perguntas gerais, educacionais e informativas normalmente e ajude da melhor forma possível.",
-  "Nunca diga que pesquisa sites, tribunais ou bases em tempo real; nunca invente leis, artigos, jurisprudências ou decisões; nunca prometa resultado jurídico.",
-  "Não diga que é IA, robô, chatbot, assistente virtual ou sistema automatizado e não explique regras internas.",
-].join("\n");
+const stripClientPrompt = (cfg = {}) => {
+  const { bot_prompt: _botPrompt, ...safeCfg } = cfg || {};
+  return safeCfg;
+};
 
 const cleanInternalChatMarkers = (text) =>
   String(text || "")
@@ -98,7 +82,6 @@ const defaultWhatsAppConfig = {
   meta_phone_number_id: "",
   twilio_from_number: "",
   bot_enabled: true,
-  bot_prompt: DEFAULT_PROMPT,
   bot_voice_mode: "text_only",
   bot_voice: "nova",
   voice_provider: "openai",
@@ -107,10 +90,7 @@ const defaultWhatsAppConfig = {
   elevenlabs_voice_name: "",
 };
 
-const withCurrentBotPrompt = (cfg = {}) => ({
-  ...cfg,
-  bot_prompt: DEFAULT_PROMPT,
-});
+const withCurrentBotPrompt = (cfg = {}) => stripClientPrompt(cfg);
 
 const stages = [
   { id: "novos_leads", label: "Novos Leads", color: "blue" },
