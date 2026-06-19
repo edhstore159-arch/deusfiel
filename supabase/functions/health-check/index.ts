@@ -5,7 +5,7 @@ const corsHeaders = {
 };
 
 async function checkOllama() {
-  const url = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "");
+  const url = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "").replace(/\/api\/(generate|chat|tags)$/, "");
   const key = Deno.env.get("OLLAMA_API_KEY");
   const model = Deno.env.get("OLLAMA_MODEL") || "qwen3:8b";
   if (!url) return { configured: false, ok: false, error: "OLLAMA_URL ausente" };
