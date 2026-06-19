@@ -5,8 +5,11 @@ export const shouldSuppressLovableDebugInstruction = (_message: string) => false
 export const isLovableNativeDebugRuntime = () => true;
 
 /**
- * Dispara o evento "lovable-debug-error" para registrar a instrução técnica
- * sem provocar runtime error ou tela branca no preview.
+ * Dispara o evento "lovable-debug-error" para que o DebugErrorThrower
+ * lance um erro fatal de runtime intencional, acionando o overlay global
+ * da Lovable e o botão "Try to Fix".
+ *
+ * NÃO substituir por toast/log/boundary. O throw é proposital.
  */
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined") return false;
