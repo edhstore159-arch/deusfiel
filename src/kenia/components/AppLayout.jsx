@@ -32,6 +32,32 @@ const NAV = [
   { to: "/app/debug", label: "Debug Tool", icon: Wrench, testid: "nav-debug" },
 ];
 
+// Prefetch lazy route chunks on hover/focus para que a navegação seja instantânea
+const PREFETCH = {
+  "/app": () => import("@/kenia/pages/Dashboard"),
+  "/app/chat-ia": () => import("@/kenia/pages/ChatIA"),
+  "/app/admin": () => import("@/kenia/pages/AdminCases"),
+  "/app/agents": () => import("@/kenia/pages/Agents"),
+  "/app/crm": () => import("@/kenia/pages/CRM"),
+  "/app/agenda": () => import("@/kenia/pages/Agenda"),
+  "/app/processes": () => import("@/kenia/pages/Processes"),
+  "/app/finance": () => import("@/kenia/pages/Finance"),
+  "/app/creatives": () => import("@/kenia/pages/Creatives"),
+  "/app/image-fusion": () => import("@/kenia/pages/ImageFusion"),
+  "/app/analytics": () => import("@/kenia/pages/Analytics"),
+  "/app/whatsapp": () => import("@/kenia/pages/WhatsAppSettings"),
+  "/app/whatsapp-logs": () => import("@/kenia/pages/WhatsAppLogs"),
+  "/app/settings": () => import("@/kenia/pages/Settings"),
+  "/app/debug": () => import("@/kenia/pages/DebugTool"),
+};
+const prefetched = new Set();
+const prefetch = (to) => {
+  if (prefetched.has(to)) return;
+  prefetched.add(to);
+  const fn = PREFETCH[to];
+  if (fn) fn().catch(() => prefetched.delete(to));
+};
+
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
