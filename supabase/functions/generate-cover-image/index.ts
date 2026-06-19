@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { prompt, reference_image_base64, logo_base64 } = body || {};
+    const { prompt, reference_image_base64, logo_base64, style } = body || {};
     if (!prompt || typeof prompt !== "string") {
       return new Response(JSON.stringify({ error: "Prompt obrigatório" }), {
         status: 400,
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const fullPrompt = `Arte quadrada profissional para redes sociais de um escritório de advocacia brasileiro. Tema: ${prompt}. Visual elegante, jurídico, humano, sem texto, sem letras, sem marcas d'água.`;
+    const fullPrompt = await elaboratePrompt(prompt, style);
 
     const toDataUrl = (b64: string) =>
       b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
