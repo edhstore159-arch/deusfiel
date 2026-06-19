@@ -7,62 +7,63 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Template base (PT) solicitado pelo usuário — guia o estilo final da imagem.
-const PT_TEMPLATE = (tema: string) => `Crie uma imagem altamente realista e visualmente impactante de ${tema}.
+// Layered descriptive template (no "orders" — pure description).
+const LAYERED_TEMPLATE = (tema: string) => `[MAIN SUBJECT]
+${tema}
 
-Estilo moderno e publicitário, com iluminação cinematográfica, cores vibrantes e alto contraste.
-A composição deve ser limpa e profissional, com foco principal bem definido e fundo levemente desfocado (efeito depth of field).
+[APPEARANCE]
+well-groomed, elegant, confident expression, natural skin texture, realistic human anatomy
 
-Detalhes extremamente nítidos, textura realista, qualidade 4K ou superior.
-Iluminação suave com highlights bem distribuídos, estilo estúdio fotográfico.
+[SCENE]
+contextual modern environment matching the theme, tidy and professional
 
-Use ângulo dinâmico, enquadramento bem pensado e estética premium, semelhante a anúncios de marcas grandes.
+[LIGHTING]
+soft natural light, cinematic lighting, balanced highlights, studio-quality
 
-Evite distorções, rostos deformados ou elementos irreais.
-Resultado final deve parecer uma fotografia profissional ou arte digital de alto nível.
+[FRAMING]
+medium shot, sharp focus on the subject, blurred background (bokeh, depth of field)
 
---ar 1:1 --v 6 --q 2`;
+[STYLE]
+photorealistic, ultra realistic, professional photography, 8k, real skin texture, premium advertising aesthetic, big-brand ad look, vibrant colors, high contrast
+
+[REINFORCEMENT]
+${tema}, ${tema}, photorealistic, ultra realistic, real skin texture, professional photography, cinematic lighting, depth of field
+
+[NEGATIVE]
+deformed face, wrong hands, low quality, artificial look, extra elements, text, letters, typography, watermark, logo, cartoon, 3d render, cgi, illustration`;
 
 const REALISM =
-  "photorealistic, ultra-realistic, cinematic lighting, vibrant colors, high contrast, " +
-  "clean professional composition, sharp main subject, shallow depth of field, " +
-  "extremely sharp details, realistic textures, 4k+ quality, soft studio lighting with balanced highlights, " +
-  "dynamic angle, premium advertising aesthetic, big-brand ad style, professional photography";
-const NEG = "no text, no letters, no typography, no watermarks, no logos, no distortions, no deformed faces, no unreal elements, no cartoon, no 3d render, no cgi";
+  "photorealistic, ultra-realistic, real skin texture, professional photography, cinematic lighting, " +
+  "depth of field, vibrant colors, high contrast, sharp focus, 8k, premium advertising aesthetic";
+const NEG = "no text, no letters, no typography, no watermarks, no logos, no deformed faces, no wrong hands, no cartoon, no 3d render, no cgi, no illustration, no artificial look";
 
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   const styleHint = style === "law"
-    ? "Contexto: anúncio fotográfico realista para redes sociais de um escritório de advocacia brasileiro."
-    : "Respeite estritamente o tema solicitado pelo usuário.";
-  const ptBrief = PT_TEMPLATE(userPrompt);
+    ? "Context: realistic photographic social-media post for a Brazilian law firm. Subject: a professional female lawyer (30-40), elegant black blazer and white shirt, modern law office, law books in background."
+    : "Strictly describe the user's theme as if the final image already exists.";
+  const layered = LAYERED_TEMPLATE(userPrompt);
   try {
     const r = await chatCompletion({
-      temperature: 0.7,
+      temperature: 0.6,
       messages: [
         {
           role: "system",
           content:
-            "Você é um diretor de arte especialista em prompts publicitários fotorrealistas. " +
-            "Receba o briefing em português e devolva APENAS um prompt em inglês, em UMA linha, " +
-            "seguindo este estilo: imagem altamente realista e visualmente impactante, estilo moderno e publicitário, " +
-            "iluminação cinematográfica, cores vibrantes, alto contraste, composição limpa e profissional, " +
-            "foco principal bem definido, fundo levemente desfocado (depth of field), detalhes extremamente nítidos, " +
-            "textura realista, qualidade 4K+, iluminação suave estilo estúdio, ângulo dinâmico, estética premium tipo anúncio de marca grande. " +
-            "Evite distorções, rostos deformados, texto, logos ou elementos irreais. " +
-            "Devolva só o prompt final em inglês, sem explicações.",
+            "You are an art director writing photorealistic image prompts. " +
+            "DESCRIBE the final image — never give orders to the model. " +
+            "Return ONE single-line English prompt using layered structure (subject, appearance, scene, lighting, framing, style) " +
+            "with repeated key concepts for emphasis, strong realism keywords (photorealistic, ultra realistic, real skin texture, " +
+            "professional photography, cinematic lighting, depth of field), and a negative section. No explanations.",
         },
-        { role: "user", content: `${styleHint}\n\n${ptBrief}` },
+        { role: "user", content: `${styleHint}\n\n${layered}` },
       ],
     });
     if (r.ok) {
       const txt = r.data?.choices?.[0]?.message?.content?.trim();
-      if (txt && txt.length > 10) return `${txt}, ${REALISM}, ${NEG}`;
+      if (txt && txt.length > 10) return `${txt}, ${REALISM}. Negative: ${NEG}`;
     }
   } catch (_e) { /* fallback below */ }
-  const base = style === "law"
-    ? `Highly realistic, visually striking advertising photograph for a Brazilian law firm social media. Theme: ${userPrompt}. Elegant, human, professional environment.`
-    : `Highly realistic, visually striking advertising photograph. Theme: ${userPrompt}.`;
-  return `${base} ${REALISM}, ${NEG}`;
+  return `${layered}\n\n${REALISM}. Negative: ${NEG}`;
 }
 
 
