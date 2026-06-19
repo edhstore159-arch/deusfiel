@@ -3,21 +3,22 @@ import { generateWithNanoBanana } from '../_shared/nano-banana.ts';
 import { chatCompletion } from '../_shared/llm.ts';
 
 const REALISM =
-  "photorealistic, ultra-realistic, real skin texture, professional photography, " +
-  "cinematic lighting, depth of field, vibrant colors, high contrast, sharp focus, 8k";
+  "RAW photo, ultra realistic, photorealistic, real skin texture with natural imperfections and skin pores, " +
+  "professional photography, photojournalism style, 35mm or 50mm lens, cinematic lighting, shallow depth of field, sharp focus, 8k";
 
 const NEGATIVE =
-  "no text, no letters, no typography, no watermarks, no logos, no collage, no split screen, " +
-  "no side-by-side, no picture-in-picture, no frames, no borders, no deformed faces, no extra limbs, " +
-  "no duplicated subjects, no cartoon, no 3d render, no cgi, no illustration";
+  "deformed body, distorted anatomy, bad proportions, extra limbs, extra arms, extra fingers, bad hands, fused fingers, broken hands, " +
+  "close-up, portrait only, cropped body, face only, duplicated subjects, collage, split screen, side-by-side, picture-in-picture, " +
+  "frames, borders, cartoon, cgi, 3d render, illustration, painting, blurry, low quality, " +
+  "no text, no letters, no typography, no watermarks, no logos";
 
 const BASE_FUSION_INTENT =
-  "Merge the two reference images into ONE single photorealistic scene as if it were a real photograph. " +
-  "Treat image 1 as the MAIN SUBJECT (preserve the person/object identity, face, body proportions, clothing and colors). " +
+  "Merge the two reference images into ONE single seamless photorealistic scene as if it were a real photograph. " +
+  "Treat image 1 as the MAIN SUBJECT (preserve identity, face, body proportions, clothing and colors). " +
   "Treat image 2 as the SCENE/CONTEXT (use its environment, lighting mood, palette and atmosphere). " +
   "Place the main subject naturally inside the scene, matching perspective, scale, lighting direction and shadows. " +
-  "Keep the entire body visible when the subject is a person — full body, head to toe, no cropping. " +
-  "Wide angle, environment clearly visible, storytelling composition.";
+  "Compose as a FULL-BODY wide shot: entire body visible from head to toe, no cropping, correct human anatomy, " +
+  "natural proportions, realistic hands and fingers. Storytelling composition, environment clearly visible.";
 
 async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || "").trim();
