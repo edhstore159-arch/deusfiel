@@ -122,6 +122,12 @@ MEMÓRIA E CONTEXTO (REGRA CRÍTICA — ANTI-REPETIÇÃO):
 - Acompanhe sempre em qual etapa do FLUXO OBRIGATÓRIO você está e siga para a PRÓXIMA etapa não cumprida.
 - Se o cliente trouxer informação fora de ordem (ex: já deu cidade antes de você perguntar), registre e PULE essa etapa.
 
+REGRA CRÍTICA — NÃO RESPONDER A PRÓPRIA PERGUNTA:
+- Você NUNCA deve responder uma pergunta que VOCÊ MESMA fez. Faça a pergunta e PARE — aguarde a resposta do cliente.
+- NUNCA escreva diálogos simulados (ex.: "Você: ...", "Cliente: ...", "— Sim, é isso.").
+- NUNCA preencha resposta hipotética em nome do cliente. Cada mensagem sua termina ou em uma afirmação curta, ou em UMA pergunta aberta, sem suposições da resposta dele.
+- Saudação SÓ na primeira mensagem da conversa. Nas demais, vá direto ao ponto, sem "Bom dia/Boa tarde/Boa noite" de novo.
+
 ATENDIMENTO COMPLETO:
 - Demonstre escuta ativa: faça um breve reconhecimento da dor antes de avançar (ex.: "Entendido, isso realmente atrapalha o dia a dia.").
 - Conduza com firmeza e empatia — uma pergunta clara por vez, sempre conectando a resposta anterior à próxima etapa.
@@ -401,12 +407,17 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
       reply = `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília). ${reply}`.trim();
     }
 
-    // Garante saudação correta (horário de Brasília) na primeira resposta
+    // Garante saudação correta (horário de Brasília) APENAS na primeira resposta.
+    // Nas mensagens seguintes, remove qualquer saudação que o modelo tenha inserido por engano.
     const isFirstAssistantMessage = !history.some((m) => m.role === "assistant" && String(m.content || "").trim());
+    const greetingLead = /^\s*(ol[áa]|oi|hello|hi|bom\s+dia|boa\s+tarde|boa\s+noite)[!,.\s]+/i;
+    reply = reply.replace(greetingLead, "").trim();
     if (isFirstAssistantMessage) {
-      reply = reply.replace(/^\s*(ol[áa]|oi|hello|hi|bom\s+dia|boa\s+tarde|boa\s+noite)[!,.\s]+/i, "").trim();
       reply = `${saudacao}! ${reply}`.trim();
     }
+    // Remove eventuais saudações duplicadas no meio do texto
+    reply = reply.replace(/\b(bom\s+dia|boa\s+tarde|boa\s+noite)[!.,]?\s+(bom\s+dia|boa\s+tarde|boa\s+noite)[!.,]?/gi, "$1!").trim();
+
 
     // Análise técnica do caso (chamada paralela à IA pedindo JSON estruturado)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
