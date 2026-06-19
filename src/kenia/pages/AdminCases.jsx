@@ -162,9 +162,9 @@ export default function AdminCases() {
         </Card>
       </div>
 
-      <div className="flex-1 grid grid-cols-12 gap-4 p-5 overflow-hidden">
+      <div className="flex-1 grid grid-cols-12 gap-4 p-4 sm:p-5 lg:overflow-hidden">
         {/* LIST */}
-        <Card className="col-span-12 lg:col-span-5 flex flex-col overflow-hidden border-nude-200" data-testid="cases-list">
+        <Card className="col-span-12 lg:col-span-5 flex flex-col overflow-hidden border-nude-200 max-h-[70vh] lg:max-h-none" data-testid="cases-list">
           <div className="p-3 border-b border-nude-200 flex flex-wrap gap-2 items-center bg-nude-50/60">
             <div className="relative flex-1 min-w-[180px]">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-nude-400" />
