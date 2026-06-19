@@ -107,11 +107,11 @@ export default function AdminCases() {
   });
 
   return (
-    <div className="h-screen flex flex-col bg-background" data-testid="admin-cases-page">
-      <div className="px-8 py-5 bg-card border-b border-nude-200 flex items-center justify-between shrink-0">
+    <div className="min-h-screen lg:h-screen flex flex-col bg-background" data-testid="admin-cases-page">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 bg-card border-b border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
         <div>
           <div className="overline text-gold-600">Painel Administrativo</div>
-          <h1 className="font-serif text-3xl text-nude-900 mt-1 tracking-tight">
+          <h1 className="font-serif text-2xl sm:text-3xl text-nude-900 mt-1 tracking-tight">
             Casos analisados pela IA
           </h1>
         </div>
