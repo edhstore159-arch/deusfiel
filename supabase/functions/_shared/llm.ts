@@ -268,11 +268,17 @@ async function imagePollinations(opts: ImageOptions) {
 }
 
 export async function generateImage(opts: ImageOptions) {
-  // 1) Pollinations (gratuito, sem chave, sem limite)
+  // 1) Emergent (gpt-image-1) — provedor principal
+  if (EMERGENT_KEY) {
+    const r = await imageEmergent(opts);
+    if (r.ok) return r;
+    console.warn("⚠️ Emergent falhou:", r.error);
+  }
+  // 2) Pollinations (Flux) — fallback gratuito, sem chave
   const r0 = await imagePollinations(opts);
   if (r0.ok) return r0;
   console.warn("⚠️ Pollinations falhou:", r0.error);
-  // 2) Fallbacks pagos
+  // 3) Demais provedores pagos como último recurso
   if (LOVABLE_KEY) {
     const r = await imageLovable(opts);
     if (r.ok) return r;
@@ -283,8 +289,7 @@ export async function generateImage(opts: ImageOptions) {
     if (r.ok) return r;
     console.warn("⚠️ Gemini direto falhou:", r.error);
   }
-  const r3 = await imageEmergent(opts);
-  if (r3.ok) return r3;
-  return { ok: false as const, error: r3.error || "Nenhum provider de imagem disponível", provider: "none" };
+  return { ok: false as const, error: "Nenhum provider de imagem disponível", provider: "none" };
 }
+
 
