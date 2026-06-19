@@ -138,7 +138,7 @@ export default function AdminCases() {
       </div>
 
       {/* KPIs */}
-      <div className="px-8 pt-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 lg:pt-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
         <Card className="p-4 border-nude-200" data-testid="kpi-total">
           <div className="text-xs tracking-widest uppercase text-nude-500 font-semibold">Total</div>
           <div className="font-serif text-3xl text-nude-900 mt-1">{data?.total ?? 0}</div>
