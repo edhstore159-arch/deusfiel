@@ -532,11 +532,12 @@ export default function WhatsAppSettings() {
         <Card className="border-nude-200">
           <div className="p-5">
             <Tabs value={cfg.provider} onValueChange={(v) => up("provider", v)}>
-              <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+              <TabsList className="grid grid-cols-5 w-full max-w-3xl">
                 <TabsTrigger value="zapi" data-testid="tab-zapi"><Zap className="w-3.5 h-3.5 mr-1.5" />Z-API</TabsTrigger>
                 <TabsTrigger value="baileys" data-testid="tab-baileys"><Smartphone className="w-3.5 h-3.5 mr-1.5" />Baileys</TabsTrigger>
                 <TabsTrigger value="evolution" data-testid="tab-evolution"><Server className="w-3.5 h-3.5 mr-1.5" />Evolution</TabsTrigger>
                 <TabsTrigger value="meta" data-testid="tab-meta"><Building2 className="w-3.5 h-3.5 mr-1.5" />Meta Cloud</TabsTrigger>
+                <TabsTrigger value="twilio" data-testid="tab-twilio"><Send className="w-3.5 h-3.5 mr-1.5" />Twilio</TabsTrigger>
               </TabsList>
 
               <TabsContent value="zapi" className="mt-5 space-y-3">
@@ -814,6 +815,72 @@ export default function WhatsAppSettings() {
                 </div>
                 <div><Label>Access Token</Label><Input value={cfg.meta_access_token || ""} onChange={(e) => up("meta_access_token", e.target.value)} data-testid="meta-token" className="font-mono text-xs" /></div>
                 <div><Label>Phone Number ID</Label><Input value={cfg.meta_phone_number_id || ""} onChange={(e) => up("meta_phone_number_id", e.target.value)} data-testid="meta-phone-id" className="font-mono text-xs" /></div>
+              </TabsContent>
+
+              <TabsContent value="twilio" className="mt-5 space-y-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Recomendado</Badge>
+                  <span className="text-sm text-nude-600">100% serverless via edge functions. Sem QR Code, sem servidor próprio.</span>
+                </div>
+
+                <Card className="bg-nude-50 border-nude-200 p-4 space-y-2 text-xs text-nude-700">
+                  <div className="font-semibold text-nude-900 text-sm">Como ativar (3 passos):</div>
+                  <ol className="list-decimal pl-5 space-y-1.5 leading-relaxed">
+                    <li>Conecte o <strong>Twilio</strong> nas integrações do Lovable (Settings → Integrations → Twilio).</li>
+                    <li>No <a href="https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn" target="_blank" rel="noreferrer" className="text-emerald-700 underline">Twilio Console → WhatsApp Sandbox</a> (ou número aprovado), cole a URL do webhook abaixo no campo <em>"When a message comes in"</em> (POST).</li>
+                    <li>Preencha o número de envio (formato <code>whatsapp:+14155238886</code>) e clique em Salvar no topo.</li>
+                  </ol>
+                </Card>
+
+                <div>
+                  <Label>Webhook URL (cole no Twilio Console)</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      readOnly
+                      value={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-twilio-webhook`}
+                      className="font-mono text-xs"
+                      data-testid="twilio-webhook-url"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-twilio-webhook`);
+                        toast.success("Webhook copiado!");
+                      }}
+                      data-testid="twilio-copy-webhook"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Número de envio (From)</Label>
+                  <Input
+                    placeholder="whatsapp:+14155238886"
+                    value={cfg.twilio_from_number || ""}
+                    onChange={(e) => up("twilio_from_number", e.target.value)}
+                    data-testid="twilio-from"
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-[11px] text-nude-500 mt-1.5">
+                    No sandbox use <code>whatsapp:+14155238886</code>. Em produção, use o número
+                    aprovado pela Meta no seu painel Twilio.
+                  </p>
+                </div>
+
+                <Card className="bg-emerald-50 border-emerald-200 p-3 text-xs text-emerald-900">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Vantagens
+                  </div>
+                  <ul className="list-disc pl-5 space-y-0.5">
+                    <li>Roda 100% nas edge functions — sem servidor extra para hospedar.</li>
+                    <li>Robô IA já responde automaticamente (Lovable AI Gateway).</li>
+                    <li>Número oficial aprovado — sem risco de banimento.</li>
+                  </ul>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>

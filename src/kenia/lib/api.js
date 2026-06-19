@@ -96,6 +96,7 @@ const defaultWhatsAppConfig = {
   evo_instance: "",
   meta_access_token: "",
   meta_phone_number_id: "",
+  twilio_from_number: "",
   bot_enabled: true,
   bot_prompt: DEFAULT_PROMPT,
   bot_voice_mode: "text_only",
