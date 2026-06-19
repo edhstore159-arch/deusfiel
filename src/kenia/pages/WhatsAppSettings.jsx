@@ -38,6 +38,8 @@ export default function WhatsAppSettings() {
   const [baileysStatus, setBaileysStatus] = useState(null);
   const [baileysQr, setBaileysQr] = useState(null);
   const [baileysLoggingOut, setBaileysLoggingOut] = useState(false);
+  const lastQrAtRef = useRef(0);
+  const pollingBaileysRef = useRef(false);
 
   const backendUrl = (import.meta.env.VITE_BACKEND_URL || "");
   const webhookBase = `${backendUrl}/api/whatsapp/webhook`;
@@ -54,17 +56,19 @@ export default function WhatsAppSettings() {
 
   useEffect(() => { load(); runDiagnostics(); }, []);
 
-  // Auto-poll Baileys status/QR when provider is baileys
+  // Auto-poll Baileys status/QR while the page is open. The QR can be needed
+  // before the provider is saved as "baileys", so do not gate this by cfg.provider.
   useEffect(() => {
-    if (cfg?.provider !== "baileys") return;
+    if (!cfg) return;
     pollBaileys();
-    const t = setInterval(pollBaileys, 8000);
+    const t = setInterval(pollBaileys, 4000);
     return () => clearInterval(t);
-  }, [cfg?.provider]);
+  }, [cfg]);
 
   // Contador de falhas consecutivas para evitar flapping (desconexões falsas)
   const failureCountRef = useRef(0);
   const MAX_FAILURES_BEFORE_OFFLINE = 5;
+  const MAX_CONNECTING_WITHOUT_QR_MS = 15000;
 
   const load = async () => {
     try {
