@@ -389,6 +389,9 @@ export default function WhatsAppSettings() {
 
   const up = (k, v) => setCfg({ ...cfg, [k]: v });
   const isBaileys = cfg.provider === "baileys";
+  const hasBaileysQr = Boolean(baileysQr?.qr);
+  const isBaileysWaitingForQr = !baileysStatus?.connected && baileysStatus?.state === "connecting";
+  const baileysQrUnavailable = isBaileysWaitingForQr && !hasBaileysQr;
   const sanitizeDiagText = (s) =>
     typeof s === "string"
       ? s
