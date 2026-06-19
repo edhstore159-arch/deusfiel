@@ -17,6 +17,7 @@ const LOGO_IMG = "https://customer-assets.emergentagent.com/job_nude-gold-dashbo
 const NAV = [
   { to: "/app", label: "Atendimento", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
   { to: "/app/chat-ia", label: "Chat IA · Análise", icon: Bot, testid: "nav-chat-ia" },
+  { to: "/app/agents", label: "Agentes IA · Treinar", icon: GraduationCap, testid: "nav-agents" },
   { to: "/app/admin", label: "Painel Admin · Casos", icon: ShieldCheck, testid: "nav-admin" },
   { to: "/app/crm", label: "CRM Pipeline", icon: KanbanSquare, testid: "nav-crm" },
   { to: "/app/agenda", label: "Agenda", icon: CalendarDays, testid: "nav-agenda" },
