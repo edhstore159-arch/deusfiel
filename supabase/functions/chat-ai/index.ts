@@ -371,7 +371,7 @@ Só envie a resposta depois que os 6 itens estiverem satisfeitos.${antiRepetitio
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
-    let reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    let reply = cleanRepeatedText(removeUserEcho(removeRoleLabels(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage)), userMessage));
     if (!reply || reply.length < 2) {
       reply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília).`
