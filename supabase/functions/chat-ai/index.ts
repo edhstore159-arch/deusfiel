@@ -332,7 +332,8 @@ VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 4. Confirme se a resposta é coerente com o histórico da conversa, não contradiz informações já dadas e não repete saudação/pergunta anterior.
 5. Garanta que a resposta seja direta, em português, no tom de secretária da Kênia Garcia, e avance a conversa (não devolva a mesma pergunta).
 6. Se for a primeira mensagem, confirme que começou com "${saudacao}!". Se o cliente perguntou se você está bem, confirme que afirmou e devolveu a pergunta.
-Só envie a resposta depois que os 6 itens estiverem satisfeitos.${antiRepetitionContext}`;
+7. NUNCA repita ou parafraseie a pergunta do cliente antes de responder. NUNCA escreva rótulos como "Cliente:", "Você:", "Secretária:", "Resposta:" — escreva apenas a resposta direta, em uma única voz (a sua). NUNCA gere a próxima fala do cliente.
+Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitionContext}`;
 
     const messages = [
       { role: "system", content: systemContent },
