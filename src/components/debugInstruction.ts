@@ -38,6 +38,3 @@ export const dispatchLovableDebugError = (message: string) => {
   window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
   return true;
 };
-
-export const deliverLovableDebugInstruction = (message: string) =>
-  dispatchLovableDebugError(message) ? ("dispatched" as const) : ("skipped" as const);
