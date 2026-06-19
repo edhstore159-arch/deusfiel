@@ -356,6 +356,13 @@ Só envie a resposta depois que os 6 itens estiverem satisfeitos.${antiRepetitio
       reply = `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília). ${reply}`.trim();
     }
 
+    // Garante saudação correta (horário de Brasília) na primeira resposta
+    const isFirstAssistantMessage = !history.some((m) => m.role === "assistant" && String(m.content || "").trim());
+    if (isFirstAssistantMessage) {
+      reply = reply.replace(/^\s*(ol[áa]|oi|hello|hi|bom\s+dia|boa\s+tarde|boa\s+noite)[!,.\s]+/i, "").trim();
+      reply = `${saudacao}! ${reply}`.trim();
+    }
+
     // Análise técnica do caso (chamada paralela à IA pedindo JSON estruturado)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
     try {
