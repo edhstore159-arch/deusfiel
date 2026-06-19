@@ -5,7 +5,6 @@ import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
-import { Textarea } from "@/kenia/components/ui/textarea";
 import { Switch } from "@/kenia/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/kenia/components/ui/tabs";
 import { Badge } from "@/kenia/components/ui/badge";
@@ -911,38 +910,8 @@ export default function WhatsAppSettings() {
               data-testid="bot-toggle"
             />
           </div>
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <Label>Prompt do robô (personalidade/instruções)</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-gold-700 hover:text-gold-800 hover:bg-gold-50"
-                data-testid="bot-reset-prompt"
-                onClick={async () => {
-                  try {
-                    const { data } = await api.get("/whatsapp/default-prompt");
-                    if (data?.prompt) {
-                      up("bot_prompt", data.prompt);
-                      toast.success("Prompt assertivo (Kênia Garcia) carregado. Clique em Salvar.");
-                    }
-                  } catch {
-                    toast.error("Erro ao carregar prompt padrão");
-                  }
-                }}
-              >
-                <RefreshCw className="w-3 h-3 mr-1" />
-                Carregar prompt assertivo (padrão)
-              </Button>
-            </div>
-            <Textarea
-              rows={5}
-              value={cfg.bot_prompt || ""}
-              onChange={(e) => up("bot_prompt", e.target.value)}
-              data-testid="bot-prompt"
-              className="font-mono text-xs"
-            />
+          <div className="rounded-md border border-nude-200 bg-nude-50 p-3 text-sm text-nude-600">
+            O atendimento automático usa instruções internas protegidas para manter a conversa natural, com contexto e sem repetir perguntas já respondidas.
           </div>
 
           {/* === MODO DE VOZ DA RESPOSTA AUTOMATICA === */}
