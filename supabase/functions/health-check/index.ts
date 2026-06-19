@@ -42,14 +42,42 @@ async function checkOllama() {
   }
 }
 
+async function checkEmergentImage() {
+  const key = Deno.env.get("EMERGENT_API_KEY");
+  if (!key) return { configured: false, ok: false, error: "EMERGENT_API_KEY ausente" };
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 25000);
+  try {
+    const r = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model: "gpt-image-1", prompt: "a red apple, photorealistic", size: "1024x1024", n: 1 }),
+    });
+    const text = await r.text();
+    if (!r.ok) return { configured: true, ok: false, status: r.status, error: text.slice(0, 300) };
+    let hasImage = false;
+    try { hasImage = !!JSON.parse(text)?.data?.[0]?.b64_json; } catch { /* noop */ }
+    return { configured: true, ok: hasImage, status: r.status, hasImage };
+  } catch (e) {
+    return { configured: true, ok: false, error: String((e as Error)?.message || e) };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const url = new URL(req.url);
+  const deep = url.searchParams.get("deep") === "1";
   const ollama = await checkOllama();
+  const emergentImage = deep ? await checkEmergentImage() : { configured: !!Deno.env.get("EMERGENT_API_KEY"), note: "passe ?deep=1 para testar geração real" };
   const providers = {
     ollama,
     lovable: { configured: !!Deno.env.get("LOVABLE_API_KEY") },
     gemini: { configured: !!Deno.env.get("GEMINI_API_KEY") },
     emergent: { configured: !!Deno.env.get("EMERGENT_API_KEY") },
+    emergentImage,
     openai: { configured: !!Deno.env.get("OPENAI_API_KEY") },
   };
   return new Response(JSON.stringify({ ok: true, providers }, null, 2), {
