@@ -705,10 +705,14 @@ export const api = HAS_BACKEND
   ? {
       get: async (url, config) => {
         const [path] = String(url).split("?");
+        const isCaseDetail = path.startsWith("/admin/case-analyses/");
         if (cloudFirstGetPaths.has(path)) return staticGet(url, config);
         try {
           const res = await liveApi.get(url, config);
           if (fallbackToStaticGetPaths.has(path) && isEmptyPayload(res?.data)) {
+            return staticGet(url, config);
+          }
+          if (isCaseDetail && isEmptyPayload(res?.data)) {
             return staticGet(url, config);
           }
           if (path === "/whatsapp/config") {
@@ -718,6 +722,7 @@ export const api = HAS_BACKEND
         } catch (err) {
           if (backendSafeGetPaths.has(path)) return staticGet(url, config);
           if (fallbackToStaticGetPaths.has(path)) return staticGet(url, config);
+          if (isCaseDetail) return staticGet(url, config);
           throw err;
         }
       },
