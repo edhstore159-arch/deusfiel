@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * DebugErrorThrower
@@ -12,13 +12,13 @@ import { useEffect } from "react";
  * qualquer boundary local. Não tratar com try/catch, toast, modal ou log.
  */
 export function DebugErrorThrower() {
+  const [message, setMessage] = useState<string | null>(null);
+
   useEffect(() => {
     const handler = (event: Event) => {
       const custom = event as CustomEvent<string>;
       if (typeof custom.detail === "string" && custom.detail.length > 0) {
-        window.setTimeout(() => {
-          throw new Error(custom.detail);
-        }, 0);
+        setMessage(custom.detail);
       }
     };
 
@@ -27,6 +27,11 @@ export function DebugErrorThrower() {
       window.removeEventListener("lovable-debug-error", handler as EventListener);
     };
   }, []);
+
+  if (message) {
+    // Erro intencional: deve escapar para o overlay global da Lovable.
+    throw new Error(message);
+  }
 
   return null;
 }
