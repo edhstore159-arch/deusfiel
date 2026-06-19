@@ -185,8 +185,10 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
 }
 
 function userAskedTemporalInfo(text: string): boolean {
-  return /\b(que\s+horas|qual\s+(?:é\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+)?(?:a\s+)?data|que\s+data|que\s+dia\s+(?:é|estamos|s[aã]o|de\s+hoje)|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))\b/i.test(String(text || ""));
+  const t = String(text || "").toLowerCase();
+  return /(que\s+horas|qual\s+(?:é\s+|e\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+|e\s+)?(?:a\s+)?data|que\s+data|que\s+dia|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))/i.test(t);
 }
+
 
 function removeTemporalLeaks(reply: string, userMessage: string): string {
   if (userAskedTemporalInfo(userMessage)) return reply;
@@ -345,7 +347,14 @@ Só envie a resposta depois que os 6 itens estiverem satisfeitos.${antiRepetitio
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
-    const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    let reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    if (!reply || reply.length < 2) {
+      reply = userAskedTemporalInfo(userMessage)
+        ? `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília).`
+        : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    } else if (userAskedTemporalInfo(userMessage) && !/\d{2}[\/\-]\d{2}|\d{4}|\d{1,2}:\d{2}|segunda|ter[cç]a|quarta|quinta|sexta|s[áa]bado|domingo|janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro/i.test(reply)) {
+      reply = `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília). ${reply}`.trim();
+    }
 
     // Análise técnica do caso (chamada paralela à IA pedindo JSON estruturado)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
