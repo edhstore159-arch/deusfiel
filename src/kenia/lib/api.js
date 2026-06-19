@@ -441,8 +441,6 @@ const staticPost = (url, body = {}) => {
   if (path === "/chat/message") {
     return (async () => {
       const sessionId = body.session_id || nextId("session");
-      const OLLAMA_URL = import.meta.env.VITE_OLLAMA_URL || "";
-      const OLLAMA_MODEL = import.meta.env.VITE_OLLAMA_MODEL || "qwen3:8b";
       const fallbackReply =
         "Tive uma instabilidade momentânea. Estou aqui para te ajudar; pode me contar o que aconteceu em uma frase curta?";
       try {
@@ -472,55 +470,14 @@ const staticPost = (url, body = {}) => {
           });
         }
       } catch (e) {
-        console.warn("chat-ai fallback falhou, tentando Ollama direto", e);
+        console.warn("chat-ai falhou; usando resposta local de contingência", e);
       }
-      if (!OLLAMA_URL) {
-        return response({
-            session_id: sessionId,
-            response: fallbackReply,
-            audio_base64: null,
-            analysis: { acertividade: 40, qualificacao: "fallback" },
-          });
-      }
-      try {
-        const history = (body.history || [])
-          .map((m) => `${m.role === "user" ? "Cliente" : "Kênia"}: ${m.content}`)
-          .join("\n");
-        const system = DEFAULT_PROMPT;
-        const prompt = `${system}\n\n${history}\nCliente: ${body.message || body.text || ""}\nKênia:`;
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-        const res = await fetch(OLLAMA_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
-          signal: controller.signal,
-          body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false, keep_alive: "10m", options: { num_predict: 220, temperature: 0.2 } }),
-        }).finally(() => clearTimeout(timeout));
-        if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`);
-        const data = await res.json();
-        const text = (data?.response || "").trim() || "Sem resposta da IA.";
-        const responseText = isNearDuplicateReply(text, body.history || [])
-          ? buildNonRepeatingFallback(body.message || body.text || "")
-          : cleanInternalChatMarkers(text);
-        return response({
-            session_id: sessionId,
-            response: responseText,
-            audio_base64: null,
-            appointment: null,
-            handoff: false,
-            speaker: null,
-            analysis: { acertividade: 80, qualificacao: "ok" },
-            server_time: null,
-          });
-      } catch (e) {
-        return response({
-            session_id: sessionId,
-            response: fallbackReply,
-            audio_base64: null,
-            analysis: { acertividade: 40, qualificacao: "fallback" },
-          });
-      }
+      return response({
+        session_id: sessionId,
+        response: fallbackReply,
+        audio_base64: null,
+        analysis: { acertividade: 40, qualificacao: "fallback" },
+      });
     })();
   }
 
