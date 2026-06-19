@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_agents: {
+        Row: {
+          created_at: string
+          id: string
+          knowledge: string
+          model: string
+          name: string
+          role: string | null
+          system_prompt: string
+          temperature: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          knowledge?: string
+          model?: string
+          name: string
+          role?: string | null
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          knowledge?: string
+          model?: string
+          name?: string
+          role?: string | null
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           appointment_date: string
