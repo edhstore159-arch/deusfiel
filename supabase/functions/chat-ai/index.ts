@@ -224,6 +224,11 @@ function userAskedTemporalInfo(text: string): boolean {
   return /(que\s+horas|qual\s+(?:é\s+|e\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+|e\s+)?(?:a\s+)?data|que\s+data|que\s+dia|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))/i.test(t);
 }
 
+function userAskedWellbeing(text: string): boolean {
+  const t = String(text || "").toLowerCase();
+  return /\b(tudo\s+bem|tá\s+bem|ta\s+bem|est[aá]\s+bem|como\s+vai|como\s+voc[eê]\s+est[aá]|como\s+est[aá])\b/i.test(t);
+}
+
 
 function removeTemporalLeaks(reply: string, userMessage: string): string {
   if (userAskedTemporalInfo(userMessage)) return reply;
@@ -361,6 +366,9 @@ Só envie a resposta depois que os 6 itens estiverem satisfeitos.${antiRepetitio
     let rawReply: string = aiResult.ok
       ? data?.choices?.[0]?.message?.content ?? ""
       : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    if (userAskedWellbeing(userMessage)) {
+      rawReply = "Estou sim, obrigada por perguntar! E você, está bem?";
+    }
     if (aiResult.ok && (isNearDuplicateReply(rawReply, history) || repeatsLastQuestion(rawReply, history))) {
       const retryResult = await chatCompletion({
         model: "google/gemini-3-flash-preview",
