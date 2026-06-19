@@ -193,10 +193,8 @@ export default function Onboarding() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Prompt do robô de atendimento</Label>
-                <Textarea rows={4} value={data.bot_prompt} onChange={e => setData({ ...data, bot_prompt: e.target.value })} data-testid="ob-prompt" />
-                <div className="text-xs text-nude-500 mt-1">Personalidade e instruções do atendente IA que conversa com seus leads no WhatsApp.</div>
+              <div className="rounded-md border border-nude-200 bg-nude-50 p-3 text-sm text-nude-600">
+                A secretária virtual já vem configurada com atendimento humanizado, memória da conversa e proteção das instruções internas.
               </div>
               <div className="pt-2 flex justify-between">
                 <Button variant="outline" onClick={() => setStep(1)}><ArrowLeft className="mr-2 w-4 h-4" /> Voltar</Button>
