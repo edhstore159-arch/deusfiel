@@ -12,7 +12,7 @@ export const DebugErrorThrower = () => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
       if (typeof detail === "string" && detail.length > 0) {
-        console.info("Debug instruction received:", detail);
+        console.info("Debug instruction received without interrupting the app.");
       }
     };
     window.addEventListener("lovable-debug-error", handler as EventListener);
