@@ -190,6 +190,30 @@ function userAskedTemporalInfo(text: string): boolean {
 }
 
 
+function removeRoleLabels(reply: string): string {
+  return String(reply || "")
+    .split(/\n+/)
+    .map((line) => line.replace(/^\s*(cliente|usu[áa]rio|user|voc[êe]|pergunta|secret[áa]ria|assistente|assistant|resposta|bot|ia)\s*[:\-–]\s*/i, "").trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function removeUserEcho(reply: string, userMessage: string): string {
+  const userNorm = normalizeForSimilarity(userMessage);
+  if (!userNorm || userNorm.split(" ").length < 3) return reply;
+  const parts = String(reply || "").split(/(?<=[.!?\n])\s+/);
+  const kept = parts.filter((part) => {
+    const partNorm = normalizeForSimilarity(part);
+    if (!partNorm) return true;
+    if (partNorm === userNorm) return false;
+    if (partNorm.length >= 10 && similarityScore(part, userMessage) >= 0.8) return false;
+    return true;
+  });
+  const result = kept.join(" ").trim();
+  return result || reply;
+}
+
 function removeTemporalLeaks(reply: string, userMessage: string): string {
   if (userAskedTemporalInfo(userMessage)) return reply;
   return String(reply || "")
@@ -308,7 +332,8 @@ VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 4. Confirme se a resposta é coerente com o histórico da conversa, não contradiz informações já dadas e não repete saudação/pergunta anterior.
 5. Garanta que a resposta seja direta, em português, no tom de secretária da Kênia Garcia, e avance a conversa (não devolva a mesma pergunta).
 6. Se for a primeira mensagem, confirme que começou com "${saudacao}!". Se o cliente perguntou se você está bem, confirme que afirmou e devolveu a pergunta.
-Só envie a resposta depois que os 6 itens estiverem satisfeitos.${antiRepetitionContext}`;
+7. NUNCA repita ou parafraseie a pergunta do cliente antes de responder. NUNCA escreva rótulos como "Cliente:", "Você:", "Secretária:", "Resposta:" — escreva apenas a resposta direta, em uma única voz (a sua). NUNCA gere a próxima fala do cliente.
+Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitionContext}`;
 
     const messages = [
       { role: "system", content: systemContent },
@@ -347,7 +372,7 @@ Só envie a resposta depois que os 6 itens estiverem satisfeitos.${antiRepetitio
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
-    let reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    let reply = cleanRepeatedText(removeUserEcho(removeRoleLabels(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage)), userMessage));
     if (!reply || reply.length < 2) {
       reply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília).`
