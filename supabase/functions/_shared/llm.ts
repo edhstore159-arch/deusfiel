@@ -18,7 +18,7 @@ export interface ImageOptions {
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
 const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
-const OLLAMA_URL = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "");
+const OLLAMA_URL = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "").replace(/\/api\/(generate|chat|tags)$/, "");
 const OLLAMA_MODEL = Deno.env.get("OLLAMA_MODEL") || "qwen3:8b";
 const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
 
