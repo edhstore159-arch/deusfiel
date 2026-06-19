@@ -1,5 +1,57 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { generateWithNanoBanana } from '../_shared/nano-banana.ts';
+import { chatCompletion } from '../_shared/llm.ts';
+
+const REALISM =
+  "photorealistic, ultra-realistic, real skin texture, professional photography, " +
+  "cinematic lighting, depth of field, vibrant colors, high contrast, sharp focus, 8k";
+
+const NEGATIVE =
+  "no text, no letters, no typography, no watermarks, no logos, no collage, no split screen, " +
+  "no side-by-side, no picture-in-picture, no frames, no borders, no deformed faces, no extra limbs, " +
+  "no duplicated subjects, no cartoon, no 3d render, no cgi, no illustration";
+
+const BASE_FUSION_INTENT =
+  "Merge the two reference images into ONE single photorealistic scene as if it were a real photograph. " +
+  "Treat image 1 as the MAIN SUBJECT (preserve the person/object identity, face, body proportions, clothing and colors). " +
+  "Treat image 2 as the SCENE/CONTEXT (use its environment, lighting mood, palette and atmosphere). " +
+  "Place the main subject naturally inside the scene, matching perspective, scale, lighting direction and shadows. " +
+  "Keep the entire body visible when the subject is a person — full body, head to toe, no cropping. " +
+  "Wide angle, environment clearly visible, storytelling composition.";
+
+async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
+  const userTheme = (userPrompt || "").trim();
+  try {
+    const r = await chatCompletion({
+      temperature: 0.4,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an art director writing prompts for an image-editing model that fuses TWO reference images into ONE photo. " +
+            "Faithfully keep the user's intent — never invent a new subject or override their request. " +
+            "Translate to English if needed and output ONE single-line descriptive prompt of the final photo (as if it already exists). " +
+            "Always state explicitly: keep the subject from image 1, use the environment from image 2, blend lighting and perspective, " +
+            "single seamless composition (no collage / no split-screen). Add realism keywords and a short 'Negative:' section. " +
+            "No markdown, no explanations.",
+        },
+        {
+          role: "user",
+          content:
+            `USER REQUEST (respect this exactly):\n"""${userTheme || "Combine the two images into one harmonious photorealistic scene."}"""\n\n` +
+            `BASELINE INTENT:\n${BASE_FUSION_INTENT}`,
+        },
+      ],
+    });
+    if (r.ok) {
+      const txt = r.data?.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 20) return txt;
+    }
+  } catch (_e) { /* fallback below */ }
+
+  // Determinístico, sem LLM:
+  return `${BASE_FUSION_INTENT} ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -12,12 +64,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userText =
-      (prompt && String(prompt).trim()) ||
-      'Combine/funda as duas imagens em uma única composição harmoniosa, mantendo elementos principais de ambas, com qualidade fotográfica.';
+    const fullPrompt = await elaborateFusionPrompt(prompt);
 
     const result = await generateWithNanoBanana({
-      prompt: userText,
+      prompt: fullPrompt,
       imageUrls: [image1_base64, image2_base64],
     });
 
@@ -27,7 +77,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, image: result.url, provider: result.provider }), {
+    return new Response(JSON.stringify({ ok: true, image: result.url, provider: result.provider, prompt_used: fullPrompt }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
