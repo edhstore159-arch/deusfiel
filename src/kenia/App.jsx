@@ -22,6 +22,7 @@ import Consulta from "@/kenia/pages/Consulta";
 import Settings from "@/kenia/pages/Settings";
 import DebugTool from "@/kenia/pages/DebugTool";
 import ChatIA from "@/kenia/pages/ChatIA";
+import Agents from "@/kenia/pages/Agents";
 import AdminCases from "@/kenia/pages/AdminCases";
 import ResetPassword from "@/kenia/pages/ResetPassword";
 import Trust from "@/kenia/pages/Trust";
