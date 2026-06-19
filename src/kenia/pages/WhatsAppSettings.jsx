@@ -40,6 +40,8 @@ export default function WhatsAppSettings() {
   const [baileysLoggingOut, setBaileysLoggingOut] = useState(false);
   const lastQrAtRef = useRef(0);
   const pollingBaileysRef = useRef(false);
+  const connectingStartedAtRef = useRef(0);
+  const autoReconnectAtRef = useRef(0);
 
   const backendUrl = (import.meta.env.VITE_BACKEND_URL || "");
   const webhookBase = `${backendUrl}/api/whatsapp/webhook`;
@@ -87,12 +89,25 @@ export default function WhatsAppSettings() {
       const normalized = normalizeBaileysStatus(st);
       failureCountRef.current = 0;
       setBaileysStatus(normalized);
+      if (normalized.state === "connecting" && !normalized.connected) {
+        if (!connectingStartedAtRef.current) connectingStartedAtRef.current = Date.now();
+      } else {
+        connectingStartedAtRef.current = 0;
+        autoReconnectAtRef.current = 0;
+      }
       if (!normalized.connected) {
         try {
           const { data: qr } = await api.get("/whatsapp/baileys/qr");
           const nextQr = qr?.qr ? qr : { ...(qr || {}), qr: null };
           if (nextQr.qr) lastQrAtRef.current = Date.now();
           setBaileysQr(nextQr);
+          if (!nextQr.qr && normalized.state === "connecting") {
+            const waitingFor = Date.now() - connectingStartedAtRef.current;
+            if (waitingFor > MAX_CONNECTING_WITHOUT_QR_MS && Date.now() - autoReconnectAtRef.current > 30000) {
+              autoReconnectAtRef.current = Date.now();
+              api.post("/whatsapp/baileys/reconnect").catch(() => undefined);
+            }
+          }
         } catch {
           setBaileysQr((prev) => prev || { qr: null, state: normalized.state });
         }
