@@ -1,6 +1,6 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
-export const shouldSuppressLovableDebugInstruction = (_message: string) => true;
+export const shouldSuppressLovableDebugInstruction = (_message: string) => false;
 
 export const isLovableNativeDebugRuntime = () => true;
 
@@ -14,7 +14,7 @@ export const isLovableNativeDebugRuntime = () => true;
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined") return false;
   window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
-  return false;
+  return true;
 };
 
 export const deliverLovableDebugInstruction = (message: string) => {
