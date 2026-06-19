@@ -206,7 +206,7 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
 
 function userAskedTemporalInfo(text: string): boolean {
   const t = String(text || "").toLowerCase();
-  return /(que\s+horas|qual\s+(?:é\s+|e\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+|e\s+)?(?:a\s+)?data|que\s+data|que\s+dia|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|fala|fale|informa).*(?:dia|hora|data))/i.test(t);
+  return /(que\s+horas|qual\s+(?:é\s+|e\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+|e\s+)?(?:a\s+)?data|que\s+data|que\s+dia|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|diz|fala|fale|informa|info)[^.?!]*(?:dia|hora|data|m[eê]s|ano)|\bhoje\b|\bagora\b|\bhoras?\b|\bdata\b|que\s+ano|estamos\s+em\s+que)/i.test(t);
 }
 
 
