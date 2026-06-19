@@ -107,15 +107,15 @@ export default function AdminCases() {
   });
 
   return (
-    <div className="h-screen flex flex-col bg-background" data-testid="admin-cases-page">
-      <div className="px-8 py-5 bg-card border-b border-nude-200 flex items-center justify-between shrink-0">
+    <div className="min-h-screen lg:h-screen flex flex-col bg-background" data-testid="admin-cases-page">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 lg:py-5 bg-card border-b border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
         <div>
           <div className="overline text-gold-600">Painel Administrativo</div>
-          <h1 className="font-serif text-3xl text-nude-900 mt-1 tracking-tight">
+          <h1 className="font-serif text-2xl sm:text-3xl text-nude-900 mt-1 tracking-tight">
             Casos analisados pela IA
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -123,7 +123,7 @@ export default function AdminCases() {
             className="gap-1.5"
             data-testid="refresh-leg-btn"
           >
-            <BookOpen className="w-3.5 h-3.5" /> Atualizar legislação do dia
+            <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Atualizar legislação do dia</span><span className="sm:hidden">Legislação</span>
           </Button>
           <Button
             variant="outline"
@@ -138,7 +138,7 @@ export default function AdminCases() {
       </div>
 
       {/* KPIs */}
-      <div className="px-8 pt-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="px-4 sm:px-6 lg:px-8 pt-4 lg:pt-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
         <Card className="p-4 border-nude-200" data-testid="kpi-total">
           <div className="text-xs tracking-widest uppercase text-nude-500 font-semibold">Total</div>
           <div className="font-serif text-3xl text-nude-900 mt-1">{data?.total ?? 0}</div>
@@ -162,9 +162,9 @@ export default function AdminCases() {
         </Card>
       </div>
 
-      <div className="flex-1 grid grid-cols-12 gap-4 p-5 overflow-hidden">
+      <div className="flex-1 grid grid-cols-12 gap-4 p-4 sm:p-5 lg:overflow-hidden">
         {/* LIST */}
-        <Card className="col-span-12 lg:col-span-5 flex flex-col overflow-hidden border-nude-200" data-testid="cases-list">
+        <Card className="col-span-12 lg:col-span-5 flex flex-col overflow-hidden border-nude-200 max-h-[70vh] lg:max-h-none" data-testid="cases-list">
           <div className="p-3 border-b border-nude-200 flex flex-wrap gap-2 items-center bg-nude-50/60">
             <div className="relative flex-1 min-w-[180px]">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-nude-400" />
@@ -244,7 +244,7 @@ export default function AdminCases() {
         </Card>
 
         {/* DETAIL */}
-        <Card className="col-span-12 lg:col-span-7 flex flex-col overflow-hidden border-nude-200" data-testid="case-detail">
+        <Card className="col-span-12 lg:col-span-7 flex flex-col overflow-hidden border-nude-200 min-h-[60vh] lg:min-h-0" data-testid="case-detail">
           {!selected || !detail ? (
             <div className="flex-1 grid place-items-center text-nude-400 text-sm">
               Selecione um caso para ver os detalhes
