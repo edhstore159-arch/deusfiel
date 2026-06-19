@@ -401,12 +401,17 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
       reply = `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília). ${reply}`.trim();
     }
 
-    // Garante saudação correta (horário de Brasília) na primeira resposta
+    // Garante saudação correta (horário de Brasília) APENAS na primeira resposta.
+    // Nas mensagens seguintes, remove qualquer saudação que o modelo tenha inserido por engano.
     const isFirstAssistantMessage = !history.some((m) => m.role === "assistant" && String(m.content || "").trim());
+    const greetingLead = /^\s*(ol[áa]|oi|hello|hi|bom\s+dia|boa\s+tarde|boa\s+noite)[!,.\s]+/i;
+    reply = reply.replace(greetingLead, "").trim();
     if (isFirstAssistantMessage) {
-      reply = reply.replace(/^\s*(ol[áa]|oi|hello|hi|bom\s+dia|boa\s+tarde|boa\s+noite)[!,.\s]+/i, "").trim();
       reply = `${saudacao}! ${reply}`.trim();
     }
+    // Remove eventuais saudações duplicadas no meio do texto
+    reply = reply.replace(/\b(bom\s+dia|boa\s+tarde|boa\s+noite)[!.,]?\s+(bom\s+dia|boa\s+tarde|boa\s+noite)[!.,]?/gi, "$1!").trim();
+
 
     // Análise técnica do caso (chamada paralela à IA pedindo JSON estruturado)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
