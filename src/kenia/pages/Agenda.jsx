@@ -140,23 +140,24 @@ export default function Agenda() {
 
   return (
     <div className="h-screen flex flex-col bg-nude-50 overflow-hidden">
-      <div className="px-6 py-4 bg-white border-b border-nude-200 flex items-center justify-between">
+      <div className="px-4 sm:px-6 py-4 bg-white border-b border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold">Calendário</div>
-          <h1 className="font-display font-bold text-2xl">Agenda de Reuniões</h1>
+          <h1 className="font-display font-bold text-xl sm:text-2xl">Agenda de Reuniões</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="border-nude-300" onClick={syncDeadlines} disabled={syncingDeadlines} data-testid="sync-deadlines-btn">
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncingDeadlines ? "animate-spin" : ""}`} /> Sincronizar prazos
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="border-nude-300 flex-1 sm:flex-none min-w-0" onClick={syncDeadlines} disabled={syncingDeadlines} data-testid="sync-deadlines-btn">
+            <RefreshCw className={`w-4 h-4 mr-2 shrink-0 ${syncingDeadlines ? "animate-spin" : ""}`} />
+            <span className="truncate">Sincronizar prazos</span>
           </Button>
-          <div className="inline-flex border border-nude-200 rounded-md p-0.5 bg-white">
+          <div className="inline-flex border border-nude-200 rounded-md p-0.5 bg-white shrink-0">
             <Button size="sm" variant={view === "calendar" ? "default" : "ghost"} className="h-7" onClick={() => setView("calendar")}>Mês</Button>
             <Button size="sm" variant={view === "list" ? "default" : "ghost"} className="h-7" onClick={() => setView("list")}>Lista</Button>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-nude-900 hover:bg-nude-800" data-testid="new-appt-btn">
-                <Plus className="w-4 h-4 mr-2" /> Nova reunião
+              <Button size="sm" className="bg-nude-900 hover:bg-nude-800 flex-1 sm:flex-none min-w-0" data-testid="new-appt-btn">
+                <Plus className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Nova reunião</span>
               </Button>
             </DialogTrigger>
             <DialogContent>
