@@ -8,9 +8,12 @@ const corsHeaders = {
 };
 
 const REALISM =
-  "photorealistic, ultra-realistic, real skin texture, professional photography, cinematic lighting, " +
-  "depth of field, vibrant colors, high contrast, sharp focus, 8k, premium advertising aesthetic";
-const NEG = "no text, no letters, no typography, no watermarks, no logos, no deformed faces, no wrong hands, no cartoon, no 3d render, no cgi, no illustration, no artificial look";
+  "RAW photo, ultra realistic, photorealistic, full-body shot, entire body visible from head to toe, " +
+  "correct human anatomy, natural body proportions, realistic hands and fingers, real skin texture with natural imperfections and skin pores, " +
+  "professional photography, photojournalism style, 50mm lens, cinematic lighting, shallow depth of field, sharp focus, 8k";
+const NEG = "deformed body, distorted anatomy, bad proportions, extra limbs, extra arms, extra fingers, bad hands, fused fingers, broken hands, " +
+  "close-up, portrait only, cropped body, face only, cartoon, cgi, 3d render, illustration, painting, blurry, low quality, " +
+  "no text, no letters, no typography, no watermarks, no logos";
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 // NÃO injeta tema (advogada, escritório etc) — só adiciona realismo. O atalho "law"
