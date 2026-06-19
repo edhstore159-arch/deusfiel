@@ -445,13 +445,12 @@ const staticPost = (url, body = {}) => {
       const fallbackReply =
         "Tive uma instabilidade momentânea. Estou aqui para te ajudar; pode me contar o que aconteceu em uma frase curta?";
       try {
-        const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: null }));
         const { data, error } = await supabase.functions.invoke("chat-ai", {
           body: {
             message: body.message || body.text || "",
             history: body.history || [],
             session_id: sessionId,
-            user_id: body.user_id || authData?.user?.id || null,
+            user_id: body.user_id || null,
             want_audio: false,
           },
         });
@@ -735,16 +734,8 @@ export const api = HAS_BACKEND
         return liveApi.post(url, body, config);
       },
       put: liveApi.put.bind(liveApi),
-      patch: (url, body, config) => {
-        const path = String(url).split("?")[0];
-        if (path.startsWith("/legal-deadlines/") || path.startsWith("/appointments/")) return staticPatch(url, body);
-        return liveApi.patch(url, body, config);
-      },
-      delete: (url, config) => {
-        const path = String(url).split("?")[0];
-        if (path.startsWith("/legal-deadlines/") || path.startsWith("/appointments/")) return staticDelete(url);
-        return liveApi.delete(url, config);
-      },
+      patch: (url, body, config) => String(url).split("?")[0].startsWith("/legal-deadlines/") ? staticPatch(url, body) : liveApi.patch(url, body, config),
+      delete: (url, config) => String(url).split("?")[0].startsWith("/legal-deadlines/") ? staticDelete(url) : liveApi.delete(url, config),
     }
   : {
       get: staticGet,

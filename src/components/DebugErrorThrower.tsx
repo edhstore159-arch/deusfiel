@@ -3,9 +3,13 @@ import { useEffect, useState } from "react";
 /**
  * DebugErrorThrower
  *
- * Escuta o evento global "lovable-debug-error" e converte a instrução em
- * erro fatal de runtime para que o overlay nativo da Lovable apareça com
- * o botão "Try to Fix". Deve ficar FORA de qualquer ErrorBoundary.
+ * Escuta "lovable-debug-error" e, durante o render seguinte, lança um
+ * Error fatal contendo a instrução. Isso é INTENCIONAL: o objetivo é
+ * cair no overlay global de erro da Lovable para que o botão
+ * "Try to Fix" receba a instrução, sem passar pela sidebar/chat.
+ *
+ * NÃO envolver em ErrorBoundary/Suspense.
+ * NÃO substituir o throw por toast, log, modal, try/catch ou boundary.
  */
 export const DebugErrorThrower = () => {
   const [message, setMessage] = useState<string | null>(null);
@@ -22,6 +26,7 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
+    // Throw proposital durante o render para escapar para o overlay global.
     throw new Error(message);
   }
 
