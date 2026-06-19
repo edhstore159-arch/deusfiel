@@ -23,6 +23,7 @@ import Settings from "@/kenia/pages/Settings";
 import DebugTool from "@/kenia/pages/DebugTool";
 import ChatIA from "@/kenia/pages/ChatIA";
 import AdminCases from "@/kenia/pages/AdminCases";
+import Agents from "@/kenia/pages/Agents";
 import ResetPassword from "@/kenia/pages/ResetPassword";
 import Trust from "@/kenia/pages/Trust";
 import AppLayout from "@/kenia/components/AppLayout";
@@ -61,6 +62,7 @@ function App() {
               <Route path="/app" element={<Dashboard />} />
               <Route path="/app/chat-ia" element={<ChatIA />} />
               <Route path="/app/admin" element={<AdminCases />} />
+              <Route path="/app/agents" element={<Agents />} />
               <Route path="/app/onboarding" element={<Onboarding />} />
               <Route path="/app/agenda" element={<Agenda />} />
               <Route path="/app/crm" element={<CRM />} />
