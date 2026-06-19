@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Text-to-image: try Lovable Gateway gpt-image-2, fallback to Emergent (gpt-image-1).
+    // Text-to-image: Emergent first, then free/provider fallbacks.
     const img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "low" });
     if (!img.ok) {
       // Local SVG fallback so the client never sees a 502 / blank screen.

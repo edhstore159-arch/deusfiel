@@ -15,6 +15,17 @@ export interface ImageOptions {
   quality?: string;
 }
 
+function isUsableBase64Image(value: unknown) {
+  const b64 = String(value || "").replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "").trim();
+  if (b64.length < 6000) return false;
+  try {
+    const head = atob(b64.slice(0, 64));
+    return head.startsWith("\x89PNG") || head.startsWith("\xff\xd8\xff") || head.startsWith("RIFF");
+  } catch {
+    return false;
+  }
+}
+
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
 const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
@@ -216,21 +227,33 @@ async function imageGemini(opts: ImageOptions) {
 
 async function imageEmergent(opts: ImageOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, error: "EMERGENT_API_KEY ausente" };
-  const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
-    body: JSON.stringify({
-      model: "gpt-image-1",
-      prompt: opts.prompt,
-      size: opts.size || "1024x1024",
-      n: 1,
-    }),
-  });
-  if (!resp.ok) return { ok: false as const, error: `Emergent ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
-  const data = await resp.json();
-  const b64 = data?.data?.[0]?.b64_json;
-  if (!b64) return { ok: false as const, error: "Emergent não retornou imagem" };
-  return { ok: true as const, b64, provider: "emergent" };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
+  try {
+    const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
+      body: JSON.stringify({
+        model: "gpt-image-1",
+        prompt: `${opts.prompt}\n\nFully filled photorealistic image, opaque background, visible subject, no blank canvas, no empty white background.`,
+        size: opts.size || "1024x1024",
+        quality: opts.quality || "medium",
+        background: "opaque",
+        output_format: "png",
+        n: 1,
+      }),
+    });
+    if (!resp.ok) return { ok: false as const, error: `Emergent ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
+    const data = await resp.json();
+    const b64 = data?.data?.[0]?.b64_json;
+    if (!isUsableBase64Image(b64)) return { ok: false as const, error: "Emergent retornou imagem vazia/inválida" };
+    return { ok: true as const, b64, provider: "emergent" };
+  } catch (e) {
+    return { ok: false as const, error: `Emergent erro: ${String((e as Error)?.message || e)}` };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // Compact Flux-friendly prompt: short, dense English, subject→look→scene→light→style + negative.
