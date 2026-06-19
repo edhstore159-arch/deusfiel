@@ -233,18 +233,41 @@ async function imageEmergent(opts: ImageOptions) {
   return { ok: true as const, b64, provider: "emergent" };
 }
 
+// Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
+async function imagePollinations(opts: ImageOptions) {
+  try {
+    const [w, h] = (opts.size || "1024x1024").split("x").map((n) => parseInt(n, 10) || 1024);
+    const seed = Math.floor(Math.random() * 1_000_000);
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(opts.prompt)}?width=${w}&height=${h}&seed=${seed}&nologo=true&model=flux`;
+    const resp = await fetch(url);
+    if (!resp.ok) return { ok: false as const, error: `Pollinations ${resp.status}` };
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+    return { ok: true as const, b64: btoa(bin), provider: "pollinations" };
+  } catch (e) {
+    return { ok: false as const, error: String((e as Error)?.message || e) };
+  }
+}
+
 export async function generateImage(opts: ImageOptions) {
+  // 1) Pollinations (gratuito, sem chave, sem limite)
+  const r0 = await imagePollinations(opts);
+  if (r0.ok) return r0;
+  console.warn("⚠️ Pollinations falhou:", r0.error);
+  // 2) Fallbacks pagos
   if (LOVABLE_KEY) {
     const r = await imageLovable(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Lovable image falhou, tentando Gemini direto:", r.error);
+    console.warn("⚠️ Lovable image falhou:", r.error);
   }
   if (GEMINI_KEY) {
     const r = await imageGemini(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Gemini direto falhou, tentando Emergent:", r.error);
+    console.warn("⚠️ Gemini direto falhou:", r.error);
   }
   const r3 = await imageEmergent(opts);
   if (r3.ok) return r3;
   return { ok: false as const, error: r3.error || "Nenhum provider de imagem disponível", provider: "none" };
 }
+
