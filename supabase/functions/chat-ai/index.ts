@@ -347,7 +347,14 @@ Só envie a resposta depois que os 6 itens estiverem satisfeitos.${antiRepetitio
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const appointment = parseAppointmentBlock(rawReply);
-    const reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    let reply = cleanRepeatedText(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage));
+    if (!reply || reply.length < 2) {
+      reply = userAskedTemporalInfo(userMessage)
+        ? `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília).`
+        : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    } else if (userAskedTemporalInfo(userMessage) && !/\d{2}[\/\-]\d{2}|\d{4}|\d{1,2}:\d{2}|segunda|ter[cç]a|quarta|quinta|sexta|s[áa]bado|domingo|janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro/i.test(reply)) {
+      reply = `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília). ${reply}`.trim();
+    }
 
     // Análise técnica do caso (chamada paralela à IA pedindo JSON estruturado)
     let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
