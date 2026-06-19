@@ -1,10 +1,45 @@
 import { generateWithNanoBanana, stripDataUrl } from '../_shared/nano-banana.ts';
 import { generateImage } from '../_shared/llm.ts';
+import { chatCompletion } from '../_shared/llm.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
+  const styleHint = style === "law"
+    ? "Contexto: arte para redes sociais de um escritório de advocacia brasileiro (visual elegante, jurídico, humano)."
+    : "Respeite estritamente o tema solicitado pelo usuário, sem adicionar contexto não pedido.";
+  try {
+    const r = await chatCompletion({
+      temperature: 0.7,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Você é um especialista em prompts para geração de imagens. " +
+            "Receba o pedido do usuário e devolva APENAS um prompt em inglês, detalhado, descritivo, " +
+            "com composição, iluminação, paleta de cores, estilo artístico e enquadramento. " +
+            "NUNCA inclua texto, letras ou marcas d'água na imagem. " +
+            "Não acrescente explicações, devolva só o prompt final em uma linha.",
+        },
+        { role: "user", content: `${styleHint}\n\nPedido do usuário: ${userPrompt}` },
+      ],
+    });
+    if (r.ok) {
+      const txt = r.data?.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 10) return `${txt}, no text, no letters, no watermarks`;
+    }
+  } catch (_e) { /* fallback below */ }
+  // Fallback: passa o prompt do usuário com instruções mínimas, sem forçar tema.
+  const ctx = style === "law"
+    ? `Square professional social-media art for a Brazilian law firm. Theme: ${userPrompt}. Elegant, human, no text, no letters, no watermarks.`
+    : `${userPrompt}. High quality, detailed, no text, no letters, no watermarks.`;
+  return ctx;
+}
+
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
