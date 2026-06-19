@@ -143,6 +143,9 @@ export default function AppLayout() {
               to={item.to}
               end={item.end}
               data-testid={item.testid}
+              onMouseEnter={() => prefetch(item.to)}
+              onFocus={() => prefetch(item.to)}
+              onTouchStart={() => prefetch(item.to)}
               className={({ isActive }) =>
                 `relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[13px] transition-all duration-200 ${
                   isActive
