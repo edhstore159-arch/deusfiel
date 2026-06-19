@@ -26,6 +26,8 @@ import ResetPassword from "@/kenia/pages/ResetPassword";
 import Trust from "@/kenia/pages/Trust";
 import AppLayout from "@/kenia/components/AppLayout";
 import ScrollToTop from "@/kenia/components/ScrollToTop";
+import { DebugErrorThrower } from "@/components/DebugErrorThrower";
+import { ErrorDebugPopup } from "@/components/ErrorDebugPopup";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -37,9 +39,11 @@ function Protected({ children }) {
 function App() {
   return (
     <div className="App">
+      <DebugErrorThrower />
       <AuthProvider>
         <BrowserRouter>
           <ScrollToTop />
+          <ErrorDebugPopup />
 
           <Routes>
             <Route path="/" element={<Landing />} />
