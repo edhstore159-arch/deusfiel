@@ -23,6 +23,7 @@ import Settings from "@/kenia/pages/Settings";
 import DebugTool from "@/kenia/pages/DebugTool";
 import ChatIA from "@/kenia/pages/ChatIA";
 import AdminCases from "@/kenia/pages/AdminCases";
+import Agents from "@/kenia/pages/Agents";
 import ResetPassword from "@/kenia/pages/ResetPassword";
 import Trust from "@/kenia/pages/Trust";
 import AppLayout from "@/kenia/components/AppLayout";
