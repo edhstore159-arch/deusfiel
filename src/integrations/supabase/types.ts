@@ -14,6 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointments: {
+        Row: {
+          appointment_date: string
+          appointment_time: string
+          case_summary: string | null
+          city: string | null
+          client_name: string
+          created_at: string
+          email: string | null
+          id: string
+          legal_area: string | null
+          phone: string | null
+          raw_payload: Json
+          session_id: string | null
+          source: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          appointment_date: string
+          appointment_time: string
+          case_summary?: string | null
+          city?: string | null
+          client_name: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          legal_area?: string | null
+          phone?: string | null
+          raw_payload?: Json
+          session_id?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          appointment_date?: string
+          appointment_time?: string
+          case_summary?: string | null
+          city?: string | null
+          client_name?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          legal_area?: string | null
+          phone?: string | null
+          raw_payload?: Json
+          session_id?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          response: string | null
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          response?: string | null
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          response?: string | null
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      debug_instructions: {
+        Row: {
+          applied_at: string | null
+          attachments: Json
+          created_at: string
+          id: string
+          instruction: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          attachments?: Json
+          created_at?: string
+          id?: string
+          instruction: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          attachments?: Json
+          created_at?: string
+          id?: string
+          instruction?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
