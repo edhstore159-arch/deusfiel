@@ -80,6 +80,8 @@ export default function WhatsAppSettings() {
   };
 
   const pollBaileys = async () => {
+    if (pollingBaileysRef.current) return;
+    pollingBaileysRef.current = true;
     try {
       const { data: st } = await api.get("/whatsapp/baileys/status");
       const normalized = normalizeBaileysStatus(st);
@@ -88,9 +90,14 @@ export default function WhatsAppSettings() {
       if (!normalized.connected) {
         try {
           const { data: qr } = await api.get("/whatsapp/baileys/qr");
-          setBaileysQr(qr);
-        } catch { /* ignore qr fetch errors */ }
+          const nextQr = qr?.qr ? qr : { ...(qr || {}), qr: null };
+          if (nextQr.qr) lastQrAtRef.current = Date.now();
+          setBaileysQr(nextQr);
+        } catch {
+          setBaileysQr((prev) => prev || { qr: null, state: normalized.state });
+        }
       } else {
+        lastQrAtRef.current = 0;
         setBaileysQr(null);
         if (cfg?.provider !== "baileys") setCfg((current) => current ? { ...current, provider: "baileys", bot_enabled: true } : current);
       }
@@ -106,6 +113,8 @@ export default function WhatsAppSettings() {
           ? `Backend respondeu ${e.response.status} em /whatsapp/baileys/status`
           : "Não foi possível contatar o backend (sidecar Baileys offline).";
       setBaileysStatus((prev) => prev?.connected ? prev : { ok: false, connected: false, state: "offline", last_error: msg });
+    } finally {
+      pollingBaileysRef.current = false;
     }
   };
 
