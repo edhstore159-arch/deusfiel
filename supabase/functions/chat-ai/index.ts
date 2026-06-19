@@ -190,6 +190,30 @@ function userAskedTemporalInfo(text: string): boolean {
 }
 
 
+function removeRoleLabels(reply: string): string {
+  return String(reply || "")
+    .split(/\n+/)
+    .map((line) => line.replace(/^\s*(cliente|usu[áa]rio|user|voc[êe]|pergunta|secret[áa]ria|assistente|assistant|resposta|bot|ia)\s*[:\-–]\s*/i, "").trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function removeUserEcho(reply: string, userMessage: string): string {
+  const userNorm = normalizeForSimilarity(userMessage);
+  if (!userNorm || userNorm.split(" ").length < 3) return reply;
+  const parts = String(reply || "").split(/(?<=[.!?\n])\s+/);
+  const kept = parts.filter((part) => {
+    const partNorm = normalizeForSimilarity(part);
+    if (!partNorm) return true;
+    if (partNorm === userNorm) return false;
+    if (partNorm.length >= 10 && similarityScore(part, userMessage) >= 0.8) return false;
+    return true;
+  });
+  const result = kept.join(" ").trim();
+  return result || reply;
+}
+
 function removeTemporalLeaks(reply: string, userMessage: string): string {
   if (userAskedTemporalInfo(userMessage)) return reply;
   return String(reply || "")
