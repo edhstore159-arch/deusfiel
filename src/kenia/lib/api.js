@@ -1,7 +1,7 @@
 import axios from "axios";
 import { supabase } from "@/integrations/supabase/client";
 
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "https://minimal-arch-muse-384-bak.onrender.com").replace(/\/$/, "");
 export const HAS_BACKEND = Boolean(BACKEND_URL);
 export const API = HAS_BACKEND ? `${BACKEND_URL}/api` : "";
 
