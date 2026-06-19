@@ -38,7 +38,6 @@ export default function WhatsAppSettings() {
   const [baileysStatus, setBaileysStatus] = useState(null);
   const [baileysQr, setBaileysQr] = useState(null);
   const [baileysLoggingOut, setBaileysLoggingOut] = useState(false);
-  const lastQrAtRef = useRef(0);
   const pollingBaileysRef = useRef(false);
   const connectingStartedAtRef = useRef(0);
   const autoReconnectAtRef = useRef(0);
@@ -99,7 +98,6 @@ export default function WhatsAppSettings() {
         try {
           const { data: qr } = await api.get("/whatsapp/baileys/qr");
           const nextQr = qr?.qr ? qr : { ...(qr || {}), qr: null };
-          if (nextQr.qr) lastQrAtRef.current = Date.now();
           setBaileysQr(nextQr);
           if (!nextQr.qr && normalized.state === "connecting") {
             const waitingFor = Date.now() - connectingStartedAtRef.current;
@@ -112,7 +110,6 @@ export default function WhatsAppSettings() {
           setBaileysQr((prev) => prev || { qr: null, state: normalized.state });
         }
       } else {
-        lastQrAtRef.current = 0;
         setBaileysQr(null);
         if (cfg?.provider !== "baileys") setCfg((current) => current ? { ...current, provider: "baileys", bot_enabled: true } : current);
       }
