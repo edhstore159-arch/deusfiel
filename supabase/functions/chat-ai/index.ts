@@ -4,6 +4,8 @@ import { chatCompletion } from "../_shared/llm.ts";
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY");
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const OLLAMA_URL = Deno.env.get("OLLAMA_URL");
 const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const ELEVENLABS_VOICE_ID = Deno.env.get("ELEVENLABS_VOICE_ID") || "EXAVITQu4vr4xnSDxMaL"; // Sarah (PT-BR natural)
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -227,9 +229,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (!LOVABLE_API_KEY && !EMERGENT_API_KEY) {
+    if (!OLLAMA_URL && !LOVABLE_API_KEY && !GEMINI_API_KEY && !EMERGENT_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "Nenhuma chave de IA configurada (LOVABLE_API_KEY ou EMERGENT_API_KEY)" }),
+        JSON.stringify({ error: "Nenhum provedor de IA configurado (OLLAMA_URL, LOVABLE_API_KEY, GEMINI_API_KEY ou EMERGENT_API_KEY)" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
