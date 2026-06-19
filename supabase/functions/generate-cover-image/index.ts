@@ -9,8 +9,13 @@ const corsHeaders = {
 
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   const styleHint = style === "law"
-    ? "Contexto: arte para redes sociais de um escritório de advocacia brasileiro (visual elegante, jurídico, humano)."
-    : "Respeite estritamente o tema solicitado pelo usuário, sem adicionar contexto não pedido.";
+    ? "Contexto: post fotográfico realista para redes sociais de um escritório de advocacia brasileiro."
+    : "Respeite estritamente o tema solicitado pelo usuário. Gere uma imagem FOTORREALISTA para redes sociais.";
+  const REALISM =
+    "photorealistic, ultra-realistic, shot on Canon EOS R5 with 50mm f/1.4 lens, " +
+    "natural lighting, shallow depth of field, high detail skin texture, realistic human anatomy, " +
+    "candid documentary style, 8k, professional color grading, sharp focus";
+  const NEG = "no text, no letters, no typography, no watermarks, no logos, no cartoon, no illustration, no 3d render, no cgi, no painting";
   try {
     const r = await chatCompletion({
       temperature: 0.7,
@@ -18,26 +23,28 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
         {
           role: "system",
           content:
-            "Você é um especialista em prompts para geração de imagens. " +
-            "Receba o pedido do usuário e devolva APENAS um prompt em inglês, detalhado, descritivo, " +
-            "com composição, iluminação, paleta de cores, estilo artístico e enquadramento. " +
-            "NUNCA inclua texto, letras ou marcas d'água na imagem. " +
-            "Não acrescente explicações, devolva só o prompt final em uma linha.",
+            "Você é um diretor de arte especialista em prompts de fotografia para redes sociais. " +
+            "Receba o pedido do usuário e devolva APENAS um prompt em inglês, em UMA linha, " +
+            "descrevendo uma FOTOGRAFIA REALISTA (não ilustração, não 3D, não cartoon). " +
+            "Inclua: sujeito, cenário, ação, lente/câmera, iluminação, paleta, mood, enquadramento e estilo fotográfico. " +
+            "Pessoas devem ter anatomia, pele e expressões realistas. " +
+            "NUNCA inclua texto, letras, logos ou marcas d'água. " +
+            "Devolva só o prompt final, sem explicações.",
         },
         { role: "user", content: `${styleHint}\n\nPedido do usuário: ${userPrompt}` },
       ],
     });
     if (r.ok) {
       const txt = r.data?.choices?.[0]?.message?.content?.trim();
-      if (txt && txt.length > 10) return `${txt}, no text, no letters, no watermarks`;
+      if (txt && txt.length > 10) return `${txt}, ${REALISM}, ${NEG}`;
     }
   } catch (_e) { /* fallback below */ }
-  // Fallback: passa o prompt do usuário com instruções mínimas, sem forçar tema.
-  const ctx = style === "law"
-    ? `Square professional social-media art for a Brazilian law firm. Theme: ${userPrompt}. Elegant, human, no text, no letters, no watermarks.`
-    : `${userPrompt}. High quality, detailed, no text, no letters, no watermarks.`;
-  return ctx;
+  const base = style === "law"
+    ? `Realistic editorial photograph for a Brazilian law firm social media. Theme: ${userPrompt}. Elegant, human, professional environment.`
+    : `Realistic editorial social-media photograph. Theme: ${userPrompt}.`;
+  return `${base} ${REALISM}, ${NEG}`;
 }
+
 
 
 
