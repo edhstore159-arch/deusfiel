@@ -233,12 +233,29 @@ async function imageEmergent(opts: ImageOptions) {
   return { ok: true as const, b64, provider: "emergent" };
 }
 
+// Compact Flux-friendly prompt: short, dense English, subject→look→scene→light→style + negative.
+function buildFluxPrompt(raw: string): string {
+  // Take first ~280 chars of user prompt, strip heavy structure markers.
+  const base = raw
+    .replace(/\[[^\]]+\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 280);
+  const STYLE =
+    "photorealistic, real skin texture, professional photography, cinematic lighting, " +
+    "shallow depth of field, sharp focus, 8k";
+  const NEG =
+    "negative: blurry, low quality, distorted face, bad hands, extra fingers, unrealistic, cartoon, oversaturated, text, watermark, logo";
+  return `${base}, ${STYLE}. ${NEG}`;
+}
+
 // Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
 async function imagePollinations(opts: ImageOptions) {
   try {
     const [w, h] = (opts.size || "1024x1024").split("x").map((n) => parseInt(n, 10) || 1024);
     const seed = Math.floor(Math.random() * 1_000_000);
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(opts.prompt)}?width=${w}&height=${h}&seed=${seed}&nologo=true&model=flux`;
+    const flux = buildFluxPrompt(opts.prompt);
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=true&model=flux`;
     const resp = await fetch(url);
     if (!resp.ok) return { ok: false as const, error: `Pollinations ${resp.status}` };
     const buf = new Uint8Array(await resp.arrayBuffer());
