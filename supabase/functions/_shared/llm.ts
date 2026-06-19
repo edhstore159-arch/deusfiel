@@ -1,4 +1,4 @@
-// Shared LLM helpers with fallback chain: Lovable → Google Gemini (direct) → Emergent.
+// Shared LLM helpers with fallback chain: Ollama (when configured) → Lovable → Google Gemini (direct) → Emergent.
 
 type ChatMessage = { role: string; content: any };
 
@@ -18,6 +18,9 @@ export interface ImageOptions {
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
 const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
+const OLLAMA_URL = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "");
+const OLLAMA_MODEL = Deno.env.get("OLLAMA_MODEL") || "qwen3:8b";
+const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
 
 // ---------- chat completions ----------
 
@@ -97,8 +100,61 @@ async function chatEmergent(opts: ChatOptions) {
   return { ok: true as const, data: await resp.json(), provider: "emergent" };
 }
 
+function isUnsupportedOllamaHost(rawUrl: string) {
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host.endsWith(".local");
+  } catch {
+    return true;
+  }
+}
+
+async function chatOllama(opts: ChatOptions) {
+  if (!OLLAMA_URL) return { ok: false as const, status: 0, error: "OLLAMA_URL ausente" };
+  if (isUnsupportedOllamaHost(OLLAMA_URL)) {
+    return { ok: false as const, status: 0, error: "OLLAMA_URL precisa ser uma URL pública acessível pelo backend" };
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const resp = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(OLLAMA_API_KEY ? { Authorization: `Bearer ${OLLAMA_API_KEY}` } : {}),
+      },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: opts.messages.map((message) => ({ role: message.role, content: String(message.content || "") })),
+        stream: false,
+        ...(opts.response_format?.type === "json_object" ? { format: "json" } : {}),
+        options: { temperature: typeof opts.temperature === "number" ? opts.temperature : 0.7 },
+      }),
+    });
+    const text = await resp.text();
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: text };
+    const data = JSON.parse(text || "{}");
+    const content = data?.message?.content || data?.response || "";
+    return {
+      ok: true as const,
+      provider: "ollama",
+      data: { choices: [{ message: { role: "assistant", content } }] },
+    };
+  } catch (error) {
+    return { ok: false as const, status: 0, error: String(error?.message || error) };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function chatCompletion(opts: ChatOptions) {
-  // Order: Lovable → Gemini (direct) → Emergent
+  // Order: Ollama → Lovable → Gemini (direct) → Emergent
+  if (OLLAMA_URL) {
+    const r = await chatOllama(opts);
+    if (r.ok) return r;
+    console.warn("⚠️ Ollama falhou, tentando Lovable/Gemini/Emergent:", r.status, r.error?.slice?.(0, 200));
+  }
   if (LOVABLE_KEY) {
     const r = await chatLovable(opts);
     if (r.ok) return r;
