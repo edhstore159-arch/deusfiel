@@ -6,7 +6,7 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Separator } from "@/kenia/components/ui/separator";
-import { Bot, Plus, Save, Trash2, Sparkles, Copy } from "lucide-react";
+import { Bot, Plus, Save, Trash2, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "kenia_ai_agents_v1";
@@ -113,21 +113,6 @@ export default function Agents() {
     setDraft(copy);
   };
 
-  const buildSystemPrompt = (a) => [
-    `Você é "${a.name}", uma secretária jurídica especializada em ${a.area}.`,
-    `Tom de voz: ${a.tone}.`,
-    `Objetivo principal: ${a.goal}`,
-    a.greeting && `Apresentação inicial: "${a.greeting}"`,
-    a.instructions && `Instruções adicionais:\n${a.instructions}`,
-    "Nunca diga que é uma IA. Responda de forma clara, humanizada e profissional.",
-  ].filter(Boolean).join("\n\n");
-
-  const copyPrompt = () => {
-    if (!draft) return;
-    navigator.clipboard.writeText(buildSystemPrompt(draft));
-    toast.success("Prompt copiado");
-  };
-
   if (!draft) return null;
 
   return (
@@ -208,9 +193,6 @@ export default function Agents() {
               </h2>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={copyPrompt} className="gap-1.5">
-                <Sparkles className="w-4 h-4" /> Copiar prompt
-              </Button>
               <Button onClick={saveDraft} className="bg-gold-600 hover:bg-gold-700 text-white gap-1.5">
                 <Save className="w-4 h-4" /> Salvar
               </Button>
@@ -307,13 +289,8 @@ export default function Agents() {
 
             <Separator />
 
-            <div>
-              <div className="text-xs uppercase tracking-widest text-nude-500 font-semibold mb-2">
-                Prévia do prompt do sistema
-              </div>
-              <pre className="text-xs text-nude-700 bg-nude-50 border border-nude-200 rounded-md p-3 whitespace-pre-wrap leading-relaxed max-h-64 overflow-auto">
-                {buildSystemPrompt(draft)}
-              </pre>
+            <div className="rounded-md border border-nude-200 bg-nude-50 p-3 text-sm text-nude-600">
+              As instruções finais do atendimento ficam protegidas no backend para não serem exibidas ao cliente.
             </div>
           </div>
         </Card>
