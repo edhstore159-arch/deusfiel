@@ -7,15 +7,34 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Template base (PT) solicitado pelo usuário — guia o estilo final da imagem.
+const PT_TEMPLATE = (tema: string) => `Crie uma imagem altamente realista e visualmente impactante de ${tema}.
+
+Estilo moderno e publicitário, com iluminação cinematográfica, cores vibrantes e alto contraste.
+A composição deve ser limpa e profissional, com foco principal bem definido e fundo levemente desfocado (efeito depth of field).
+
+Detalhes extremamente nítidos, textura realista, qualidade 4K ou superior.
+Iluminação suave com highlights bem distribuídos, estilo estúdio fotográfico.
+
+Use ângulo dinâmico, enquadramento bem pensado e estética premium, semelhante a anúncios de marcas grandes.
+
+Evite distorções, rostos deformados ou elementos irreais.
+Resultado final deve parecer uma fotografia profissional ou arte digital de alto nível.
+
+--ar 1:1 --v 6 --q 2`;
+
+const REALISM =
+  "photorealistic, ultra-realistic, cinematic lighting, vibrant colors, high contrast, " +
+  "clean professional composition, sharp main subject, shallow depth of field, " +
+  "extremely sharp details, realistic textures, 4k+ quality, soft studio lighting with balanced highlights, " +
+  "dynamic angle, premium advertising aesthetic, big-brand ad style, professional photography";
+const NEG = "no text, no letters, no typography, no watermarks, no logos, no distortions, no deformed faces, no unreal elements, no cartoon, no 3d render, no cgi";
+
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   const styleHint = style === "law"
-    ? "Contexto: post fotográfico realista para redes sociais de um escritório de advocacia brasileiro."
-    : "Respeite estritamente o tema solicitado pelo usuário. Gere uma imagem FOTORREALISTA para redes sociais.";
-  const REALISM =
-    "photorealistic, ultra-realistic, shot on Canon EOS R5 with 50mm f/1.4 lens, " +
-    "natural lighting, shallow depth of field, high detail skin texture, realistic human anatomy, " +
-    "candid documentary style, 8k, professional color grading, sharp focus";
-  const NEG = "no text, no letters, no typography, no watermarks, no logos, no cartoon, no illustration, no 3d render, no cgi, no painting";
+    ? "Contexto: anúncio fotográfico realista para redes sociais de um escritório de advocacia brasileiro."
+    : "Respeite estritamente o tema solicitado pelo usuário.";
+  const ptBrief = PT_TEMPLATE(userPrompt);
   try {
     const r = await chatCompletion({
       temperature: 0.7,
@@ -23,15 +42,16 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
         {
           role: "system",
           content:
-            "Você é um diretor de arte especialista em prompts de fotografia para redes sociais. " +
-            "Receba o pedido do usuário e devolva APENAS um prompt em inglês, em UMA linha, " +
-            "descrevendo uma FOTOGRAFIA REALISTA (não ilustração, não 3D, não cartoon). " +
-            "Inclua: sujeito, cenário, ação, lente/câmera, iluminação, paleta, mood, enquadramento e estilo fotográfico. " +
-            "Pessoas devem ter anatomia, pele e expressões realistas. " +
-            "NUNCA inclua texto, letras, logos ou marcas d'água. " +
-            "Devolva só o prompt final, sem explicações.",
+            "Você é um diretor de arte especialista em prompts publicitários fotorrealistas. " +
+            "Receba o briefing em português e devolva APENAS um prompt em inglês, em UMA linha, " +
+            "seguindo este estilo: imagem altamente realista e visualmente impactante, estilo moderno e publicitário, " +
+            "iluminação cinematográfica, cores vibrantes, alto contraste, composição limpa e profissional, " +
+            "foco principal bem definido, fundo levemente desfocado (depth of field), detalhes extremamente nítidos, " +
+            "textura realista, qualidade 4K+, iluminação suave estilo estúdio, ângulo dinâmico, estética premium tipo anúncio de marca grande. " +
+            "Evite distorções, rostos deformados, texto, logos ou elementos irreais. " +
+            "Devolva só o prompt final em inglês, sem explicações.",
         },
-        { role: "user", content: `${styleHint}\n\nPedido do usuário: ${userPrompt}` },
+        { role: "user", content: `${styleHint}\n\n${ptBrief}` },
       ],
     });
     if (r.ok) {
@@ -40,8 +60,8 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
     }
   } catch (_e) { /* fallback below */ }
   const base = style === "law"
-    ? `Realistic editorial photograph for a Brazilian law firm social media. Theme: ${userPrompt}. Elegant, human, professional environment.`
-    : `Realistic editorial social-media photograph. Theme: ${userPrompt}.`;
+    ? `Highly realistic, visually striking advertising photograph for a Brazilian law firm social media. Theme: ${userPrompt}. Elegant, human, professional environment.`
+    : `Highly realistic, visually striking advertising photograph. Theme: ${userPrompt}.`;
   return `${base} ${REALISM}, ${NEG}`;
 }
 
