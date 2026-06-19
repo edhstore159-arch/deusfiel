@@ -3,13 +3,8 @@ import { useEffect } from "react";
 /**
  * DebugErrorThrower
  *
- * Escuta "lovable-debug-error" e, durante o render seguinte, lança um
- * Error fatal contendo a instrução. Isso é INTENCIONAL: o objetivo é
- * cair no overlay global de erro da Lovable para que o botão
- * "Try to Fix" receba a instrução, sem passar pela sidebar/chat.
- *
- * NÃO envolver em ErrorBoundary/Suspense.
- * NÃO substituir o throw por toast, log, modal, try/catch ou boundary.
+ * Escuta "lovable-debug-error" e registra a instrução sem quebrar a tela
+ * do app. O erro fatal anterior causava tela branca no preview.
  */
 export const DebugErrorThrower = () => {
   useEffect(() => {
