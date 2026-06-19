@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * DebugErrorThrower
@@ -12,17 +12,23 @@ import { useEffect } from "react";
  * NÃO substituir o throw por toast, log, modal, try/catch ou boundary.
  */
 export const DebugErrorThrower = () => {
+  const [message, setMessage] = useState<string | null>(null);
+
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
       if (typeof detail === "string" && detail.length > 0) {
-        // Nunca derruba a aplicação nem mostra instruções internas ao cliente.
-        console.info("Instrução de debug recebida e suprimida.");
+        setMessage(detail);
       }
     };
     window.addEventListener("lovable-debug-error", handler as EventListener);
     return () => window.removeEventListener("lovable-debug-error", handler as EventListener);
   }, []);
+
+  if (message) {
+    // Throw proposital durante o render para escapar para o overlay global.
+    throw new Error(message);
+  }
 
   return null;
 };

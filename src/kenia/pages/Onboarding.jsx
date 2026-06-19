@@ -5,6 +5,7 @@ import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
+import { Textarea } from "@/kenia/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kenia/components/ui/select";
 import { Progress } from "@/kenia/components/ui/progress";
 import { Badge } from "@/kenia/components/ui/badge";
@@ -15,6 +16,21 @@ import {
   Building2, MessageSquare, Sparkles, Loader2, QrCode,
 } from "lucide-react";
 
+const DEFAULT_BOT_PROMPT = [
+  "Você é a secretária da Kênia Garcia no WhatsApp.",
+  "Sua função é atender clientes com cordialidade, empatia e profissionalismo, auxiliando em questões jurídicas e dúvidas gerais.",
+  "Nunca diga que é uma inteligência artificial, assistente virtual, chatbot, robô ou sistema automatizado.",
+  "Não mencione tecnologias, modelos de IA, automações ou sistemas internos.",
+  "Quando iniciar conversa ou se apresentar, diga exatamente: \"Olá! Sou a secretária da Kênia Garcia. Como posso ajudar?\"",
+  "Responda de forma clara, objetiva e humanizada. Não informe data, hora ou dia, exceto se o cliente pedir.",
+  "Não repita a mesma frase em mensagens consecutivas, não repita a apresentação em todas as respostas e apresente-se apenas no início da conversa ou quando necessário.",
+  "Evite repetir perguntas já respondidas e orientações já fornecidas; se o cliente não responder, reformule a pergunta de outra forma.",
+  "Use todo o histórico disponível para manter continuidade; não pergunte novamente informações que o cliente já respondeu.",
+  "Relacione novas informações com fatos anteriores e mantenha contexto sobre nome, telefone, e-mail, área jurídica, fatos principais, datas, documentos, objetivo e status do atendimento.",
+  "Em agendamentos, confirme apenas dados necessários que ainda não foram fornecidos; nunca trate cada mensagem como uma conversa nova quando houver histórico.",
+  "Nunca invente leis ou prometa resultado jurídico.",
+].join(" ");
+
 export default function Onboarding() {
   const [step, setStep] = useState(1);
   const { user } = useAuth();
@@ -22,6 +38,7 @@ export default function Onboarding() {
   const [data, setData] = useState({
     office_name: "", oab: user?.oab || "",
     main_area: "Trabalhista",
+    bot_prompt: DEFAULT_BOT_PROMPT,
   });
   const [zapi, setZapi] = useState({
     zapi_instance_id: "", zapi_instance_token: "", zapi_client_token: "",
@@ -49,6 +66,7 @@ export default function Onboarding() {
         zapi_instance_token: c.zapi_instance_token || "",
         zapi_client_token: c.zapi_client_token || "",
       });
+      if (c.bot_prompt) setData(d => ({ ...d, bot_prompt: c.bot_prompt }));
     }).catch(() => {});
   }, []);
 
@@ -85,7 +103,7 @@ export default function Onboarding() {
     try {
       await api.put("/whatsapp/config", {
         provider: "baileys", ...zapi,
-        bot_enabled: true,
+        bot_enabled: true, bot_prompt: data.bot_prompt,
       });
       toast.success("Configuração WhatsApp salva");
       const { data: qrData } = await api.get("/whatsapp/qr");
@@ -193,8 +211,10 @@ export default function Onboarding() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="rounded-md border border-nude-200 bg-nude-50 p-3 text-sm text-nude-600">
-                A secretária virtual já vem configurada com atendimento humanizado, memória da conversa e proteção das instruções internas.
+              <div>
+                <Label>Prompt do robô de atendimento</Label>
+                <Textarea rows={4} value={data.bot_prompt} onChange={e => setData({ ...data, bot_prompt: e.target.value })} data-testid="ob-prompt" />
+                <div className="text-xs text-nude-500 mt-1">Personalidade e instruções do atendente IA que conversa com seus leads no WhatsApp.</div>
               </div>
               <div className="pt-2 flex justify-between">
                 <Button variant="outline" onClick={() => setStep(1)}><ArrowLeft className="mr-2 w-4 h-4" /> Voltar</Button>
