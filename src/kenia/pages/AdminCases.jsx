@@ -115,7 +115,7 @@ export default function AdminCases() {
             Casos analisados pela IA
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -123,7 +123,7 @@ export default function AdminCases() {
             className="gap-1.5"
             data-testid="refresh-leg-btn"
           >
-            <BookOpen className="w-3.5 h-3.5" /> Atualizar legislação do dia
+            <BookOpen className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Atualizar legislação do dia</span><span className="sm:hidden">Legislação</span>
           </Button>
           <Button
             variant="outline"
