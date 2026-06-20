@@ -536,7 +536,7 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
     }
     if (!userAskedTemporalInfo(userMessage) && reply.includes("?")) {
       reply = compactQuestion(reply);
-      if (isNearDuplicateReply(reply, history)) reply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+      if (isNearDuplicateReply(reply, history) || isRepeatedQuestion(reply, history)) reply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
 
     // Garante saudação correta (horário de Brasília) APENAS na primeira resposta.
