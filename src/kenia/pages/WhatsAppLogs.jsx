@@ -8,7 +8,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { toast } from "sonner";
 import {
   ArrowDownLeft, ArrowUpRight, Bot, RefreshCw, CheckCheck,
-  AlertCircle, Search, Radio,
+  AlertCircle, Search, Radio, Phone,
 } from "lucide-react";
 
 export default function WhatsAppLogs() {
