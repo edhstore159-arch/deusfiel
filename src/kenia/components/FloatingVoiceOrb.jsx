@@ -260,6 +260,12 @@ export default function FloatingVoiceOrb() {
       reportTodayAppointments();
       return;
     }
+    // Ligar para [nome]
+    const callMatch = text.match(/\b(?:ligar|telefonar|chamar|ligue|telefone)\s+(?:para|pro|pra|o|a)?\s*(.+)/i);
+    if (callMatch) { callClient(callMatch[1].trim()); return; }
+    // Reagendar [nome]
+    const reMatch = text.match(/\b(?:reagendar|remarcar|reagenda|remarca)\s+(?:com|para|o|a)?\s*(.+)/i);
+    if (reMatch) { rescheduleClient(reMatch[1].trim()); return; }
     const route = matchRoute(text);
     // Comandos diretos de navegação ("abrir/ir/vai para X")
     if (route && /\b(abrir|abra|ir|vai|vá|leva|leve|navegar|abre)\b/i.test(text)) {
