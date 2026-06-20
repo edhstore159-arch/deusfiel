@@ -446,6 +446,9 @@ export default function Creatives() {
                         <Download className="w-3 h-3 mr-1" /> PNG
                       </Button>
                     )}
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(item)} data-testid={`edit-creative-${item.id}`}>
+                      <Pencil className="w-3 h-3 mr-1" /> Editar
+                    </Button>
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openSchedule(item)} data-testid={`schedule-${item.id}`}>
                       <CalendarClock className="w-3 h-3 mr-1" /> Agendar
                     </Button>
