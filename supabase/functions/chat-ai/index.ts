@@ -60,9 +60,8 @@ ESTILO DE FALA (OBRIGATÓRIO):
 - NUNCA fale em primeira pessoa ("eu", "minha", "posso te ajudar", "vou", "consigo"). Não se apresente nem se referencie.
 - SEMPRE direcione a fala ao cliente em segunda pessoa ("você", "seu", "sua", "te"). Foque no cliente, não na secretária.
 - Exemplos: em vez de "Eu posso te ajudar com isso", escreva "Você pode contar com a equipe certa para isso". Em vez de "Vou agendar para você", escreva "Seu atendimento pode ser agendado agora".
-- Português brasileiro, tom caloroso e empático, no máximo 2 frases curtas por mensagem.
+- Português brasileiro, tom caloroso e empático, 1-3 frases por mensagem.
 - UMA pergunta por vez. NUNCA empilhe perguntas.
-- Perguntas devem ser curtas: no máximo 18 palavras, sem listas de dados na mesma pergunta.
 - Sempre que o cliente mencionar uma área genérica, faça PERGUNTAS DE APROFUNDAMENTO antes de avançar.
 
 RECONHECIMENTO DE IMAGENS:
@@ -235,39 +234,16 @@ function isNearDuplicateReply(reply: string, history: Array<{ role: string; cont
   });
 }
 
-function isRepeatedQuestion(reply: string, history: Array<{ role: string; content: string }>): boolean {
-  const question = String(reply || "").split(/(?<=\?)/).find((part) => part.includes("?")) || "";
-  if (!question) return false;
-  return recentAssistantReplies(history).some((previous) =>
-    String(previous || "")
-      .split(/(?<=\?)/)
-      .filter((part) => part.includes("?"))
-      .some((previousQuestion) => similarityScore(question, previousQuestion) >= 0.5),
-  );
-}
-
 function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string): string {
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
-    return "Claro. Qual data você prefere para o atendimento?";
+    return "Claro. Para eu deixar a consulta registrada corretamente, me informe nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
   if (/\b(div[oó]rcio|guarda|pens[aã]o|fam[ií]lia|invent[aá]rio|trabalhista|demiss[aã]o|rescis[aã]o|inss|aposentadoria|consumidor|cobran[cç]a|audi[eê]ncia|intima[cç][aã]o)\b/i.test(text)) {
-    return "Entendi. Existe algum prazo ou audiência marcada?";
+    return "Entendi. Para eu direcionar melhor seu atendimento, me conte quando isso aconteceu, sua cidade/estado e se existe algum prazo ou audiência marcado.";
   }
-  return "Entendi. O que você precisa resolver agora?";
-}
-
-function compactQuestion(reply: string): string {
-  const text = cleanRepeatedText(String(reply || "").trim());
-  if (!text) return text;
-  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((part) => part.trim()).filter(Boolean) || [text];
-  const questions = sentences.filter((part) => part.includes("?"));
-  const chosen = questions.length ? questions[questions.length - 1] : sentences.slice(0, 2).join(" ");
-  const words = chosen.split(/\s+/).filter(Boolean);
-  if (words.length <= 18) return chosen.trim();
-  const shortened = words.slice(0, 18).join(" ").replace(/[,.!?;:]*$/, "");
-  return chosen.includes("?") ? `${shortened}?` : `${shortened}.`;
+  return "Entendi. Para seguir sem repetir informações, me conte em poucas palavras o que aconteceu e qual ajuda você precisa agora.";
 }
 
 const caseAreaMatchers = [
@@ -296,7 +272,7 @@ function normalizeCaseAnalysis(analysis: any, fallback: any = {}) {
     area: String(source.area || fallback.area || "Em análise jurídica"),
     resumo: String(source.resumo || fallback.resumo || "Análise inicial do atendimento em andamento."),
     motivo: String(source.motivo || fallback.motivo || "A avaliação será refinada conforme mais detalhes forem informados."),
-    proxima_pergunta: compactQuestion(String(source.proxima_pergunta || fallback.proxima_pergunta || "")),
+    proxima_pergunta: String(source.proxima_pergunta || fallback.proxima_pergunta || ""),
     fundamentos: Array.isArray(source.fundamentos) ? source.fundamentos : Array.isArray(fallback.fundamentos) ? fallback.fundamentos : [],
   };
 }
@@ -321,8 +297,8 @@ function buildLocalCaseAnalysis(history: Array<{ role: string; content: string }
       ? "A conversa já contém sinais da área jurídica e detalhes suficientes para uma triagem inicial."
       : "Ainda faltam dados objetivos sobre área, datas, documentos e impacto do problema.",
     proxima_pergunta: hasDeadline
-      ? "Há algum documento ou número de processo?"
-      : "Existe prazo ou audiência marcada?",
+      ? "Você tem algum documento, contrato, comprovante ou número de processo sobre esse caso?"
+      : "Existe algum prazo, audiência, bloqueio ou urgência acontecendo agora?",
     fundamentos: matched ? [matched.area] : [],
   });
 }
@@ -475,7 +451,7 @@ VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 3. Verifique se a sua resposta realmente atende ao que foi perguntado — se não atender, refaça.
 4. Confirme se a resposta é coerente com o histórico da conversa, não contradiz informações já dadas e não repete saudação/pergunta anterior.
 5. Garanta que a resposta seja direta, em português, no tom de secretária da Kênia Garcia, e avance a conversa (não devolva a mesma pergunta).
-6. Se houver pergunta, envie só UMA pergunta curta, diferente das anteriores, com no máximo 18 palavras.
+6. Se for a primeira mensagem, confirme que começou com "${saudacao}!". Se o cliente perguntou se você está bem, confirme que afirmou e devolveu a pergunta.
 7. NUNCA repita ou parafraseie a pergunta do cliente antes de responder. NUNCA escreva rótulos como "Cliente:", "Você:", "Secretária:", "Resposta:" — escreva apenas a resposta direta, em uma única voz (a sua). NUNCA gere a próxima fala do cliente.
 Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitionContext}`;
 
@@ -533,10 +509,6 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
         : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     } else if (userAskedTemporalInfo(userMessage) && !/\d{2}[\/\-]\d{2}|\d{4}|\d{1,2}:\d{2}|segunda|ter[cç]a|quarta|quinta|sexta|s[áa]bado|domingo|janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro/i.test(reply)) {
       reply = `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília). ${reply}`.trim();
-    }
-    if (!userAskedTemporalInfo(userMessage) && reply.includes("?")) {
-      reply = compactQuestion(reply);
-      if (isNearDuplicateReply(reply, history) || isRepeatedQuestion(reply, history)) reply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
 
     // Garante saudação correta (horário de Brasília) APENAS na primeira resposta.
