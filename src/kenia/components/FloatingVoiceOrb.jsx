@@ -477,6 +477,23 @@ export default function FloatingVoiceOrb() {
             </div>
           )}
 
+          {ytQuery && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-nude-900 truncate">YouTube: {ytQuery}</span>
+                <button onClick={() => setYtQuery("")} className="text-nude-500 hover:text-nude-900 text-xs">fechar</button>
+              </div>
+              <div className="aspect-video w-full rounded overflow-hidden bg-black">
+                <iframe
+                  title="YouTube"
+                  className="w-full h-full"
+                  src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(ytQuery)}&autoplay=1`}
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
