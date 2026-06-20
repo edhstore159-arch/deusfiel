@@ -235,6 +235,17 @@ function isNearDuplicateReply(reply: string, history: Array<{ role: string; cont
   });
 }
 
+function isRepeatedQuestion(reply: string, history: Array<{ role: string; content: string }>): boolean {
+  const question = String(reply || "").split(/(?<=\?)/).find((part) => part.includes("?")) || "";
+  if (!question) return false;
+  return recentAssistantReplies(history).some((previous) =>
+    String(previous || "")
+      .split(/(?<=\?)/)
+      .filter((part) => part.includes("?"))
+      .some((previousQuestion) => similarityScore(question, previousQuestion) >= 0.5),
+  );
+}
+
 function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string): string {
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
@@ -285,7 +296,7 @@ function normalizeCaseAnalysis(analysis: any, fallback: any = {}) {
     area: String(source.area || fallback.area || "Em análise jurídica"),
     resumo: String(source.resumo || fallback.resumo || "Análise inicial do atendimento em andamento."),
     motivo: String(source.motivo || fallback.motivo || "A avaliação será refinada conforme mais detalhes forem informados."),
-    proxima_pergunta: String(source.proxima_pergunta || fallback.proxima_pergunta || ""),
+    proxima_pergunta: compactQuestion(String(source.proxima_pergunta || fallback.proxima_pergunta || "")),
     fundamentos: Array.isArray(source.fundamentos) ? source.fundamentos : Array.isArray(fallback.fundamentos) ? fallback.fundamentos : [],
   };
 }
