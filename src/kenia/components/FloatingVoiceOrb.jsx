@@ -230,13 +230,20 @@ export default function FloatingVoiceOrb() {
   const speak = (text) => {
     try {
       const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
+      const spokenText = String(text || "").trim();
+      if (!spokenText) return;
+      speechRunIdRef.current += 1;
+      const runId = speechRunIdRef.current;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "pt-BR";
       u.onstart = () => {
+        if (runId !== speechRunIdRef.current) return;
+        if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
         if (!shouldResume) return;
         speakingRef.current = true;
       };
       const resume = () => {
+        if (runId !== speechRunIdRef.current) return;
         speakingRef.current = false;
         if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
         if (shouldResume && alwaysOnRef.current && shouldRestartRef.current) {
@@ -245,9 +252,10 @@ export default function FloatingVoiceOrb() {
       };
       u.onend = resume;
       u.onerror = resume;
-      window.speechSynthesis.cancel();
+      try { window.speechSynthesis.cancel(); } catch {}
+      speakingRef.current = shouldResume;
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
-      const fallbackMs = Math.min(15000, Math.max(2000, String(text || "").length * 80));
+      const fallbackMs = Math.min(20000, Math.max(2500, spokenText.length * 90));
       speechResumeTimerRef.current = window.setTimeout(resume, fallbackMs);
       window.speechSynthesis.speak(u);
     } catch {}
