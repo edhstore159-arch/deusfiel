@@ -565,16 +565,31 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
           location: "Google Meet",
           duration_min: 60,
         };
+        // Garante que o agendamento sempre fique vinculado a um atendente
+        // (admin). Sem isso, leads vindos do chat público ficariam com
+        // user_id = null e invisíveis para a equipe por causa do RLS.
+        let assigneeId = userId;
+        if (!assigneeId) {
+          const { data: adminRow } = await supabase
+            .from("user_roles")
+            .select("user_id")
+            .eq("role", "admin")
+            .order("user_id", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          assigneeId = adminRow?.user_id ?? null;
+        }
         await supabase.from("appointments").insert({
-          user_id: userId,
+          user_id: assigneeId,
           session_id: sessionId,
           ...appointment,
-          raw_payload: enrichedPayload,
+          raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente" },
           source: "chat_ai",
           status: "scheduled",
         });
         (appointment as any).meeting_link = meetUrl;
         (appointment as any).meet_url = meetUrl;
+        (appointment as any).assigned_to = assigneeId;
       }
     } catch (err) {
       console.error("Erro ao salvar conversa/agendamento:", err);
