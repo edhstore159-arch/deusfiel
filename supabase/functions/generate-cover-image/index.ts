@@ -19,8 +19,12 @@ const REALISM =
 const NEG =
   "digital art, illustration, painting, cartoon, anime, 3d render, CGI, plastic skin, perfect skin, airbrushed, beauty filter, " +
   "stock photo aesthetic, AI-looking, oversaturated, exaggerated HDR, artificial studio lighting, overprocessed, " +
+  "deformed face, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, bad teeth, fake smile, " +
   "deformed body, distorted anatomy, bad proportions, extra limbs, extra fingers, fused fingers, broken hands, " +
   "close-up only, face only, cropped body, blurry, low quality, watermark, logo, text, typography";
+
+const FACE_LOCK =
+  "FACE LOCK: natural balanced human face, correct facial anatomy, aligned eyes, realistic pupils and eyelids, normal nose and mouth, natural teeth, relaxed authentic expression, realistic skin texture with pores, no beautification filter, no face warp, no smoothing that changes identity.";
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
@@ -42,6 +46,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             "ALWAYS FILL THESE FIELDS in the output prompt:",
             "- SCENE: describe the scene faithfully from the user theme.",
             "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise.",
+            `- FACE QUALITY: ${FACE_LOCK}`,
             "- ENVIRONMENT: real environment (simple home, office, street, etc.) with natural elements and imperfections (objects slightly out of place, real texture, light dust, wear).",
             "- LIGHTING: realistic cinematic lighting — soft natural window light, soft realistic shadows, balanced contrast, no exaggerated HDR.",
             "- CAMERA: 50mm or 85mm lens, shallow depth of field (slightly blurred background), focus on the face, DSLR photography style, natural ISO, no artificial noise.",
@@ -64,7 +69,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
     }
   } catch (_e) { /* fallback */ }
 
-  return `${userTheme}. ${REALISM}. Negative: ${NEG}. --style raw --no artificial --no smooth skin --no CGI --photorealism high`;
+  return `${userTheme}. ${REALISM}. ${FACE_LOCK}. Negative: ${NEG}. --style raw --no artificial --no smooth skin --no CGI --photorealism high`;
 }
 
 
@@ -96,7 +101,7 @@ Deno.serve(async (req) => {
 
       if (reference_image_base64) {
         imageUrls.push(toDataUrl(reference_image_base64));
-        promptParts.push("Use a primeira imagem enviada como referência visual principal (mantenha tema, cores e elementos).");
+        promptParts.push("Use a primeira imagem enviada como referência visual principal. If it contains a person, preserve the face identity and proportions; never redraw, stretch, beautify, smooth, warp, or replace facial features.");
       }
       if (logo_base64) {
         imageUrls.push(toDataUrl(logo_base64));
@@ -120,7 +125,7 @@ Deno.serve(async (req) => {
     }
 
     // Text-to-image: try Lovable Gateway gpt-image-2, fallback to Emergent (gpt-image-1).
-    const img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "low" });
+    const img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "high" });
     if (!img.ok) {
       // Local SVG fallback so the client never sees a 502 / blank screen.
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#g)"/><circle cx="512" cy="420" r="160" fill="rgba(255,255,255,0.08)"/><rect x="312" y="640" width="400" height="14" rx="7" fill="rgba(255,255,255,0.35)"/><rect x="372" y="680" width="280" height="10" rx="5" fill="rgba(255,255,255,0.22)"/></svg>`;
