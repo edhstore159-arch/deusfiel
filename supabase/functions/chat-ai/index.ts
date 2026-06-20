@@ -409,7 +409,8 @@ Deno.serve(async (req) => {
       hour: "2-digit",
       minute: "2-digit",
     }).format(now);
-    const isoSp = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).toISOString();
+    // ISO real (UTC) do instante atual — não reinterpretar wall-time de SP como UTC (causava data errada perto da meia-noite).
+    const isoSp = now.toISOString();
 
     const hourSp = parseInt(
       new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now),
