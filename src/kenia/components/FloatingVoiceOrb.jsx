@@ -522,8 +522,14 @@ export default function FloatingVoiceOrb() {
             </button>
           </div>
           <p className="text-xs text-nude-600 mb-3">
-            Toque no microfone e diga, por exemplo: <em>“abrir agenda”</em>, <em>“ir para o CRM”</em>, <em>“central de mensagens”</em>.
+            Toque no microfone e diga, por exemplo: <em>“abrir agenda”</em>. Ou ative a <strong>escuta contínua</strong> e diga <em>“secretária”</em> antes do comando.
           </p>
+          <button
+            onClick={toggleAlwaysOn}
+            className={`w-full mb-2 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${alwaysOn ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-nude-100 text-nude-800 hover:bg-nude-200"}`}
+          >
+            {alwaysOn ? '🟢 Escuta contínua ATIVA — diga "secretária"' : "Ativar escuta contínua (palavra: secretária)"}
+          </button>
           <button
             onClick={toggleListen}
             disabled={thinking}
