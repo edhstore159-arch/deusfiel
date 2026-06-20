@@ -179,19 +179,26 @@ export default function FloatingVoiceOrb() {
           </p>
           <button
             onClick={toggleListen}
-            className={`w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            disabled={thinking}
+            className={`w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
               listening ? "bg-rose-600 text-white hover:bg-rose-700" : "bg-gold-600 text-white hover:bg-gold-700"
             }`}
             data-testid="voice-orb-mic"
           >
-            <Mic className="w-4 h-4" />
-            {listening ? "Ouvindo… toque para parar" : "Falar comando"}
+            {thinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+            {thinking ? "Pensando…" : listening ? "Ouvindo… toque para parar" : "Falar comando"}
           </button>
           {transcript && (
             <div className="mt-3 p-2 rounded bg-nude-50 text-xs text-nude-700 break-words">
-              {transcript}
+              <span className="font-medium text-nude-900">Você:</span> {transcript}
             </div>
           )}
+          {reply && (
+            <div className="mt-2 p-2 rounded bg-gold-50 text-xs text-nude-800 break-words max-h-40 overflow-auto">
+              <span className="font-medium text-gold-700">Kênia:</span> {reply}
+            </div>
+          )}
+
         </div>
       )}
     </>
