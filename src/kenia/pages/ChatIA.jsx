@@ -739,7 +739,11 @@ export default function ChatIA() {
       if (data.appointment) {
         toast.success("Consulta salva automaticamente na Agenda");
       }
-      if (data.analysis) setAnalysis(data.analysis);
+      if (data.analysis) {
+        const a = { ...data.analysis };
+        if (a.qualificacao === "desqualificado") a.qualificacao = "nao_qualificado";
+        setAnalysis(a);
+      }
       upsertLead({ description: msg });
       setThinking(false);
       if (data.handoff) {
