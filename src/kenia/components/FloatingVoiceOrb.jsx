@@ -352,14 +352,33 @@ export default function FloatingVoiceOrb() {
   };
 
   const [ytQuery, setYtQuery] = useState("");
+  const [ytVideoId, setYtVideoId] = useState("");
+  const [ytIds, setYtIds] = useState([]);
+  const [ytIdx, setYtIdx] = useState(0);
 
-  const playYouTube = (query) => {
+  const playYouTube = async (query) => {
     const q = (query || "").trim();
     if (!q) return;
-    setYtQuery(q);
+    setYtQuery(q); setYtVideoId(""); setYtIds([]); setYtIdx(0);
     setOpen(true);
-    const msg = `Tocando ${q} no YouTube aqui mesmo.`;
+    const msg = `Procurando ${q} no YouTube.`;
     setReply(msg); speak(msg);
+    try {
+      const { data, error } = await supabase.functions.invoke("youtube-search", { body: { query: q } });
+      if (error) throw error;
+      const ids = data?.ids || (data?.videoId ? [data.videoId] : []);
+      if (!ids.length) throw new Error("Nenhum vídeo encontrado");
+      setYtIds(ids); setYtVideoId(ids[0]); setYtIdx(0);
+    } catch (e) {
+      const m = `Não consegui encontrar vídeos para ${q}.`;
+      setReply(m); speak(m); toast.error(m);
+    }
+  };
+
+  const ytNext = () => {
+    if (!ytIds.length) return;
+    const next = (ytIdx + 1) % ytIds.length;
+    setYtIdx(next); setYtVideoId(ytIds[next]);
   };
 
   const handleCommand = (text) => {
@@ -481,16 +500,25 @@ export default function FloatingVoiceOrb() {
             <div className="mt-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-medium text-nude-900 truncate">YouTube: {ytQuery}</span>
-                <button onClick={() => setYtQuery("")} className="text-nude-500 hover:text-nude-900 text-xs">fechar</button>
+                <div className="flex items-center gap-2">
+                  {ytIds.length > 1 && (
+                    <button onClick={ytNext} className="text-gold-700 hover:text-gold-900 text-xs">próximo</button>
+                  )}
+                  <button onClick={() => { setYtQuery(""); setYtVideoId(""); setYtIds([]); }} className="text-nude-500 hover:text-nude-900 text-xs">fechar</button>
+                </div>
               </div>
-              <div className="aspect-video w-full rounded overflow-hidden bg-black">
-                <iframe
-                  title="YouTube"
-                  className="w-full h-full"
-                  src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(ytQuery)}&autoplay=1`}
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen
-                />
+              <div className="aspect-video w-full rounded overflow-hidden bg-black flex items-center justify-center">
+                {ytVideoId ? (
+                  <iframe
+                    title="YouTube"
+                    className="w-full h-full"
+                    src={`https://www.youtube-nocookie.com/embed/${ytVideoId}?autoplay=1&rel=0`}
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <span className="text-xs text-white/70">Procurando…</span>
+                )}
               </div>
             </div>
           )}
