@@ -347,12 +347,19 @@ export default function FloatingVoiceOrb() {
       reportTodayAppointments();
       return;
     }
+    // Enviar mensagem no WhatsApp: "enviar/mandar mensagem/whatsapp para [nome] dizendo/falando/: [texto]"
+    const waMatch = text.match(/\b(?:enviar|mandar|envie|mande)\s+(?:uma\s+)?(?:mensagem|whats?app|zap)\s+(?:para|pro|pra|ao|a|o)\s+(.+?)\s+(?:dizendo|falando|com\s+a\s+mensagem|que|:)\s+(.+)/i);
+    if (waMatch) { sendWhatsAppTo(waMatch[1].trim(), waMatch[2].trim()); return; }
+    // Mudar data do agendamento: "mudar/alterar/remarcar agendamento de [nome] para [data]"
+    const chMatch = text.match(/\b(?:mudar|alterar|trocar|remarcar|reagendar|mover|adiar)\s+(?:o\s+|a\s+)?(?:agendamento|reuniao|reunião|consulta|compromisso|hor[aá]rio)?\s*(?:de|do|da|com)?\s*(.+?)\s+(?:para|pra|pro)\s+(.+)/i);
+    if (chMatch) { changeAppointmentDate(chMatch[1].trim(), chMatch[2].trim()); return; }
     // Ligar para [nome]
     const callMatch = text.match(/\b(?:ligar|telefonar|chamar|ligue|telefone)\s+(?:para|pro|pra|o|a)?\s*(.+)/i);
     if (callMatch) { callClient(callMatch[1].trim()); return; }
-    // Reagendar [nome]
+    // Reagendar [nome] (sem data) — abre a agenda
     const reMatch = text.match(/\b(?:reagendar|remarcar|reagenda|remarca)\s+(?:com|para|o|a)?\s*(.+)/i);
     if (reMatch) { rescheduleClient(reMatch[1].trim()); return; }
+
     const route = matchRoute(text);
     // Comandos diretos de navegação ("abrir/ir/vai para X")
     if (route && /\b(abrir|abra|ir|vai|vá|leva|leve|navegar|abre)\b/i.test(text)) {
