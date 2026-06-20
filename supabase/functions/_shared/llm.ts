@@ -249,42 +249,19 @@ function buildFluxPrompt(raw: string): string {
   return `${base}, ${STYLE}. ${NEG}`;
 }
 
-function toBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode(...bytes.slice(i, i + 0x8000));
-  }
-  return btoa(bin);
-}
-
 // Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
 async function imagePollinations(opts: ImageOptions) {
   try {
     const [w, h] = (opts.size || "1024x1024").split("x").map((n) => parseInt(n, 10) || 1024);
     const seed = Math.floor(Math.random() * 1_000_000);
     const flux = buildFluxPrompt(opts.prompt);
-    const urls = [
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=true&model=flux`,
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed + 1}&nologo=true&enhance=true`,
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed + 2}&nologo=true&model=turbo`,
-    ];
-    let lastError = "";
-    for (const url of urls) {
-      const resp = await fetch(url, { headers: { Accept: "image/png,image/jpeg,image/*" } });
-      if (!resp.ok) {
-        lastError = `Pollinations ${resp.status}`;
-        continue;
-      }
-      const contentType = resp.headers.get("content-type") || "";
-      const buf = new Uint8Array(await resp.arrayBuffer());
-      const looksLikeImage = contentType.startsWith("image/") || (buf[0] === 0x89 && buf[1] === 0x50) || (buf[0] === 0xff && buf[1] === 0xd8);
-      if (!looksLikeImage || buf.length < 1024) {
-        lastError = `Pollinations retornou ${contentType || "conteúdo inválido"}`;
-        continue;
-      }
-      return { ok: true as const, b64: toBase64(buf), provider: "pollinations" };
-    }
-    return { ok: false as const, error: lastError || "Pollinations sem imagem" };
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=true&model=flux`;
+    const resp = await fetch(url);
+    if (!resp.ok) return { ok: false as const, error: `Pollinations ${resp.status}` };
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+    return { ok: true as const, b64: btoa(bin), provider: "pollinations" };
   } catch (e) {
     return { ok: false as const, error: String((e as Error)?.message || e) };
   }
