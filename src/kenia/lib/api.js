@@ -793,7 +793,18 @@ const staticDelete = (url) => {
   };
   if (path.startsWith("/leads/")) return removeFrom("leads", seedLeads);
   if (path.startsWith("/finance/transactions/")) return removeFrom("transactions", seedTransactions);
-  if (path.startsWith("/appointments/")) return removeFrom("appointments", seedAppointments);
+  if (path.startsWith("/appointments/")) {
+    return (async () => {
+      const id = path.split("/").pop();
+      try {
+        const { error } = await supabase.from("appointments").delete().eq("id", id);
+        if (error) throw error;
+        return response({ ok: true });
+      } catch {
+        return removeFrom("appointments", seedAppointments);
+      }
+    })();
+  }
   if (path.startsWith("/legal-deadlines/")) return removeFrom("legal_deadlines", seedLegalDeadlines);
   if (path.startsWith("/processes/")) return removeFrom("processes", seedProcesses);
   if (path.startsWith("/creatives/")) return removeFrom("creatives", seedCreatives);
