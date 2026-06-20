@@ -90,13 +90,13 @@ export default function FloatingVoiceOrb() {
   const loadClientContext = async () => {
     if (contextRef.current && Date.now() - contextAtRef.current < 60_000) return contextRef.current;
     const safe = async (p) => { try { const { data } = await api.get(p); return data; } catch { return null; } };
-    const [leads, contacts, processes, appointments, analyses] = await Promise.all([
-      safe("/leads"), safe("/contacts"), safe("/processes"), safe("/appointments"), safe("/case-analyses"),
+    const [leads, contacts, processes, appointments, analyses, logs, deadlines] = await Promise.all([
+      safe("/leads"), safe("/whatsapp/contacts"), safe("/processes"), safe("/appointments"), safe("/case-analyses"), safe("/whatsapp/logs"), safe("/legal-deadlines"),
     ]);
     const pick = (d) => Array.isArray(d) ? d : (Array.isArray(d?.items) ? d.items : []);
     const ctx = {
       leads: pick(leads), contacts: pick(contacts), processes: pick(processes),
-      appointments: pick(appointments), analyses: pick(analyses),
+      appointments: pick(appointments), analyses: pick(analyses), logs: pick(logs), deadlines: pick(deadlines),
     };
     contextRef.current = ctx;
     contextAtRef.current = Date.now();
@@ -116,13 +116,17 @@ export default function FloatingVoiceOrb() {
     try {
       const ctx = await loadClientContext().catch(() => null);
       const ctxSummary = ctx ? [
+        `RESUMO: ${ctx.contacts.length} contatos na central de mensagens, ${ctx.leads.length} leads no CRM, ${ctx.processes.length} processos, ${ctx.appointments.length} agendamentos, ${ctx.logs.length} mensagens registradas, ${ctx.deadlines.length} prazos.`,
         `Leads: ${JSON.stringify(ctx.leads.slice(0, 30).map((l) => ({ nome: l.name, tel: l.phone, area: l.case_type, etapa: l.stage, desc: l.description })))}`,
-        `Contatos: ${JSON.stringify(ctx.contacts.slice(0, 30).map((c) => ({ nome: c.name, tel: c.phone, ultima: c.last_message })))}`,
-        `Processos: ${JSON.stringify(ctx.processes.slice(0, 30).map((p) => ({ cliente: p.client_name, numero: p.process_number, area: p.case_type, vara: p.court, status: p.status, proxima_audiencia: p.next_hearing, descricao: p.description })))}`,
+        `Contatos (central de mensagens): ${JSON.stringify(ctx.contacts.slice(0, 50).map((c) => ({ nome: c.name, tel: c.phone, nao_lidas: c.unread, ultima: c.last_message })))}`,
+        `Processos: ${JSON.stringify(ctx.processes.slice(0, 30).map((p) => ({ cliente: p.client_name, numero: p.process_number, area: p.case_type, vara: p.court, status: p.status, proxima_audiencia: p.next_hearing })))}`,
         `Agendamentos: ${JSON.stringify(ctx.appointments.slice(0, 30).map((a) => ({ titulo: a.title, cliente: a.client_name, quando: a.starts_at, local: a.location, status: a.status })))}`,
-        `Análises: ${JSON.stringify(ctx.analyses.slice(0, 20).map((a) => ({ cliente: a.visitor_name, tel: a.visitor_phone, area: a.area, resumo: a.resumo })))}`,
+        `Prazos: ${JSON.stringify(ctx.deadlines.slice(0, 20).map((d) => ({ cliente: d.client_name, titulo: d.title, vencimento: d.due_at, urgencia: d.urgency })))}`,
+        `Mensagens recentes: ${JSON.stringify(ctx.logs.slice(-20).map((l) => ({ contato: l.contact_name, tel: l.contact_phone, texto: l.text, eu: l.from_me })))}`,
+        `Análises de caso: ${JSON.stringify(ctx.analyses.slice(0, 20).map((a) => ({ cliente: a.visitor_name, tel: a.visitor_phone, area: a.area, resumo: a.resumo })))}`,
       ].join("\n") : "";
-      const enrichedSystem = `Você é Kênia, assistente da Dra. Kênia Garcia. Tem acesso aos dados internos do escritório abaixo e deve usá-los para responder com precisão. Pode informar telefones, processos, status e sugerir reagendar reuniões ou ligar para clientes. Não invente dados que não estejam na lista.\n\nDADOS:\n${ctxSummary}`;
+      const enrichedSystem = `Você é Kênia, assistente de voz da Dra. Kênia Garcia. Você TEM ACESSO COMPLETO aos dados internos abaixo (contatos, leads, processos, agendamentos, mensagens, prazos). Use SEMPRE esses dados para responder com precisão. NUNCA diga "não tenho acesso" ou "não tenho informações" — os dados estão logo abaixo. Quando solicitado, informe nomes, telefones, quantidade de mensagens/pessoas, status de processos, e pode sugerir reagendar reuniões ou ligar para clientes.\n\nDADOS DO ESCRITÓRIO:\n${ctxSummary}`;
+
       const { data, error } = await supabase.functions.invoke("chat-ai", {
         body: {
           message: text,
