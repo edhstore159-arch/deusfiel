@@ -56,8 +56,16 @@ export default function FloatingVoiceOrb() {
   const lastFinalRef = useRef({ text: "", at: 0 });
   const speakingRef = useRef(false);
   const speechResumeTimerRef = useRef(null);
+  const speechRunIdRef = useRef(0);
   const [alwaysOn, setAlwaysOn] = useState(false);
   useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
+
+  const stopCurrentSpeech = () => {
+    speechRunIdRef.current += 1;
+    speakingRef.current = false;
+    if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+    try { window.speechSynthesis?.cancel?.(); } catch {}
+  };
 
   const restartContinuousRecognition = (delay = 300) => {
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
@@ -121,12 +129,17 @@ export default function FloatingVoiceOrb() {
 
         if (alwaysOnRef.current) {
           const awake = now < awakeUntilRef.current;
-          if (hasWakeWord(finalText)) {
-            const wasSpeaking = speakingRef.current || window.speechSynthesis?.speaking;
+          const finalHasWakeWord = hasWakeWord(finalText);
+          const wasSpeaking = speakingRef.current || window.speechSynthesis?.speaking;
+
+          if (wasSpeaking && !finalHasWakeWord) {
+            // Evita que a própria voz da Kênia seja capturada como nova pergunta.
+            continue;
+          }
+
+          if (finalHasWakeWord) {
             if (wasSpeaking) {
-              try { window.speechSynthesis.cancel(); } catch {}
-              speakingRef.current = false;
-              if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+              stopCurrentSpeech();
               restartContinuousRecognition(100);
             }
             awakeUntilRef.current = now + 15000;
