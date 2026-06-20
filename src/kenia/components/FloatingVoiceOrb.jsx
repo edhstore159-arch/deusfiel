@@ -189,6 +189,89 @@ export default function FloatingVoiceOrb() {
     }
   };
 
+  // Parse data em PT-BR: "hoje 15:00", "amanha 10h", "25/12 14:30", "25/12/2026 09:00"
+  const parseDateTimePt = (raw) => {
+    if (!raw) return null;
+    const s = String(raw).toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").trim();
+    const hm = s.match(/(\d{1,2})(?:[h:](\d{2}))?/);
+    let hour = hm ? parseInt(hm[1], 10) : 10;
+    let min = hm && hm[2] ? parseInt(hm[2], 10) : 0;
+    if (isNaN(hour) || hour > 23) { hour = 10; min = 0; }
+    const d = new Date();
+    if (/\bdepois de amanha\b/.test(s)) { d.setDate(d.getDate() + 2); }
+    else if (/\bamanha\b/.test(s)) { d.setDate(d.getDate() + 1); }
+    else if (/\bhoje\b/.test(s)) { /* keep */ }
+    else {
+      const dm = s.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
+      if (dm) {
+        const day = parseInt(dm[1], 10);
+        const month = parseInt(dm[2], 10) - 1;
+        let year = dm[3] ? parseInt(dm[3], 10) : d.getFullYear();
+        if (year < 100) year += 2000;
+        d.setFullYear(year, month, day);
+      } else { return null; }
+    }
+    d.setHours(hour, min, 0, 0);
+    return d;
+  };
+
+  const changeAppointmentDate = async (name, whenExpr) => {
+    setThinking(true);
+    try {
+      const ctx = await loadClientContext();
+      const list = ctx?.appointments || [];
+      const n = norm(name);
+      const appt = list.find((a) => norm(a.client_name || a.customer_name || a.lead_name).includes(n));
+      if (!appt) {
+        const msg = `Não encontrei agendamento para ${name}.`;
+        setReply(msg); speak(msg); return;
+      }
+      const newDate = parseDateTimePt(whenExpr);
+      if (!newDate) {
+        const msg = `Não entendi a nova data "${whenExpr}". Diga, por exemplo: amanhã às 15h, ou 25 do 12 às 14:30.`;
+        setReply(msg); speak(msg); return;
+      }
+      const id = appt.id || appt._id;
+      const payload = {
+        starts_at: newDate.toISOString(),
+        appointment_date: newDate.toISOString().slice(0, 10),
+        appointment_time: newDate.toTimeString().slice(0, 5),
+      };
+      await api.patch(`/appointments/${id}`, payload).catch(async () => api.put(`/appointments/${id}`, payload));
+      contextRef.current = null;
+      const who = appt.client_name || name;
+      const msg = `Agendamento de ${who} alterado para ${fmtDateTime(newDate.toISOString())}.`;
+      setReply(msg); speak(msg);
+      toast.success(msg);
+    } catch (e) {
+      toast.error("Falha ao alterar agendamento: " + (e?.message || e));
+      speak("Não consegui alterar o agendamento.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const sendWhatsAppTo = async (name, message) => {
+    setThinking(true);
+    try {
+      const ctx = await loadClientContext();
+      const c = findClient(name, ctx);
+      if (!c) { const m = `Não encontrei ${name} na central de mensagens.`; setReply(m); speak(m); return; }
+      const contactId = c.id || c._id || c.contact_id;
+      const phone = c.phone || c.client_phone || "";
+      await api.post("/whatsapp/send", { contact_id: contactId, phone, text: message, from_me: true });
+      const m = `Mensagem enviada para ${c.name || c.client_name}.`;
+      setReply(m); speak(m); toast.success(m);
+    } catch (e) {
+      toast.error("Falha ao enviar WhatsApp: " + (e?.message || e));
+      speak("Não consegui enviar a mensagem.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
+
+
 
   const fmtDateTime = (iso) => {
     try {
