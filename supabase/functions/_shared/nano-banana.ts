@@ -58,30 +58,32 @@ function buildLocalFusionFallback(opts: NanoBananaOptions): string | null {
   if (!images.length) return null;
   const person = escapeXml(images[0]);
   const scene = escapeXml(images[1] || images[0]);
-  // Fusão local SEM IA: cenário ao fundo cobrindo toda a área + pessoa
-  // recortada por máscara radial suave (sem bordas duras, sem split-screen),
-  // com leve correção de cor para casar com a ambientação do cenário.
+  // Fusão local SEM IA preservando o ROSTO:
+  // - cenário ao fundo (leve desfoque) cobrindo toda a área
+  // - pessoa centralizada com preserveAspectRatio="xMidYMid meet"
+  //   (NUNCA corta nem estica o rosto — proporção real mantida)
+  // - máscara radial suave só nas bordas para integrar ao cenário
+  // - SEM color-matrix sobre a pessoa (preserva tom de pele e traços)
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <radialGradient id="pm" cx="50%" cy="46%" r="52%">
-      <stop offset="55%" stop-color="white" stop-opacity="1"/>
-      <stop offset="82%" stop-color="white" stop-opacity="0.78"/>
+    <radialGradient id="pm" cx="50%" cy="50%" r="55%">
+      <stop offset="70%" stop-color="white" stop-opacity="1"/>
+      <stop offset="90%" stop-color="white" stop-opacity="0.85"/>
       <stop offset="100%" stop-color="white" stop-opacity="0"/>
     </radialGradient>
-    <mask id="soft"><rect width="1024" height="1024" fill="black"/><rect x="192" y="96" width="640" height="832" fill="url(#pm)"/></mask>
-    <filter id="ambient"><feColorMatrix type="matrix" values="0.94 0 0 0 0.02  0 0.94 0 0 0.02  0 0 0.96 0 0.04  0 0 0 1 0"/></filter>
-    <filter id="bgSoft"><feGaussianBlur stdDeviation="3"/></filter>
+    <mask id="soft"><rect width="1024" height="1024" fill="black"/><rect width="1024" height="1024" fill="url(#pm)"/></mask>
+    <filter id="bgSoft"><feGaussianBlur stdDeviation="6"/></filter>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="16"/>
-      <feOffset dx="0" dy="20" result="o"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18"/>
+      <feOffset dx="0" dy="24" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
   <image href="${scene}" x="0" y="0" width="1024" height="1024" preserveAspectRatio="xMidYMid slice" filter="url(#bgSoft)"/>
-  <rect width="1024" height="1024" fill="rgba(10,10,20,0.18)"/>
+  <rect width="1024" height="1024" fill="rgba(10,10,20,0.22)"/>
   <g mask="url(#soft)" filter="url(#shadow)">
-    <image href="${person}" x="192" y="96" width="640" height="832" preserveAspectRatio="xMidYMid slice" filter="url(#ambient)"/>
+    <image href="${person}" x="0" y="0" width="1024" height="1024" preserveAspectRatio="xMidYMid meet"/>
   </g>
 </svg>`;
   return `data:image/svg+xml;base64,${toBase64Utf8(svg)}`;
