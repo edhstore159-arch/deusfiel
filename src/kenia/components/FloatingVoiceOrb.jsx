@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Mic, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/kenia/lib/api";
+
 
 
 const LOGO = "https://customer-assets.emergentagent.com/job_nude-gold-dashboard/artifacts/ckw9kwam_IMG-20241228-WA0003.jpg";
@@ -110,8 +112,80 @@ export default function FloatingVoiceOrb() {
     }
   };
 
+  const fmtDateTime = (iso) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+    } catch { return String(iso || ""); }
+  };
+
+  const isSameDay = (iso, ref) => {
+    try {
+      const d = new Date(iso);
+      return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+    } catch { return false; }
+  };
+
+  const reportTodayAppointments = async () => {
+    setThinking(true);
+    setReply("");
+    try {
+      const { data } = await api.get("/appointments");
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : (Array.isArray(data?.appointments) ? data.appointments : []));
+      const today = new Date();
+      const todays = list
+        .filter((a) => isSameDay(a.starts_at || a.start_at || a.date || a.scheduled_at, today))
+        .sort((a, b) => new Date(a.starts_at || a.start_at || a.date) - new Date(b.starts_at || b.start_at || b.date));
+      if (!todays.length) {
+        const msg = "Não há agendamentos para hoje.";
+        setReply(msg); speak(msg); return;
+      }
+      const lines = todays.map((a, i) => {
+        const when = fmtDateTime(a.starts_at || a.start_at || a.date || a.scheduled_at);
+        const who = a.client_name || a.customer_name || a.lead_name || a.patient_name || a.contact_name || "Cliente";
+        const phone = a.phone || a.client_phone || a.whatsapp || "";
+        const assignee = a.assigned_to || a.attendant || a.therapist_name || a.responsible || "";
+        const title = a.title || a.service || a.subject || a.area || "Atendimento";
+        const status = a.status || "";
+        const notes = a.notes || a.description || "";
+        const link = a.meet_url || a.meeting_link || a.room_url || "";
+        const parts = [
+          `${i + 1}. ${when} — ${title}`,
+          `   Cliente: ${who}${phone ? " (" + phone + ")" : ""}`,
+          assignee ? `   Responsável: ${assignee}` : "",
+          status ? `   Status: ${status}` : "",
+          link ? `   Link: ${link}` : "",
+          notes ? `   Obs.: ${notes}` : "",
+        ].filter(Boolean);
+        return parts.join("\n");
+      });
+      const header = `Você tem ${todays.length} agendamento${todays.length > 1 ? "s" : ""} hoje:`;
+      const full = `${header}\n${lines.join("\n")}`;
+      setReply(full);
+      // Resumo curto na voz
+      const spoken = `${header} ` + todays.map((a, i) => {
+        const t = new Date(a.starts_at || a.start_at || a.date).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        const who = a.client_name || a.customer_name || a.lead_name || a.patient_name || "cliente";
+        const assignee = a.assigned_to || a.therapist_name || a.attendant || "";
+        return `${i + 1}: às ${t} com ${who}${assignee ? ", responsável " + assignee : ""}.`;
+      }).join(" ");
+      speak(spoken);
+    } catch (e) {
+      toast.error("Não consegui buscar a agenda: " + (e?.message || e));
+      speak("Não consegui buscar a agenda agora.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
   const handleCommand = (text) => {
     if (!text?.trim()) return;
+    const lower = text.toLowerCase();
+    // Intenção: agendamentos do dia / de hoje
+    if (/\bagendamento[s]?\b/.test(lower) && /\b(hoje|do dia|de hoje|para hoje)\b/.test(lower)) {
+      reportTodayAppointments();
+      return;
+    }
     const route = matchRoute(text);
     // Comandos diretos de navegação ("abrir/ir/vai para X")
     if (route && /\b(abrir|abra|ir|vai|vá|leva|leve|navegar|abre)\b/i.test(text)) {
@@ -125,6 +199,7 @@ export default function FloatingVoiceOrb() {
     // Caso geral: pergunta ao assistente (Ollama via chat-ai)
     askOllama(text);
   };
+
 
 
   const toggleListen = () => {
