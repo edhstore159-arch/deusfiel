@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const REALISM =
   "RAW photo, ultra realistic photograph captured on a professional DSLR camera, photojournalism / documentary photography style, " +
-  "85mm or 50mm lens, shallow depth of field with softly blurred background, sharp focus on the subject's face, " +
+  "85mm or 50mm lens, shallow depth of field, realistic sharpness without warped facial details, " +
   "natural soft lighting (preferably window light), realistic soft shadows, balanced contrast (no exaggerated HDR), " +
   "natural color grading (no Instagram filter, no oversaturation), " +
   "real skin texture with visible pores and natural imperfections, slight stubble where appropriate, authentic emotional expression, " +
@@ -19,7 +19,7 @@ const REALISM =
 const NEG =
   "digital art, illustration, painting, cartoon, anime, 3d render, CGI, plastic skin, perfect skin, airbrushed, beauty filter, " +
   "stock photo aesthetic, AI-looking, oversaturated, exaggerated HDR, artificial studio lighting, overprocessed, " +
-  "deformed body, distorted anatomy, bad proportions, extra limbs, extra fingers, fused fingers, broken hands, " +
+  "deformed face, warped face, asymmetrical eyes, malformed eyes, distorted mouth, melted skin, changed identity, deformed body, distorted anatomy, bad proportions, extra limbs, extra fingers, fused fingers, broken hands, " +
   "close-up only, face only, cropped body, blurry, low quality, watermark, logo, text, typography";
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
@@ -41,10 +41,10 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             "STRICT FIDELITY: Never change, replace, simplify or reinterpret the subject. Never invent elements not requested. Preserve ALL elements described by the user (people, objects, setting, mood, action). Translate non-English input to English while keeping exact meaning.",
             "ALWAYS FILL THESE FIELDS in the output prompt:",
             "- SCENE: describe the scene faithfully from the user theme.",
-            "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise.",
+            "- CHARACTER: for generic social-media creatives, avoid large visible human faces; prefer hands, documents, office scenes, back/side silhouettes, or people shown at a safe distance. If the user explicitly requests a visible face, render one natural face with correct anatomy, aligned eyes, realistic mouth and unchanged identity from any reference. Never perfect, artificial, warped or beautified faces. Brazilian appearance unless the user says otherwise.",
             "- ENVIRONMENT: real environment (simple home, office, street, etc.) with natural elements and imperfections (objects slightly out of place, real texture, light dust, wear).",
             "- LIGHTING: realistic cinematic lighting — soft natural window light, soft realistic shadows, balanced contrast, no exaggerated HDR.",
-            "- CAMERA: 50mm or 85mm lens, shallow depth of field (slightly blurred background), focus on the face, DSLR photography style, natural ISO, no artificial noise.",
+            "- CAMERA: 50mm or 85mm lens, shallow depth of field (slightly blurred background), DSLR photography style, natural ISO, no artificial noise. Do not use extreme face close-ups unless explicitly requested.",
             "- STYLE: documentary photography, ultra realistic, natural colors (no oversaturation), no Instagram filter, no AI look.",
             "- DETAILS: real skin texture (pores, small imperfections), eyes with natural light reflections, real fabric folds, nothing plastic or CGI.",
             "FORBIDDEN: digital art, cartoon, 3D render, perfect skin, exaggerated artificial lighting, stock-photo aesthetic.",

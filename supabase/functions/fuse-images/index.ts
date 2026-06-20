@@ -7,7 +7,7 @@ const REALISM =
   "real imperfections, cinematic lighting, high dynamic range, 4k, sharp focus";
 
 const NEGATIVE =
-  "blurry, distorted face, different person, cartoon, illustration, fake skin, over-smooth, " +
+  "blurry, distorted face, warped face, melted face, asymmetrical eyes, malformed eyes, distorted mouth, different person, changed identity, cartoon, illustration, fake skin, over-smooth, " +
   "extra fingers, mutated, unrealistic proportions, collage, split screen, side-by-side, " +
   "picture-in-picture, frames, borders, text, watermarks, logos";
 
@@ -19,11 +19,11 @@ const TEMPLATE_SYSTEM =
   "Output ONLY the filled prompt as a single line (no markdown, no headings, no explanations).\n\n" +
   "TEMPLATE:\n" +
   "SUBJECT (IMAGE 1 - PERSON): gender, age, skin tone, face shape, eye color and shape, eyebrows, nose, lips, hair (color/texture/style), expression, body type, posture. " +
-  "CRITICAL: face MUST remain consistent — do NOT change identity, do NOT stylize, do NOT beautify. " +
+  "CRITICAL FACE LOCK: preserve the exact original face from IMAGE 1 — same identity, proportions, eyes, nose, mouth, jawline, skin texture, expression and camera angle; do NOT redraw, morph, stylize, beautify, age, rejuvenate or swap the face. " +
   "CLOTHING & STYLE: colors, fabric, fit, accessories. " +
   "SCENE (IMAGE 2 - ENVIRONMENT): location, lighting, time of day, objects, background elements, mood. " +
   "CAMERA & PHOTO STYLE: " + REALISM + ". " +
-  "RULES: do NOT change facial features, do NOT invent new elements, do NOT cartoonize or stylize, keep proportions realistic, preserve identity exactly. " +
+  "RULES: do NOT change facial features, do NOT invent new elements, do NOT cartoonize or stylize, keep proportions realistic, preserve identity exactly; if identity cannot be preserved, keep the original face untouched rather than generating a new face. " +
   "End the prompt with: 'Negative: " + NEGATIVE + "'.";
 
 async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
