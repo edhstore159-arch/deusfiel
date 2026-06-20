@@ -55,13 +55,18 @@ export default function FloatingVoiceOrb() {
   const handleCommandRef = useRef(null);
   const lastFinalRef = useRef({ text: "", at: 0 });
   const speakingRef = useRef(false);
+  const speechResumeTimerRef = useRef(null);
   const [alwaysOn, setAlwaysOn] = useState(false);
   useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
 
   const restartContinuousRecognition = (delay = 300) => {
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
     restartTimerRef.current = window.setTimeout(() => {
-      if (!shouldRestartRef.current || !alwaysOnRef.current || recognitionActiveRef.current || speakingRef.current) return;
+      if (!shouldRestartRef.current || !alwaysOnRef.current || recognitionActiveRef.current) return;
+      if (speakingRef.current) {
+        restartContinuousRecognition(500);
+        return;
+      }
       const rec = recognitionRef.current;
       if (!rec) return;
       try {
@@ -158,6 +163,7 @@ export default function FloatingVoiceOrb() {
     return () => {
       shouldRestartRef.current = false;
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
       recognitionRef.current = null;
       rec.onend = null;
       try { rec.abort?.(); } catch {}
@@ -212,6 +218,7 @@ export default function FloatingVoiceOrb() {
       };
       const resume = () => {
         speakingRef.current = false;
+        if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
         if (shouldResume && alwaysOnRef.current && shouldRestartRef.current) {
           restartContinuousRecognition(250);
         }
@@ -219,6 +226,9 @@ export default function FloatingVoiceOrb() {
       u.onend = resume;
       u.onerror = resume;
       window.speechSynthesis.cancel();
+      if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+      const fallbackMs = Math.min(15000, Math.max(2000, String(text || "").length * 80));
+      speechResumeTimerRef.current = window.setTimeout(resume, fallbackMs);
       window.speechSynthesis.speak(u);
     } catch {}
   };
