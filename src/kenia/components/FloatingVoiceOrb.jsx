@@ -500,16 +500,25 @@ export default function FloatingVoiceOrb() {
             <div className="mt-3">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-medium text-nude-900 truncate">YouTube: {ytQuery}</span>
-                <button onClick={() => setYtQuery("")} className="text-nude-500 hover:text-nude-900 text-xs">fechar</button>
+                <div className="flex items-center gap-2">
+                  {ytIds.length > 1 && (
+                    <button onClick={ytNext} className="text-gold-700 hover:text-gold-900 text-xs">próximo</button>
+                  )}
+                  <button onClick={() => { setYtQuery(""); setYtVideoId(""); setYtIds([]); }} className="text-nude-500 hover:text-nude-900 text-xs">fechar</button>
+                </div>
               </div>
-              <div className="aspect-video w-full rounded overflow-hidden bg-black">
-                <iframe
-                  title="YouTube"
-                  className="w-full h-full"
-                  src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(ytQuery)}&autoplay=1`}
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen
-                />
+              <div className="aspect-video w-full rounded overflow-hidden bg-black flex items-center justify-center">
+                {ytVideoId ? (
+                  <iframe
+                    title="YouTube"
+                    className="w-full h-full"
+                    src={`https://www.youtube-nocookie.com/embed/${ytVideoId}?autoplay=1&rel=0`}
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <span className="text-xs text-white/70">Procurando…</span>
+                )}
               </div>
             </div>
           )}
