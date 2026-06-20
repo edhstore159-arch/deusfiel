@@ -22,6 +22,17 @@ const OLLAMA_URL = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "").replac
 const OLLAMA_MODEL = Deno.env.get("OLLAMA_MODEL") || "qwen3:8b";
 const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
 
+const FACE_SAFE_PROMPT =
+  "Face quality lock: natural human face, aligned eyes, normal eyelids, realistic nose and mouth, natural teeth, correct facial symmetry, relaxed expression, realistic skin texture, no warped facial features, no melted face, no duplicated eyes, no distorted pupils, no plastic smoothing.";
+
+function hasHumanSubject(prompt = "") {
+  return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|criança)\b/i.test(prompt);
+}
+
+function withFaceSafety(prompt: string) {
+  return hasHumanSubject(prompt) ? `${prompt}. ${FACE_SAFE_PROMPT}` : prompt;
+}
+
 // ---------- chat completions ----------
 
 async function chatLovable(opts: ChatOptions) {
@@ -175,13 +186,14 @@ export async function chatCompletion(opts: ChatOptions) {
 
 async function imageLovable(opts: ImageOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, error: "LOVABLE_API_KEY ausente" };
+  const safePrompt = withFaceSafety(opts.prompt);
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
     body: JSON.stringify({
       model: "openai/gpt-image-2",
-      prompt: opts.prompt,
-      quality: opts.quality || "low",
+      prompt: safePrompt,
+      quality: opts.quality || (hasHumanSubject(safePrompt) ? "high" : "low"),
       size: opts.size || "1024x1024",
       stream: false,
     }),
@@ -197,11 +209,12 @@ async function imageGemini(opts: ImageOptions) {
   if (!GEMINI_KEY) return { ok: false as const, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+  const safePrompt = withFaceSafety(opts.prompt);
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+      contents: [{ role: "user", parts: [{ text: safePrompt }] }],
       generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
     }),
   });
@@ -216,12 +229,13 @@ async function imageGemini(opts: ImageOptions) {
 
 async function imageEmergent(opts: ImageOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, error: "EMERGENT_API_KEY ausente" };
+  const safePrompt = withFaceSafety(opts.prompt);
   const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
     body: JSON.stringify({
       model: "gpt-image-1",
-      prompt: opts.prompt,
+      prompt: safePrompt,
       size: opts.size || "1024x1024",
       n: 1,
     }),
@@ -242,10 +256,11 @@ function buildFluxPrompt(raw: string): string {
     .trim()
     .slice(0, 280);
   const STYLE =
-    "photorealistic, real skin texture, professional photography, cinematic lighting, " +
-    "shallow depth of field, sharp focus, 8k";
+    "photorealistic, professional portrait photography, real skin texture, natural skin pores, " +
+    "correct facial anatomy, symmetrical eyes, realistic pupils, natural mouth and nose, " +
+    "cinematic lighting, shallow depth of field, sharp focus, 8k";
   const NEG =
-    "negative: blurry, low quality, distorted face, bad hands, extra fingers, unrealistic, cartoon, oversaturated, text, watermark, logo";
+    "negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, bad hands, extra fingers, unrealistic, cartoon, oversaturated, text, watermark, logo";
   return `${base}, ${STYLE}. ${NEG}`;
 }
 
@@ -268,22 +283,33 @@ async function imagePollinations(opts: ImageOptions) {
 }
 
 export async function generateImage(opts: ImageOptions) {
-  // 1) Pollinations (gratuito, sem chave, sem limite)
-  const r0 = await imagePollinations(opts);
-  if (r0.ok) return r0;
-  console.warn("⚠️ Pollinations falhou:", r0.error);
-  // 2) Fallbacks pagos
+  const humanSubject = hasHumanSubject(opts.prompt);
+  const faceSafeOpts = { ...opts, prompt: withFaceSafety(opts.prompt), quality: opts.quality || (humanSubject ? "high" : undefined) };
+  // Para imagens com pessoas, prioriza modelos com melhor anatomia facial; Pollinations fica só como fallback.
   if (LOVABLE_KEY) {
-    const r = await imageLovable(opts);
+    const r = await imageLovable(faceSafeOpts);
     if (r.ok) return r;
     console.warn("⚠️ Lovable image falhou:", r.error);
   }
   if (GEMINI_KEY) {
-    const r = await imageGemini(opts);
+    const r = await imageGemini(faceSafeOpts);
     if (r.ok) return r;
     console.warn("⚠️ Gemini direto falhou:", r.error);
   }
-  const r3 = await imageEmergent(opts);
+  if (humanSubject && EMERGENT_KEY) {
+    const r = await imageEmergent(faceSafeOpts);
+    if (r.ok) return r;
+    console.warn("⚠️ Emergent image falhou:", r.error);
+  }
+  const r0 = await imagePollinations(faceSafeOpts);
+  if (r0.ok) return r0;
+  console.warn("⚠️ Pollinations falhou:", r0.error);
+  if (!humanSubject) {
+    const r3 = await imageEmergent(faceSafeOpts);
+    if (r3.ok) return r3;
+    return { ok: false as const, error: r3.error || "Nenhum provider de imagem disponível", provider: "none" };
+  }
+  const r3 = await imageEmergent(faceSafeOpts);
   if (r3.ok) return r3;
   return { ok: false as const, error: r3.error || "Nenhum provider de imagem disponível", provider: "none" };
 }
