@@ -238,12 +238,24 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
-    return "Claro. Para eu deixar a consulta registrada corretamente, me informe nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
+    return "Claro. Qual data você prefere para o atendimento?";
   }
   if (/\b(div[oó]rcio|guarda|pens[aã]o|fam[ií]lia|invent[aá]rio|trabalhista|demiss[aã]o|rescis[aã]o|inss|aposentadoria|consumidor|cobran[cç]a|audi[eê]ncia|intima[cç][aã]o)\b/i.test(text)) {
-    return "Entendi. Para eu direcionar melhor seu atendimento, me conte quando isso aconteceu, sua cidade/estado e se existe algum prazo ou audiência marcado.";
+    return "Entendi. Existe algum prazo ou audiência marcada?";
   }
-  return "Entendi. Para seguir sem repetir informações, me conte em poucas palavras o que aconteceu e qual ajuda você precisa agora.";
+  return "Entendi. O que você precisa resolver agora?";
+}
+
+function compactQuestion(reply: string): string {
+  const text = cleanRepeatedText(String(reply || "").trim());
+  if (!text) return text;
+  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((part) => part.trim()).filter(Boolean) || [text];
+  const questions = sentences.filter((part) => part.includes("?"));
+  const chosen = questions.length ? questions[questions.length - 1] : sentences.slice(0, 2).join(" ");
+  const words = chosen.split(/\s+/).filter(Boolean);
+  if (words.length <= 18) return chosen.trim();
+  const shortened = words.slice(0, 18).join(" ").replace(/[,.!?;:]*$/, "");
+  return chosen.includes("?") ? `${shortened}?` : `${shortened}.`;
 }
 
 const caseAreaMatchers = [
@@ -297,8 +309,8 @@ function buildLocalCaseAnalysis(history: Array<{ role: string; content: string }
       ? "A conversa já contém sinais da área jurídica e detalhes suficientes para uma triagem inicial."
       : "Ainda faltam dados objetivos sobre área, datas, documentos e impacto do problema.",
     proxima_pergunta: hasDeadline
-      ? "Você tem algum documento, contrato, comprovante ou número de processo sobre esse caso?"
-      : "Existe algum prazo, audiência, bloqueio ou urgência acontecendo agora?",
+      ? "Há algum documento ou número de processo?"
+      : "Existe prazo ou audiência marcada?",
     fundamentos: matched ? [matched.area] : [],
   });
 }
