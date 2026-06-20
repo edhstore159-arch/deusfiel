@@ -3,44 +3,40 @@ import { generateWithNanoBanana } from '../_shared/nano-banana.ts';
 import { chatCompletion } from '../_shared/llm.ts';
 
 const REALISM =
-  "RAW photo, ultra realistic, photorealistic, real skin texture with natural imperfections and skin pores, " +
-  "professional photography, photojournalism style, 35mm or 50mm lens, cinematic lighting, shallow depth of field, sharp focus, 8k";
+  "ultra realistic photography, 50mm lens, shallow depth of field, natural skin texture, " +
+  "real imperfections, cinematic lighting, high dynamic range, 4k, sharp focus";
 
 const NEGATIVE =
-  "deformed body, distorted anatomy, bad proportions, extra limbs, extra arms, extra fingers, bad hands, fused fingers, broken hands, " +
-  "close-up, portrait only, cropped body, face only, duplicated subjects, collage, split screen, side-by-side, picture-in-picture, " +
-  "frames, borders, cartoon, cgi, 3d render, illustration, painting, blurry, low quality, " +
-  "no text, no letters, no typography, no watermarks, no logos";
+  "blurry, distorted face, different person, cartoon, illustration, fake skin, over-smooth, " +
+  "extra fingers, mutated, unrealistic proportions, collage, split screen, side-by-side, " +
+  "picture-in-picture, frames, borders, text, watermarks, logos";
 
-const BASE_FUSION_INTENT =
-  "Merge the two reference images into ONE single seamless photorealistic scene as if it were a real photograph. " +
-  "Treat image 1 as the MAIN SUBJECT (preserve identity, face, body proportions, clothing and colors). " +
-  "Treat image 2 as the SCENE/CONTEXT (use its environment, lighting mood, palette and atmosphere). " +
-  "Place the main subject naturally inside the scene, matching perspective, scale, lighting direction and shadows. " +
-  "Compose as a FULL-BODY wide shot: entire body visible from head to toe, no cropping, correct human anatomy, " +
-  "natural proportions, realistic hands and fingers. Storytelling composition, environment clearly visible.";
+const TEMPLATE_SYSTEM =
+  "You are a photorealistic image generator prompt engineer that must STRICTLY preserve the original visual identity of the two reference images. " +
+  "You will receive TWO reference images: IMAGE 1 = the PERSON (subject), IMAGE 2 = the ENVIRONMENT (scene). " +
+  "Produce ONE single-line English prompt that recreates a scene combining elements from them with MAXIMUM fidelity. " +
+  "Fill EVERY field of the template below with what is actually observable — never leave brackets, never invent traits. " +
+  "Output ONLY the filled prompt as a single line (no markdown, no headings, no explanations).\n\n" +
+  "TEMPLATE:\n" +
+  "SUBJECT (IMAGE 1 - PERSON): gender, age, skin tone, face shape, eye color and shape, eyebrows, nose, lips, hair (color/texture/style), expression, body type, posture. " +
+  "CRITICAL: face MUST remain consistent — do NOT change identity, do NOT stylize, do NOT beautify. " +
+  "CLOTHING & STYLE: colors, fabric, fit, accessories. " +
+  "SCENE (IMAGE 2 - ENVIRONMENT): location, lighting, time of day, objects, background elements, mood. " +
+  "CAMERA & PHOTO STYLE: " + REALISM + ". " +
+  "RULES: do NOT change facial features, do NOT invent new elements, do NOT cartoonize or stylize, keep proportions realistic, preserve identity exactly. " +
+  "End the prompt with: 'Negative: " + NEGATIVE + "'.";
 
 async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || "").trim();
   try {
     const r = await chatCompletion({
-      temperature: 0.4,
+      temperature: 0.3,
       messages: [
-        {
-          role: "system",
-          content:
-            "You are an art director writing prompts for an image-editing model that fuses TWO reference images into ONE photo. " +
-            "Faithfully keep the user's intent — never invent a new subject or override their request. " +
-            "Translate to English if needed and output ONE single-line descriptive prompt of the final photo (as if it already exists). " +
-            "Always state explicitly: keep the subject from image 1, use the environment from image 2, blend lighting and perspective, " +
-            "single seamless composition (no collage / no split-screen). Add realism keywords and a short 'Negative:' section. " +
-            "No markdown, no explanations.",
-        },
+        { role: "system", content: TEMPLATE_SYSTEM },
         {
           role: "user",
           content:
-            `USER REQUEST (respect this exactly):\n"""${userTheme || "Combine the two images into one harmonious photorealistic scene."}"""\n\n` +
-            `BASELINE INTENT:\n${BASE_FUSION_INTENT}`,
+            `USER DIRECTION (respect exactly, never override identity preservation):\n"""${userTheme || "Place the person from image 1 naturally inside the environment from image 2."}"""`,
         },
       ],
     });
@@ -50,8 +46,7 @@ async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
     }
   } catch (_e) { /* fallback below */ }
 
-  // Determinístico, sem LLM:
-  return `${BASE_FUSION_INTENT} ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
+  return `Place the person from IMAGE 1 (preserve exact identity, face, skin, hair, clothing, accessories) inside the environment from IMAGE 2 (preserve its lighting, palette, time of day, mood). Single seamless photorealistic composition, match perspective and shadows, no collage, no split-screen. ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
 }
 
 Deno.serve(async (req) => {
