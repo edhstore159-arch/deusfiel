@@ -120,20 +120,15 @@ export default function FloatingVoiceOrb() {
         lastFinalRef.current = { text: finalText, at: now };
 
         if (alwaysOnRef.current) {
-          const awake = now < awakeUntilRef.current;
-          if (hasWakeWord(finalText)) {
-            awakeUntilRef.current = now + 15000;
-            setOpen(true);
-            const rest = stripWake(finalText);
-            if (rest) { handleCommandRef.current?.(rest); }
-            else {
-              const msg = "Pois não? Estou ouvindo.";
-              setReply(msg);
-              speak(msg);
-            }
-          } else if (awake) {
-            awakeUntilRef.current = now + 15000;
-            handleCommandRef.current?.(finalText);
+          if (!hasWakeWord(finalText)) continue;
+          awakeUntilRef.current = 0;
+          setOpen(true);
+          const rest = stripWake(finalText);
+          if (rest) { handleCommandRef.current?.(rest); }
+          else {
+            const msg = "Pois não? Estou ouvindo.";
+            setReply(msg);
+            speak(msg);
           }
         } else {
           handleCommandRef.current?.(finalText);
