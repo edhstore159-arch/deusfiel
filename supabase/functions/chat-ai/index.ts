@@ -454,8 +454,18 @@ VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 7. NUNCA repita ou parafraseie a pergunta do cliente antes de responder. NUNCA escreva rótulos como "Cliente:", "Você:", "Secretária:", "Resposta:" — escreva apenas a resposta direta, em uma única voz (a sua). NUNCA gere a próxima fala do cliente.
 Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitionContext}`;
 
+    const extraContext: string = String(body.context || "").trim();
+    const overrideSystem: string = String(body.system_prompt || "").trim();
+    const isVoiceOrb = sessionId === "kenia-voice-orb";
+
+    const finalSystem = isVoiceOrb && overrideSystem
+      ? `${overrideSystem}\n\nCONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime}.`
+      : extraContext
+        ? `${systemContent}\n\nDADOS INTERNOS DISPONÍVEIS (use-os literalmente para responder; não diga que não tem acesso):\n${extraContext}`
+        : systemContent;
+
     const messages = [
-      { role: "system", content: systemContent },
+      { role: "system", content: finalSystem },
       ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
       { role: "user", content: userMessage },
     ];
