@@ -90,10 +90,10 @@ export default function FloatingVoiceOrb() {
   };
 
   const normalizeVoice = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-  const WAKE_RE = /(^|[\s,;:.\-!?])(ok\s+)?(secretaria|kenia(?:\s+garcia)?|ola\s+kenia)(?=$|[\s,;:.\-!?])/i;
+  const WAKE_RE = /(^|[\s,;:.\-!?])(ok\s+)?(secretaria|secetaria|kenia(?:\s+garcia)?|ola\s+kenia)(?=$|[\s,;:.\-!?])/i;
   const hasWakeWord = (t) => WAKE_RE.test(normalizeVoice(t));
   const stripWake = (t) => String(t || "")
-    .replace(/(^|[\s,;:.\-!?])(?:ok\s+)?(?:secret[aá]ria|secretaria|k[eê]nia(?:\s+garcia)?|kenia(?:\s+garcia)?|ol[aá]\s+k[eê]nia|ola\s+kenia)(?=$|[\s,;:.\-!?])/i, " ")
+    .replace(/(^|[\s,;:.\-!?])(?:ok\s+)?(?:secret[aá]ria|secretaria|secetaria|k[eê]nia(?:\s+garcia)?|kenia(?:\s+garcia)?|ol[aá]\s+k[eê]nia|ola\s+kenia)(?=$|[\s,;:.\-!?])/i, " ")
     .replace(/^[\s,;:.\-!?]+/, "")
     .trim();
 
