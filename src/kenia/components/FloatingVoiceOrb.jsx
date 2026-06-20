@@ -49,6 +49,7 @@ export default function FloatingVoiceOrb() {
 
   const alwaysOnRef = useRef(false);
   const awakeUntilRef = useRef(0);
+  const commandSessionActiveRef = useRef(false);
   const shouldRestartRef = useRef(false);
   const recognitionActiveRef = useRef(false);
   const restartTimerRef = useRef(null);
@@ -235,6 +236,13 @@ export default function FloatingVoiceOrb() {
   const contextAtRef = useRef(0);
 
   const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const isWakeOnlyPrompt = (text) => /^(?:fala|fale|conversa|converse|atenda|atende|escuta|escute|ouve|ouca)(?:\s+(?:comigo|me|aqui))?$/i.test(norm(text).trim());
+
+  const activateCommandSession = () => {
+    commandSessionActiveRef.current = true;
+    awakeUntilRef.current = 0;
+    setOpen(true);
+  };
 
   const loadClientContext = async () => {
     if (contextRef.current && Date.now() - contextAtRef.current < 60_000) return contextRef.current;
