@@ -196,6 +196,54 @@ export default function Creatives() {
     }
   };
 
+  const openEdit = (item) => {
+    setEditTarget(item);
+    setEditPrompt(item.last_edit_prompt || "");
+    setEditPreview(item.image_b64 || null);
+    setEditUpload(null);
+  };
+
+  const onPickEditUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { toast.error("Imagem muito grande (máx 8MB)"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      setEditUpload(dataUrl);
+      setEditPreview(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const runEdit = async () => {
+    if (!editTarget) return;
+    if (!editPrompt.trim()) { toast.error("Descreva a modificação desejada"); return; }
+    const sourceImage = editUpload || editTarget.image_b64;
+    if (!sourceImage) { toast.error("Sem imagem original para editar"); return; }
+    setEditing(true);
+    try {
+      const { data } = await api.post("/creatives/edit", {
+        id: editTarget.id,
+        image_base64: sourceImage,
+        prompt: editPrompt.trim(),
+      });
+      if (data?.ok && (data.image_b64 || data.image)) {
+        const next = data.image_b64 || data.image;
+        setEditPreview(next);
+        setEditUpload(null);
+        toast.success("Criativo atualizado");
+        load();
+      } else {
+        toast.error(data?.error || "Não foi possível editar");
+      }
+    } catch (e) {
+      toast.error(e.response?.data?.error || e.message || "Erro ao editar");
+    } finally {
+      setEditing(false);
+    }
+  };
+
   const remove = async (id) => {
     if (!confirm("Excluir criativo?")) return;
     await api.delete(`/creatives/${id}`);
