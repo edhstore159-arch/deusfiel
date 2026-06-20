@@ -47,28 +47,78 @@ export default function FloatingVoiceOrb() {
     typeof window !== "undefined" &&
     (window.SpeechRecognition || window.webkitSpeechRecognition);
 
+  const alwaysOnRef = useRef(false);
+  const awakeUntilRef = useRef(0);
+  const [alwaysOn, setAlwaysOn] = useState(false);
+  useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
+
+  const WAKE_RE = /\b(secretaria|secretária|kenia|kênia|ken[ií]a garcia|ok kenia|ol[aá] kenia)\b/i;
+  const stripWake = (t) => t.replace(WAKE_RE, "").replace(/^[\s,;:.\-]+/, "").trim();
+
   useEffect(() => {
     if (!supported) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const rec = new SR();
     rec.lang = "pt-BR";
-    rec.continuous = false;
+    rec.continuous = true;
     rec.interimResults = true;
     rec.onresult = (e) => {
       const txt = Array.from(e.results).map((r) => r[0].transcript).join(" ");
       setTranscript(txt);
-      if (e.results[e.results.length - 1].isFinal) {
-        handleCommand(txt);
+      const last = e.results[e.results.length - 1];
+      if (!last.isFinal) return;
+      const finalText = last[0].transcript.trim();
+      if (alwaysOnRef.current) {
+        const awake = Date.now() < awakeUntilRef.current;
+        if (WAKE_RE.test(finalText)) {
+          awakeUntilRef.current = Date.now() + 15000;
+          const rest = stripWake(finalText);
+          if (rest) { handleCommand(rest); }
+          else { speak("Pois não?"); setReply("Estou ouvindo…"); }
+        } else if (awake) {
+          awakeUntilRef.current = Date.now() + 15000;
+          handleCommand(finalText);
+        }
+      } else {
+        handleCommand(finalText);
       }
     };
     rec.onerror = (e) => {
-      setListening(false);
-      if (e.error !== "no-speech") toast.error("Erro no microfone: " + e.error);
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        setListening(false); setAlwaysOn(false);
+        toast.error("Permissão de microfone negada.");
+      } else if (e.error !== "no-speech" && e.error !== "aborted") {
+        // keep going for transient errors
+      }
     };
-    rec.onend = () => setListening(false);
+    rec.onend = () => {
+      if (alwaysOnRef.current) {
+        try { rec.start(); } catch {}
+      } else {
+        setListening(false);
+      }
+    };
     recognitionRef.current = rec;
     return () => { try { rec.stop(); } catch {} };
   }, [supported]);
+
+  const toggleAlwaysOn = () => {
+    if (!supported) { toast.error("Reconhecimento de voz não suportado."); return; }
+    const rec = recognitionRef.current; if (!rec) return;
+    if (alwaysOn) {
+      setAlwaysOn(false); alwaysOnRef.current = false;
+      try { rec.stop(); } catch {}
+      setListening(false);
+      toast.message("Escuta contínua desativada.");
+    } else {
+      setAlwaysOn(true); alwaysOnRef.current = true;
+      awakeUntilRef.current = 0;
+      try { rec.start(); setListening(true); } catch {}
+      toast.success('Diga "secretária" para ativar.');
+      speak("Estou de prontidão. Diga secretária para falar comigo.");
+    }
+  };
+
 
   const speak = (text) => {
     try {
