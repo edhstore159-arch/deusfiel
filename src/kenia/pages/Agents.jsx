@@ -60,6 +60,7 @@ export default function Agents() {
   const [agents, setAgents] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState(null);
+  const avatarInputRef = useRef(null);
 
   useEffect(() => {
     const list = readAgents();
