@@ -762,7 +762,23 @@ const staticPatch = (url, body = {}) => {
   };
   if (path.startsWith("/leads/")) return updateCollection("leads", seedLeads);
   if (path.startsWith("/finance/transactions/")) return updateCollection("transactions", seedTransactions);
-  if (path.startsWith("/appointments/")) return updateCollection("appointments", seedAppointments);
+  if (path.startsWith("/appointments/")) {
+    return (async () => {
+      const id = path.split("/").pop();
+      try {
+        const { data, error } = await supabase
+          .from("appointments")
+          .update(mapAppointmentMutationPayload(body))
+          .eq("id", id)
+          .select("*")
+          .single();
+        if (error) throw error;
+        return response(normalizeAppointment(data));
+      } catch {
+        return updateCollection("appointments", seedAppointments);
+      }
+    })();
+  }
   if (path.startsWith("/legal-deadlines/")) return updateCollection("legal_deadlines", seedLegalDeadlines);
   if (path.startsWith("/admin/case-analyses/")) return updateCollection("case_analyses", seedAnalyses);
   return response({ ok: true, fallback: true });
