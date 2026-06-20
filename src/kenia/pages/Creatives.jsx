@@ -45,6 +45,11 @@ export default function Creatives() {
     scheduled_for: "",
     platforms: ["instagram"],
   });
+  const [editTarget, setEditTarget] = useState(null); // creative item being edited
+  const [editPrompt, setEditPrompt] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editPreview, setEditPreview] = useState(null);
+  const [editUpload, setEditUpload] = useState(null); // data URL for replacement source image
 
   const onPickImage = (e) => {
     const file = e.target.files?.[0];
