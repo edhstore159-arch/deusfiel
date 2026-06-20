@@ -121,16 +121,22 @@ export default function FloatingVoiceOrb() {
         lastFinalRef.current = { text: finalText, at: now };
 
         if (alwaysOnRef.current) {
-          if (!hasWakeWord(finalText)) continue;
-          awakeUntilRef.current = 0;
-          setOpen(true);
-          const rest = stripWake(finalText);
-          if (rest) { handleCommandRef.current?.(rest); }
-          else {
-            const msg = "Pois não? Estou ouvindo.";
-            setReply(msg);
-            speak(msg);
+          const woke = hasWakeWord(finalText);
+          const commandText = woke ? stripWake(finalText) : finalText;
+          if (woke) {
+            window.speechSynthesis?.cancel?.();
+            activateCommandSession();
+            if (!commandText || isWakeOnlyPrompt(commandText)) {
+              const msg = "Pois não? Pode falar.";
+              setReply(msg);
+              speak(msg);
+              continue;
+            }
+          } else if (!commandSessionActiveRef.current) {
+            continue;
           }
+
+          handleCommandRef.current?.(commandText);
         } else {
           handleCommandRef.current?.(finalText);
           shouldRestartRef.current = false;
