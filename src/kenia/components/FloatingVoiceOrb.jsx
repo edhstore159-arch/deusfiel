@@ -505,9 +505,21 @@ export default function FloatingVoiceOrb() {
     setYtIdx(next); setYtVideoId(ytIds[next]);
   };
 
+  const closeYouTube = () => {
+    setYtVideoId(""); setYtIds([]); setYtIdx(0); setYtQuery("");
+  };
+
   const handleCommand = (text) => {
     if (!text?.trim()) return;
     const lower = text.toLowerCase();
+    // Fechar / parar música ou aba do YouTube
+    if (/\b(fech[ae]r?|fecha|para|pare|parar|encerra[r]?|desliga[r]?|stop|pause|pausa[r]?)\b[\s\S]*\b(m[uú]sica|som|v[ií]deo|youtube|yt|aba|player)\b/i.test(lower)
+        || /\b(m[uú]sica|som|v[ií]deo|youtube|aba|player)\b[\s\S]*\b(fech[ae]r?|fecha|para|pare|parar|encerra[r]?|desliga[r]?|stop|pause|pausa[r]?)\b/i.test(lower)) {
+      closeYouTube();
+      const m = "Música fechada.";
+      setReply(m); speak(m); toast.success(m);
+      return;
+    }
     // Tocar música no YouTube
     const ytMatch = text.match(/\b(?:toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|p[oõ]r|reproduz|reproduzir)\s+(?:a\s+|o\s+)?(?:m[uú]sica|som|v[ií]deo|playlist|clipe|audio|[aá]udio)?\s*(?:do|da|no|de)?\s*(.+?)(?:\s+(?:no|do|pelo|pelo\s+youtube|youtube))?\s*$/i);
     if (/youtube|y\s*tube|yt\b/i.test(lower) || (ytMatch && /\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz)\b/i.test(lower))) {
