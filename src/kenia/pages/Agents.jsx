@@ -369,15 +369,17 @@ export default function Agents() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="active"
-                type="checkbox"
-                checked={draft.active}
-                onChange={(e) => setDraft({ ...draft, active: e.target.checked })}
-                className="w-4 h-4 accent-gold-600"
+            <div className="flex items-center justify-between rounded-md border border-nude-200 bg-nude-50/50 px-4 py-3">
+              <div>
+                <div className="text-sm font-medium text-nude-900">Agente ativo</div>
+                <p className="text-xs text-nude-500 mt-0.5">
+                  Quando desativado, o agente não responde em nenhum canal.
+                </p>
+              </div>
+              <Switch
+                checked={!!draft.active}
+                onCheckedChange={(v) => setDraft({ ...draft, active: v })}
               />
-              <label htmlFor="active" className="text-sm text-nude-700">Agente ativo</label>
             </div>
 
             <Separator />
