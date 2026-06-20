@@ -49,6 +49,7 @@ export default function FloatingVoiceOrb() {
 
   const alwaysOnRef = useRef(false);
   const awakeUntilRef = useRef(0);
+  const commandSessionActiveRef = useRef(false);
   const shouldRestartRef = useRef(false);
   const recognitionActiveRef = useRef(false);
   const restartTimerRef = useRef(null);
@@ -78,6 +79,7 @@ export default function FloatingVoiceOrb() {
         }
         shouldRestartRef.current = false;
         alwaysOnRef.current = false;
+        commandSessionActiveRef.current = false;
         setAlwaysOn(false);
         setListening(false);
         if (err?.name === "NotAllowedError") {
@@ -88,10 +90,10 @@ export default function FloatingVoiceOrb() {
   };
 
   const normalizeVoice = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-  const WAKE_RE = /(^|[\s,;:.\-!?])(ok\s+)?(secretaria|kenia(?:\s+garcia)?|ola\s+kenia)(?=$|[\s,;:.\-!?])/i;
+  const WAKE_RE = /(^|[\s,;:.\-!?])(ok\s+)?(secretaria|secetaria|kenia(?:\s+garcia)?|ola\s+kenia)(?=$|[\s,;:.\-!?])/i;
   const hasWakeWord = (t) => WAKE_RE.test(normalizeVoice(t));
   const stripWake = (t) => String(t || "")
-    .replace(/(^|[\s,;:.\-!?])(?:ok\s+)?(?:secret[aá]ria|secretaria|k[eê]nia(?:\s+garcia)?|kenia(?:\s+garcia)?|ol[aá]\s+k[eê]nia|ola\s+kenia)(?=$|[\s,;:.\-!?])/i, " ")
+    .replace(/(^|[\s,;:.\-!?])(?:ok\s+)?(?:secret[aá]ria|secretaria|secetaria|k[eê]nia(?:\s+garcia)?|kenia(?:\s+garcia)?|ol[aá]\s+k[eê]nia|ola\s+kenia)(?=$|[\s,;:.\-!?])/i, " ")
     .replace(/^[\s,;:.\-!?]+/, "")
     .trim();
 
@@ -120,16 +122,22 @@ export default function FloatingVoiceOrb() {
         lastFinalRef.current = { text: finalText, at: now };
 
         if (alwaysOnRef.current) {
-          if (!hasWakeWord(finalText)) continue;
-          awakeUntilRef.current = 0;
-          setOpen(true);
-          const rest = stripWake(finalText);
-          if (rest) { handleCommandRef.current?.(rest); }
-          else {
-            const msg = "Pois não? Estou ouvindo.";
-            setReply(msg);
-            speak(msg);
+          const woke = hasWakeWord(finalText);
+          const commandText = woke ? stripWake(finalText) : finalText;
+          if (woke) {
+            window.speechSynthesis?.cancel?.();
+            activateCommandSession();
+            if (!commandText || isWakeOnlyPrompt(commandText)) {
+              const msg = "Pois não? Pode falar.";
+              setReply(msg);
+              speak(msg);
+              continue;
+            }
+          } else if (!commandSessionActiveRef.current) {
+            continue;
           }
+
+          handleCommandRef.current?.(commandText);
         } else {
           handleCommandRef.current?.(finalText);
           shouldRestartRef.current = false;
@@ -141,6 +149,7 @@ export default function FloatingVoiceOrb() {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         shouldRestartRef.current = false;
         alwaysOnRef.current = false;
+        commandSessionActiveRef.current = false;
         recognitionActiveRef.current = false;
         setListening(false); setAlwaysOn(false);
         toast.error("Permissão de microfone negada.");
@@ -157,6 +166,7 @@ export default function FloatingVoiceOrb() {
     recognitionRef.current = rec;
     return () => {
       shouldRestartRef.current = false;
+      commandSessionActiveRef.current = false;
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
       recognitionRef.current = null;
@@ -172,6 +182,7 @@ export default function FloatingVoiceOrb() {
     if (alwaysOnRef.current) {
       shouldRestartRef.current = false;
       alwaysOnRef.current = false;
+      commandSessionActiveRef.current = false;
       setAlwaysOn(false);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       try { rec.abort?.(); } catch {}
@@ -179,6 +190,7 @@ export default function FloatingVoiceOrb() {
       toast.message("Escuta contínua desativada.");
     } else {
       setAlwaysOn(true); alwaysOnRef.current = true; shouldRestartRef.current = true;
+      commandSessionActiveRef.current = false;
       awakeUntilRef.current = 0;
       setTranscript("");
       try {
@@ -193,6 +205,7 @@ export default function FloatingVoiceOrb() {
         }
         shouldRestartRef.current = false;
         alwaysOnRef.current = false;
+        commandSessionActiveRef.current = false;
         setAlwaysOn(false);
         setListening(false);
         toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
@@ -235,6 +248,13 @@ export default function FloatingVoiceOrb() {
   const contextAtRef = useRef(0);
 
   const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const isWakeOnlyPrompt = (text) => /^(?:fala|fale|conversa|converse|atenda|atende|escuta|escute|ouve|ouca)(?:\s+(?:comigo|me|aqui))?$/i.test(norm(text).trim());
+
+  const activateCommandSession = () => {
+    commandSessionActiveRef.current = true;
+    awakeUntilRef.current = 0;
+    setOpen(true);
+  };
 
   const loadClientContext = async () => {
     if (contextRef.current && Date.now() - contextAtRef.current < 60_000) return contextRef.current;
@@ -599,6 +619,7 @@ export default function FloatingVoiceOrb() {
     if (listening || recognitionActiveRef.current) {
       shouldRestartRef.current = false;
       alwaysOnRef.current = false;
+      commandSessionActiveRef.current = false;
       setAlwaysOn(false);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       try { rec.abort?.(); } catch {}
@@ -606,6 +627,7 @@ export default function FloatingVoiceOrb() {
     } else {
       shouldRestartRef.current = false;
       alwaysOnRef.current = false;
+      commandSessionActiveRef.current = false;
       setAlwaysOn(false);
       setTranscript("");
       try {
