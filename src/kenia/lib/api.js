@@ -767,7 +767,7 @@ liveApi.interceptors.response.use(
 );
 
 const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today"]);
-const cloudFirstPostPaths = new Set(["/creatives/generate", "/creatives/fuse-images", "/appointments", "/legal-deadlines", "/legal-deadlines/sync", "/leads", "/public/leads"]);
+const cloudFirstPostPaths = new Set(["/creatives/generate", "/creatives/fuse-images", "/creatives/edit", "/appointments", "/legal-deadlines", "/legal-deadlines/sync", "/leads", "/public/leads"]);
 const staticOnlyMutationPrefixes = ["/leads/"];
 const liveFirstWithStaticFallbackPostPaths = new Set(["/chat/message"]);
 const fallbackToStaticPostPaths = new Set(["/debug/instruction"]);
