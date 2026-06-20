@@ -767,7 +767,8 @@ liveApi.interceptors.response.use(
 );
 
 const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today"]);
-const cloudFirstPostPaths = new Set(["/creatives/generate", "/creatives/fuse-images", "/appointments", "/legal-deadlines", "/legal-deadlines/sync"]);
+const cloudFirstPostPaths = new Set(["/creatives/generate", "/creatives/fuse-images", "/appointments", "/legal-deadlines", "/legal-deadlines/sync", "/leads", "/public/leads"]);
+const staticOnlyMutationPrefixes = ["/leads/"];
 const liveFirstWithStaticFallbackPostPaths = new Set(["/chat/message"]);
 const fallbackToStaticPostPaths = new Set(["/debug/instruction"]);
 
@@ -840,8 +841,20 @@ export const api = HAS_BACKEND
         return liveApi.post(url, body, config);
       },
       put: liveApi.put.bind(liveApi),
-      patch: (url, body, config) => String(url).split("?")[0].startsWith("/legal-deadlines/") ? staticPatch(url, body) : liveApi.patch(url, body, config),
-      delete: (url, config) => String(url).split("?")[0].startsWith("/legal-deadlines/") ? staticDelete(url) : liveApi.delete(url, config),
+      patch: (url, body, config) => {
+        const p = String(url).split("?")[0];
+        if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+          return staticPatch(url, body);
+        }
+        return liveApi.patch(url, body, config);
+      },
+      delete: (url, config) => {
+        const p = String(url).split("?")[0];
+        if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+          return staticDelete(url);
+        }
+        return liveApi.delete(url, config);
+      },
     }
   : {
       get: staticGet,
