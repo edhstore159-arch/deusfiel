@@ -619,6 +619,7 @@ export default function FloatingVoiceOrb() {
     if (listening || recognitionActiveRef.current) {
       shouldRestartRef.current = false;
       alwaysOnRef.current = false;
+      commandSessionActiveRef.current = false;
       setAlwaysOn(false);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       try { rec.abort?.(); } catch {}
@@ -626,6 +627,7 @@ export default function FloatingVoiceOrb() {
     } else {
       shouldRestartRef.current = false;
       alwaysOnRef.current = false;
+      commandSessionActiveRef.current = false;
       setAlwaysOn(false);
       setTranscript("");
       try {
