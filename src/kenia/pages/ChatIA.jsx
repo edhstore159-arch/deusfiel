@@ -684,6 +684,19 @@ export default function ChatIA() {
     setMessages((prev) => [...prev, { role: "user", content: msg }]);
     setInput("");
     setThinking(true);
+    // Mostra um esboço de análise imediatamente para o usuário ver o painel reagindo
+    setAnalysis((prev) =>
+      prev || {
+        acertividade: 35,
+        chance_exito: 30,
+        qualificacao: "necessita_mais_info",
+        area: "Em análise",
+        resumo: "Analisando os primeiros detalhes do caso…",
+        motivo: "Aguardando mais informações para refinar a análise.",
+        proxima_pergunta: "",
+        fundamentos: [],
+      }
+    );
     const scheduleIntent = extractScheduleIntent(msg);
     if (scheduleIntent) {
       try {
@@ -726,7 +739,11 @@ export default function ChatIA() {
       if (data.appointment) {
         toast.success("Consulta salva automaticamente na Agenda");
       }
-      if (data.analysis) setAnalysis(data.analysis);
+      if (data.analysis) {
+        const a = { ...data.analysis };
+        if (a.qualificacao === "desqualificado") a.qualificacao = "nao_qualificado";
+        setAnalysis(a);
+      }
       upsertLead({ description: msg });
       setThinking(false);
       if (data.handoff) {
