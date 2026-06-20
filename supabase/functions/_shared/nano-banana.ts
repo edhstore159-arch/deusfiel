@@ -56,20 +56,33 @@ function toBase64Utf8(value: string) {
 function buildLocalFusionFallback(opts: NanoBananaOptions): string | null {
   const images = (opts.imageUrls || []).filter(Boolean).slice(0, 2);
   if (!images.length) return null;
-  const first = escapeXml(images[0]);
-  const second = escapeXml(images[1] || images[0]);
+  const person = escapeXml(images[0]);
+  const scene = escapeXml(images[1] || images[0]);
+  // Fusão local SEM IA: cenário ao fundo cobrindo toda a área + pessoa
+  // recortada por máscara radial suave (sem bordas duras, sem split-screen),
+  // com leve correção de cor para casar com a ambientação do cenário.
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#111827"/><stop offset="1" stop-color="#4338ca"/></linearGradient>
-    <clipPath id="left"><path d="M0 0h596L428 1024H0z"/></clipPath>
-    <clipPath id="right"><path d="M596 0h428v1024H428z"/></clipPath>
-    <filter id="soft"><feGaussianBlur stdDeviation="0.25"/></filter>
+    <radialGradient id="pm" cx="50%" cy="46%" r="52%">
+      <stop offset="55%" stop-color="white" stop-opacity="1"/>
+      <stop offset="82%" stop-color="white" stop-opacity="0.78"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="soft"><rect width="1024" height="1024" fill="black"/><rect x="192" y="96" width="640" height="832" fill="url(#pm)"/></mask>
+    <filter id="ambient"><feColorMatrix type="matrix" values="0.94 0 0 0 0.02  0 0.94 0 0 0.02  0 0 0.96 0 0.04  0 0 0 1 0"/></filter>
+    <filter id="bgSoft"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="16"/>
+      <feOffset dx="0" dy="20" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <rect width="1024" height="1024" fill="url(#bg)"/>
-  <image href="${first}" x="0" y="0" width="650" height="1024" preserveAspectRatio="xMidYMid slice" clip-path="url(#left)"/>
-  <image href="${second}" x="374" y="0" width="650" height="1024" preserveAspectRatio="xMidYMid slice" clip-path="url(#right)" opacity="0.96"/>
-  <image href="${first}" x="0" y="0" width="1024" height="1024" preserveAspectRatio="xMidYMid slice" opacity="0.12" filter="url(#soft)"/>
-  <path d="M596 0 428 1024" stroke="rgba(255,255,255,.62)" stroke-width="10"/>
+  <image href="${scene}" x="0" y="0" width="1024" height="1024" preserveAspectRatio="xMidYMid slice" filter="url(#bgSoft)"/>
+  <rect width="1024" height="1024" fill="rgba(10,10,20,0.18)"/>
+  <g mask="url(#soft)" filter="url(#shadow)">
+    <image href="${person}" x="192" y="96" width="640" height="832" preserveAspectRatio="xMidYMid slice" filter="url(#ambient)"/>
+  </g>
 </svg>`;
   return `data:image/svg+xml;base64,${toBase64Utf8(svg)}`;
 }
