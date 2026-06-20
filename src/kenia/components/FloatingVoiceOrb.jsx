@@ -77,19 +77,55 @@ export default function FloatingVoiceOrb() {
     } catch {}
   };
 
+  const [thinking, setThinking] = useState(false);
+  const [reply, setReply] = useState("");
+  const historyRef = useRef([]);
+
+  const askOllama = async (text) => {
+    setThinking(true);
+    setReply("");
+    try {
+      const { data, error } = await supabase.functions.invoke("chat-ai", {
+        body: {
+          message: text,
+          history: historyRef.current.slice(-8),
+          session_id: "kenia-voice-orb",
+        },
+      });
+      if (error) throw error;
+      const answer = String(data?.reply || data?.message || data?.text || "").trim();
+      if (!answer) throw new Error("Resposta vazia");
+      historyRef.current.push({ role: "user", content: text });
+      historyRef.current.push({ role: "assistant", content: answer });
+      setReply(answer);
+      speak(answer);
+      // Se a resposta sugerir uma rota, navegue também
+      const r = matchRoute(answer);
+      if (r) navigate(r);
+    } catch (e) {
+      toast.error("Falha ao consultar Kênia (Ollama): " + (e?.message || e));
+      speak("Não consegui processar agora.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
   const handleCommand = (text) => {
+    if (!text?.trim()) return;
     const route = matchRoute(text);
-    if (route) {
+    // Comandos diretos de navegação ("abrir/ir/vai para X")
+    if (route && /\b(abrir|abra|ir|vai|vá|leva|leve|navegar|abre)\b/i.test(text)) {
       navigate(route);
       const label = ROUTES.find((r) => r.to === route)?.keys[0] || "página";
       toast.success(`Abrindo ${label}`);
       speak(`Abrindo ${label}`);
       setOpen(false);
-    } else {
-      toast.message("Não entendi o comando", { description: text });
-      speak("Não entendi. Tente dizer: agenda, CRM ou logs.");
+      return;
     }
+    // Caso geral: pergunta ao assistente (Ollama via chat-ai)
+    askOllama(text);
   };
+
 
   const toggleListen = () => {
     if (!supported) {
