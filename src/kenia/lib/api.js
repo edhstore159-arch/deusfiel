@@ -910,14 +910,14 @@ export const api = HAS_BACKEND
       put: liveApi.put.bind(liveApi),
       patch: (url, body, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+        if (p.startsWith("/appointments/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticPatch(url, body);
         }
         return liveApi.patch(url, body, config);
       },
       delete: (url, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+        if (p.startsWith("/appointments/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticDelete(url);
         }
         return liveApi.delete(url, config);
