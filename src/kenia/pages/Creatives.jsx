@@ -585,6 +585,59 @@ export default function Creatives() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Edit dialog */}
+      {editTarget && (
+        <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) { setEditTarget(null); setEditPreview(null); setEditUpload(null); setEditPrompt(""); } }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Pencil className="w-4 h-4 text-gold-600" /> Editar criativo com IA
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="aspect-square bg-nude-100 rounded-md overflow-hidden border border-nude-200">
+                  {editPreview ? (
+                    <img src={imageSrc(editPreview)} alt="Prévia" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-nude-400 text-sm">Sem imagem</div>
+                  )}
+                </div>
+                <label className="flex items-center justify-center gap-2 h-10 border border-dashed border-nude-300 rounded-md cursor-pointer hover:bg-nude-50 text-xs text-nude-600">
+                  <Upload className="w-3.5 h-3.5" />
+                  {editUpload ? "Trocar imagem base" : "Enviar nova imagem base (opcional)"}
+                  <input type="file" accept="image/*" className="hidden" onChange={onPickEditUpload} />
+                </label>
+              </div>
+              <div className="flex flex-col">
+                <Label>Modificações desejadas</Label>
+                <Textarea
+                  rows={8}
+                  className="mt-1.5 flex-1"
+                  placeholder="Ex.: Troque o fundo por um escritório de advocacia moderno, mantenha o texto principal, adicione um detalhe dourado no rodapé e melhore o contraste."
+                  value={editPrompt}
+                  onChange={(e) => setEditPrompt(e.target.value)}
+                />
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    onClick={runEdit}
+                    disabled={editing}
+                    className="flex-1 bg-nude-900 hover:bg-nude-800"
+                  >
+                    {editing ? <span className="animate-pulse-soft">Aplicando edição...</span> : <><Wand2 className="w-4 h-4 mr-2" /> Aplicar com IA</>}
+                  </Button>
+                  {editPreview && (
+                    <Button variant="outline" onClick={() => download({ id: editTarget.id, image_b64: editPreview })}>
+                      <Download className="w-4 h-4 mr-2" /> Baixar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
