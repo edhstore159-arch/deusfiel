@@ -589,6 +589,7 @@ const staticPost = (url, body = {}) => {
       } catch (e) {
         genError = e?.message || String(e);
       }
+      if (!b64) b64 = buildLocalCreativeImage(body.title || topic, topic);
       const storedImage = await compactImageForStorage(b64);
       const item = {
         id: nextId("creative"),
