@@ -56,8 +56,16 @@ export default function FloatingVoiceOrb() {
   const lastFinalRef = useRef({ text: "", at: 0 });
   const speakingRef = useRef(false);
   const speechResumeTimerRef = useRef(null);
+  const speechRunIdRef = useRef(0);
   const [alwaysOn, setAlwaysOn] = useState(false);
   useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
+
+  const stopCurrentSpeech = () => {
+    speechRunIdRef.current += 1;
+    speakingRef.current = false;
+    if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+    try { window.speechSynthesis?.cancel?.(); } catch {}
+  };
 
   const restartContinuousRecognition = (delay = 300) => {
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
@@ -121,12 +129,17 @@ export default function FloatingVoiceOrb() {
 
         if (alwaysOnRef.current) {
           const awake = now < awakeUntilRef.current;
-          if (hasWakeWord(finalText)) {
-            const wasSpeaking = speakingRef.current || window.speechSynthesis?.speaking;
+          const finalHasWakeWord = hasWakeWord(finalText);
+          const wasSpeaking = speakingRef.current || window.speechSynthesis?.speaking;
+
+          if (wasSpeaking && !finalHasWakeWord) {
+            // Evita que a própria voz da Kênia seja capturada como nova pergunta.
+            continue;
+          }
+
+          if (finalHasWakeWord) {
             if (wasSpeaking) {
-              try { window.speechSynthesis.cancel(); } catch {}
-              speakingRef.current = false;
-              if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+              stopCurrentSpeech();
               restartContinuousRecognition(100);
             }
             awakeUntilRef.current = now + 15000;
@@ -217,13 +230,20 @@ export default function FloatingVoiceOrb() {
   const speak = (text) => {
     try {
       const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
+      const spokenText = String(text || "").trim();
+      if (!spokenText) return;
+      speechRunIdRef.current += 1;
+      const runId = speechRunIdRef.current;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "pt-BR";
       u.onstart = () => {
+        if (runId !== speechRunIdRef.current) return;
+        if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
         if (!shouldResume) return;
         speakingRef.current = true;
       };
       const resume = () => {
+        if (runId !== speechRunIdRef.current) return;
         speakingRef.current = false;
         if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
         if (shouldResume && alwaysOnRef.current && shouldRestartRef.current) {
@@ -232,9 +252,10 @@ export default function FloatingVoiceOrb() {
       };
       u.onend = resume;
       u.onerror = resume;
-      window.speechSynthesis.cancel();
+      try { window.speechSynthesis.cancel(); } catch {}
+      speakingRef.current = shouldResume;
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
-      const fallbackMs = Math.min(15000, Math.max(2000, String(text || "").length * 80));
+      const fallbackMs = Math.min(20000, Math.max(2500, spokenText.length * 90));
       speechResumeTimerRef.current = window.setTimeout(resume, fallbackMs);
       window.speechSynthesis.speak(u);
     } catch {}
@@ -548,6 +569,10 @@ export default function FloatingVoiceOrb() {
 
   const handleCommand = (text) => {
     if (!text?.trim()) return;
+    if (speakingRef.current || window.speechSynthesis?.speaking) {
+      stopCurrentSpeech();
+      if (alwaysOnRef.current && shouldRestartRef.current) restartContinuousRecognition(100);
+    }
     const lower = text.toLowerCase();
     // Fechar / parar música ou aba do YouTube
     if (/\b(fech[ae]r?|fecha|para|pare|parar|encerra[r]?|desliga[r]?|stop|pause|pausa[r]?)\b[\s\S]*\b(m[uú]sica|som|v[ií]deo|youtube|yt|aba|player)\b/i.test(lower)
