@@ -246,6 +246,63 @@ function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime
   return "Entendi. Para seguir sem repetir informações, me conte em poucas palavras o que aconteceu e qual ajuda você precisa agora.";
 }
 
+const caseAreaMatchers = [
+  { area: "Direito de Família", words: /\b(div[oó]rcio|guarda|pens[aã]o|alimentos|visita|uni[aã]o\s+est[aá]vel|invent[aá]rio|partilha|heran[cç]a)\b/i },
+  { area: "Direito Bancário", words: /\b(banco|empr[eé]stimo|consignado|juros|cart[aã]o|pix|golpe|negativa[cç][aã]o|serasa|spc|d[ií]vida)\b/i },
+  { area: "Direito Previdenciário", words: /\b(inss|aposentadoria|aux[ií]lio|benef[ií]cio|bpc|loas|per[ií]cia|pens[aã]o\s+por\s+morte)\b/i },
+  { area: "Direito Trabalhista", words: /\b(trabalho|demiss[aã]o|rescis[aã]o|fgts|sal[aá]rio|horas?\s+extras?|f[eé]rias|ass[eé]dio|emprego)\b/i },
+  { area: "Direito do Consumidor", words: /\b(produto|servi[cç]o|compra|defeito|garantia|cancelamento|reembolso|cobran[cç]a|consumidor)\b/i },
+];
+
+function clampPercent(value: unknown, fallback: number): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fallback;
+}
+
+function normalizeCaseAnalysis(analysis: any, fallback: any = {}) {
+  const source = analysis && typeof analysis === "object" ? analysis : {};
+  const rawQual = source.qualificacao === "desqualificado" ? "nao_qualificado" : source.qualificacao;
+  const qualificacao = ["qualificado", "necessita_mais_info", "nao_qualificado"].includes(rawQual)
+    ? rawQual
+    : fallback.qualificacao || "necessita_mais_info";
+  return {
+    acertividade: clampPercent(source.acertividade, fallback.acertividade ?? 40),
+    chance_exito: clampPercent(source.chance_exito, fallback.chance_exito ?? 35),
+    qualificacao,
+    area: String(source.area || fallback.area || "Em análise jurídica"),
+    resumo: String(source.resumo || fallback.resumo || "Análise inicial do atendimento em andamento."),
+    motivo: String(source.motivo || fallback.motivo || "A avaliação será refinada conforme mais detalhes forem informados."),
+    proxima_pergunta: String(source.proxima_pergunta || fallback.proxima_pergunta || ""),
+    fundamentos: Array.isArray(source.fundamentos) ? source.fundamentos : Array.isArray(fallback.fundamentos) ? fallback.fundamentos : [],
+  };
+}
+
+function buildLocalCaseAnalysis(history: Array<{ role: string; content: string }>, userMessage: string) {
+  const userTexts = [...history.filter((m) => m.role === "user").map((m) => m.content), userMessage]
+    .map((text) => String(text || "").trim())
+    .filter(Boolean);
+  const combined = userTexts.join("\n");
+  const matched = caseAreaMatchers.find((item) => item.words.test(combined));
+  const infoCount = Math.min(5, userTexts.length);
+  const hasDeadline = /\b(prazo|audi[eê]ncia|intima[cç][aã]o|urgente|hoje|amanh[aã]|dias?|data)\b/i.test(combined);
+  const hasDocument = /\b(documento|contrato|processo|print|prova|comprovante|foto|anexo)\b/i.test(combined);
+  const score = clampPercent(30 + infoCount * 10 + (matched ? 18 : 0) + (hasDeadline ? 10 : 0) + (hasDocument ? 8 : 0), 45);
+  return normalizeCaseAnalysis({
+    acertividade: score,
+    chance_exito: Math.max(25, score - 10),
+    qualificacao: score >= 75 ? "qualificado" : "necessita_mais_info",
+    area: matched?.area || "Em análise jurídica",
+    resumo: combined.slice(0, 180) || "Cliente iniciou a descrição do caso.",
+    motivo: matched
+      ? "A conversa já contém sinais da área jurídica e detalhes suficientes para uma triagem inicial."
+      : "Ainda faltam dados objetivos sobre área, datas, documentos e impacto do problema.",
+    proxima_pergunta: hasDeadline
+      ? "Você tem algum documento, contrato, comprovante ou número de processo sobre esse caso?"
+      : "Existe algum prazo, audiência, bloqueio ou urgência acontecendo agora?",
+    fundamentos: matched ? [matched.area] : [],
+  });
+}
+
 function userAskedTemporalInfo(text: string): boolean {
   const t = String(text || "").toLowerCase();
   return /(que\s+horas|qual\s+(?:é\s+|e\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+|e\s+)?(?:a\s+)?data|que\s+data|que\s+dia|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|diz|fala|fale|informa|info)[^.?!]*(?:dia|hora|data|m[eê]s|ano)|\bhoje\b|\bagora\b|\bhoras?\b|\bdata\b|que\s+ano|estamos\s+em\s+que)/i.test(t);
