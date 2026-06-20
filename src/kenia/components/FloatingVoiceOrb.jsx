@@ -569,6 +569,10 @@ export default function FloatingVoiceOrb() {
 
   const handleCommand = (text) => {
     if (!text?.trim()) return;
+    if (speakingRef.current || window.speechSynthesis?.speaking) {
+      stopCurrentSpeech();
+      if (alwaysOnRef.current && shouldRestartRef.current) restartContinuousRecognition(100);
+    }
     const lower = text.toLowerCase();
     // Fechar / parar música ou aba do YouTube
     if (/\b(fech[ae]r?|fecha|para|pare|parar|encerra[r]?|desliga[r]?|stop|pause|pausa[r]?)\b[\s\S]*\b(m[uú]sica|som|v[ií]deo|youtube|yt|aba|player)\b/i.test(lower)
