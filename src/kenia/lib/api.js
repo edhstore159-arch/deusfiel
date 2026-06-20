@@ -582,11 +582,12 @@ const staticPost = (url, body = {}) => {
       } catch (e) {
         genError = e?.message || String(e);
       }
+      const storedImage = await compactImageForStorage(b64);
       const item = {
         id: nextId("creative"),
         ...body,
         caption: `Post sugerido: ${topic}.\n\nExplique o direito com clareza, convide o cliente a separar documentos e finalize com chamada para atendimento.`,
-        image_b64: b64,
+        image_b64: storedImage,
         ...(genError ? { error: genError } : {}),
       };
       const items = read("creatives", seedCreatives);
