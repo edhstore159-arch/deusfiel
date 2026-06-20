@@ -24,7 +24,8 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
-    throw new Error(message);
+    console.warn("Debug instruction received without crashing the app:", message);
+    setMessage(null);
   }
 
   return null;
