@@ -483,6 +483,7 @@ const staticPost = (url, body = {}) => {
   if (path === "/chat/message") {
     return (async () => {
       const sessionId = body.session_id || nextId("session");
+      const localAnalysis = buildLocalCaseAnalysis(body.history || [], body.message || body.text || "");
       const fallbackReply =
         "Tive uma instabilidade momentânea. Estou aqui para te ajudar; pode me contar o que aconteceu em uma frase curta?";
       try {
@@ -507,7 +508,7 @@ const staticPost = (url, body = {}) => {
             appointment: data.appointment || null,
             handoff: Boolean(data.handoff),
             speaker: data.speaker || null,
-            analysis: data.analysis || { acertividade: 80, qualificacao: "ok" },
+            analysis: normalizeCaseAnalysis(data.analysis, localAnalysis),
             server_time: null,
           });
         }
@@ -518,7 +519,7 @@ const staticPost = (url, body = {}) => {
         session_id: sessionId,
         response: fallbackReply,
         audio_base64: null,
-        analysis: { acertividade: 40, qualificacao: "fallback" },
+        analysis: localAnalysis,
       });
     })();
   }
