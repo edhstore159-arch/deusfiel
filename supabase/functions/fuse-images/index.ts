@@ -4,12 +4,15 @@ import { chatCompletion } from '../_shared/llm.ts';
 
 const REALISM =
   "ultra realistic photography, 50mm lens, shallow depth of field, natural skin texture, " +
-  "real imperfections, cinematic lighting, high dynamic range, 4k, sharp focus";
+  "real imperfections, aligned eyes, realistic pupils, natural mouth and nose, cinematic lighting, high dynamic range, 4k, sharp focus";
 
 const NEGATIVE =
-  "blurry, distorted face, different person, cartoon, illustration, fake skin, over-smooth, " +
+  "blurry, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, bad teeth, different person, cartoon, illustration, fake skin, plastic skin, over-smooth, " +
   "extra fingers, mutated, unrealistic proportions, collage, split screen, side-by-side, " +
   "picture-in-picture, frames, borders, text, watermarks, logos";
+
+const FACE_LOCK =
+  "FACE LOCK: preserve the exact face from IMAGE 1; maintain facial geometry, skin tone, eye spacing, pupils, nose, lips, jawline and expression. Do not beautify, redraw, smooth, stretch, warp, replace or stylize the face.";
 
 const TEMPLATE_SYSTEM =
   "You are a photorealistic image generator prompt engineer that must STRICTLY preserve the original visual identity of the two reference images. " +
@@ -19,11 +22,11 @@ const TEMPLATE_SYSTEM =
   "Output ONLY the filled prompt as a single line (no markdown, no headings, no explanations).\n\n" +
   "TEMPLATE:\n" +
   "SUBJECT (IMAGE 1 - PERSON): gender, age, skin tone, face shape, eye color and shape, eyebrows, nose, lips, hair (color/texture/style), expression, body type, posture. " +
-  "CRITICAL: face MUST remain consistent — do NOT change identity, do NOT stylize, do NOT beautify. " +
+  `CRITICAL: ${FACE_LOCK} ` +
   "CLOTHING & STYLE: colors, fabric, fit, accessories. " +
   "SCENE (IMAGE 2 - ENVIRONMENT): location, lighting, time of day, objects, background elements, mood. " +
   "CAMERA & PHOTO STYLE: " + REALISM + ". " +
-  "RULES: do NOT change facial features, do NOT invent new elements, do NOT cartoonize or stylize, keep proportions realistic, preserve identity exactly. " +
+  "RULES: do NOT change facial features, do NOT invent new elements, do NOT cartoonize or stylize, keep proportions realistic, preserve identity exactly, keep face natural and undistorted. " +
   "End the prompt with: 'Negative: " + NEGATIVE + "'.";
 
 async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
@@ -46,7 +49,7 @@ async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
     }
   } catch (_e) { /* fallback below */ }
 
-  return `Place the person from IMAGE 1 (preserve exact identity, face, skin, hair, clothing, accessories) inside the environment from IMAGE 2 (preserve its lighting, palette, time of day, mood). Single seamless photorealistic composition, match perspective and shadows, no collage, no split-screen. ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
+  return `Place the person from IMAGE 1 (preserve exact identity, face, skin, hair, clothing, accessories) inside the environment from IMAGE 2 (preserve its lighting, palette, time of day, mood). ${FACE_LOCK} Single seamless photorealistic composition, match perspective and shadows, no collage, no split-screen. ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
 }
 
 Deno.serve(async (req) => {
