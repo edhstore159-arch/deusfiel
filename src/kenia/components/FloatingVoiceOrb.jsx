@@ -49,11 +49,21 @@ export default function FloatingVoiceOrb() {
 
   const alwaysOnRef = useRef(false);
   const awakeUntilRef = useRef(0);
+  const shouldRestartRef = useRef(false);
+  const recognitionActiveRef = useRef(false);
+  const restartTimerRef = useRef(null);
+  const handleCommandRef = useRef(null);
+  const lastFinalRef = useRef({ text: "", at: 0 });
   const [alwaysOn, setAlwaysOn] = useState(false);
   useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
 
-  const WAKE_RE = /\b(secretaria|secretária|kenia|kênia|ken[ií]a garcia|ok kenia|ol[aá] kenia)\b/i;
-  const stripWake = (t) => t.replace(WAKE_RE, "").replace(/^[\s,;:.\-]+/, "").trim();
+  const normalizeVoice = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const WAKE_RE = /(^|[\s,;:.\-!?])(ok\s+)?(secretaria|kenia(?:\s+garcia)?|ola\s+kenia)(?=$|[\s,;:.\-!?])/i;
+  const hasWakeWord = (t) => WAKE_RE.test(normalizeVoice(t));
+  const stripWake = (t) => String(t || "")
+    .replace(/(^|[\s,;:.\-!?])(?:ok\s+)?(?:secret[aá]ria|secretaria|k[eê]nia(?:\s+garcia)?|kenia(?:\s+garcia)?|ol[aá]\s+k[eê]nia|ola\s+kenia)(?=$|[\s,;:.\-!?])/i, " ")
+    .replace(/^[\s,;:.\-!?]+/, "")
+    .trim();
 
   useEffect(() => {
     if (!supported) return;
@@ -62,29 +72,46 @@ export default function FloatingVoiceOrb() {
     rec.lang = "pt-BR";
     rec.continuous = true;
     rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    rec.onstart = () => {
+      recognitionActiveRef.current = true;
+      setListening(true);
+    };
     rec.onresult = (e) => {
       const txt = Array.from(e.results).map((r) => r[0].transcript).join(" ");
       setTranscript(txt);
-      const last = e.results[e.results.length - 1];
-      if (!last.isFinal) return;
-      const finalText = last[0].transcript.trim();
-      if (alwaysOnRef.current) {
-        const awake = Date.now() < awakeUntilRef.current;
-        if (WAKE_RE.test(finalText)) {
-          awakeUntilRef.current = Date.now() + 15000;
-          const rest = stripWake(finalText);
-          if (rest) { handleCommand(rest); }
-          else { speak("Pois não?"); setReply("Estou ouvindo…"); }
-        } else if (awake) {
-          awakeUntilRef.current = Date.now() + 15000;
-          handleCommand(finalText);
+      for (let i = e.resultIndex; i < e.results.length; i += 1) {
+        const result = e.results[i];
+        if (!result?.isFinal) continue;
+        const finalText = result[0]?.transcript?.trim();
+        if (!finalText) continue;
+        const now = Date.now();
+        if (lastFinalRef.current.text === finalText && now - lastFinalRef.current.at < 1500) continue;
+        lastFinalRef.current = { text: finalText, at: now };
+
+        if (alwaysOnRef.current) {
+          const awake = now < awakeUntilRef.current;
+          if (hasWakeWord(finalText)) {
+            awakeUntilRef.current = now + 15000;
+            const rest = stripWake(finalText);
+            if (rest) { handleCommandRef.current?.(rest); }
+            else { speak("Pois não?"); setReply("Estou ouvindo…"); }
+          } else if (awake) {
+            awakeUntilRef.current = now + 15000;
+            handleCommandRef.current?.(finalText);
+          }
+        } else {
+          handleCommandRef.current?.(finalText);
+          shouldRestartRef.current = false;
+          try { rec.stop(); } catch {}
         }
-      } else {
-        handleCommand(finalText);
       }
     };
     rec.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        shouldRestartRef.current = false;
+        alwaysOnRef.current = false;
+        recognitionActiveRef.current = false;
         setListening(false); setAlwaysOn(false);
         toast.error("Permissão de microfone negada.");
       } else if (e.error !== "no-speech" && e.error !== "aborted") {
@@ -92,30 +119,77 @@ export default function FloatingVoiceOrb() {
       }
     };
     rec.onend = () => {
-      if (alwaysOnRef.current) {
-        try { rec.start(); } catch {}
-      } else {
-        setListening(false);
-      }
+      recognitionActiveRef.current = false;
+      setListening(false);
+      if (!shouldRestartRef.current || !alwaysOnRef.current) return;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = window.setTimeout(() => {
+        if (!shouldRestartRef.current || !alwaysOnRef.current || recognitionActiveRef.current) return;
+        try {
+          rec.start();
+          recognitionActiveRef.current = true;
+          setListening(true);
+        } catch (err) {
+          if (err?.name === "InvalidStateError") {
+            recognitionActiveRef.current = true;
+            setListening(true);
+            return;
+          }
+          shouldRestartRef.current = false;
+          alwaysOnRef.current = false;
+          setAlwaysOn(false);
+          setListening(false);
+          if (err?.name === "NotAllowedError") {
+            toast.error("Permissão de microfone bloqueada. Ative novamente a escuta contínua.");
+          }
+        }
+      }, 300);
     };
     recognitionRef.current = rec;
-    return () => { try { rec.stop(); } catch {} };
+    return () => {
+      shouldRestartRef.current = false;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      recognitionRef.current = null;
+      rec.onend = null;
+      try { rec.abort?.(); } catch {}
+      try { rec.stop(); } catch {}
+    };
   }, [supported]);
 
   const toggleAlwaysOn = () => {
     if (!supported) { toast.error("Reconhecimento de voz não suportado."); return; }
     const rec = recognitionRef.current; if (!rec) return;
-    if (alwaysOn) {
-      setAlwaysOn(false); alwaysOnRef.current = false;
-      try { rec.stop(); } catch {}
+    if (alwaysOnRef.current) {
+      shouldRestartRef.current = false;
+      alwaysOnRef.current = false;
+      setAlwaysOn(false);
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      try { rec.abort?.(); } catch {}
       setListening(false);
       toast.message("Escuta contínua desativada.");
     } else {
-      setAlwaysOn(true); alwaysOnRef.current = true;
+      setAlwaysOn(true); alwaysOnRef.current = true; shouldRestartRef.current = true;
       awakeUntilRef.current = 0;
-      try { rec.start(); setListening(true); } catch {}
-      toast.success('Diga "secretária" para ativar.');
-      speak("Estou de prontidão. Diga secretária para falar comigo.");
+      setTranscript("");
+      try {
+        if (!recognitionActiveRef.current) rec.start();
+        recognitionActiveRef.current = true;
+        setListening(true);
+        toast.success('Diga "secretária" para ativar.');
+        speak("Estou de prontidão. Diga secretária para falar comigo.");
+      } catch (err) {
+        if (err?.name === "InvalidStateError") {
+          recognitionActiveRef.current = true;
+          setListening(true);
+          toast.success('Diga "secretária" para ativar.');
+          return;
+        }
+        shouldRestartRef.current = false;
+        alwaysOnRef.current = false;
+        setAlwaysOn(false);
+        setListening(false);
+        toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
+      }
     }
   };
 
@@ -472,6 +546,10 @@ export default function FloatingVoiceOrb() {
     askOllama(text);
   };
 
+  useEffect(() => {
+    handleCommandRef.current = handleCommand;
+  });
+
 
 
   const toggleListen = () => {
@@ -481,16 +559,31 @@ export default function FloatingVoiceOrb() {
     }
     const rec = recognitionRef.current;
     if (!rec) return;
-    if (listening) {
-      try { rec.stop(); } catch {}
+    if (listening || recognitionActiveRef.current) {
+      shouldRestartRef.current = false;
+      alwaysOnRef.current = false;
+      setAlwaysOn(false);
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      try { rec.abort?.(); } catch {}
       setListening(false);
     } else {
+      shouldRestartRef.current = false;
+      alwaysOnRef.current = false;
+      setAlwaysOn(false);
       setTranscript("");
       try {
         rec.start();
+        recognitionActiveRef.current = true;
         setListening(true);
-      } catch {
+      } catch (err) {
+        if (err?.name === "InvalidStateError") {
+          recognitionActiveRef.current = true;
+          setListening(true);
+          return;
+        }
+        recognitionActiveRef.current = false;
         setListening(false);
+        toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
       }
     }
   };
