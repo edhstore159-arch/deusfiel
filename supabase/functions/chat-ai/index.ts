@@ -512,8 +512,9 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
     reply = reply.replace(/\b(bom\s+dia|boa\s+tarde|boa\s+noite)[!.,]?\s+(bom\s+dia|boa\s+tarde|boa\s+noite)[!.,]?/gi, "$1!").trim();
 
 
-    // Análise técnica do caso (chamada paralela à IA pedindo JSON estruturado)
-    let analysis: any = { acertividade: 70, qualificacao: "necessita_mais_info" };
+    // Análise técnica do caso: começa com heurística local e refina com IA quando disponível.
+    const localAnalysis = buildLocalCaseAnalysis(history, userMessage);
+    let analysis: any = localAnalysis;
     try {
       const convoText = [...history, { role: "user", content: userMessage }, { role: "assistant", content: reply }]
         .map((m) => `${m.role}: ${m.content}`)
@@ -532,7 +533,7 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
       });
       if (aResp.ok) {
         const parsed = JSON.parse(aResp.data?.choices?.[0]?.message?.content || "{}");
-        analysis = { ...analysis, ...parsed };
+        analysis = normalizeCaseAnalysis(parsed, localAnalysis);
       }
     } catch (err) {
       console.error("Erro ao gerar análise:", err);
