@@ -352,14 +352,33 @@ export default function FloatingVoiceOrb() {
   };
 
   const [ytQuery, setYtQuery] = useState("");
+  const [ytVideoId, setYtVideoId] = useState("");
+  const [ytIds, setYtIds] = useState([]);
+  const [ytIdx, setYtIdx] = useState(0);
 
-  const playYouTube = (query) => {
+  const playYouTube = async (query) => {
     const q = (query || "").trim();
     if (!q) return;
-    setYtQuery(q);
+    setYtQuery(q); setYtVideoId(""); setYtIds([]); setYtIdx(0);
     setOpen(true);
-    const msg = `Tocando ${q} no YouTube aqui mesmo.`;
+    const msg = `Procurando ${q} no YouTube.`;
     setReply(msg); speak(msg);
+    try {
+      const { data, error } = await supabase.functions.invoke("youtube-search", { body: { query: q } });
+      if (error) throw error;
+      const ids = data?.ids || (data?.videoId ? [data.videoId] : []);
+      if (!ids.length) throw new Error("Nenhum vídeo encontrado");
+      setYtIds(ids); setYtVideoId(ids[0]); setYtIdx(0);
+    } catch (e) {
+      const m = `Não consegui encontrar vídeos para ${q}.`;
+      setReply(m); speak(m); toast.error(m);
+    }
+  };
+
+  const ytNext = () => {
+    if (!ytIds.length) return;
+    const next = (ytIdx + 1) % ytIds.length;
+    setYtIdx(next); setYtVideoId(ytIds[next]);
   };
 
   const handleCommand = (text) => {
