@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
@@ -6,7 +6,8 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Separator } from "@/kenia/components/ui/separator";
-import { Bot, Plus, Save, Trash2, Sparkles, Copy } from "lucide-react";
+import { Switch } from "@/kenia/components/ui/switch";
+import { Bot, Plus, Save, Trash2, Sparkles, Copy, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "kenia_ai_agents_v1";
@@ -33,8 +34,16 @@ const blankAgent = () => ({
   greeting: "Olá! Sou a secretária jurídica. Como posso ajudar?",
   goal: "Qualificar o lead, identificar a área jurídica e sugerir próximos passos.",
   instructions: "",
+  avatar: "",
   active: true,
   createdAt: new Date().toISOString(),
+});
+
+const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ""));
+  reader.onerror = reject;
+  reader.readAsDataURL(file);
 });
 
 const readAgents = () => {
@@ -51,6 +60,7 @@ export default function Agents() {
   const [agents, setAgents] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState(null);
+  const avatarInputRef = useRef(null);
 
   useEffect(() => {
     const list = readAgents();
@@ -113,6 +123,26 @@ export default function Agents() {
     setDraft(copy);
   };
 
+  const toggleActive = (id, value) => {
+    const next = agents.map((a) => (a.id === id ? { ...a, active: value } : a));
+    setAgents(next);
+    writeAgents(next);
+    if (draft?.id === id) setDraft({ ...draft, active: value });
+    toast.success(value ? "Agente ativado" : "Agente desativado");
+  };
+
+  const onAvatarPick = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Selecione uma imagem"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("Imagem deve ter até 2MB"); return; }
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setDraft((d) => ({ ...d, avatar: dataUrl }));
+    } catch {
+      toast.error("Falha ao carregar imagem");
+    }
+  };
+
   const buildSystemPrompt = (a) => [
     `Você é "${a.name}", uma secretária jurídica especializada em ${a.area}.`,
     `Tom de voz: ${a.tone}.`,
@@ -169,26 +199,38 @@ export default function Agents() {
                     className={`p-4 cursor-pointer hover:bg-nude-50 ${selectedId === a.id ? "bg-gold-50/50" : ""}`}
                     onClick={() => { setSelectedId(a.id); setDraft(a); }}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
+                    <div className="flex items-start gap-3">
+                      {a.avatar ? (
+                        <img src={a.avatar} alt={a.name} className="w-10 h-10 rounded-full object-cover border border-nude-200 shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-nude-100 border border-nude-200 flex items-center justify-center shrink-0">
+                          <Bot className="w-5 h-5 text-nude-400" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
                         <div className="font-medium text-nude-900 truncate">{a.name || "Sem nome"}</div>
                         <div className="text-xs text-nude-500 mt-0.5 truncate">{a.area} · {a.tone}</div>
                         <div className="flex flex-wrap gap-1 mt-2">
                           <Badge variant="outline" className="text-[10px]">
                             {MODELS.find((m) => m.id === a.model)?.label || a.model}
                           </Badge>
-                          {a.active && (
-                            <Badge className="text-[10px] bg-gold-600 text-white">Ativo</Badge>
-                          )}
+                          <Badge className={`text-[10px] ${a.active ? "bg-gold-600 text-white" : "bg-nude-200 text-nude-600"}`}>
+                            {a.active ? "Ativo" : "Inativo"}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); duplicate(a); }}>
-                          <Copy className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-600 hover:bg-rose-50" onClick={(e) => { e.stopPropagation(); removeAgent(a.id); }}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                      <div className="flex flex-col items-end gap-2">
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Switch checked={!!a.active} onCheckedChange={(v) => toggleActive(a.id, v)} />
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); duplicate(a); }}>
+                            <Copy className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-600 hover:bg-rose-50" onClick={(e) => { e.stopPropagation(); removeAgent(a.id); }}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </li>
@@ -218,6 +260,39 @@ export default function Agents() {
           </div>
 
           <div className="p-5 space-y-5">
+            <div className="flex items-center gap-4">
+              {draft.avatar ? (
+                <img src={draft.avatar} alt="Avatar do agente" className="w-20 h-20 rounded-full object-cover border border-nude-200" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-nude-100 border border-nude-200 flex items-center justify-center">
+                  <Bot className="w-9 h-9 text-nude-400" />
+                </div>
+              )}
+              <div className="flex-1">
+                <div className="text-xs uppercase tracking-widest text-nude-500 font-semibold">Imagem do agente</div>
+                <p className="text-xs text-nude-400 mt-1">PNG ou JPG, até 2MB.</p>
+                <div className="flex gap-2 mt-2">
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => { onAvatarPick(e.target.files?.[0]); e.target.value = ""; }}
+                  />
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => avatarInputRef.current?.click()}>
+                    <Upload className="w-4 h-4" /> {draft.avatar ? "Trocar imagem" : "Enviar imagem"}
+                  </Button>
+                  {draft.avatar && (
+                    <Button type="button" variant="ghost" size="sm" className="gap-1.5 text-rose-600 hover:bg-rose-50" onClick={() => setDraft({ ...draft, avatar: "" })}>
+                      <X className="w-4 h-4" /> Remover
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs uppercase tracking-widest text-nude-500 font-semibold">Nome do agente</label>
@@ -294,15 +369,17 @@ export default function Agents() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="active"
-                type="checkbox"
-                checked={draft.active}
-                onChange={(e) => setDraft({ ...draft, active: e.target.checked })}
-                className="w-4 h-4 accent-gold-600"
+            <div className="flex items-center justify-between rounded-md border border-nude-200 bg-nude-50/50 px-4 py-3">
+              <div>
+                <div className="text-sm font-medium text-nude-900">Agente ativo</div>
+                <p className="text-xs text-nude-500 mt-0.5">
+                  Quando desativado, o agente não responde em nenhum canal.
+                </p>
+              </div>
+              <Switch
+                checked={!!draft.active}
+                onCheckedChange={(v) => setDraft({ ...draft, active: v })}
               />
-              <label htmlFor="active" className="text-sm text-nude-700">Agente ativo</label>
             </div>
 
             <Separator />
