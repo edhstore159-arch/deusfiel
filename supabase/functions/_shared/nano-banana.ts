@@ -64,24 +64,25 @@ function buildLocalFusionFallback(opts: NanoBananaOptions): string | null {
   //   (NUNCA corta nem estica o rosto — proporção real mantida)
   // - máscara radial suave só nas bordas para integrar ao cenário
   // - SEM color-matrix sobre a pessoa (preserva tom de pele e traços)
+  // Mantém o rosto INTACTO: sem corte (meet), máscara só nas bordas extremas,
+  // sem color-matrix, sem desfoque sobre a pessoa, sombra suave de ambiente.
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <radialGradient id="pm" cx="50%" cy="50%" r="55%">
-      <stop offset="70%" stop-color="white" stop-opacity="1"/>
-      <stop offset="90%" stop-color="white" stop-opacity="0.85"/>
+    <radialGradient id="pm" cx="50%" cy="50%" r="78%">
+      <stop offset="88%" stop-color="white" stop-opacity="1"/>
       <stop offset="100%" stop-color="white" stop-opacity="0"/>
     </radialGradient>
     <mask id="soft"><rect width="1024" height="1024" fill="black"/><rect width="1024" height="1024" fill="url(#pm)"/></mask>
-    <filter id="bgSoft"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="bgSoft"><feGaussianBlur stdDeviation="12"/></filter>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="18"/>
-      <feOffset dx="0" dy="24" result="o"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="22"/>
+      <feOffset dx="0" dy="28" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.32"/></feComponentTransfer>
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
   <image href="${scene}" x="0" y="0" width="1024" height="1024" preserveAspectRatio="xMidYMid slice" filter="url(#bgSoft)"/>
-  <rect width="1024" height="1024" fill="rgba(10,10,20,0.22)"/>
+  <rect width="1024" height="1024" fill="rgba(0,0,0,0.10)"/>
   <g mask="url(#soft)" filter="url(#shadow)">
     <image href="${person}" x="0" y="0" width="1024" height="1024" preserveAspectRatio="xMidYMid meet"/>
   </g>
