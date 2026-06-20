@@ -34,8 +34,16 @@ const blankAgent = () => ({
   greeting: "Olá! Sou a secretária jurídica. Como posso ajudar?",
   goal: "Qualificar o lead, identificar a área jurídica e sugerir próximos passos.",
   instructions: "",
+  avatar: "",
   active: true,
   createdAt: new Date().toISOString(),
+});
+
+const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ""));
+  reader.onerror = reject;
+  reader.readAsDataURL(file);
 });
 
 const readAgents = () => {
