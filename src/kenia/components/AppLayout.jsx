@@ -10,6 +10,7 @@ import {
 import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
 import { ErrorDebugPopup } from "@/components/ErrorDebugPopup";
+import FloatingVoiceOrb from "@/kenia/components/FloatingVoiceOrb";
 import { api } from "@/kenia/lib/api";
 
 const LOGO_IMG = "https://customer-assets.emergentagent.com/job_nude-gold-dashboard/artifacts/ckw9kwam_IMG-20241228-WA0003.jpg";
@@ -199,6 +200,7 @@ export default function AppLayout() {
       {/* Main */}
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <ErrorDebugPopup />
+        <FloatingVoiceOrb />
         {deadlineCount > 0 && (
           <button
             type="button"

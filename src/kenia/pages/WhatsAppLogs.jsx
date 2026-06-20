@@ -8,7 +8,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { toast } from "sonner";
 import {
   ArrowDownLeft, ArrowUpRight, Bot, RefreshCw, CheckCheck,
-  AlertCircle, Search, Radio,
+  AlertCircle, Search, Radio, Phone,
 } from "lucide-react";
 
 export default function WhatsAppLogs() {
@@ -232,6 +232,19 @@ function LogRow({ msg }) {
           <Badge className={`${tagColor} hover:${tagColor} text-[10px]`}>{tagLabel}</Badge>
           <span className="font-medium text-sm">{msg.contact_name || "—"}</span>
           <span className="text-xs text-nude-500 font-mono">{msg.contact_phone}</span>
+          {msg.contact_phone && (
+            <a
+              href={`tel:+${String(msg.contact_phone).replace(/\D/g, "")}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toast.success(`Ligando para ${msg.contact_name || msg.contact_phone}…`);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gold-600 hover:bg-gold-700 text-white text-[10px] font-medium"
+              data-testid="call-contact-btn"
+            >
+              <Phone className="w-3 h-3" /> Telefonar
+            </a>
+          )}
           <span className="text-xs text-nude-400 ml-auto">{date} • {time}</span>
         </div>
         <div className="text-sm text-nude-700 mt-1 whitespace-pre-wrap break-words">
