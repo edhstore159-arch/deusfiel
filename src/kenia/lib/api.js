@@ -343,6 +343,13 @@ const compactImageForStorage = (src, maxSide = 768, quality = 0.82) => new Promi
   img.src = value;
 });
 
+const buildLocalCreativeImage = (title = "Criativo jurídico", topic = "") => {
+  const safeTitle = String(title || "Criativo jurídico").replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+  const safeTopic = String(topic || "Conteúdo profissional").slice(0, 90).replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7f0e8"/><stop offset="1" stop-color="#d7b46a"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#bg)"/><rect x="78" y="78" width="868" height="868" rx="28" fill="rgba(255,255,255,.62)" stroke="rgba(80,55,30,.18)"/><text x="512" y="420" text-anchor="middle" font-family="Georgia, serif" font-size="58" font-weight="700" fill="#2f261f">${safeTitle}</text><text x="512" y="498" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#6f5a45">${safeTopic}</text><path d="M372 610h280" stroke="#9b7628" stroke-width="8" stroke-linecap="round"/><text x="512" y="706" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#4c3f35">Kênia Garcia Advocacia</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+};
+
 const buildJitsiLink = (seed) => {
   const safe = String(seed || `kenia-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
     .replace(/[^a-zA-Z0-9-]/g, "-")
