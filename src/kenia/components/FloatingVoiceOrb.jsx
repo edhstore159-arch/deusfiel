@@ -79,6 +79,7 @@ export default function FloatingVoiceOrb() {
         }
         shouldRestartRef.current = false;
         alwaysOnRef.current = false;
+        commandSessionActiveRef.current = false;
         setAlwaysOn(false);
         setListening(false);
         if (err?.name === "NotAllowedError") {
@@ -148,6 +149,7 @@ export default function FloatingVoiceOrb() {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         shouldRestartRef.current = false;
         alwaysOnRef.current = false;
+        commandSessionActiveRef.current = false;
         recognitionActiveRef.current = false;
         setListening(false); setAlwaysOn(false);
         toast.error("Permissão de microfone negada.");
@@ -164,6 +166,7 @@ export default function FloatingVoiceOrb() {
     recognitionRef.current = rec;
     return () => {
       shouldRestartRef.current = false;
+      commandSessionActiveRef.current = false;
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
       recognitionRef.current = null;
