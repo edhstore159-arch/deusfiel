@@ -199,26 +199,38 @@ export default function Agents() {
                     className={`p-4 cursor-pointer hover:bg-nude-50 ${selectedId === a.id ? "bg-gold-50/50" : ""}`}
                     onClick={() => { setSelectedId(a.id); setDraft(a); }}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
+                    <div className="flex items-start gap-3">
+                      {a.avatar ? (
+                        <img src={a.avatar} alt={a.name} className="w-10 h-10 rounded-full object-cover border border-nude-200 shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-nude-100 border border-nude-200 flex items-center justify-center shrink-0">
+                          <Bot className="w-5 h-5 text-nude-400" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
                         <div className="font-medium text-nude-900 truncate">{a.name || "Sem nome"}</div>
                         <div className="text-xs text-nude-500 mt-0.5 truncate">{a.area} · {a.tone}</div>
                         <div className="flex flex-wrap gap-1 mt-2">
                           <Badge variant="outline" className="text-[10px]">
                             {MODELS.find((m) => m.id === a.model)?.label || a.model}
                           </Badge>
-                          {a.active && (
-                            <Badge className="text-[10px] bg-gold-600 text-white">Ativo</Badge>
-                          )}
+                          <Badge className={`text-[10px] ${a.active ? "bg-gold-600 text-white" : "bg-nude-200 text-nude-600"}`}>
+                            {a.active ? "Ativo" : "Inativo"}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); duplicate(a); }}>
-                          <Copy className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-600 hover:bg-rose-50" onClick={(e) => { e.stopPropagation(); removeAgent(a.id); }}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                      <div className="flex flex-col items-end gap-2">
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Switch checked={!!a.active} onCheckedChange={(v) => toggleActive(a.id, v)} />
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); duplicate(a); }}>
+                            <Copy className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-600 hover:bg-rose-50" onClick={(e) => { e.stopPropagation(); removeAgent(a.id); }}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </li>
