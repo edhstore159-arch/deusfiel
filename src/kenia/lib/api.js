@@ -297,17 +297,51 @@ const seedAnalyses = [
 ];
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
+const volatileStore = new Map();
 const read = (key, fallback) => {
   try {
     const raw = localStorage.getItem(`static_api_${key}`);
+    if (!raw && volatileStore.has(key)) return clone(volatileStore.get(key));
     return raw ? JSON.parse(raw) : clone(fallback);
   } catch {
+    if (volatileStore.has(key)) return clone(volatileStore.get(key));
     return clone(fallback);
   }
 };
-const write = (key, value) => localStorage.setItem(`static_api_${key}`, JSON.stringify(value));
+const stripHeavyImages = (value) => Array.isArray(value)
+  ? value.map((item) => ({ ...item, image_b64: item?.image_b64 ? "" : item?.image_b64 }))
+  : value;
+const write = (key, value) => {
+  volatileStore.set(key, clone(value));
+  try {
+    localStorage.setItem(`static_api_${key}`, JSON.stringify(value));
+  } catch {
+    try { localStorage.setItem(`static_api_${key}`, JSON.stringify(stripHeavyImages(value))); } catch {}
+  }
+};
 const response = (data, status = 200, headers = {}) => Promise.resolve({ data: clone(data), status, statusText: "OK", headers, config: {} });
 const nextId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+const compactImageForStorage = (src, maxSide = 768, quality = 0.82) => new Promise((resolve) => {
+  const value = String(src || "");
+  if (!value.startsWith("data:image/") || value.startsWith("data:image/svg")) return resolve(value);
+  if (typeof Image === "undefined" || typeof document === "undefined") return resolve(value);
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth || maxSide, img.naturalHeight || maxSide));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round((img.naturalWidth || maxSide) * scale));
+      canvas.height = Math.max(1, Math.round((img.naturalHeight || maxSide) * scale));
+      canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    } catch {
+      resolve(value);
+    }
+  };
+  img.onerror = () => resolve(value);
+  img.src = value;
+});
 
 const buildJitsiLink = (seed) => {
   const safe = String(seed || `kenia-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
