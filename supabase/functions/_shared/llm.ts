@@ -243,12 +243,10 @@ function buildFluxPrompt(raw: string): string {
     .slice(0, 280);
   const STYLE =
     "photorealistic, real skin texture, professional photography, cinematic lighting, " +
-    "shallow depth of field, sharp focus, 8k, no warped facial details";
+    "shallow depth of field, sharp focus, 8k";
   const NEG =
-    "negative: blurry, low quality, distorted face, warped face, asymmetrical eyes, malformed eyes, distorted mouth, bad hands, extra fingers, unrealistic, cartoon, oversaturated, text, watermark, logo";
-  const FACE_SAFE =
-    "For legal/social creatives, avoid large close-up human faces unless explicitly requested; prefer hands, documents, office scenes, silhouettes, or people viewed from side/back at natural distance.";
-  return `${base}, ${FACE_SAFE} ${STYLE}. ${NEG}`;
+    "negative: blurry, low quality, distorted face, bad hands, extra fingers, unrealistic, cartoon, oversaturated, text, watermark, logo";
+  return `${base}, ${STYLE}. ${NEG}`;
 }
 
 // Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
