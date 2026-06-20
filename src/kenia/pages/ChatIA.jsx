@@ -735,6 +735,7 @@ export default function ChatIA() {
   const send = async (text) => {
     const msg = (text ?? input).trim();
     if (!msg) return;
+    const historySnapshot = messages.map((m) => ({ role: m.role, content: m.content }));
     if (waitFollowUpTimerRef.current) {
       clearTimeout(waitFollowUpTimerRef.current);
       waitFollowUpTimerRef.current = null;
@@ -742,19 +743,8 @@ export default function ChatIA() {
     setMessages((prev) => [...prev, { role: "user", content: msg }]);
     setInput("");
     setThinking(true);
-    // Mostra um esboço de análise imediatamente para o usuário ver o painel reagindo
-    setAnalysis((prev) =>
-      prev || {
-        acertividade: 35,
-        chance_exito: 30,
-        qualificacao: "necessita_mais_info",
-        area: "Em análise",
-        resumo: "Analisando os primeiros detalhes do caso…",
-        motivo: "Aguardando mais informações para refinar a análise.",
-        proxima_pergunta: "",
-        fundamentos: [],
-      }
-    );
+    const optimisticAnalysis = buildLocalAnalysis(historySnapshot, msg, analysis);
+    setAnalysis(optimisticAnalysis);
     const scheduleIntent = extractScheduleIntent(msg);
     if (scheduleIntent) {
       try {
@@ -783,7 +773,7 @@ export default function ChatIA() {
         "/chat/message",
         {
           message: msg,
-          history: messages.map((m) => ({ role: m.role, content: m.content })),
+          history: historySnapshot,
           session_id: sessionId,
           visitor_name: name || null,
           visitor_phone: phone || null,
@@ -798,9 +788,9 @@ export default function ChatIA() {
         toast.success("Consulta salva automaticamente na Agenda");
       }
       if (data.analysis) {
-        const a = { ...data.analysis };
-        if (a.qualificacao === "desqualificado") a.qualificacao = "nao_qualificado";
-        setAnalysis(a);
+        setAnalysis(normalizeAnalysis(data.analysis, optimisticAnalysis));
+      } else {
+        setAnalysis(optimisticAnalysis);
       }
       upsertLead({ description: msg });
       setThinking(false);
