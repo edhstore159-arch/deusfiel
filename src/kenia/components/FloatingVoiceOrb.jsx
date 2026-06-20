@@ -431,9 +431,24 @@ export default function FloatingVoiceOrb() {
     setYtIdx(next); setYtVideoId(ytIds[next]);
   };
 
+  const stopYouTube = () => {
+    setYtVideoId("");
+    setYtQuery("");
+    setYtIds([]);
+    setYtIdx(0);
+    toast.success("Música parada");
+    speak("Parando a música");
+  };
+
   const handleCommand = (text) => {
     if (!text?.trim()) return;
     const lower = text.toLowerCase();
+    // Parar música / vídeo
+    if (/\b(par[ae]|pare|parar|interrompe|interromper|desliga|desligar|cala|fecha|encerra|encerrar|finaliza|finalizar|stop)\b.*\b(m[uú]sica|som|v[ií]deo|[aá]udio|youtube|tocando|reprodu[çc][aã]o)\b/i.test(lower)
+        || /\b(par[ae]|pare|parar|stop)\s+(de\s+)?(tocar|reproduzir|cantar)\b/i.test(lower)) {
+      stopYouTube();
+      return;
+    }
     // Tocar música no YouTube
     const ytMatch = text.match(/\b(?:toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|p[oõ]r|reproduz|reproduzir)\s+(?:a\s+|o\s+)?(?:m[uú]sica|som|v[ií]deo|playlist|clipe|audio|[aá]udio)?\s*(?:do|da|no|de)?\s*(.+?)(?:\s+(?:no|do|pelo|pelo\s+youtube|youtube))?\s*$/i);
     if (/youtube|y\s*tube|yt\b/i.test(lower) || (ytMatch && /\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz)\b/i.test(lower))) {
