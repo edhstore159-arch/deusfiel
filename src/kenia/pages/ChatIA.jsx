@@ -918,9 +918,9 @@ export default function ChatIA() {
       {/* Main Layout */}
       <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-3 sm:gap-4 p-3 sm:p-4 lg:overflow-hidden min-h-0">
         {/* CHAT */}
-        {!showAnalysisPanel && (
+        {(
           <Card
-            className="flex-1 min-h-[60vh] lg:min-h-0 lg:col-span-8 flex flex-col overflow-hidden border-nude-200"
+            className={`${showAnalysisPanel ? "hidden lg:flex" : "flex"} flex-1 min-h-[60vh] lg:min-h-0 lg:col-span-8 flex-col overflow-hidden border-nude-200`}
             data-testid="chat-panel"
           >
             {/* visitor info */}
@@ -1175,9 +1175,9 @@ export default function ChatIA() {
         )}
 
         {/* ANALYSIS SIDE */}
-        {showAnalysisPanel && (
+        {(
           <Card
-            className="lg:col-span-4 flex flex-col overflow-hidden border-nude-200"
+            className={`${showAnalysisPanel ? "flex" : "hidden lg:flex"} lg:col-span-4 flex-col overflow-hidden border-nude-200`}
             data-testid="analysis-panel"
           >
             <div className="px-5 py-3 border-b border-nude-200 bg-nude-50/60">
