@@ -54,8 +54,33 @@ export default function FloatingVoiceOrb() {
   const restartTimerRef = useRef(null);
   const handleCommandRef = useRef(null);
   const lastFinalRef = useRef({ text: "", at: 0 });
+  const speakingRef = useRef(false);
   const [alwaysOn, setAlwaysOn] = useState(false);
   useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
+
+  const restartContinuousRecognition = (delay = 300) => {
+    if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+    restartTimerRef.current = window.setTimeout(() => {
+      if (!shouldRestartRef.current || !alwaysOnRef.current || recognitionActiveRef.current || speakingRef.current) return;
+      const rec = recognitionRef.current;
+      if (!rec) return;
+      try {
+        rec.start();
+      } catch (err) {
+        if (err?.name === "InvalidStateError") {
+          restartContinuousRecognition(500);
+          return;
+        }
+        shouldRestartRef.current = false;
+        alwaysOnRef.current = false;
+        setAlwaysOn(false);
+        setListening(false);
+        if (err?.name === "NotAllowedError") {
+          toast.error("Permissão de microfone bloqueada. Ative novamente a escuta contínua.");
+        }
+      }
+    }, delay);
+  };
 
   const normalizeVoice = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   const WAKE_RE = /(^|[\s,;:.\-!?])(ok\s+)?(secretaria|kenia(?:\s+garcia)?|ola\s+kenia)(?=$|[\s,;:.\-!?])/i;
@@ -93,9 +118,14 @@ export default function FloatingVoiceOrb() {
           const awake = now < awakeUntilRef.current;
           if (hasWakeWord(finalText)) {
             awakeUntilRef.current = now + 15000;
+            setOpen(true);
             const rest = stripWake(finalText);
             if (rest) { handleCommandRef.current?.(rest); }
-            else { speak("Pois não?"); setReply("Estou ouvindo…"); }
+            else {
+              const msg = "Pois não? Estou ouvindo.";
+              setReply(msg);
+              speak(msg);
+            }
           } else if (awake) {
             awakeUntilRef.current = now + 15000;
             handleCommandRef.current?.(finalText);
@@ -122,28 +152,7 @@ export default function FloatingVoiceOrb() {
       recognitionActiveRef.current = false;
       setListening(false);
       if (!shouldRestartRef.current || !alwaysOnRef.current) return;
-      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
-      restartTimerRef.current = window.setTimeout(() => {
-        if (!shouldRestartRef.current || !alwaysOnRef.current || recognitionActiveRef.current) return;
-        try {
-          rec.start();
-          recognitionActiveRef.current = true;
-          setListening(true);
-        } catch (err) {
-          if (err?.name === "InvalidStateError") {
-            recognitionActiveRef.current = true;
-            setListening(true);
-            return;
-          }
-          shouldRestartRef.current = false;
-          alwaysOnRef.current = false;
-          setAlwaysOn(false);
-          setListening(false);
-          if (err?.name === "NotAllowedError") {
-            toast.error("Permissão de microfone bloqueada. Ative novamente a escuta contínua.");
-          }
-        }
-      }, 300);
+      restartContinuousRecognition(speakingRef.current ? 700 : 300);
     };
     recognitionRef.current = rec;
     return () => {
@@ -173,14 +182,11 @@ export default function FloatingVoiceOrb() {
       setTranscript("");
       try {
         if (!recognitionActiveRef.current) rec.start();
-        recognitionActiveRef.current = true;
-        setListening(true);
         toast.success('Diga "secretária" para ativar.');
         speak("Estou de prontidão. Diga secretária para falar comigo.");
       } catch (err) {
         if (err?.name === "InvalidStateError") {
-          recognitionActiveRef.current = true;
-          setListening(true);
+          restartContinuousRecognition(500);
           toast.success('Diga "secretária" para ativar.');
           return;
         }
@@ -196,8 +202,22 @@ export default function FloatingVoiceOrb() {
 
   const speak = (text) => {
     try {
+      const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "pt-BR";
+      u.onstart = () => {
+        if (!shouldResume) return;
+        speakingRef.current = true;
+        try { recognitionRef.current?.abort?.(); } catch {}
+      };
+      const resume = () => {
+        speakingRef.current = false;
+        if (shouldResume && alwaysOnRef.current && shouldRestartRef.current) {
+          restartContinuousRecognition(250);
+        }
+      };
+      u.onend = resume;
+      u.onerror = resume;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);
     } catch {}
