@@ -297,17 +297,58 @@ const seedAnalyses = [
 ];
 
 const clone = (v) => JSON.parse(JSON.stringify(v));
+const volatileStore = new Map();
 const read = (key, fallback) => {
   try {
     const raw = localStorage.getItem(`static_api_${key}`);
+    if (!raw && volatileStore.has(key)) return clone(volatileStore.get(key));
     return raw ? JSON.parse(raw) : clone(fallback);
   } catch {
+    if (volatileStore.has(key)) return clone(volatileStore.get(key));
     return clone(fallback);
   }
 };
-const write = (key, value) => localStorage.setItem(`static_api_${key}`, JSON.stringify(value));
+const stripHeavyImages = (value) => Array.isArray(value)
+  ? value.map((item) => ({ ...item, image_b64: item?.image_b64 ? "" : item?.image_b64 }))
+  : value;
+const write = (key, value) => {
+  volatileStore.set(key, clone(value));
+  try {
+    localStorage.setItem(`static_api_${key}`, JSON.stringify(value));
+  } catch {
+    try { localStorage.setItem(`static_api_${key}`, JSON.stringify(stripHeavyImages(value))); } catch {}
+  }
+};
 const response = (data, status = 200, headers = {}) => Promise.resolve({ data: clone(data), status, statusText: "OK", headers, config: {} });
 const nextId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+const compactImageForStorage = (src, maxSide = 768, quality = 0.82) => new Promise((resolve) => {
+  const value = String(src || "");
+  if (!value.startsWith("data:image/") || value.startsWith("data:image/svg")) return resolve(value);
+  if (typeof Image === "undefined" || typeof document === "undefined") return resolve(value);
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth || maxSide, img.naturalHeight || maxSide));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round((img.naturalWidth || maxSide) * scale));
+      canvas.height = Math.max(1, Math.round((img.naturalHeight || maxSide) * scale));
+      canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    } catch {
+      resolve(value);
+    }
+  };
+  img.onerror = () => resolve(value);
+  img.src = value;
+});
+
+const buildLocalCreativeImage = (title = "Criativo jurídico", topic = "") => {
+  const safeTitle = String(title || "Criativo jurídico").replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+  const safeTopic = String(topic || "Conteúdo profissional").slice(0, 90).replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7f0e8"/><stop offset="1" stop-color="#d7b46a"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#bg)"/><rect x="78" y="78" width="868" height="868" rx="28" fill="rgba(255,255,255,.62)" stroke="rgba(80,55,30,.18)"/><text x="512" y="420" text-anchor="middle" font-family="Georgia, serif" font-size="58" font-weight="700" fill="#2f261f">${safeTitle}</text><text x="512" y="498" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#6f5a45">${safeTopic}</text><path d="M372 610h280" stroke="#9b7628" stroke-width="8" stroke-linecap="round"/><text x="512" y="706" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#4c3f35">Kênia Garcia Advocacia</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+};
 
 const buildJitsiLink = (seed) => {
   const safe = String(seed || `kenia-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
@@ -548,11 +589,13 @@ const staticPost = (url, body = {}) => {
       } catch (e) {
         genError = e?.message || String(e);
       }
+      if (!b64) b64 = buildLocalCreativeImage(body.title || topic, topic);
+      const storedImage = await compactImageForStorage(b64);
       const item = {
         id: nextId("creative"),
         ...body,
         caption: `Post sugerido: ${topic}.\n\nExplique o direito com clareza, convide o cliente a separar documentos e finalize com chamada para atendimento.`,
-        image_b64: b64,
+        image_b64: storedImage,
         ...(genError ? { error: genError } : {}),
       };
       const items = read("creatives", seedCreatives);
