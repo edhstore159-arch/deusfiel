@@ -182,6 +182,7 @@ export default function FloatingVoiceOrb() {
     if (alwaysOnRef.current) {
       shouldRestartRef.current = false;
       alwaysOnRef.current = false;
+      commandSessionActiveRef.current = false;
       setAlwaysOn(false);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       try { rec.abort?.(); } catch {}
@@ -189,6 +190,7 @@ export default function FloatingVoiceOrb() {
       toast.message("Escuta contínua desativada.");
     } else {
       setAlwaysOn(true); alwaysOnRef.current = true; shouldRestartRef.current = true;
+      commandSessionActiveRef.current = false;
       awakeUntilRef.current = 0;
       setTranscript("");
       try {
@@ -203,6 +205,7 @@ export default function FloatingVoiceOrb() {
         }
         shouldRestartRef.current = false;
         alwaysOnRef.current = false;
+        commandSessionActiveRef.current = false;
         setAlwaysOn(false);
         setListening(false);
         toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
