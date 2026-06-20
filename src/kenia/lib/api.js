@@ -689,7 +689,32 @@ const staticPost = (url, body = {}) => {
       }
     })();
   }
-  if (path === "/public/consulta") return response({ found: true, processes: seedProcesses, client_name: "Cliente demonstração" });
+  if (path === "/creatives/edit") {
+    return (async () => {
+      try {
+        const sourceImage = body.image_base64 || body.image_b64 || body.image || "";
+        if (!sourceImage) return response({ ok: false, error: "Imagem original ausente" });
+        const { data, error } = await supabase.functions.invoke("edit-creative", {
+          body: { image_base64: sourceImage, prompt: body.prompt || body.instruction || "" },
+        });
+        if (error) throw error;
+        if (!data?.ok || !(data?.image || data?.image_b64)) {
+          return response({ ok: false, error: data?.error || "Edição não retornou imagem" });
+        }
+        const newImage = await compactImageForStorage(data.image || data.image_b64);
+        if (body.id) {
+          const items = read("creatives", seedCreatives).map((item) =>
+            item.id === body.id ? { ...item, image_b64: newImage, last_edit_prompt: body.prompt || null } : item,
+          );
+          write("creatives", items);
+        }
+        return response({ ok: true, image_b64: newImage, image: newImage });
+      } catch (e) {
+        return response({ ok: false, error: e?.message || String(e) });
+      }
+    })();
+  }
+
   return response({ ok: false, fallback: true, error: "STATIC_MODE" });
 };
 
