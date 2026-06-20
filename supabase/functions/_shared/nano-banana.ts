@@ -11,6 +11,13 @@ export interface NanoBananaOptions {
   imageUrls?: string[]; // data URLs or http(s) URLs
 }
 
+const FACE_PRESERVATION_LOCK =
+  "Face preservation lock: when any reference image contains a person, preserve the original identity and facial geometry exactly. Keep eyes aligned, pupils natural, nose and mouth realistic, skin texture natural, expression relaxed. Do not redraw the face, do not beautify, do not over-smooth, do not stretch, warp, melt, duplicate, replace, or stylize facial features.";
+
+function withFacePreservation(prompt: string) {
+  return `${prompt}\n\n${FACE_PRESERVATION_LOCK}\nNegative: distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, plastic skin, over-smoothed skin, changed identity, different person.`;
+}
+
 function extractImageFromMessage(msg: any): string | null {
   if (!msg) return null;
   const images = msg.images;
@@ -93,6 +100,7 @@ function buildLocalFusionFallback(opts: NanoBananaOptions): string | null {
 async function callLovableGateway(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("LOVABLE_API_KEY");
   if (!key) return { url: null, error: "LOVABLE_API_KEY ausente" };
+  const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt) };
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -100,7 +108,7 @@ async function callLovableGateway(opts: NanoBananaOptions): Promise<{ url: strin
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-image",
         modalities: ["image", "text"],
-        messages: [{ role: "user", content: buildContent(opts) }],
+        messages: [{ role: "user", content: buildContent(safeOpts) }],
       }),
     });
     if (!resp.ok) {
@@ -119,7 +127,7 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return { url: null, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
-  const parts: any[] = [{ text: opts.prompt }];
+  const parts: any[] = [{ text: withFacePreservation(opts.prompt) }];
   for (const u of opts.imageUrls || []) {
     const m = String(u).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
     if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
@@ -154,6 +162,7 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
 async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("EMERGENT_API_KEY");
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
+  const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt) };
   const models = [
     "gemini-2.5-flash-image",
     "google/gemini-2.5-flash-image",
@@ -169,7 +178,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         body: JSON.stringify({
           model,
           modalities: ["image", "text"],
-          messages: [{ role: "user", content: buildContent(opts) }],
+          messages: [{ role: "user", content: buildContent(safeOpts) }],
         }),
       });
       if (!resp.ok) {
