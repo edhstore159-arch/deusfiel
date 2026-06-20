@@ -200,6 +200,7 @@ export default function AppLayout() {
       {/* Main */}
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <ErrorDebugPopup />
+        <FloatingVoiceOrb />
         {deadlineCount > 0 && (
           <button
             type="button"
