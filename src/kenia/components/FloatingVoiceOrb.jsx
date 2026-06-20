@@ -82,16 +82,54 @@ export default function FloatingVoiceOrb() {
   const [thinking, setThinking] = useState(false);
   const [reply, setReply] = useState("");
   const historyRef = useRef([]);
+  const contextRef = useRef(null);
+  const contextAtRef = useRef(0);
+
+  const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+  const loadClientContext = async () => {
+    if (contextRef.current && Date.now() - contextAtRef.current < 60_000) return contextRef.current;
+    const safe = async (p) => { try { const { data } = await api.get(p); return data; } catch { return null; } };
+    const [leads, contacts, processes, appointments, analyses] = await Promise.all([
+      safe("/leads"), safe("/contacts"), safe("/processes"), safe("/appointments"), safe("/case-analyses"),
+    ]);
+    const pick = (d) => Array.isArray(d) ? d : (Array.isArray(d?.items) ? d.items : []);
+    const ctx = {
+      leads: pick(leads), contacts: pick(contacts), processes: pick(processes),
+      appointments: pick(appointments), analyses: pick(analyses),
+    };
+    contextRef.current = ctx;
+    contextAtRef.current = Date.now();
+    return ctx;
+  };
+
+  const findClient = (name, ctx) => {
+    const n = norm(name);
+    if (!n) return null;
+    const pools = [...(ctx?.contacts || []), ...(ctx?.leads || [])];
+    return pools.find((c) => norm(c.name || c.client_name).includes(n)) || null;
+  };
 
   const askOllama = async (text) => {
     setThinking(true);
     setReply("");
     try {
+      const ctx = await loadClientContext().catch(() => null);
+      const ctxSummary = ctx ? [
+        `Leads: ${JSON.stringify(ctx.leads.slice(0, 30).map((l) => ({ nome: l.name, tel: l.phone, area: l.case_type, etapa: l.stage, desc: l.description })))}`,
+        `Contatos: ${JSON.stringify(ctx.contacts.slice(0, 30).map((c) => ({ nome: c.name, tel: c.phone, ultima: c.last_message })))}`,
+        `Processos: ${JSON.stringify(ctx.processes.slice(0, 30).map((p) => ({ cliente: p.client_name, numero: p.process_number, area: p.case_type, vara: p.court, status: p.status, proxima_audiencia: p.next_hearing, descricao: p.description })))}`,
+        `Agendamentos: ${JSON.stringify(ctx.appointments.slice(0, 30).map((a) => ({ titulo: a.title, cliente: a.client_name, quando: a.starts_at, local: a.location, status: a.status })))}`,
+        `Análises: ${JSON.stringify(ctx.analyses.slice(0, 20).map((a) => ({ cliente: a.visitor_name, tel: a.visitor_phone, area: a.area, resumo: a.resumo })))}`,
+      ].join("\n") : "";
+      const enrichedSystem = `Você é Kênia, assistente da Dra. Kênia Garcia. Tem acesso aos dados internos do escritório abaixo e deve usá-los para responder com precisão. Pode informar telefones, processos, status e sugerir reagendar reuniões ou ligar para clientes. Não invente dados que não estejam na lista.\n\nDADOS:\n${ctxSummary}`;
       const { data, error } = await supabase.functions.invoke("chat-ai", {
         body: {
           message: text,
           history: historyRef.current.slice(-8),
           session_id: "kenia-voice-orb",
+          system_prompt: enrichedSystem,
+          context: ctxSummary,
         },
       });
       if (error) throw error;
@@ -101,7 +139,6 @@ export default function FloatingVoiceOrb() {
       historyRef.current.push({ role: "assistant", content: answer });
       setReply(answer);
       speak(answer);
-      // Se a resposta sugerir uma rota, navegue também
       const r = matchRoute(answer);
       if (r) navigate(r);
     } catch (e) {
@@ -111,6 +148,43 @@ export default function FloatingVoiceOrb() {
       setThinking(false);
     }
   };
+
+  const callClient = async (name) => {
+    setThinking(true);
+    try {
+      const ctx = await loadClientContext();
+      const c = findClient(name, ctx);
+      if (!c) {
+        const msg = `Não encontrei o cliente ${name}.`;
+        setReply(msg); speak(msg); return;
+      }
+      const phone = c.phone || c.client_phone || "";
+      const msg = `Abrindo central de mensagens para ligar para ${c.name || c.client_name}${phone ? " (" + phone + ")" : ""}.`;
+      setReply(msg); speak(msg);
+      navigate(`/app/whatsapp-logs?call=${encodeURIComponent(phone)}&name=${encodeURIComponent(c.name || c.client_name || "")}`);
+      setOpen(false);
+    } catch (e) {
+      toast.error("Não consegui ligar: " + (e?.message || e));
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const rescheduleClient = async (name) => {
+    setThinking(true);
+    try {
+      const ctx = await loadClientContext();
+      const c = findClient(name, ctx);
+      const target = c?.name || c?.client_name || name;
+      const msg = `Abrindo a agenda para reagendar com ${target}.`;
+      setReply(msg); speak(msg);
+      navigate(`/app/agenda?reschedule=${encodeURIComponent(target)}`);
+      setOpen(false);
+    } finally {
+      setThinking(false);
+    }
+  };
+
 
   const fmtDateTime = (iso) => {
     try {
