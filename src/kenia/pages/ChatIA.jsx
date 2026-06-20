@@ -684,6 +684,19 @@ export default function ChatIA() {
     setMessages((prev) => [...prev, { role: "user", content: msg }]);
     setInput("");
     setThinking(true);
+    // Mostra um esboço de análise imediatamente para o usuário ver o painel reagindo
+    setAnalysis((prev) =>
+      prev || {
+        acertividade: 35,
+        chance_exito: 30,
+        qualificacao: "necessita_mais_info",
+        area: "Em análise",
+        resumo: "Analisando os primeiros detalhes do caso…",
+        motivo: "Aguardando mais informações para refinar a análise.",
+        proxima_pergunta: "",
+        fundamentos: [],
+      }
+    );
     const scheduleIntent = extractScheduleIntent(msg);
     if (scheduleIntent) {
       try {
