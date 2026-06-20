@@ -351,9 +351,25 @@ export default function FloatingVoiceOrb() {
     }
   };
 
+  const playYouTube = (query) => {
+    const q = (query || "").trim();
+    if (!q) return;
+    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    const msg = `Abrindo o YouTube com: ${q}.`;
+    setReply(msg); speak(msg);
+    if (!win) toast.message(msg);
+  };
+
   const handleCommand = (text) => {
     if (!text?.trim()) return;
     const lower = text.toLowerCase();
+    // Tocar música no YouTube
+    const ytMatch = text.match(/\b(?:toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|p[oõ]r|reproduz|reproduzir)\s+(?:a\s+|o\s+)?(?:m[uú]sica|som|v[ií]deo|playlist|clipe|audio|[aá]udio)?\s*(?:do|da|no|de)?\s*(.+?)(?:\s+(?:no|do|pelo|pelo\s+youtube|youtube))?\s*$/i);
+    if (/youtube|y\s*tube|yt\b/i.test(lower) || (ytMatch && /\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz)\b/i.test(lower))) {
+      const q = ytMatch ? ytMatch[1] : text.replace(/youtube/gi, "").replace(/\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|m[uú]sica|som|v[ií]deo)\b/gi, "").trim();
+      if (q) { playYouTube(q); return; }
+    }
     // Intenção: agendamentos do dia / de hoje
     if (/\bagendamento[s]?\b/.test(lower) && /\b(hoje|do dia|de hoje|para hoje)\b/.test(lower)) {
       reportTodayAppointments();
