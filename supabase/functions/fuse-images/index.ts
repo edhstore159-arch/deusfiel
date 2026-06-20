@@ -3,13 +3,12 @@ import { generateWithNanoBanana } from '../_shared/nano-banana.ts';
 import { chatCompletion } from '../_shared/llm.ts';
 
 const REALISM =
-  "ultra realistic photography, 50mm lens, natural skin texture, real imperfections, " +
-  "cinematic lighting, high dynamic range, 4k, sharp focus, crisp facial details even when the face is small or far from camera, " +
-  "deep enough depth of field to keep every visible face sharp, realistic micro-texture in eyes, lips and skin";
+  "ultra realistic photography, 50mm lens, shallow depth of field, natural skin texture, " +
+  "real imperfections, cinematic lighting, high dynamic range, 4k, sharp focus";
 
 const NEGATIVE =
   "blurry, distorted face, different person, cartoon, illustration, fake skin, over-smooth, " +
-  "out-of-focus face, soft face, smeared facial details, extra fingers, mutated, unrealistic proportions, collage, split screen, side-by-side, " +
+  "extra fingers, mutated, unrealistic proportions, collage, split screen, side-by-side, " +
   "picture-in-picture, frames, borders, text, watermarks, logos";
 
 const TEMPLATE_SYSTEM =
@@ -20,7 +19,7 @@ const TEMPLATE_SYSTEM =
   "Output ONLY the filled prompt as a single line (no markdown, no headings, no explanations).\n\n" +
   "TEMPLATE:\n" +
   "SUBJECT (IMAGE 1 - PERSON): gender, age, skin tone, face shape, eye color and shape, eyebrows, nose, lips, hair (color/texture/style), expression, body type, posture. " +
-  "CRITICAL: face MUST remain consistent and sharp — do NOT change identity, do NOT stylize, do NOT beautify, do NOT blur distant faces. " +
+  "CRITICAL: face MUST remain consistent — do NOT change identity, do NOT stylize, do NOT beautify. " +
   "CLOTHING & STYLE: colors, fabric, fit, accessories. " +
   "SCENE (IMAGE 2 - ENVIRONMENT): location, lighting, time of day, objects, background elements, mood. " +
   "CAMERA & PHOTO STYLE: " + REALISM + ". " +
@@ -47,7 +46,7 @@ async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
     }
   } catch (_e) { /* fallback below */ }
 
-  return `Place the person from IMAGE 1 (preserve exact identity, face, skin, hair, clothing, accessories; every visible face must stay crisp and recognizable even if small or far away) inside the environment from IMAGE 2 (preserve its lighting, palette, time of day, mood). Single seamless photorealistic composition, match perspective and shadows, no collage, no split-screen. ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
+  return `Place the person from IMAGE 1 (preserve exact identity, face, skin, hair, clothing, accessories) inside the environment from IMAGE 2 (preserve its lighting, palette, time of day, mood). Single seamless photorealistic composition, match perspective and shadows, no collage, no split-screen. ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
 }
 
 Deno.serve(async (req) => {

@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const REALISM =
   "RAW photo, ultra realistic photograph captured on a professional DSLR camera, photojournalism / documentary photography style, " +
-  "85mm or 50mm lens, realistic depth of field, sharp focus on every visible human face even when small or far from camera, " +
+  "85mm or 50mm lens, shallow depth of field with softly blurred background, sharp focus on the subject's face, " +
   "natural soft lighting (preferably window light), realistic soft shadows, balanced contrast (no exaggerated HDR), " +
   "natural color grading (no Instagram filter, no oversaturation), " +
   "real skin texture with visible pores and natural imperfections, slight stubble where appropriate, authentic emotional expression, " +
@@ -20,7 +20,7 @@ const NEG =
   "digital art, illustration, painting, cartoon, anime, 3d render, CGI, plastic skin, perfect skin, airbrushed, beauty filter, " +
   "stock photo aesthetic, AI-looking, oversaturated, exaggerated HDR, artificial studio lighting, overprocessed, " +
   "deformed body, distorted anatomy, bad proportions, extra limbs, extra fingers, fused fingers, broken hands, " +
-  "out-of-focus face, blurred face, smeared facial details, unrecognizable distant face, close-up only, face only, cropped body, blurry, low quality, watermark, logo, text, typography";
+  "close-up only, face only, cropped body, blurry, low quality, watermark, logo, text, typography";
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
@@ -44,7 +44,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise.",
             "- ENVIRONMENT: real environment (simple home, office, street, etc.) with natural elements and imperfections (objects slightly out of place, real texture, light dust, wear).",
             "- LIGHTING: realistic cinematic lighting — soft natural window light, soft realistic shadows, balanced contrast, no exaggerated HDR.",
-            "- CAMERA: 50mm or 85mm lens, DSLR photography style, natural ISO, no artificial noise. Use enough depth of field to keep every visible face sharp and recognizable; never blur a face because it is far from the camera.",
+            "- CAMERA: 50mm or 85mm lens, shallow depth of field (slightly blurred background), focus on the face, DSLR photography style, natural ISO, no artificial noise.",
             "- STYLE: documentary photography, ultra realistic, natural colors (no oversaturation), no Instagram filter, no AI look.",
             "- DETAILS: real skin texture (pores, small imperfections), eyes with natural light reflections, real fabric folds, nothing plastic or CGI.",
             "FORBIDDEN: digital art, cartoon, 3D render, perfect skin, exaggerated artificial lighting, stock-photo aesthetic.",
@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
 
       if (reference_image_base64) {
         imageUrls.push(toDataUrl(reference_image_base64));
-        promptParts.push("Edit the uploaded reference image directly in Nano Banana style: preserve the original identity, face, anatomy, pose, camera angle and composition unless the user explicitly asks to change them. Apply only the requested alteration from the prompt. Keep all visible faces sharp, realistic and recognizable, including distant/small faces; do not beautify, replace, blur, smear or distort facial features.");
+        promptParts.push("Use a primeira imagem enviada como referência visual principal (mantenha tema, cores e elementos).");
       }
       if (logo_base64) {
         imageUrls.push(toDataUrl(logo_base64));
