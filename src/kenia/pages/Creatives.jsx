@@ -9,7 +9,7 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/kenia/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kenia/components/ui/select";
-import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, X as XIcon, CalendarClock } from "lucide-react";
+import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, X as XIcon, CalendarClock, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import SocialConnections from "@/kenia/components/SocialConnections";
 
@@ -45,6 +45,11 @@ export default function Creatives() {
     scheduled_for: "",
     platforms: ["instagram"],
   });
+  const [editTarget, setEditTarget] = useState(null); // creative item being edited
+  const [editPrompt, setEditPrompt] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editPreview, setEditPreview] = useState(null);
+  const [editUpload, setEditUpload] = useState(null); // data URL for replacement source image
 
   const onPickImage = (e) => {
     const file = e.target.files?.[0];
@@ -188,6 +193,54 @@ export default function Creatives() {
       toast.error(e.response?.data?.detail || "Erro ao gerar");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const openEdit = (item) => {
+    setEditTarget(item);
+    setEditPrompt(item.last_edit_prompt || "");
+    setEditPreview(item.image_b64 || null);
+    setEditUpload(null);
+  };
+
+  const onPickEditUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { toast.error("Imagem muito grande (máx 8MB)"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      setEditUpload(dataUrl);
+      setEditPreview(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const runEdit = async () => {
+    if (!editTarget) return;
+    if (!editPrompt.trim()) { toast.error("Descreva a modificação desejada"); return; }
+    const sourceImage = editUpload || editTarget.image_b64;
+    if (!sourceImage) { toast.error("Sem imagem original para editar"); return; }
+    setEditing(true);
+    try {
+      const { data } = await api.post("/creatives/edit", {
+        id: editTarget.id,
+        image_base64: sourceImage,
+        prompt: editPrompt.trim(),
+      });
+      if (data?.ok && (data.image_b64 || data.image)) {
+        const next = data.image_b64 || data.image;
+        setEditPreview(next);
+        setEditUpload(null);
+        toast.success("Criativo atualizado");
+        load();
+      } else {
+        toast.error(data?.error || "Não foi possível editar");
+      }
+    } catch (e) {
+      toast.error(e.response?.data?.error || e.message || "Erro ao editar");
+    } finally {
+      setEditing(false);
     }
   };
 
@@ -393,6 +446,9 @@ export default function Creatives() {
                         <Download className="w-3 h-3 mr-1" /> PNG
                       </Button>
                     )}
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(item)} data-testid={`edit-creative-${item.id}`}>
+                      <Pencil className="w-3 h-3 mr-1" /> Editar
+                    </Button>
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openSchedule(item)} data-testid={`schedule-${item.id}`}>
                       <CalendarClock className="w-3 h-3 mr-1" /> Agendar
                     </Button>
@@ -520,6 +576,59 @@ export default function Creatives() {
                   </Button>
                   {preview.image_b64 && (
                     <Button onClick={() => download(preview)} className="flex-1 bg-nude-900 hover:bg-nude-800">
+                      <Download className="w-4 h-4 mr-2" /> Baixar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit dialog */}
+      {editTarget && (
+        <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) { setEditTarget(null); setEditPreview(null); setEditUpload(null); setEditPrompt(""); } }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Pencil className="w-4 h-4 text-gold-600" /> Editar criativo com IA
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="aspect-square bg-nude-100 rounded-md overflow-hidden border border-nude-200">
+                  {editPreview ? (
+                    <img src={imageSrc(editPreview)} alt="Prévia" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-nude-400 text-sm">Sem imagem</div>
+                  )}
+                </div>
+                <label className="flex items-center justify-center gap-2 h-10 border border-dashed border-nude-300 rounded-md cursor-pointer hover:bg-nude-50 text-xs text-nude-600">
+                  <Upload className="w-3.5 h-3.5" />
+                  {editUpload ? "Trocar imagem base" : "Enviar nova imagem base (opcional)"}
+                  <input type="file" accept="image/*" className="hidden" onChange={onPickEditUpload} />
+                </label>
+              </div>
+              <div className="flex flex-col">
+                <Label>Modificações desejadas</Label>
+                <Textarea
+                  rows={8}
+                  className="mt-1.5 flex-1"
+                  placeholder="Ex.: Troque o fundo por um escritório de advocacia moderno, mantenha o texto principal, adicione um detalhe dourado no rodapé e melhore o contraste."
+                  value={editPrompt}
+                  onChange={(e) => setEditPrompt(e.target.value)}
+                />
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    onClick={runEdit}
+                    disabled={editing}
+                    className="flex-1 bg-nude-900 hover:bg-nude-800"
+                  >
+                    {editing ? <span className="animate-pulse-soft">Aplicando edição...</span> : <><Wand2 className="w-4 h-4 mr-2" /> Aplicar com IA</>}
+                  </Button>
+                  {editPreview && (
+                    <Button variant="outline" onClick={() => download({ id: editTarget.id, image_b64: editPreview })}>
                       <Download className="w-4 h-4 mr-2" /> Baixar
                     </Button>
                   )}
