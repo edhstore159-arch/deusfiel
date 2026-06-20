@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Mic, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import api from "@/kenia/lib/api";
+import { api } from "@/kenia/lib/api";
 
 
 
