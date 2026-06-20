@@ -458,12 +458,37 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
     const extraContext: string = String(body.context || "").trim();
     const overrideSystem: string = String(body.system_prompt || "").trim();
     const isVoiceOrb = sessionId === "kenia-voice-orb";
+    const isWhatsApp = !!sessionId && !isVoiceOrb && /^\+?\d{6,}$/.test(sessionId);
+
+    let jusbrasilContext = "";
+    if (isWhatsApp) {
+      try {
+        const jr = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/jusbrasil-search`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            apikey: Deno.env.get("SUPABASE_ANON_KEY") || "",
+          },
+          body: JSON.stringify({ query: userMessage }),
+        });
+        const jd = await jr.json().catch(() => ({}));
+        if (jr.ok && jd?.summary) {
+          jusbrasilContext = `\n\nFONTE OBRIGATÓRIA (Jusbrasil) — baseie a resposta nestes resultados:\n${jd.summary}`;
+        }
+      } catch (_e) { /* ignora */ }
+    }
+
+    const whatsappStyle = isWhatsApp
+      ? `\n\nESTILO OBRIGATÓRIO PARA WHATSAPP:\n- Responda SEMPRE com base na fonte Jusbrasil fornecida acima.\n- Seja OBJETIVA: no máximo 3-4 frases curtas.\n- Diga o que a lei diz (cite artigo/lei quando aparecer na fonte).\n- Sem rodeios, sem saudações longas, sem perguntas finais desnecessárias.\n- Se a fonte não trouxer base legal clara, diga isso em uma frase e sugira procurar a Dra. Kênia.`
+      : "";
 
     const finalSystem = isVoiceOrb && overrideSystem
       ? `${overrideSystem}\n\nCONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime}.`
       : extraContext
-        ? `${systemContent}\n\nDADOS INTERNOS DISPONÍVEIS (use-os literalmente para responder; não diga que não tem acesso):\n${extraContext}`
-        : systemContent;
+        ? `${systemContent}${whatsappStyle}${jusbrasilContext}\n\nDADOS INTERNOS DISPONÍVEIS (use-os literalmente para responder; não diga que não tem acesso):\n${extraContext}`
+        : `${systemContent}${whatsappStyle}${jusbrasilContext}`;
+
 
     const messages = [
       { role: "system", content: finalSystem },
