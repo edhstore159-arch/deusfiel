@@ -22,6 +22,17 @@ const OLLAMA_URL = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "").replac
 const OLLAMA_MODEL = Deno.env.get("OLLAMA_MODEL") || "qwen3:8b";
 const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
 
+const FACE_SAFE_PROMPT =
+  "Face quality lock: natural human face, aligned eyes, normal eyelids, realistic nose and mouth, natural teeth, correct facial symmetry, relaxed expression, realistic skin texture, no warped facial features, no melted face, no duplicated eyes, no distorted pupils, no plastic smoothing.";
+
+function hasHumanSubject(prompt = "") {
+  return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|criança)\b/i.test(prompt);
+}
+
+function withFaceSafety(prompt: string) {
+  return hasHumanSubject(prompt) ? `${prompt}. ${FACE_SAFE_PROMPT}` : prompt;
+}
+
 // ---------- chat completions ----------
 
 async function chatLovable(opts: ChatOptions) {
@@ -175,13 +186,14 @@ export async function chatCompletion(opts: ChatOptions) {
 
 async function imageLovable(opts: ImageOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, error: "LOVABLE_API_KEY ausente" };
+  const safePrompt = withFaceSafety(opts.prompt);
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
     body: JSON.stringify({
       model: "openai/gpt-image-2",
-      prompt: opts.prompt,
-      quality: opts.quality || "low",
+      prompt: safePrompt,
+      quality: opts.quality || (hasHumanSubject(safePrompt) ? "high" : "low"),
       size: opts.size || "1024x1024",
       stream: false,
     }),
