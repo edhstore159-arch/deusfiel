@@ -123,6 +123,26 @@ export default function Agents() {
     setDraft(copy);
   };
 
+  const toggleActive = (id, value) => {
+    const next = agents.map((a) => (a.id === id ? { ...a, active: value } : a));
+    setAgents(next);
+    writeAgents(next);
+    if (draft?.id === id) setDraft({ ...draft, active: value });
+    toast.success(value ? "Agente ativado" : "Agente desativado");
+  };
+
+  const onAvatarPick = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Selecione uma imagem"); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("Imagem deve ter até 2MB"); return; }
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setDraft((d) => ({ ...d, avatar: dataUrl }));
+    } catch {
+      toast.error("Falha ao carregar imagem");
+    }
+  };
+
   const buildSystemPrompt = (a) => [
     `Você é "${a.name}", uma secretária jurídica especializada em ${a.area}.`,
     `Tom de voz: ${a.tone}.`,
