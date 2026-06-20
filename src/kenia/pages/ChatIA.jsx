@@ -198,6 +198,64 @@ const QUAL_META = {
   },
 };
 
+const LEGAL_KEYWORDS = [
+  { area: "Direito de Família", words: /\b(div[oó]rcio|guarda|pens[aã]o|alimentos|visita|uni[aã]o\s+est[aá]vel|invent[aá]rio|partilha|heran[cç]a)\b/i },
+  { area: "Direito Bancário", words: /\b(banco|empr[eé]stimo|consignado|juros|cart[aã]o|pix|golpe|negativa[cç][aã]o|serasa|spc|d[ií]vida)\b/i },
+  { area: "Direito Previdenciário", words: /\b(inss|aposentadoria|aux[ií]lio|benef[ií]cio|bpc|loas|per[ií]cia|pens[aã]o\s+por\s+morte)\b/i },
+  { area: "Direito Trabalhista", words: /\b(trabalho|demiss[aã]o|rescis[aã]o|fgts|sal[aá]rio|horas?\s+extras?|f[eé]rias|ass[eé]dio|emprego)\b/i },
+  { area: "Direito do Consumidor", words: /\b(produto|servi[cç]o|compra|defeito|garantia|cancelamento|reembolso|cobran[cç]a|consumidor)\b/i },
+];
+
+const clampPercent = (value, fallback) => {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fallback;
+};
+
+const normalizeAnalysis = (value, fallback = {}) => {
+  const source = value && typeof value === "object" ? value : {};
+  const qualificacao = source.qualificacao === "desqualificado"
+    ? "nao_qualificado"
+    : QUAL_META[source.qualificacao]
+      ? source.qualificacao
+      : fallback.qualificacao || "necessita_mais_info";
+  return {
+    acertividade: clampPercent(source.acertividade, fallback.acertividade ?? 35),
+    chance_exito: clampPercent(source.chance_exito, fallback.chance_exito ?? 30),
+    qualificacao,
+    area: String(source.area || fallback.area || "Em análise"),
+    resumo: String(source.resumo || fallback.resumo || "Analisando os detalhes informados no atendimento."),
+    motivo: String(source.motivo || fallback.motivo || "Quanto mais contexto for enviado, mais precisa fica a avaliação."),
+    proxima_pergunta: String(source.proxima_pergunta || fallback.proxima_pergunta || ""),
+    fundamentos: Array.isArray(source.fundamentos) ? source.fundamentos : (Array.isArray(fallback.fundamentos) ? fallback.fundamentos : []),
+  };
+};
+
+const buildLocalAnalysis = (history, currentMessage, previous = null) => {
+  const userTexts = [...history.filter((m) => m.role === "user").map((m) => m.content), currentMessage]
+    .map((text) => String(text || "").trim())
+    .filter(Boolean);
+  const combined = userTexts.join("\n");
+  const matched = LEGAL_KEYWORDS.find((item) => item.words.test(combined));
+  const infoCount = Math.min(5, userTexts.length);
+  const hasDeadline = /\b(prazo|audi[eê]ncia|intima[cç][aã]o|urgente|hoje|amanh[aã]|dias?|data)\b/i.test(combined);
+  const hasDocument = /\b(documento|contrato|processo|print|prova|comprovante|foto|anexo)\b/i.test(combined);
+  const score = clampPercent(30 + infoCount * 10 + (matched ? 18 : 0) + (hasDeadline ? 10 : 0) + (hasDocument ? 8 : 0), 45);
+  return normalizeAnalysis({
+    acertividade: Math.max(previous?.acertividade || 0, score),
+    chance_exito: Math.max(previous?.chance_exito || 0, Math.max(25, score - 10)),
+    qualificacao: score >= 75 ? "qualificado" : "necessita_mais_info",
+    area: matched?.area || previous?.area || "Em análise jurídica",
+    resumo: combined.slice(0, 180) || "Cliente iniciou a descrição do caso.",
+    motivo: matched
+      ? "A conversa já contém sinais da área jurídica e detalhes suficientes para uma triagem inicial."
+      : "Ainda faltam dados objetivos sobre área, datas, documentos e impacto do problema.",
+    proxima_pergunta: hasDeadline
+      ? "Você tem algum documento, contrato, comprovante ou número de processo sobre esse caso?"
+      : "Existe algum prazo, audiência, bloqueio ou urgência acontecendo agora?",
+    fundamentos: matched ? [matched.area] : [],
+  }, previous || {});
+};
+
 export default function ChatIA() {
   const [messages, setMessages] = useState([
     {
