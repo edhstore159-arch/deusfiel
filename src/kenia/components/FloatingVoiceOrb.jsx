@@ -93,7 +93,7 @@ export default function FloatingVoiceOrb() {
         },
       });
       if (error) throw error;
-      const answer = String(data?.reply || data?.message || data?.text || "").trim();
+      const answer = String(data?.response || data?.reply || data?.message || data?.text || "").trim();
       if (!answer) throw new Error("Resposta vazia");
       historyRef.current.push({ role: "user", content: text });
       historyRef.current.push({ role: "assistant", content: answer });
