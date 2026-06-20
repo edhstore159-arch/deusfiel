@@ -414,6 +414,20 @@ const buildJitsiLink = (seed) => {
   return `https://meet.jit.si/${safe}`;
 };
 
+const mapAppointmentMutationPayload = (body = {}) => {
+  const patch = { ...body };
+  if (body.starts_at) {
+    const start = new Date(body.starts_at);
+    if (!Number.isNaN(start.getTime())) {
+      patch.appointment_date = start.toISOString().slice(0, 10);
+      patch.appointment_time = start.toTimeString().slice(0, 5);
+    }
+    delete patch.starts_at;
+  }
+  if (body.status === "confirmado") patch.status = "scheduled";
+  return patch;
+};
+
 const normalizeAppointment = (item) => {
   const startsAt = item.starts_at || (item.appointment_date && item.appointment_time
     ? new Date(`${item.appointment_date}T${String(item.appointment_time).slice(0, 5)}:00`).toISOString()
@@ -748,7 +762,23 @@ const staticPatch = (url, body = {}) => {
   };
   if (path.startsWith("/leads/")) return updateCollection("leads", seedLeads);
   if (path.startsWith("/finance/transactions/")) return updateCollection("transactions", seedTransactions);
-  if (path.startsWith("/appointments/")) return updateCollection("appointments", seedAppointments);
+  if (path.startsWith("/appointments/")) {
+    return (async () => {
+      const id = path.split("/").pop();
+      try {
+        const { data, error } = await supabase
+          .from("appointments")
+          .update(mapAppointmentMutationPayload(body))
+          .eq("id", id)
+          .select("*")
+          .single();
+        if (error) throw error;
+        return response(normalizeAppointment(data));
+      } catch {
+        return updateCollection("appointments", seedAppointments);
+      }
+    })();
+  }
   if (path.startsWith("/legal-deadlines/")) return updateCollection("legal_deadlines", seedLegalDeadlines);
   if (path.startsWith("/admin/case-analyses/")) return updateCollection("case_analyses", seedAnalyses);
   return response({ ok: true, fallback: true });
@@ -763,7 +793,18 @@ const staticDelete = (url) => {
   };
   if (path.startsWith("/leads/")) return removeFrom("leads", seedLeads);
   if (path.startsWith("/finance/transactions/")) return removeFrom("transactions", seedTransactions);
-  if (path.startsWith("/appointments/")) return removeFrom("appointments", seedAppointments);
+  if (path.startsWith("/appointments/")) {
+    return (async () => {
+      const id = path.split("/").pop();
+      try {
+        const { error } = await supabase.from("appointments").delete().eq("id", id);
+        if (error) throw error;
+        return response({ ok: true });
+      } catch {
+        return removeFrom("appointments", seedAppointments);
+      }
+    })();
+  }
   if (path.startsWith("/legal-deadlines/")) return removeFrom("legal_deadlines", seedLegalDeadlines);
   if (path.startsWith("/processes/")) return removeFrom("processes", seedProcesses);
   if (path.startsWith("/creatives/")) return removeFrom("creatives", seedCreatives);
@@ -869,14 +910,14 @@ export const api = HAS_BACKEND
       put: liveApi.put.bind(liveApi),
       patch: (url, body, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+        if (p.startsWith("/appointments/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticPatch(url, body);
         }
         return liveApi.patch(url, body, config);
       },
       delete: (url, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+        if (p.startsWith("/appointments/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticDelete(url);
         }
         return liveApi.delete(url, config);
