@@ -209,11 +209,12 @@ async function imageGemini(opts: ImageOptions) {
   if (!GEMINI_KEY) return { ok: false as const, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+  const safePrompt = withFaceSafety(opts.prompt);
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+      contents: [{ role: "user", parts: [{ text: safePrompt }] }],
       generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
     }),
   });
@@ -228,12 +229,13 @@ async function imageGemini(opts: ImageOptions) {
 
 async function imageEmergent(opts: ImageOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, error: "EMERGENT_API_KEY ausente" };
+  const safePrompt = withFaceSafety(opts.prompt);
   const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
     body: JSON.stringify({
       model: "gpt-image-1",
-      prompt: opts.prompt,
+      prompt: safePrompt,
       size: opts.size || "1024x1024",
       n: 1,
     }),
@@ -254,10 +256,11 @@ function buildFluxPrompt(raw: string): string {
     .trim()
     .slice(0, 280);
   const STYLE =
-    "photorealistic, real skin texture, professional photography, cinematic lighting, " +
-    "shallow depth of field, sharp focus, 8k";
+    "photorealistic, professional portrait photography, real skin texture, natural skin pores, " +
+    "correct facial anatomy, symmetrical eyes, realistic pupils, natural mouth and nose, " +
+    "cinematic lighting, shallow depth of field, sharp focus, 8k";
   const NEG =
-    "negative: blurry, low quality, distorted face, bad hands, extra fingers, unrealistic, cartoon, oversaturated, text, watermark, logo";
+    "negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, bad hands, extra fingers, unrealistic, cartoon, oversaturated, text, watermark, logo";
   return `${base}, ${STYLE}. ${NEG}`;
 }
 
@@ -280,22 +283,23 @@ async function imagePollinations(opts: ImageOptions) {
 }
 
 export async function generateImage(opts: ImageOptions) {
+  const faceSafeOpts = { ...opts, prompt: withFaceSafety(opts.prompt), quality: opts.quality || (hasHumanSubject(opts.prompt) ? "high" : undefined) };
   // 1) Pollinations (gratuito, sem chave, sem limite)
-  const r0 = await imagePollinations(opts);
+  const r0 = await imagePollinations(faceSafeOpts);
   if (r0.ok) return r0;
   console.warn("⚠️ Pollinations falhou:", r0.error);
   // 2) Fallbacks pagos
   if (LOVABLE_KEY) {
-    const r = await imageLovable(opts);
+    const r = await imageLovable(faceSafeOpts);
     if (r.ok) return r;
     console.warn("⚠️ Lovable image falhou:", r.error);
   }
   if (GEMINI_KEY) {
-    const r = await imageGemini(opts);
+    const r = await imageGemini(faceSafeOpts);
     if (r.ok) return r;
     console.warn("⚠️ Gemini direto falhou:", r.error);
   }
-  const r3 = await imageEmergent(opts);
+  const r3 = await imageEmergent(faceSafeOpts);
   if (r3.ok) return r3;
   return { ok: false as const, error: r3.error || "Nenhum provider de imagem disponível", provider: "none" };
 }
