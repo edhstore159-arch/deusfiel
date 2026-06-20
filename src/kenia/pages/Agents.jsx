@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
@@ -6,7 +6,8 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Separator } from "@/kenia/components/ui/separator";
-import { Bot, Plus, Save, Trash2, Sparkles, Copy } from "lucide-react";
+import { Switch } from "@/kenia/components/ui/switch";
+import { Bot, Plus, Save, Trash2, Sparkles, Copy, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "kenia_ai_agents_v1";
