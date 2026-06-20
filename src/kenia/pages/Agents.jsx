@@ -260,6 +260,39 @@ export default function Agents() {
           </div>
 
           <div className="p-5 space-y-5">
+            <div className="flex items-center gap-4">
+              {draft.avatar ? (
+                <img src={draft.avatar} alt="Avatar do agente" className="w-20 h-20 rounded-full object-cover border border-nude-200" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-nude-100 border border-nude-200 flex items-center justify-center">
+                  <Bot className="w-9 h-9 text-nude-400" />
+                </div>
+              )}
+              <div className="flex-1">
+                <div className="text-xs uppercase tracking-widest text-nude-500 font-semibold">Imagem do agente</div>
+                <p className="text-xs text-nude-400 mt-1">PNG ou JPG, até 2MB.</p>
+                <div className="flex gap-2 mt-2">
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => { onAvatarPick(e.target.files?.[0]); e.target.value = ""; }}
+                  />
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => avatarInputRef.current?.click()}>
+                    <Upload className="w-4 h-4" /> {draft.avatar ? "Trocar imagem" : "Enviar imagem"}
+                  </Button>
+                  {draft.avatar && (
+                    <Button type="button" variant="ghost" size="sm" className="gap-1.5 text-rose-600 hover:bg-rose-50" onClick={() => setDraft({ ...draft, avatar: "" })}>
+                      <X className="w-4 h-4" /> Remover
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs uppercase tracking-widest text-nude-500 font-semibold">Nome do agente</label>
