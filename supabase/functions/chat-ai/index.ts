@@ -523,6 +523,10 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
     } else if (userAskedTemporalInfo(userMessage) && !/\d{2}[\/\-]\d{2}|\d{4}|\d{1,2}:\d{2}|segunda|ter[cç]a|quarta|quinta|sexta|s[áa]bado|domingo|janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro/i.test(reply)) {
       reply = `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília). ${reply}`.trim();
     }
+    if (!userAskedTemporalInfo(userMessage) && reply.includes("?")) {
+      reply = compactQuestion(reply);
+      if (isNearDuplicateReply(reply, history)) reply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    }
 
     // Garante saudação correta (horário de Brasília) APENAS na primeira resposta.
     // Nas mensagens seguintes, remove qualquer saudação que o modelo tenha inserido por engano.
