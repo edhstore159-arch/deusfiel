@@ -351,14 +351,15 @@ export default function FloatingVoiceOrb() {
     }
   };
 
+  const [ytQuery, setYtQuery] = useState("");
+
   const playYouTube = (query) => {
     const q = (query || "").trim();
     if (!q) return;
-    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
-    const win = window.open(url, "_blank", "noopener,noreferrer");
-    const msg = `Abrindo o YouTube com: ${q}.`;
+    setYtQuery(q);
+    setOpen(true);
+    const msg = `Tocando ${q} no YouTube aqui mesmo.`;
     setReply(msg); speak(msg);
-    if (!win) toast.message(msg);
   };
 
   const handleCommand = (text) => {
