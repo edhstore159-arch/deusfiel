@@ -56,16 +56,8 @@ export default function FloatingVoiceOrb() {
   const lastFinalRef = useRef({ text: "", at: 0 });
   const speakingRef = useRef(false);
   const speechResumeTimerRef = useRef(null);
-  const speechRunIdRef = useRef(0);
   const [alwaysOn, setAlwaysOn] = useState(false);
   useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
-
-  const stopCurrentSpeech = () => {
-    speechRunIdRef.current += 1;
-    speakingRef.current = false;
-    if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
-    try { window.speechSynthesis?.cancel?.(); } catch {}
-  };
 
   const restartContinuousRecognition = (delay = 300) => {
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
@@ -129,17 +121,12 @@ export default function FloatingVoiceOrb() {
 
         if (alwaysOnRef.current) {
           const awake = now < awakeUntilRef.current;
-          const finalHasWakeWord = hasWakeWord(finalText);
-          const wasSpeaking = speakingRef.current || window.speechSynthesis?.speaking;
-
-          if (wasSpeaking && !finalHasWakeWord) {
-            // Evita que a própria voz da Kênia seja capturada como nova pergunta.
-            continue;
-          }
-
-          if (finalHasWakeWord) {
+          if (hasWakeWord(finalText)) {
+            const wasSpeaking = speakingRef.current || window.speechSynthesis?.speaking;
             if (wasSpeaking) {
-              stopCurrentSpeech();
+              try { window.speechSynthesis.cancel(); } catch {}
+              speakingRef.current = false;
+              if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
               restartContinuousRecognition(100);
             }
             awakeUntilRef.current = now + 15000;
@@ -230,20 +217,13 @@ export default function FloatingVoiceOrb() {
   const speak = (text) => {
     try {
       const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
-      const spokenText = String(text || "").trim();
-      if (!spokenText) return;
-      speechRunIdRef.current += 1;
-      const runId = speechRunIdRef.current;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "pt-BR";
       u.onstart = () => {
-        if (runId !== speechRunIdRef.current) return;
-        if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
         if (!shouldResume) return;
         speakingRef.current = true;
       };
       const resume = () => {
-        if (runId !== speechRunIdRef.current) return;
         speakingRef.current = false;
         if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
         if (shouldResume && alwaysOnRef.current && shouldRestartRef.current) {
@@ -252,10 +232,9 @@ export default function FloatingVoiceOrb() {
       };
       u.onend = resume;
       u.onerror = resume;
-      try { window.speechSynthesis.cancel(); } catch {}
-      speakingRef.current = shouldResume;
+      window.speechSynthesis.cancel();
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
-      const fallbackMs = Math.min(20000, Math.max(2500, spokenText.length * 90));
+      const fallbackMs = Math.min(15000, Math.max(2000, String(text || "").length * 80));
       speechResumeTimerRef.current = window.setTimeout(resume, fallbackMs);
       window.speechSynthesis.speak(u);
     } catch {}
@@ -318,7 +297,7 @@ export default function FloatingVoiceOrb() {
         } catch {}
       }
 
-      const enrichedSystem = `Você é Kênia, assistente de voz da Dra. Kênia Garcia. Você TEM ACESSO COMPLETO aos dados internos abaixo (contatos, leads, processos, agendamentos, mensagens, prazos). Use SEMPRE esses dados para responder com precisão. NUNCA diga "não tenho acesso" ou "não tenho informações" — os dados estão logo abaixo. Quando solicitado, informe nomes, telefones, quantidade de mensagens/pessoas, status de processos, e pode sugerir reagendar reuniões ou ligar para clientes. Para temas jurídicos, baseie-se nos RESULTADOS DA BUSCA NO JUSBRASIL quando fornecidos, citando títulos e links.\n\nALÉM DISSO, você é uma assistente versátil: pode dar dicas, conselhos e orientações sobre QUALQUER tema que o usuário pedir — produtividade, saúde, bem-estar, finanças pessoais, tecnologia, estudos, carreira, relacionamentos, viagens, culinária, etc. Responda de forma prática, breve e amigável, com 2-4 dicas objetivas quando o assunto for genérico. Nunca recuse um tema só por estar fora do escritório; só recuse conteúdo ilegal, perigoso ou antiético. Para temas médicos, jurídicos ou financeiros sensíveis, recomende ao final consultar um profissional.\n\nDADOS DO ESCRITÓRIO:\n${ctxSummary}${jusContext}`;
+      const enrichedSystem = `Você é Kênia, assistente de voz da Dra. Kênia Garcia. Você TEM ACESSO COMPLETO aos dados internos abaixo (contatos, leads, processos, agendamentos, mensagens, prazos). Use SEMPRE esses dados para responder com precisão. NUNCA diga "não tenho acesso" ou "não tenho informações" — os dados estão logo abaixo. Quando solicitado, informe nomes, telefones, quantidade de mensagens/pessoas, status de processos, e pode sugerir reagendar reuniões ou ligar para clientes. Para temas jurídicos, baseie-se nos RESULTADOS DA BUSCA NO JUSBRASIL quando fornecidos, citando títulos e links.\n\nDADOS DO ESCRITÓRIO:\n${ctxSummary}${jusContext}`;
 
 
       const { data, error } = await supabase.functions.invoke("chat-ai", {
@@ -569,10 +548,6 @@ export default function FloatingVoiceOrb() {
 
   const handleCommand = (text) => {
     if (!text?.trim()) return;
-    if (speakingRef.current || window.speechSynthesis?.speaking) {
-      stopCurrentSpeech();
-      if (alwaysOnRef.current && shouldRestartRef.current) restartContinuousRecognition(100);
-    }
     const lower = text.toLowerCase();
     // Fechar / parar música ou aba do YouTube
     if (/\b(fech[ae]r?|fecha|para|pare|parar|encerra[r]?|desliga[r]?|stop|pause|pausa[r]?)\b[\s\S]*\b(m[uú]sica|som|v[ií]deo|youtube|yt|aba|player)\b/i.test(lower)
