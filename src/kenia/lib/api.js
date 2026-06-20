@@ -715,6 +715,7 @@ const staticPost = (url, body = {}) => {
     })();
   }
 
+  if (path === "/public/consulta") return response({ found: true, processes: seedProcesses, client_name: "Cliente demonstração" });
   return response({ ok: false, fallback: true, error: "STATIC_MODE" });
 };
 
