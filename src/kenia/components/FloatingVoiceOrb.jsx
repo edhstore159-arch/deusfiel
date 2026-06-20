@@ -125,7 +125,19 @@ export default function FloatingVoiceOrb() {
         `Mensagens recentes: ${JSON.stringify(ctx.logs.slice(-20).map((l) => ({ contato: l.contact_name, tel: l.contact_phone, texto: l.text, eu: l.from_me })))}`,
         `Análises de caso: ${JSON.stringify(ctx.analyses.slice(0, 20).map((a) => ({ cliente: a.visitor_name, tel: a.visitor_phone, area: a.area, resumo: a.resumo })))}`,
       ].join("\n") : "";
-      const enrichedSystem = `Você é Kênia, assistente de voz da Dra. Kênia Garcia. Você TEM ACESSO COMPLETO aos dados internos abaixo (contatos, leads, processos, agendamentos, mensagens, prazos). Use SEMPRE esses dados para responder com precisão. NUNCA diga "não tenho acesso" ou "não tenho informações" — os dados estão logo abaixo. Quando solicitado, informe nomes, telefones, quantidade de mensagens/pessoas, status de processos, e pode sugerir reagendar reuniões ou ligar para clientes.\n\nDADOS DO ESCRITÓRIO:\n${ctxSummary}`;
+
+      // Busca no Jusbrasil quando a pergunta é jurídica
+      const legalRe = /\b(lei|leis|art(?:igo)?\.?\s*\d|c[oó]digo|cpc|cpp|clt|cf|stf|stj|tjsp|tjmg|jurisprud[eê]ncia|s[uú]mula|processo\b(?!s? do))|\b(direito|trabalhista|c[ií]vel|criminal|penal|tribut[aá]rio|previdenci[aá]rio|consumidor|fam[ií]lia|imobili[aá]rio|herdeiro|inventario|invent[aá]rio|div[oó]rcio|guarda|pens[aã]o|alimentos|usucapi[aã]o|despejo|reintegra[cç][aã]o|habeas corpus|recurso)\b/i;
+      let jusContext = "";
+      if (legalRe.test(text)) {
+        try {
+          const { data: js } = await supabase.functions.invoke("jusbrasil-search", { body: { query: text } });
+          if (js?.summary) jusContext = `\n\nRESULTADOS DA BUSCA NO JUSBRASIL (use estas referências reais, cite títulos e URLs quando útil):\n${js.summary}\nFonte da busca: ${js.source_url}`;
+        } catch {}
+      }
+
+      const enrichedSystem = `Você é Kênia, assistente de voz da Dra. Kênia Garcia. Você TEM ACESSO COMPLETO aos dados internos abaixo (contatos, leads, processos, agendamentos, mensagens, prazos). Use SEMPRE esses dados para responder com precisão. NUNCA diga "não tenho acesso" ou "não tenho informações" — os dados estão logo abaixo. Quando solicitado, informe nomes, telefones, quantidade de mensagens/pessoas, status de processos, e pode sugerir reagendar reuniões ou ligar para clientes. Para temas jurídicos, baseie-se nos RESULTADOS DA BUSCA NO JUSBRASIL quando fornecidos, citando títulos e links.\n\nDADOS DO ESCRITÓRIO:\n${ctxSummary}${jusContext}`;
+
 
       const { data, error } = await supabase.functions.invoke("chat-ai", {
         body: {
