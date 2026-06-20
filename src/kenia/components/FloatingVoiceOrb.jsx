@@ -122,13 +122,6 @@ export default function FloatingVoiceOrb() {
         if (alwaysOnRef.current) {
           const awake = now < awakeUntilRef.current;
           if (hasWakeWord(finalText)) {
-            const wasSpeaking = speakingRef.current || window.speechSynthesis?.speaking;
-            if (wasSpeaking) {
-              try { window.speechSynthesis.cancel(); } catch {}
-              speakingRef.current = false;
-              if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
-              restartContinuousRecognition(100);
-            }
             awakeUntilRef.current = now + 15000;
             setOpen(true);
             const rest = stripWake(finalText);
@@ -136,8 +129,7 @@ export default function FloatingVoiceOrb() {
             else {
               const msg = "Pois não? Estou ouvindo.";
               setReply(msg);
-              if (wasSpeaking) restartContinuousRecognition(150);
-              else speak(msg);
+              speak(msg);
             }
           } else if (awake) {
             awakeUntilRef.current = now + 15000;
@@ -222,6 +214,7 @@ export default function FloatingVoiceOrb() {
       u.onstart = () => {
         if (!shouldResume) return;
         speakingRef.current = true;
+        try { recognitionRef.current?.abort?.(); } catch {}
       };
       const resume = () => {
         speakingRef.current = false;
