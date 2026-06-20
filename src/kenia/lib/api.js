@@ -414,6 +414,20 @@ const buildJitsiLink = (seed) => {
   return `https://meet.jit.si/${safe}`;
 };
 
+const mapAppointmentMutationPayload = (body = {}) => {
+  const patch = { ...body };
+  if (body.starts_at) {
+    const start = new Date(body.starts_at);
+    if (!Number.isNaN(start.getTime())) {
+      patch.appointment_date = start.toISOString().slice(0, 10);
+      patch.appointment_time = start.toTimeString().slice(0, 5);
+    }
+    delete patch.starts_at;
+  }
+  if (body.status === "confirmado") patch.status = "scheduled";
+  return patch;
+};
+
 const normalizeAppointment = (item) => {
   const startsAt = item.starts_at || (item.appointment_date && item.appointment_time
     ? new Date(`${item.appointment_date}T${String(item.appointment_time).slice(0, 5)}:00`).toISOString()
