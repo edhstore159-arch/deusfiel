@@ -8,16 +8,21 @@ const corsHeaders = {
 };
 
 const REALISM =
-  "RAW photo, ultra realistic, photorealistic, full-body shot, entire body visible from head to toe, " +
-  "correct human anatomy, natural body proportions, realistic hands and fingers, real skin texture with natural imperfections and skin pores, " +
-  "professional photography, photojournalism style, 50mm lens, cinematic lighting, shallow depth of field, sharp focus, 8k";
-const NEG = "deformed body, distorted anatomy, bad proportions, extra limbs, extra arms, extra fingers, bad hands, fused fingers, broken hands, " +
-  "close-up, portrait only, cropped body, face only, cartoon, cgi, 3d render, illustration, painting, blurry, low quality, " +
-  "no text, no letters, no typography, no watermarks, no logos";
+  "RAW photo, ultra realistic photograph captured on a professional DSLR camera, photojournalism / documentary photography style, " +
+  "85mm or 50mm lens, shallow depth of field with softly blurred background, sharp focus on the subject's face, " +
+  "natural soft lighting (preferably window light), realistic soft shadows, balanced contrast (no exaggerated HDR), " +
+  "natural color grading (no Instagram filter, no oversaturation), " +
+  "real skin texture with visible pores and natural imperfections, slight stubble where appropriate, authentic emotional expression, " +
+  "natural catchlights in the eyes, real fabric folds and wrinkles in clothing, natural ISO with no artificial denoising, " +
+  "everyday real environment with natural imperfections (objects slightly out of place, real textures, light dust, wear)";
+
+const NEG =
+  "digital art, illustration, painting, cartoon, anime, 3d render, CGI, plastic skin, perfect skin, airbrushed, beauty filter, " +
+  "stock photo aesthetic, AI-looking, oversaturated, exaggerated HDR, artificial studio lighting, overprocessed, " +
+  "deformed body, distorted anatomy, bad proportions, extra limbs, extra fingers, fused fingers, broken hands, " +
+  "close-up only, face only, cropped body, blurry, low quality, watermark, logo, text, typography";
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
-// NÃO injeta tema (advogada, escritório etc) — só adiciona realismo. O atalho "law"
-// só é usado se o usuário não descrever um sujeito próprio.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   const userTheme = (userPrompt || "").trim();
   const extraContext = style === "law"
@@ -26,23 +31,26 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
 
   try {
     const r = await chatCompletion({
-      temperature: 0.4,
+      temperature: 0.3,
       messages: [
         {
           role: "system",
-          content:
-            [
-              "You are a professional art director specialized in photorealistic AI image generation.",
-              "Your task is to faithfully and accurately translate the user's request into a highly detailed, ultra-realistic image prompt.",
-              "CRITICAL RULES: NEVER change, replace, simplify, or reinterpret the subject. NEVER invent new elements that were not requested. ALWAYS preserve ALL elements described by the user (people, objects, setting, mood, colors, action). If the input is not in English, translate it to English while preserving exact meaning.",
-              "COMPOSITION RULES: When people are present, ALWAYS use a full-body wide shot, entire body visible from head to toe, correct human anatomy, realistic proportions, realistic hands with five fingers per hand, natural posture (no stiff or broken poses). Use 35mm or 50mm lens, cinematic lighting, natural shadows, depth of field, real-world camera perspective.",
-              "REALISM ENFORCEMENT: Add only details that enhance realism without changing the request — RAW photo, photorealistic, ultra realistic, real skin texture, natural imperfections, skin pores, professional photography, photojournalism style. Materials must look real (fabric, metal, skin, glass). Avoid artificial or CGI-looking results.",
-              "ANTI-DISTORTION RULES: Force stability in anatomy (correct human anatomy, natural body proportions, symmetrical body structure). Force hand quality (realistic hands, five fingers clearly defined, no fused or broken fingers). Avoid model confusion (clear scene description, no ambiguous wording, no conflicting instructions).",
-              "FRAMING CONTROL: NEVER generate close-up, portrait, face-only, or cropped body UNLESS the user explicitly requests it.",
-              "OUTPUT FORMAT: Generate ONLY ONE single-line prompt. Write in English. Describe the image as if it already exists. Do NOT explain anything. Do NOT use markdown. Do NOT break into multiple lines.",
-              "FINAL STRUCTURE: [Scene description with full detail], RAW photo, photorealistic, ultra realistic, real skin texture, natural imperfections, professional photography, cinematic lighting, depth of field, 35mm lens. Negative: deformed body, distorted anatomy, bad proportions, extra limbs, missing fingers, fused fingers, broken hands, unrealistic body, asymmetry, long neck, poorly drawn hands, close-up, portrait, cropped body, face only, cartoon, cgi, render, blurry, low quality.",
-            ].join(" "),
-
+          content: [
+            "You are a director of photography and a specialist in hyper-realistic image prompts (Nano Banana style).",
+            "Your task is to convert the user's scene description into ONE single-line English prompt that produces an EXTREMELY realistic photograph — as if captured by a professional DSLR camera, NOT digital art, NOT illustration, NOT 3D render.",
+            "STRICT FIDELITY: Never change, replace, simplify or reinterpret the subject. Never invent elements not requested. Preserve ALL elements described by the user (people, objects, setting, mood, action). Translate non-English input to English while keeping exact meaning.",
+            "ALWAYS FILL THESE FIELDS in the output prompt:",
+            "- SCENE: describe the scene faithfully from the user theme.",
+            "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise.",
+            "- ENVIRONMENT: real environment (simple home, office, street, etc.) with natural elements and imperfections (objects slightly out of place, real texture, light dust, wear).",
+            "- LIGHTING: realistic cinematic lighting — soft natural window light, soft realistic shadows, balanced contrast, no exaggerated HDR.",
+            "- CAMERA: 50mm or 85mm lens, shallow depth of field (slightly blurred background), focus on the face, DSLR photography style, natural ISO, no artificial noise.",
+            "- STYLE: documentary photography, ultra realistic, natural colors (no oversaturation), no Instagram filter, no AI look.",
+            "- DETAILS: real skin texture (pores, small imperfections), eyes with natural light reflections, real fabric folds, nothing plastic or CGI.",
+            "FORBIDDEN: digital art, cartoon, 3D render, perfect skin, exaggerated artificial lighting, stock-photo aesthetic.",
+            "GOAL: the image must look like a REAL photograph of a true, emotional, everyday situation.",
+            "OUTPUT FORMAT: ONE single-line English prompt. No markdown, no bullet points, no explanations. End with: '--style raw --no artificial --no smooth skin --no CGI --photorealism high'.",
+          ].join(" "),
         },
         {
           role: "user",
@@ -56,8 +64,9 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
     }
   } catch (_e) { /* fallback */ }
 
-  return `${userTheme}. ${REALISM}. Negative: ${NEG}`;
+  return `${userTheme}. ${REALISM}. Negative: ${NEG}. --style raw --no artificial --no smooth skin --no CGI --photorealism high`;
 }
+
 
 
 
