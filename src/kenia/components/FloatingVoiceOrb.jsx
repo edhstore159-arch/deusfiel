@@ -773,17 +773,17 @@ export default function FloatingVoiceOrb() {
             });
             // NÃO mexer em alwaysOn/recognition — escuta contínua segue ativa mesmo minimizado.
           }}
-          className="relative w-16 h-16 rounded-full overflow-hidden ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white animate-orb-glow"
+          className="voice-orb-sun relative w-16 h-16 rounded-full ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white animate-orb-glow"
           aria-label="Assistente de voz Kênia"
           data-testid="voice-orb"
         >
-          <img src={LOGO} alt="Kênia" className="w-full h-full object-cover" />
+          <img src={LOGO} alt="Kênia" className="relative z-10 w-full h-full object-cover rounded-full" />
           {listening && (
-            <span className="absolute inset-0 rounded-full ring-4 ring-rose-500 animate-pulse pointer-events-none" />
+            <span className="absolute inset-0 z-20 rounded-full ring-4 ring-rose-500 animate-pulse pointer-events-none" />
           )}
           {alwaysOn && (
             <span
-              className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"
+              className="absolute -top-1 -right-1 z-20 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"
               title="Escuta contínua ativa"
             />
           )}
