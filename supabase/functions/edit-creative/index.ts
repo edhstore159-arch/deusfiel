@@ -4,11 +4,8 @@ import { generateWithNanoBanana } from "../_shared/nano-banana.ts";
 const REALISM =
   "high quality, sharp focus, natural lighting, realistic textures, balanced composition";
 const NEGATIVE =
-  "blurry, distorted, warped, melted faces, asymmetrical eyes, bad hands, deformed hands, abnormal hands, distorted hands, extra fingers, missing fingers, fused fingers, duplicated fingers, broken fingers, bent-backwards fingers, wrong thumb placement, claw hands, rubber fingers, displaced hands, mutated, " +
+  "blurry, distorted, warped, melted faces, asymmetrical eyes, extra fingers, mutated, " +
   "low quality, watermarks, fake text, garbled letters, broken layout";
-
-const HAND_LOCK =
-  "HAND LOCK: if any hand or fingers are visible, correct them to photorealistic anatomy before final output. Each visible hand must have exactly five fingers (one thumb plus four fingers), correct knuckles, natural nail placement, realistic palm structure, natural spacing/webbing, and a wrist aligned to the forearm. Preserve the original pose when possible, but fix extra fingers, missing fingers, fused fingers, duplicated fingertips, broken joints, claw-like fingers, rubbery fingers, wrong thumb placement, detached hands, or hands growing from the wrong place.";
 
 function buildEditPrompt(userInstruction: string) {
   const instruction = (userInstruction || "").trim() ||
@@ -19,8 +16,6 @@ function buildEditPrompt(userInstruction: string) {
     "asks to change them. Keep text legible and high-quality. Output a single edited image.",
     "",
     `USER MODIFICATIONS: ${instruction}`,
-    "",
-    HAND_LOCK,
     "",
     `STYLE: ${REALISM}.`,
     `Negative: ${NEGATIVE}.`,
