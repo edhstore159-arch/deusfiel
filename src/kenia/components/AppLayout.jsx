@@ -150,7 +150,7 @@ export default function AppLayout() {
               onFocus={() => prefetch(item.to)}
               onTouchStart={() => prefetch(item.to)}
               className={({ isActive }) =>
-                `relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[17px] uppercase tracking-wide transition-all duration-200 ${
+                `relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[13px] uppercase tracking-wide transition-all duration-200 ${
                   isActive
                     ? "bg-gold-50 text-gold-700 font-semibold nav-active-accent"
                     : "text-nude-600 hover:bg-nude-100 hover:text-nude-900"
