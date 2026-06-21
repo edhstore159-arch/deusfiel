@@ -716,8 +716,8 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
         } else {
           console.log("[chat-ai] appointment salvo id=", inserted?.id, "user_id=", assigneeId);
         }
-        (appointment as any).meeting_link = meetUrl;
-        (appointment as any).meet_url = meetUrl;
+        (appointment as any).meeting_link = finalMeetUrl;
+        (appointment as any).meet_url = finalMeetUrl;
         (appointment as any).assigned_to = assigneeId;
       }
     } catch (err) {
