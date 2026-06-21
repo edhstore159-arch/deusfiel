@@ -43,7 +43,9 @@ export default function FloatingVoiceOrb() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [scrolled, setScrolled] = useState(false);
+  const [goldBurst, setGoldBurst] = useState(false);
   const recognitionRef = useRef(null);
+  const goldBurstTimerRef = useRef(null);
   const supported =
     typeof window !== "undefined" &&
     (window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -60,6 +62,12 @@ export default function FloatingVoiceOrb() {
   const speechResumeTimerRef = useRef(null);
   const [alwaysOn, setAlwaysOn] = useState(false);
   useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
+
+  useEffect(() => {
+    return () => {
+      if (goldBurstTimerRef.current) clearTimeout(goldBurstTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const getScrollTop = () => {
@@ -818,6 +826,9 @@ export default function FloatingVoiceOrb() {
           type="button"
           onClick={() => {
             unlockSpeech();
+            setGoldBurst(true);
+            if (goldBurstTimerRef.current) clearTimeout(goldBurstTimerRef.current);
+            goldBurstTimerRef.current = window.setTimeout(() => setGoldBurst(false), 950);
             setOpen((v) => {
               const next = !v;
               userMinimizedRef.current = !next; // se está fechando, marca como minimizado pelo usuário
@@ -825,7 +836,7 @@ export default function FloatingVoiceOrb() {
             });
             // NÃO mexer em alwaysOn/recognition — escuta contínua segue ativa mesmo minimizado.
           }}
-          className="voice-orb-sun relative w-16 h-16 rounded-full ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white animate-orb-glow"
+          className={`voice-orb-sun relative w-16 h-16 rounded-full ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white animate-orb-glow ${goldBurst ? "voice-orb-sun-burst" : ""}`}
           aria-label="Assistente de voz Kênia"
           data-testid="voice-orb"
         >
