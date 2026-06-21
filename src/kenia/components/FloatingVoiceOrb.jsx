@@ -350,12 +350,40 @@ export default function FloatingVoiceOrb() {
     setReply("");
     try {
       const ctx = await loadClientContext().catch(() => null);
+      // Computa "hoje" e "amanhã" no fuso de São Paulo para destacar agendamentos relevantes.
+      const isoSP = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+      const _now = new Date();
+      const _tomorrow = new Date(_now.getTime() + 24 * 60 * 60 * 1000);
+      const _todayISO = isoSP(_now);
+      const _tomorrowISO = isoSP(_tomorrow);
+      const apptISO = (a) => {
+        const raw = a.appointment_date || a.starts_at || a.date || "";
+        if (!raw) return "";
+        try { return isoSP(new Date(raw)); } catch { return String(raw).slice(0, 10); }
+      };
+      const mapAppt = (a) => ({
+        cliente: a.client_name || a.customer_name || a.lead_name,
+        tel: a.phone || a.client_phone,
+        email: a.email,
+        data: a.appointment_date || a.starts_at,
+        hora: a.appointment_time,
+        area: a.legal_area || a.case_type,
+        cidade: a.city,
+        resumo_caso: a.case_summary || a.description,
+        status: a.status,
+        origem: a.source,
+      });
+      const apptsTomorrow = (ctx.appointments || []).filter((a) => apptISO(a) === _tomorrowISO).map(mapAppt);
+      const apptsToday = (ctx.appointments || []).filter((a) => apptISO(a) === _todayISO).map(mapAppt);
+
       const ctxSummary = ctx ? [
-        `RESUMO: ${ctx.contacts.length} contatos, ${ctx.leads.length} leads, ${ctx.processes.length} processos, ${ctx.appointments.length} agendamentos, ${ctx.logs.length} mensagens, ${ctx.deadlines.length} prazos, ${(ctx.conversations||[]).length} conversas IA.`,
+        `RESUMO: ${ctx.contacts.length} contatos, ${ctx.leads.length} leads, ${ctx.processes.length} processos, ${ctx.appointments.length} agendamentos (HOJE ${_todayISO}: ${apptsToday.length} | AMANHÃ ${_tomorrowISO}: ${apptsTomorrow.length}), ${ctx.logs.length} mensagens, ${ctx.deadlines.length} prazos, ${(ctx.conversations||[]).length} conversas IA.`,
+        `AGENDAMENTOS DE HOJE (${_todayISO}) — use estes dados literais quando perguntarem sobre "hoje": ${JSON.stringify(apptsToday)}`,
+        `AGENDAMENTOS DE AMANHÃ (${_tomorrowISO}) — use estes dados literais quando perguntarem sobre "amanhã", sempre informando nome, telefone, horário, área e resumo do caso: ${JSON.stringify(apptsTomorrow)}`,
         `Leads COMPLETOS: ${JSON.stringify((ctx.leads||[]).slice(0, 200).map((l) => ({ nome: l.name, tel: l.phone, email: l.email, area: l.case_type, etapa: l.stage, cidade: l.city, descricao: l.description, caso: l.case_summary, valor: l.value, origem: l.source, criado: l.created_at, notas: l.notes })))}`,
         `Contatos COMPLETOS: ${JSON.stringify((ctx.contacts||[]).slice(0, 200).map((c) => ({ nome: c.name, tel: c.phone, email: c.email, nao_lidas: c.unread, ultima_msg: c.last_message, ultimo_contato: c.last_contact_at, tags: c.tags, notas: c.notes })))}`,
         `Processos COMPLETOS: ${JSON.stringify((ctx.processes||[]).slice(0, 200).map((p) => ({ cliente: p.client_name, tel: p.client_phone, numero: p.process_number, area: p.case_type, vara: p.court, status: p.status, proxima_audiencia: p.next_hearing, valor_causa: p.case_value, parte_contraria: p.opposing_party, descricao: p.description, observacoes: p.notes })))}`,
-        `Agendamentos COMPLETOS: ${JSON.stringify((ctx.appointments||[]).slice(0, 200).map((a) => ({ cliente: a.client_name, tel: a.phone, email: a.email, data: a.appointment_date || a.starts_at, hora: a.appointment_time, area: a.legal_area, cidade: a.city, resumo_caso: a.case_summary, status: a.status, origem: a.source })))}`,
+        `Agendamentos COMPLETOS (todos): ${JSON.stringify((ctx.appointments||[]).slice(0, 200).map(mapAppt))}`,
         `Prazos COMPLETOS: ${JSON.stringify((ctx.deadlines||[]).slice(0, 100).map((d) => ({ cliente: d.client_name, titulo: d.title, descricao: d.description, vencimento: d.due_at, urgencia: d.urgency, processo: d.process_number })))}`,
         `Mensagens COMPLETAS: ${JSON.stringify((ctx.logs||[]).slice(-100).map((l) => ({ contato: l.contact_name, tel: l.contact_phone, texto: l.text, eu: l.from_me, quando: l.created_at })))}`,
         `Análises de caso COMPLETAS: ${JSON.stringify((ctx.analyses||[]).slice(0, 100).map((a) => ({ cliente: a.visitor_name, tel: a.visitor_phone, email: a.visitor_email, area: a.area, resumo: a.resumo, detalhes: a.details, recomendacao: a.recommendation, criado: a.created_at })))}`,
