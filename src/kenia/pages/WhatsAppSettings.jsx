@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/kenia/components/ui/
 import { Badge } from "@/kenia/components/ui/badge";
 import { Separator } from "@/kenia/components/ui/separator";
 import { toast } from "sonner";
+import { formatWhatsAppPhone, pickWhatsAppNumber } from "@/kenia/lib/phone";
 import {
   Zap, Server, Building2, Smartphone, CheckCircle2, XCircle,
   Loader2, Bot, Send, QrCode, Copy, Activity, AlertTriangle, RefreshCw,
@@ -38,6 +39,9 @@ export default function WhatsAppSettings() {
   const [baileysStatus, setBaileysStatus] = useState(null);
   const [baileysQr, setBaileysQr] = useState(null);
   const [baileysLoggingOut, setBaileysLoggingOut] = useState(false);
+
+  const centerDigits = pickWhatsAppNumber(baileysStatus, cfg);
+  const centerPhone = centerDigits ? formatWhatsAppPhone(centerDigits) : "—";
 
   const backendUrl = (import.meta.env.VITE_BACKEND_URL || "");
   const webhookBase = `${backendUrl}/api/whatsapp/webhook`;
@@ -634,7 +638,7 @@ export default function WhatsAppSettings() {
                       {baileysStatus?.connected ? (
                         <div className="flex items-center gap-2 text-gold-700 font-medium">
                           <CheckCircle2 className="w-4 h-4" />
-                          Conectado{baileysStatus.me?.id ? ` — ${baileysStatus.me.id.split("@")[0]}` : ""}
+                          Conectado{centerDigits ? ` — ${centerPhone}` : ""}
                         </div>
                       ) : baileysStatus?.state === "conflicted" ? (
                         <div className="flex items-center gap-2 text-rose-700 font-medium">
@@ -660,6 +664,11 @@ export default function WhatsAppSettings() {
                       <div className="text-xs text-nude-500 mt-1">
                         Estado: <code className="bg-white px-1.5 py-0.5 rounded text-[11px]">{baileysStatus?.state || "—"}</code>
                       </div>
+                      {centerDigits && (
+                        <div className="text-xs text-nude-600 mt-1">
+                          Número real da central: <code className="bg-white px-1.5 py-0.5 rounded text-[11px]">{centerPhone}</code>
+                        </div>
+                      )}
                       {baileysStatus?.last_error && (baileysStatus?.state === "conflicted" || baileysStatus?.state === "offline" || baileysStatus?.state === "static") && (
                         <div className="text-xs text-gold-800 mt-2 p-2 bg-gold-50 border border-gold-200 rounded" data-testid="baileys-conflict-msg">
                           ⚠️ {baileysStatus.last_error}
