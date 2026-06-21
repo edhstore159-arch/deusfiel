@@ -248,10 +248,10 @@ function LogRow({ msg }) {
         <div className="flex items-center gap-2 flex-wrap">
           <Badge className={`${tagColor} hover:${tagColor} text-[10px]`}>{tagLabel}</Badge>
           <span className="font-medium text-sm">{msg.contact_name || "—"}</span>
-          <span className="text-xs text-nude-500 font-mono">{msg.contact_phone}</span>
-          {msg.contact_phone && (
+          <span className="text-xs text-nude-500 font-mono" title={msg.contact_phone}>{displayPhone}</span>
+          {telDigits && (
             <a
-              href={`tel:+${String(msg.contact_phone).replace(/\D/g, "")}`}
+              href={`tel:+${telDigits}`}
               onClick={(e) => {
                 e.stopPropagation();
                 toast.success(`Ligando para ${msg.contact_name || msg.contact_phone}…`);
