@@ -595,7 +595,11 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
       if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
-    const appointment = parseAppointmentBlock(rawReply) || extractAppointmentFromText(userMessage, history);
+    const appointment =
+      parseAppointmentBlock(rawReply) ||
+      extractAppointmentFromText(userMessage, history) ||
+      extractAppointmentFromText(rawReply, [...history, { role: "user", content: userMessage }]);
+    console.log("[chat-ai] appointment detectado?", !!appointment, appointment ? { date: appointment.appointment_date, time: appointment.appointment_time, name: appointment.client_name } : null);
     let reply = cleanRepeatedText(removeUserEcho(removeRoleLabels(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage)), userMessage));
     if (!reply || reply.length < 2) {
       reply = userAskedTemporalInfo(userMessage)
