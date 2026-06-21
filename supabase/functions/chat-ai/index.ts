@@ -51,6 +51,27 @@ async function synthesizeSpeech(text: string): Promise<string | null> {
   }
 }
 
+function createValidMeetingLink(clientName = "consulta"): string {
+  const cleanName = String(clientName || "consulta")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 30) || "consulta";
+  const room = `kenia-${cleanName}-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+  const url = `https://meet.jit.si/${room}`;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" || parsed.hostname !== "meet.jit.si" || !parsed.pathname.slice(1)) {
+      throw new Error("meeting link inválido");
+    }
+    return parsed.toString();
+  } catch (_err) {
+    return `https://meet.jit.si/kenia-consulta-${crypto.randomUUID()}`;
+  }
+}
+
 const DEFAULT_PROMPT = `Você é a secretária da plataforma, uma pessoa real atendendo o cliente pelo chat/WhatsApp. NUNCA se identifique como "virtual", "IA", "robô", "assistente automática" ou "bot" — fale e aja como uma secretária humana de verdade.
 
 OBJETIVO:
