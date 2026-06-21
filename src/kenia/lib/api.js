@@ -438,6 +438,31 @@ const normalizeAppointment = (item) => {
   };
 };
 
+const toAppointmentDbPayload = (body = {}, existing = null) => {
+  const start = body.starts_at
+    ? new Date(body.starts_at)
+    : body.appointment_date
+      ? new Date(`${body.appointment_date}T${String(body.appointment_time || "10:00").slice(0, 5)}:00`)
+      : null;
+  const raw = { ...(existing?.raw_payload || {}), ...body };
+  const payload = { raw_payload: raw };
+  if (body.client_name != null) payload.client_name = body.client_name || "Cliente";
+  if (body.phone !== undefined) payload.phone = body.phone || null;
+  if (body.email !== undefined) payload.email = body.email || null;
+  if (body.city !== undefined) payload.city = body.city || null;
+  if (body.area !== undefined || body.legal_area !== undefined || body.title !== undefined) {
+    payload.legal_area = body.area || body.legal_area || body.title || "Atendimento jurídico";
+  }
+  if (body.notes !== undefined || body.case_summary !== undefined) payload.case_summary = body.notes || body.case_summary || null;
+  if (start && !Number.isNaN(start.getTime())) {
+    payload.appointment_date = start.toISOString().slice(0, 10);
+    payload.appointment_time = start.toTimeString().slice(0, 5);
+  }
+  if (body.source !== undefined) payload.source = body.source || "panel";
+  if (body.status !== undefined) payload.status = body.status === "confirmado" ? "scheduled" : body.status || "scheduled";
+  return payload;
+};
+
 const getMetrics = () => {
   const leads = read("leads", seedLeads);
   const processes = read("processes", seedProcesses);
