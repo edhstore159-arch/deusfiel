@@ -218,7 +218,7 @@ export default function AppLayout() {
           <div className="w-9" />
         </header>
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto" data-app-scroll-container="true">
           <Outlet />
         </div>
       </main>
