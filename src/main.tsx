@@ -2,7 +2,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./kenia/App.jsx";
 import "./index.css";
-import "./kenia/index.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
