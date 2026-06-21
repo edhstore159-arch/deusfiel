@@ -648,6 +648,21 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
       console.error("Erro ao gerar análise:", err);
     }
 
+    // Gera link válido da reunião (Jitsi - sala pública, sem necessidade de login)
+    let meetUrl: string | null = null;
+    if (appointment) {
+      const room = `kenia-${(appointment.client_name || "consulta")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "-")
+        .slice(0, 30)}-${Date.now().toString(36)}`;
+      meetUrl = `https://meet.jit.si/${room}`;
+      const dateStr = appointment.appointment_date || "";
+      const timeStr = appointment.appointment_time || "";
+      if (!reply.includes(meetUrl)) {
+        reply = `${reply}\n\n✅ Agendamento confirmado para ${dateStr} às ${timeStr}.\n🔗 Link da reunião: ${meetUrl}`.trim();
+      }
+    }
+
     // Gera áudio (TTS ElevenLabs) se o cliente pediu
     const wantAudio = body.want_audio !== false; // default true
     const audio_base64 = wantAudio ? await synthesizeSpeech(reply) : null;
