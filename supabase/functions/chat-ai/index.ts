@@ -223,6 +223,36 @@ function recentAssistantReplies(history: Array<{ role: string; content: string }
     .slice(-4);
 }
 
+// Extrai fatos já informados pelo cliente para evitar repetir perguntas.
+function extractClientFacts(history: Array<{ role: string; content: string }>, currentMessage: string): string[] {
+  const userText = [...history.filter((m) => m.role === "user").map((m) => m.content), currentMessage]
+    .map((t) => String(t || "")).join("\n");
+  const facts: string[] = [];
+
+  const email = userText.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+  if (email) facts.push(`E-mail: ${email[0]}`);
+
+  const phone = userText.match(/(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/);
+  if (phone) facts.push(`Telefone: ${phone[0]}`);
+
+  const nome = userText.match(/\b(?:meu nome [eé]|me chamo|sou (?:o|a)\s+)([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/i);
+  if (nome) facts.push(`Nome: ${nome[1].trim()}`);
+
+  const cidade = userText.match(/\b(?:moro em|sou de|cidade[:\s]+)\s*([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:[\s-][\wÀ-ÿ]+){0,3})(?:\s*[\/\-]\s*([A-Z]{2}))?/i);
+  if (cidade) facts.push(`Localidade: ${cidade[1]}${cidade[2] ? "/" + cidade[2] : ""}`);
+
+  const area = caseAreaMatchers.find((m) => m.words.test(userText));
+  if (area) facts.push(`Área jurídica: ${area.area}`);
+
+  const data = userText.match(/\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b|\b\d{1,2}\s+de\s+(?:janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i);
+  if (data) facts.push(`Data mencionada: ${data[0]}`);
+
+  const hora = userText.match(/\b\d{1,2}[:h]\d{2}\b/i);
+  if (hora) facts.push(`Horário mencionado: ${hora[0]}`);
+
+  return Array.from(new Set(facts));
+}
+
 function isNearDuplicateReply(reply: string, history: Array<{ role: string; content: string }>): boolean {
   const normalizedReply = normalizeForSimilarity(reply);
   if (!normalizedReply) return false;
