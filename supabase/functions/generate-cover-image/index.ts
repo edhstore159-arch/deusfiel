@@ -13,6 +13,7 @@ const REALISM =
   "16K hyper-detailed resolution with extreme micro-detail on skin: visible pores across the entire face, fine peach fuzz catching the light, subtle freckles, real moles, tiny skin imperfections, faint under-eye shadows, natural skin oiliness on the T-zone, light redness on cheeks and nose tip, fine expression lines where age-appropriate, " +
   "individual hair strands clearly separated with natural flyaways and stray hairs, eyebrow hairs individually visible with natural irregularity, lower lashes defined, light stubble where appropriate, " +
   "ultra-realistic eyes: detailed iris fiber patterns with radial striations and depth, dark limbal ring, wet glossy sclera with subtle red capillaries, sharp pinpoint catchlights that match the real light source position, natural tear line, soft eyelid shadow, subsurface scattering on the eyelid, " +
+  "ultra-realistic hands and arms when visible: natural bone structure, correct wrist and elbow joints, realistic tendons, knuckles, fingernails, skin folds, veins, tiny scars and pores, five anatomically correct fingers per hand, hands sized correctly relative to the face and body, " +
   "soft directional natural window light wrapping the face, realistic soft-edged shadows, subsurface scattering on ears, nose and fingers, balanced low-contrast color grading with accurate Brazilian skin tones, slight green-magenta tint of real ambient light, " +
   "authentic environment with real clutter, dust particles floating in light beams, fabric with real folds and weave texture, natural ISO grain preserved (NO denoising, NO smoothing, NO beauty filter), slight chromatic aberration at high-contrast edges, very subtle motion blur on moving parts, " +
   "imperfect candid framing with the subject slightly off-center, genuine micro-expressions, looks exactly like a real photo captured by a human photographer in a real place";
@@ -24,7 +25,7 @@ const NEG =
   "asymmetrical eyes, different sized eyes, one eye bigger than the other, oversized eyes, bulging eyes, googly eyes, anime eyes, huge pupils, crossed eyes, lazy eye, misaligned eyes, duplicated eyes, extra eyes, missing eye, distorted pupils, uneven eyelids, " +
   "deformed nose, crooked nose, double nose, deformed mouth, crooked mouth, extra mouth, missing mouth, bad teeth, extra teeth, missing teeth, fake smile, " +
   "deformed ears, extra ears, deformed jaw, deformed chin, extra heads, two heads, multiple faces, floating head, detached head, " +
-  "deformed body, distorted anatomy, bad proportions, extra limbs, missing limbs, extra arms, extra legs, extra fingers, missing fingers, fused fingers, broken hands, deformed hands, " +
+  "deformed body, distorted anatomy, bad proportions, extra limbs, missing limbs, extra arms, extra legs, twisted arms, broken arms, rubber arms, boneless arms, disconnected shoulders, malformed elbows, twisted wrists, deformed wrists, extra joints, missing joints, extra fingers, missing fingers, fused fingers, mutated fingers, webbed fingers, long fingers, short fingers, broken fingers, duplicated fingers, broken hands, deformed hands, bad hands, malformed hands, melted hands, claw hands, oversized hands, tiny hands, " +
   "close-up only, face only, cropped body, blurry, low quality, watermark, logo, text, typography";
 
 const FACE_LOCK =
@@ -39,6 +40,14 @@ const FACE_LOCK =
   "The gaze must have clear INTENT and DIRECTION — looking at the camera, at another person, or at an object in the scene — conveying a real human emotion consistent with the scene (attention, empathy, curiosity, determination, warmth, focus). " +
   "Micro-expressions around the eyes (slight brow movement, natural eyelid creases, subtle smile lines when appropriate) must reinforce the emotion. " +
   "Forbidden: empty stare, soulless eyes, glassy eyes, white/grey pupils, misaligned gaze, cross-eyed look, unfocused eyes, eyes pointing in different directions, dilated unnatural pupils, dead expression.";
+
+const HAND_BODY_LOCK =
+  "HAND AND ARM LOCK (CRITICAL — must be respected whenever hands or arms are visible): render anatomically correct human hands, wrists, forearms, elbows, upper arms and shoulders with natural proportions and believable pose. " +
+  "Each visible hand must have exactly five correctly separated fingers, one thumb in the proper position, realistic finger lengths, natural knuckles, fingernails, cuticles, tendons, veins, palm creases, wrinkles, skin pores and tiny imperfections. " +
+  "Hands must be the correct size relative to the person's face and body, never oversized or tiny, never rubbery, melted, fused, duplicated, webbed or claw-like. " +
+  "Arms must connect naturally from shoulder to elbow to wrist, with correct joint direction, believable muscle and bone structure, realistic foreshortening, and no extra bends or impossible angles. " +
+  "If a hand is partly hidden by an object, clothing, another person, or the frame edge, the occlusion must be physically plausible and must not create extra fingers, missing fingers or broken anatomy. " +
+  "Gestures must look like a real candid photograph: relaxed fingers, natural grip tension when holding objects, visible contact shadows, correct scale and perspective, detailed skin texture and natural lighting on every visible limb.";
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
@@ -59,14 +68,15 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             "STRICT FIDELITY: Never change, replace, simplify or reinterpret the subject. Never invent elements not requested. Preserve ALL elements described by the user (people, objects, setting, mood, action). Translate non-English input to English while keeping exact meaning.",
             "ALWAYS FILL THESE FIELDS in the output prompt:",
             "- SCENE: describe the scene faithfully from the user theme.",
-            "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise.",
+            "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise. If hands or arms are visible, they must have realistic anatomy and high detail.",
             `- FACE QUALITY: ${FACE_LOCK}`,
+            `- BODY ANATOMY: ${HAND_BODY_LOCK}`,
             "- ENVIRONMENT: real environment (simple home, office, street, etc.) with natural elements and imperfections (objects slightly out of place, real texture, light dust, wear).",
             "- LIGHTING: realistic cinematic lighting — soft natural window light, soft realistic shadows, balanced contrast, no exaggerated HDR.",
             "- CAMERA: 50mm or 85mm lens, shallow depth of field (slightly blurred background), focus on the face, DSLR photography style, natural ISO, no artificial noise.",
             "- STYLE: documentary photography, ultra realistic, natural colors (no oversaturation), no Instagram filter, no AI look.",
-            "- DETAILS: real skin texture (pores, small imperfections), eyes with natural light reflections, real fabric folds, nothing plastic or CGI.",
-            "FORBIDDEN: digital art, cartoon, 3D render, perfect skin, exaggerated artificial lighting, stock-photo aesthetic.",
+            "- DETAILS: real skin texture (pores, small imperfections), eyes with natural light reflections, realistic hands with five correct fingers, natural arms with correct joints, real fabric folds, nothing plastic or CGI.",
+            "FORBIDDEN: digital art, cartoon, 3D render, perfect skin, exaggerated artificial lighting, stock-photo aesthetic, deformed hands, extra fingers, missing fingers, fused fingers, twisted arms, broken wrists, impossible elbows.",
             "GOAL: the image must look like a REAL photograph of a true, emotional, everyday situation.",
             "OUTPUT FORMAT: ONE single-line English prompt. No markdown, no bullet points, no explanations. End with: '--style raw --no artificial --no smooth skin --no CGI --photorealism high'.",
           ].join(" "),
@@ -83,7 +93,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
     }
   } catch (_e) { /* fallback */ }
 
-  return `${userTheme}. ${REALISM}. ${FACE_LOCK}. Negative: ${NEG}. --style raw --no artificial --no smooth skin --no CGI --photorealism high`;
+  return `${userTheme}. ${REALISM}. ${FACE_LOCK}. ${HAND_BODY_LOCK}. Negative: ${NEG}. --style raw --no artificial --no smooth skin --no CGI --photorealism high`;
 }
 
 
@@ -115,7 +125,7 @@ Deno.serve(async (req) => {
 
       if (reference_image_base64) {
         imageUrls.push(toDataUrl(reference_image_base64));
-        promptParts.push("Use a primeira imagem enviada como referência visual principal. If it contains a person, preserve the face identity and proportions; never redraw, stretch, beautify, smooth, warp, or replace facial features.");
+        promptParts.push("Use a primeira imagem enviada como referência visual principal. If it contains a person, preserve the face identity and proportions; never redraw, stretch, beautify, smooth, warp, or replace facial features. Preserve and correct visible hand and arm anatomy: five natural fingers per hand, realistic wrists, elbows and shoulders, detailed skin texture, no deformation, no extra fingers, no missing fingers, no twisted arms.");
       }
       if (logo_base64) {
         imageUrls.push(toDataUrl(logo_base64));
