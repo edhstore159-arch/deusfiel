@@ -377,6 +377,67 @@ function parseAppointmentBlock(text: string) {
   }
 }
 
+// Extrai um agendamento direto do texto do cliente (sem depender da IA).
+// Procura uma intenção de agendamento + data + hora explícitos.
+function extractAppointmentFromText(text: string, history: Array<{ role: string; content: string }> = []) {
+  const t = String(text || "");
+  if (!/\b(agendar|agendamento|marcar|marca[cç][aã]o|consulta|reuni[aã]o|atendimento|hor[aá]rio)\b/i.test(t)) return null;
+
+  // Hora: 14:30, 14h, 14h30, às 14
+  const timeMatch = t.match(/\b(?:[aà]s\s*)?(\d{1,2})(?:[:h](\d{2}))?\s*(h|hs|horas)?\b/i);
+  // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
+  const todayMatch = /\bhoje\b/i.test(t);
+  const tomorrowMatch = /\bamanh[aã]\b/i.test(t);
+  const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+
+  if (!timeMatch || (!todayMatch && !tomorrowMatch && !dateMatch)) return null;
+
+  // Monta YYYY-MM-DD em SP
+  const spParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const y0 = Number(spParts.find(p => p.type === "year")!.value);
+  const m0 = Number(spParts.find(p => p.type === "month")!.value);
+  const d0 = Number(spParts.find(p => p.type === "day")!.value);
+
+  let y = y0, m = m0, d = d0;
+  if (tomorrowMatch) {
+    const dt = new Date(Date.UTC(y0, m0 - 1, d0 + 1));
+    y = dt.getUTCFullYear(); m = dt.getUTCMonth() + 1; d = dt.getUTCDate();
+  } else if (dateMatch) {
+    d = Number(dateMatch[1]); m = Number(dateMatch[2]);
+    if (dateMatch[3]) { y = Number(dateMatch[3]); if (y < 100) y += 2000; }
+  }
+  const hh = Math.max(0, Math.min(23, Number(timeMatch[1])));
+  const mm = Math.max(0, Math.min(59, Number(timeMatch[2] || "0")));
+  if (!Number.isFinite(hh)) return null;
+
+  const date = `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const time = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
+
+  // Tenta achar nome/telefone/email no histórico+mensagem
+  const all = [...history.map(h => h.content), t].join("\n");
+  const phone = (all.match(/\+?\d{2}\s?\(?\d{2}\)?\s?\d{4,5}-?\d{4}/) || [])[0] || null;
+  const email = (all.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0] || null;
+  const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
+  const client_name = nameMatch?.[1]?.trim() || "Cliente do WhatsApp";
+
+  return {
+    client_name,
+    phone,
+    email,
+    city: null,
+    legal_area: "Atendimento jurídico",
+    case_summary: t.slice(0, 240),
+    appointment_date: date,
+    appointment_time: time,
+    raw_payload: { source: "text_fallback", original: t },
+  };
+}
+
+
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
