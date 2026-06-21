@@ -383,8 +383,9 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   const t = String(text || "");
   if (!/\b(agendar|agendamento|marcar|marca[cç][aã]o|consulta|reuni[aã]o|atendimento|hor[aá]rio)\b/i.test(t)) return null;
 
-  // Hora: 14:30, 14h, 14h30, às 14
-  const timeMatch = t.match(/\b(?:[aà]s\s*)?(\d{1,2})(?:[:h](\d{2}))?\s*(h|hs|horas)?\b/i);
+  // Hora: 14:30, 14h, 14h30, às 14, para 14.
+  // Evita capturar pedaços de telefone ou datas como 20/06.
+  const timeMatch = t.match(/\b(?:[aà]s|as|para|pra)\s*(\d{1,2})(?::(\d{2})|h(\d{2})?)?\b|\b(\d{1,2})(?::(\d{2})|h(\d{2})?)\b/i);
   // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
   const todayMatch = /\bhoje\b/i.test(t);
   const tomorrowMatch = /\bamanh[aã]\b/i.test(t);
@@ -408,8 +409,11 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
     d = Number(dateMatch[1]); m = Number(dateMatch[2]);
     if (dateMatch[3]) { y = Number(dateMatch[3]); if (y < 100) y += 2000; }
   }
-  const hh = Math.max(0, Math.min(23, Number(timeMatch[1])));
-  const mm = Math.max(0, Math.min(59, Number(timeMatch[2] || "0")));
+  const hourRaw = timeMatch[1] || timeMatch[4];
+  const minuteRaw = timeMatch[2] || timeMatch[3] || timeMatch[5] || timeMatch[6] || "0";
+  const hh = Number(hourRaw);
+  const mm = Number(minuteRaw);
+  if (!Number.isFinite(hh) || hh < 0 || hh > 23 || !Number.isFinite(mm) || mm < 0 || mm > 59) return null;
   if (!Number.isFinite(hh)) return null;
 
   const date = `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -418,9 +422,9 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
 
   // Tenta achar nome/telefone/email no histórico+mensagem
   const all = [...history.map(h => h.content), t].join("\n");
-  const phone = (all.match(/\+?\d{2}\s?\(?\d{2}\)?\s?\d{4,5}-?\d{4}/) || [])[0] || null;
+  const phone = (all.match(/\+?\d{2,3}\s?\(?\d{2}\)?\s?\d{4,5}-?\d{4}/) || [])[0] || null;
   const email = (all.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0] || null;
-  const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
+  const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?|nome\s*[:\-]?\s*)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
   const client_name = nameMatch?.[1]?.trim() || "Cliente do WhatsApp";
 
   return {
