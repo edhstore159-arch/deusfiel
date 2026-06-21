@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, X as XIcon, CalendarClock, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import SocialConnections from "@/kenia/components/SocialConnections";
+import CreativeAssetsLibrary from "@/kenia/components/CreativeAssetsLibrary";
 
 const PLATFORMS = [
   { id: "instagram", label: "Instagram" },
@@ -403,6 +404,7 @@ export default function Creatives() {
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
+        <CreativeAssetsLibrary onPick={(dataUrl) => { setRefImage(dataUrl); setOpen(true); }} />
         
         {items.length === 0 ? (
           <Card className="p-12 border-dashed border-nude-300 text-center">
