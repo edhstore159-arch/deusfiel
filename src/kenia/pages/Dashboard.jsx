@@ -113,7 +113,13 @@ export default function Dashboard() {
   const loadAppointments = async () => {
     try {
       const { data } = await api.get("/appointments");
-      const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data?.appointments)
+            ? data.appointments
+            : [];
       const now = Date.now();
       const upcoming = list
         .filter((a) => a?.starts_at && new Date(a.starts_at).getTime() >= now - 60 * 60 * 1000)
