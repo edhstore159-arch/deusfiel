@@ -664,6 +664,7 @@ export default function FloatingVoiceOrb() {
 
 
   const toggleListen = () => {
+    unlockSpeech();
     if (!supported) {
       toast.error("Reconhecimento de voz não suportado neste navegador.");
       return;
