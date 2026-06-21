@@ -148,14 +148,13 @@ export default function Onboarding() {
   const progress = (step / 4) * 100;
 
   return (
-    <div className="min-h-screen bg-nude-50 flex items-center justify-center p-3 sm:p-6">
-      <div className="w-full max-w-2xl">
-        <div className="flex items-center gap-2.5 mb-4 sm:mb-6">
-          <div className="w-9 h-9 rounded-md bg-nude-900 grid place-items-center shrink-0">
-            <Scale className="w-5 h-5 text-white" />
-          </div>
-          <div className="font-display font-bold text-lg sm:text-xl truncate">Espírito Santo<span className="text-gold-600">.</span></div>
-        </div>
+    <div className="min-h-screen bg-nude-50 flex flex-col items-center p-3 sm:p-6">
+      <div className="w-full max-w-2xl flex flex-col items-center">
+        <img
+          src="https://customer-assets.emergentagent.com/job_nude-gold-dashboard/artifacts/ckw9kwam_IMG-20241228-WA0003.jpg"
+          alt="Kênia Garcia Advocacia"
+          className="w-20 h-20 rounded-full object-cover ring-2 ring-gold-300/60 animate-orb-glow"
+        />
 
         <Card className="p-4 sm:p-8 border-nude-200 shadow-sm">
           <div className="mb-6">
