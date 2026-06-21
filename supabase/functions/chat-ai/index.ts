@@ -677,16 +677,12 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
         response: reply,
       });
       if (appointment) {
-        const room = `kenia-${(appointment.client_name || "consulta")
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, "-")
-          .slice(0, 30)}-${Date.now().toString(36)}`;
-        const meetUrl = `https://meet.jit.si/${room}`;
+        const finalMeetUrl = meetUrl || `https://meet.jit.si/kenia-${Date.now().toString(36)}`;
         const enrichedPayload = {
           ...(appointment.raw_payload || {}),
-          meeting_link: meetUrl,
-          meet_url: meetUrl,
-          location: "Google Meet",
+          meeting_link: finalMeetUrl,
+          meet_url: finalMeetUrl,
+          location: "Jitsi Meet",
           duration_min: 60,
         };
         // Garante que o agendamento sempre fique vinculado a um atendente
