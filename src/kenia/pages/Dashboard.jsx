@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/kenia/lib/api";
+import { extractWhatsAppDigits, formatWhatsAppPhone, pickWhatsAppNumber } from "@/kenia/lib/phone";
 import { Card } from "@/kenia/components/ui/card";
 import { Input } from "@/kenia/components/ui/input";
 import { Button } from "@/kenia/components/ui/button";
@@ -32,12 +33,14 @@ export default function Dashboard() {
   ]);
   const [aiThinking, setAiThinking] = useState(false);
   const [search, setSearch] = useState("");
+  const [whatsAppCenter, setWhatsAppCenter] = useState({ connected: false, phone: "" });
   const aiBoxRef = useRef(null);
 
   useEffect(() => {
     loadContacts();
     loadMetrics();
     loadAppointments();
+    loadWhatsAppCenter();
   }, []);
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export default function Dashboard() {
     const t = setInterval(() => {
       loadContacts();
       loadAppointments();
+      loadWhatsAppCenter();
       if (activeContact) loadMessages(activeContact.id);
     }, 3000);
     return () => clearInterval(t);
@@ -120,6 +124,22 @@ export default function Dashboard() {
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
       setAppointments(upcoming);
     } catch {}
+  };
+
+  const loadWhatsAppCenter = async () => {
+    try {
+      const [{ data: cfg }, { data: status }] = await Promise.all([
+        api.get("/whatsapp/config").catch(() => ({ data: null })),
+        api.get("/whatsapp/baileys/status").catch(() => ({ data: null })),
+      ]);
+      const digits = pickWhatsAppNumber(status, cfg);
+      setWhatsAppCenter({
+        connected: Boolean(status?.connected || digits),
+        phone: digits,
+      });
+    } catch {
+      setWhatsAppCenter({ connected: false, phone: "" });
+    }
   };
 
   const loadLeadForContact = async (phone) => {
@@ -246,6 +266,7 @@ export default function Dashboard() {
   );
 
   const initials = (name) => name.split(" ").map(s => s[0]).slice(0, 2).join("").toUpperCase();
+  const centerPhoneLabel = whatsAppCenter.phone ? formatWhatsAppPhone(whatsAppCenter.phone) : "Número não identificado";
 
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="dashboard-page">
