@@ -19,12 +19,20 @@ const REALISM =
 const NEG =
   "digital art, illustration, painting, cartoon, anime, 3d render, CGI, plastic skin, perfect skin, airbrushed, beauty filter, " +
   "stock photo aesthetic, AI-looking, oversaturated, exaggerated HDR, artificial studio lighting, overprocessed, " +
-  "deformed face, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, bad teeth, fake smile, " +
-  "deformed body, distorted anatomy, bad proportions, extra limbs, extra fingers, fused fingers, broken hands, " +
+  "deformed face, distorted face, warped face, melted face, mutated face, disfigured face, ugly face, asymmetrical face, " +
+  "asymmetrical eyes, crossed eyes, lazy eye, misaligned eyes, duplicated eyes, extra eyes, missing eye, distorted pupils, " +
+  "deformed nose, crooked nose, double nose, deformed mouth, crooked mouth, extra mouth, missing mouth, bad teeth, extra teeth, missing teeth, fake smile, " +
+  "deformed ears, extra ears, deformed jaw, deformed chin, extra heads, two heads, multiple faces, floating head, detached head, " +
+  "deformed body, distorted anatomy, bad proportions, extra limbs, missing limbs, extra arms, extra legs, extra fingers, missing fingers, fused fingers, broken hands, deformed hands, " +
   "close-up only, face only, cropped body, blurry, low quality, watermark, logo, text, typography";
 
 const FACE_LOCK =
-  "FACE LOCK: natural balanced human face, correct facial anatomy, aligned eyes, realistic pupils and eyelids, normal nose and mouth, natural teeth, relaxed authentic expression, realistic skin texture with pores, no beautification filter, no face warp, no smoothing that changes identity.";
+  "FACE LOCK (CRITICAL — must be respected above all stylistic choices): render a single anatomically correct human face with symmetric, balanced and properly aligned features. " +
+  "Exactly two eyes of the same size and shape looking in the same direction, with realistic pupils, irises, eyelids and natural catchlights. " +
+  "One nose centered between the eyes with realistic nostrils. One mouth with natural lips and natural teeth alignment when visible. Two ears in correct position when visible. " +
+  "Natural jawline and chin, balanced facial proportions, correct head-to-body ratio, one head per person, no duplicated, floating or detached features. " +
+  "Realistic skin texture with pores and subtle imperfections, relaxed authentic expression, no warping, no melting, no smoothing that changes identity, no beautification filter. " +
+  "If multiple people appear in the scene, every single one of them must independently respect this face lock. The composition must make visual sense — people, objects and environment coherently related, with correct scale, perspective and interaction.";
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
