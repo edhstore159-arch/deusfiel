@@ -773,6 +773,25 @@ const staticPut = (url, body = {}) => {
 
 const staticPatch = (url, body = {}) => {
   const [path] = String(url).split("?");
+  const updateAppointment = async () => {
+    const id = path.split("/").pop();
+    try {
+      const { data: current, error: currentError } = await supabase.from("appointments").select("*").eq("id", id).maybeSingle();
+      if (currentError) throw currentError;
+      const { data, error } = await supabase
+        .from("appointments")
+        .update(toAppointmentDbPayload(body, current))
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return response(normalizeAppointment(data));
+    } catch {
+      const items = read("appointments", seedAppointments).map((item) => (item.id === id ? normalizeAppointment({ ...item, ...body }) : item));
+      write("appointments", items);
+      return response(items.find((item) => item.id === id) || { ok: true });
+    }
+  };
   const updateCollection = (key, fallback) => {
     const id = path.split("/").pop();
     const items = read(key, fallback).map((item) => (item.id === id ? { ...item, ...body } : item));
@@ -781,7 +800,7 @@ const staticPatch = (url, body = {}) => {
   };
   if (path.startsWith("/leads/")) return updateCollection("leads", seedLeads);
   if (path.startsWith("/finance/transactions/")) return updateCollection("transactions", seedTransactions);
-  if (path.startsWith("/appointments/")) return updateCollection("appointments", seedAppointments);
+  if (path.startsWith("/appointments/")) return updateAppointment();
   if (path.startsWith("/legal-deadlines/")) return updateCollection("legal_deadlines", seedLegalDeadlines);
   if (path.startsWith("/admin/case-analyses/")) return updateCollection("case_analyses", seedAnalyses);
   return response({ ok: true, fallback: true });
