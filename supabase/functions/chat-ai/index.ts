@@ -381,18 +381,14 @@ function parseAppointmentBlock(text: string) {
 // Procura uma intenção de agendamento + data + hora explícitos.
 function extractAppointmentFromText(text: string, history: Array<{ role: string; content: string }> = []) {
   const t = String(text || "");
-  const all = [...history.map(h => h.content), t].join("\n");
-  if (!/\b(agendar|agendamento|marcar|marca[cç][aã]o|consulta|reuni[aã]o|atendimento|hor[aá]rio)\b/i.test(all)) return null;
+  if (!/\b(agendar|agendamento|marcar|marca[cç][aã]o|consulta|reuni[aã]o|atendimento|hor[aá]rio)\b/i.test(t)) return null;
 
-  // Hora: 14:30, 14h, 14h30, às 14, para 14.
-  // Evita capturar pedaços de telefone ou datas como 20/06.
-  const timeMatch = t.match(/\b(?:[aàá]s|as|para|pra)\s*(\d{1,2})(?::(\d{2})|h(\d{2})?)?\b|\b(\d{1,2})(?::(\d{2})|h(\d{2})?)\b/i)
-    || all.match(/\b(?:[aàá]s|as|para|pra)\s*(\d{1,2})(?::(\d{2})|h(\d{2})?)?\b|\b(\d{1,2})(?::(\d{2})|h(\d{2})?)\b/i);
+  // Hora: 14:30, 14h, 14h30, às 14
+  const timeMatch = t.match(/\b(?:[aà]s\s*)?(\d{1,2})(?:[:h](\d{2}))?\s*(h|hs|horas)?\b/i);
   // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
-  const todayMatch = /(^|\s)hoje(\s|$|[,.!?])/i.test(t) || /(^|\s)hoje(\s|$|[,.!?])/i.test(all);
-  const tomorrowMatch = /amanh[aã]/i.test(t) || /amanh[aã]/i.test(all);
-  const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/)
-    || all.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+  const todayMatch = /\bhoje\b/i.test(t);
+  const tomorrowMatch = /\bamanh[aã]\b/i.test(t);
+  const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
 
   if (!timeMatch || (!todayMatch && !tomorrowMatch && !dateMatch)) return null;
 
@@ -412,11 +408,8 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
     d = Number(dateMatch[1]); m = Number(dateMatch[2]);
     if (dateMatch[3]) { y = Number(dateMatch[3]); if (y < 100) y += 2000; }
   }
-  const hourRaw = timeMatch[1] || timeMatch[4];
-  const minuteRaw = timeMatch[2] || timeMatch[3] || timeMatch[5] || timeMatch[6] || "0";
-  const hh = Number(hourRaw);
-  const mm = Number(minuteRaw);
-  if (!Number.isFinite(hh) || hh < 0 || hh > 23 || !Number.isFinite(mm) || mm < 0 || mm > 59) return null;
+  const hh = Math.max(0, Math.min(23, Number(timeMatch[1])));
+  const mm = Math.max(0, Math.min(59, Number(timeMatch[2] || "0")));
   if (!Number.isFinite(hh)) return null;
 
   const date = `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -424,9 +417,10 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
 
   // Tenta achar nome/telefone/email no histórico+mensagem
-  const phone = (all.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?\d{4,5}-?\d{4}/) || [])[0] || null;
+  const all = [...history.map(h => h.content), t].join("\n");
+  const phone = (all.match(/\+?\d{2}\s?\(?\d{2}\)?\s?\d{4,5}-?\d{4}/) || [])[0] || null;
   const email = (all.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0] || null;
-  const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?|nome\s*[:\-]?\s*)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
+  const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
   const client_name = nameMatch?.[1]?.trim() || "Cliente do WhatsApp";
 
   return {
@@ -458,7 +452,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
-    let history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
+    const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
     const sessionId: string | null = body.session_id ? String(body.session_id) : null;
@@ -469,31 +463,6 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
-
-    // WhatsApp/Twilio envia apenas a última mensagem; recarrega o histórico salvo
-    // para a IA conseguir completar agendamentos em conversas de vários passos.
-    if (history.length === 0 && sessionId) {
-      try {
-        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-        const { data: savedHistory, error: historyError } = await supabase
-          .from("conversations")
-          .select("message,response,created_at")
-          .eq("session_id", sessionId)
-          .order("created_at", { ascending: true })
-          .limit(30);
-        if (historyError) {
-          console.error("[chat-ai] falha ao carregar histórico:", historyError);
-        } else if (Array.isArray(savedHistory) && savedHistory.length > 0) {
-          history = savedHistory.flatMap((row) => [
-            { role: "user", content: String(row.message || "") },
-            { role: "assistant", content: String(row.response || "") },
-          ]).filter((item) => item.content.trim());
-          console.log("[chat-ai] histórico restaurado", { sessionId, turns: savedHistory.length });
-        }
-      } catch (historyErr) {
-        console.error("[chat-ai] erro ao restaurar histórico:", historyErr);
-      }
     }
 
     const now = new Date();

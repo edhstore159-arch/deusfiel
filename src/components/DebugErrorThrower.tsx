@@ -23,9 +23,8 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
-    // Não derruba mais a aplicação: a instrução já fica registrada no estado/logs.
-    // Isso evita tela em branco quando o debug é acionado dentro do preview.
-    console.info("Instrução de debug recebida:", message);
+    // Intencional: erro fatal para acionar o overlay global da Lovable.
+    throw new Error(message);
   }
 
   return null;
