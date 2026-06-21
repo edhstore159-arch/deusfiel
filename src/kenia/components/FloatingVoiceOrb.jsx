@@ -304,10 +304,12 @@ export default function FloatingVoiceOrb() {
   const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   const isWakeOnlyPrompt = (text) => /^(?:fala|fale|conversa|converse|atenda|atende|escuta|escute|ouve|ouca)(?:\s+(?:comigo|me|aqui))?$/i.test(norm(text).trim());
 
+  const userMinimizedRef = useRef(false);
   const activateCommandSession = () => {
     commandSessionActiveRef.current = true;
     awakeUntilRef.current = 0;
-    setOpen(true);
+    // Se o usuário minimizou de propósito, mantemos minimizado — a escuta segue ativa em background.
+    if (!userMinimizedRef.current) setOpen(true);
   };
 
   const loadClientContext = async () => {
@@ -706,7 +708,15 @@ export default function FloatingVoiceOrb() {
     <>
       <button
         type="button"
-        onClick={() => { unlockSpeech(); setOpen((v) => !v); }}
+        onClick={() => {
+          unlockSpeech();
+          setOpen((v) => {
+            const next = !v;
+            userMinimizedRef.current = !next; // se está fechando, marca como minimizado pelo usuário
+            return next;
+          });
+          // NÃO mexer em alwaysOn/recognition — escuta contínua segue ativa mesmo minimizado.
+        }}
         className="fixed left-5 bottom-5 z-50 w-16 h-16 rounded-full overflow-hidden shadow-xl ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white"
         aria-label="Assistente de voz Kênia"
         data-testid="voice-orb"
@@ -714,6 +724,12 @@ export default function FloatingVoiceOrb() {
         <img src={LOGO} alt="Kênia" className="w-full h-full object-cover" />
         {listening && (
           <span className="absolute inset-0 rounded-full ring-4 ring-rose-500 animate-pulse pointer-events-none" />
+        )}
+        {alwaysOn && (
+          <span
+            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"
+            title="Escuta contínua ativa"
+          />
         )}
       </button>
 
@@ -724,7 +740,7 @@ export default function FloatingVoiceOrb() {
         >
           <div className="flex items-center justify-between mb-2">
             <div className="font-serif text-base text-nude-900">Assistente Kênia</div>
-            <button onClick={() => setOpen(false)} className="text-nude-500 hover:text-nude-900">
+            <button onClick={() => { userMinimizedRef.current = true; setOpen(false); }} className="text-nude-500 hover:text-nude-900" title="Minimizar (escuta continua ativa)">
               <X className="w-4 h-4" />
             </button>
           </div>
