@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
  * NÃO envolver em ErrorBoundary/Suspense. NÃO trocar throw por console/log.
  */
 export const DebugErrorThrower = () => {
-  const [, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (e: Event) => {
