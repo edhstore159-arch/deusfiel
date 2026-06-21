@@ -201,18 +201,6 @@ export default function AppLayout() {
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <ErrorDebugPopup />
         <FloatingVoiceOrb />
-        {deadlineCount > 0 && (
-          <button
-            type="button"
-            onClick={() => navigate("/app/agenda")}
-            className="fixed right-24 bottom-5 z-40 inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-900/20 hover:bg-rose-700"
-            data-testid="deadline-floating-alert"
-            aria-label={`${deadlineCount} prazo(s) vencendo`}
-          >
-            <Radio className="h-4 w-4" />
-            {deadlineCount} prazo{deadlineCount > 1 ? "s" : ""}
-          </button>
-        )}
         {/* Topbar mobile com botão de menu */}
         <header className="lg:hidden sticky top-0 z-30 h-14 px-3 flex items-center justify-between bg-card border-b border-nude-200">
           <button
