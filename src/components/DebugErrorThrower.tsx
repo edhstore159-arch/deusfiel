@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * DebugErrorThrower
@@ -9,16 +9,23 @@ import { useEffect } from "react";
  * NÃO envolver em ErrorBoundary/Suspense. NÃO trocar throw por console/log.
  */
 export const DebugErrorThrower = () => {
+  const [message, setMessage] = useState<string | null>(null);
+
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail;
       if (typeof detail === "string" && detail.length > 0) {
-        console.warn("lovable-debug-error recebido sem derrubar a aplicação:", detail);
+        setMessage(detail);
       }
     };
     window.addEventListener("lovable-debug-error", handler as EventListener);
     return () => window.removeEventListener("lovable-debug-error", handler as EventListener);
   }, []);
+
+  if (message) {
+    // Intencional: erro fatal para acionar o overlay global da Lovable.
+    throw new Error(message);
+  }
 
   return null;
 };
