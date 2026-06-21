@@ -214,11 +214,62 @@ export default function FloatingVoiceOrb() {
   };
 
 
+  const speechUnlockedRef = useRef(false);
+  const voicesRef = useRef([]);
+
+  const loadVoices = () => {
+    try {
+      const list = window.speechSynthesis?.getVoices?.() || [];
+      if (list.length) voicesRef.current = list;
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => { try { window.speechSynthesis.onvoiceschanged = null; } catch {} };
+  }, []);
+
+  // Deve ser chamado DE DENTRO de um gesto do usuário (click/touch).
+  // Em iOS/Android o speechSynthesis fica bloqueado até esse "unlock".
+  const unlockSpeech = () => {
+    if (speechUnlockedRef.current) return;
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth) return;
+      const warm = new SpeechSynthesisUtterance(" ");
+      warm.volume = 0; // silencioso, só para destravar o motor
+      warm.lang = "pt-BR";
+      synth.cancel();
+      synth.resume?.();
+      synth.speak(warm);
+      speechUnlockedRef.current = true;
+      loadVoices();
+    } catch {}
+  };
+
+  const pickPtVoice = () => {
+    const list = voicesRef.current || [];
+    return (
+      list.find((v) => /pt[-_]BR/i.test(v.lang)) ||
+      list.find((v) => /^pt/i.test(v.lang)) ||
+      null
+    );
+  };
+
   const speak = (text) => {
     try {
+      const synth = window.speechSynthesis;
+      if (!synth || !text) return;
       const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
-      const u = new SpeechSynthesisUtterance(text);
+      const u = new SpeechSynthesisUtterance(String(text));
       u.lang = "pt-BR";
+      u.rate = 1;
+      u.pitch = 1;
+      u.volume = 1;
+      const v = pickPtVoice();
+      if (v) u.voice = v;
       u.onstart = () => {
         if (!shouldResume) return;
         speakingRef.current = true;
@@ -233,11 +284,13 @@ export default function FloatingVoiceOrb() {
       };
       u.onend = resume;
       u.onerror = resume;
-      window.speechSynthesis.cancel();
+      synth.cancel();
+      // iOS Safari às vezes entra em "paused" — força resume antes de falar.
+      try { synth.resume?.(); } catch {}
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
       const fallbackMs = Math.min(15000, Math.max(2000, String(text || "").length * 80));
       speechResumeTimerRef.current = window.setTimeout(resume, fallbackMs);
-      window.speechSynthesis.speak(u);
+      synth.speak(u);
     } catch {}
   };
 
