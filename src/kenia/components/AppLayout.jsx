@@ -202,6 +202,8 @@ export default function AppLayout() {
         <ErrorDebugPopup />
         <FloatingVoiceOrb />
         {/* Topbar mobile com botão de menu */}
+        {/* Espaçador no mobile para que o orb fixo no topo não cubra a topbar/conteúdo */}
+        <div aria-hidden="true" className="lg:hidden h-24 shrink-0" />
         <header className="lg:hidden sticky top-0 z-30 h-14 px-3 flex items-center justify-between bg-card border-b border-nude-200">
           <button
             className="p-2 -ml-1 rounded-md text-nude-700 hover:bg-nude-100"
@@ -211,10 +213,8 @@ export default function AppLayout() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2 min-w-0">
-            <img src={LOGO_IMG} alt="" className="w-7 h-7 rounded object-cover ring-1 ring-gold-300/40" />
-            <span className="font-serif text-sm text-nude-900 truncate">Kênia Garcia</span>
-          </div>
+          {/* Logo centralizado oculto no mobile — o orb da Kênia já ocupa o topo */}
+          <div className="w-9" />
           <div className="w-9" />
         </header>
 
