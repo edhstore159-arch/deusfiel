@@ -8,12 +8,14 @@ const corsHeaders = {
 };
 
 const REALISM =
-  "RAW photo, ultra realistic photograph captured on a professional DSLR camera, photojournalism / documentary photography style, " +
-  "85mm or 50mm lens, shallow depth of field with softly blurred background, sharp focus on the subject's face, " +
-  "natural soft lighting (preferably window light), realistic soft shadows, balanced contrast (no exaggerated HDR), " +
-  "natural color grading (no Instagram filter, no oversaturation), " +
-  "real skin texture with visible pores and natural imperfections, slight stubble where appropriate, authentic emotional expression, " +
-  "natural catchlights in the eyes, real fabric folds and wrinkles in clothing, natural ISO with no artificial denoising, " +
+  "RAW photo, ultra realistic photograph captured on a professional full-frame DSLR (Canon 5D / Sony A7) at ISO 200, " +
+  "photojournalism / documentary photography style, 85mm or 50mm prime lens at f/2.0, shallow depth of field with softly blurred background (creamy bokeh), tack-sharp focus on the subject's eyes, " +
+  "8K ultra high resolution, micro-detail, hyper-detailed facial features, individual hair strands visible, eyebrows with individual hairs, eyelashes clearly defined, fine peach-fuzz on the skin, " +
+  "photorealistic skin with real pores, subtle freckles or moles, natural under-eye texture, small visible veins where realistic, light asymmetric imperfections that make the face human, slight stubble where appropriate, " +
+  "lifelike eyes with detailed iris patterns and fibers, wet sclera with subtle red vessels, sharp catchlights from the main light source, soft eyelid shadow, natural eye moisture, " +
+  "natural soft lighting (preferably window light) wrapping the face, gentle realistic shadows under the chin and nose, balanced contrast (no exaggerated HDR), " +
+  "natural color grading and accurate skin tones (no Instagram filter, no oversaturation, no orange-and-teal), " +
+  "authentic emotional expression with micro-expressions, real fabric folds and wrinkles in clothing, natural ISO grain (no artificial denoising, no waxy skin), " +
   "everyday real environment with natural imperfections (objects slightly out of place, real textures, light dust, wear)";
 
 const NEG =
