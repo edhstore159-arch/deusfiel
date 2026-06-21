@@ -630,11 +630,12 @@ export default function FloatingVoiceOrb() {
       setReply(m); speak(m); toast.success(m);
       return;
     }
-    // Tocar música no YouTube
-    const ytMatch = text.match(/\b(?:toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|p[oõ]r|reproduz|reproduzir)\s+(?:a\s+|o\s+)?(?:m[uú]sica|som|v[ií]deo|playlist|clipe|audio|[aá]udio)?\s*(?:do|da|no|de)?\s*(.+?)(?:\s+(?:no|do|pelo|pelo\s+youtube|youtube))?\s*$/i);
-    if (/youtube|y\s*tube|yt\b/i.test(lower) || (ytMatch && /\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz)\b/i.test(lower))) {
-      const q = ytMatch ? ytMatch[1] : text.replace(/youtube/gi, "").replace(/\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|m[uú]sica|som|v[ií]deo)\b/gi, "").trim();
-      if (q) { playYouTube(q); return; }
+    // Tocar música no YouTube — aceita "toca X", "música X", "ouvir X", com ou sem mencionar YouTube
+    const ytMatch = text.match(/\b(?:toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|p[oõ]r|reproduz|reproduzir|escutar|ouvir|busca[r]?|procura[r]?)\s+(?:a\s+|o\s+|uma\s+|um\s+)?(?:m[uú]sica|son[s]?|som|v[ií]deo|playlist|clipe|audio|[aá]udio|can[cç][aã]o)?\s*(?:do|da|de|dos|das|no|pelo|pela)?\s*(.+?)(?:\s+(?:no|do|pelo|pela|pelo\s+youtube|youtube))?\s*$/i);
+    const musicOnly = text.match(/\b(?:m[uú]sica|can[cç][aã]o|playlist|clipe)\s+(?:do|da|de|dos|das)?\s*(.+)/i);
+    if (/youtube|y\s*tube|yt\b/i.test(lower) || (ytMatch && /\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|escutar|ouvir)\b/i.test(lower)) || musicOnly) {
+      const q = (ytMatch ? ytMatch[1] : (musicOnly ? musicOnly[1] : text)).replace(/youtube/gi, "").replace(/\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|m[uú]sica|som|v[ií]deo|can[cç][aã]o|playlist|clipe)\b/gi, "").trim();
+      if (q) { userMinimizedRef.current = false; setOpen(true); playYouTube(q); return; }
     }
     // Intenção: agendamentos do dia / de hoje
     if (/\bagendamento[s]?\b/.test(lower) && /\b(hoje|do dia|de hoje|para hoje)\b/.test(lower)) {
