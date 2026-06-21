@@ -761,7 +761,7 @@ export default function FloatingVoiceOrb() {
 
   return (
     <>
-      <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-0 p-0" data-testid="voice-orb-wrap">
+      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-0 p-0 lg:top-4" data-testid="voice-orb-wrap">
         <button
           type="button"
           onClick={() => {
@@ -773,7 +773,7 @@ export default function FloatingVoiceOrb() {
             });
             // NÃO mexer em alwaysOn/recognition — escuta contínua segue ativa mesmo minimizado.
           }}
-          className="relative w-16 h-16 rounded-full overflow-hidden ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white animate-orb-glow"
+          className="relative w-12 h-12 rounded-full overflow-hidden ring-2 ring-gold-300 hover:scale-105 transition-transform bg-white animate-orb-glow lg:w-14 lg:h-14"
           aria-label="Assistente de voz Kênia"
           data-testid="voice-orb"
         >
@@ -788,12 +788,12 @@ export default function FloatingVoiceOrb() {
             />
           )}
         </button>
-        <span className="pointer-events-none text-[10px] font-semibold tracking-wide text-gold-700 whitespace-nowrap drop-shadow-sm">Kênia Garcia · atendente virtual</span>
+        <span className="pointer-events-none text-[9px] font-semibold text-gold-700 whitespace-nowrap drop-shadow-sm lg:text-[10px]">Kênia Garcia · atendente virtual</span>
       </div>
 
       {open && (
         <div
-          className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-72 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4"
+          className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-72 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4 lg:top-28"
           data-testid="voice-orb-panel"
         >
           <div className="flex items-center justify-between mb-2">
