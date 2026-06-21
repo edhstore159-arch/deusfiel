@@ -40,6 +40,16 @@ const FACE_LOCK =
   "Micro-expressions around the eyes (slight brow movement, natural eyelid creases, subtle smile lines when appropriate) must reinforce the emotion. " +
   "Forbidden: empty stare, soulless eyes, glassy eyes, white/grey pupils, misaligned gaze, cross-eyed look, unfocused eyes, eyes pointing in different directions, dilated unnatural pupils, dead expression.";
 
+const ANATOMY_LOCK =
+  "ANATOMY LOCK (CRITICAL — must be respected above stylistic choices): render an anatomically correct human body with perfectly natural proportions and joint placement. " +
+  "Exactly two arms attached at the shoulders, two legs attached at the hips, one head attached to the neck, hands with exactly five fingers each (one thumb + four fingers, correct length and natural curl), feet with five toes each. " +
+  "All limbs must be PROPERLY CONNECTED to the torso at anatomically correct joints — shoulders, elbows, wrists, hips, knees and ankles in their natural positions, never floating, never detached, never displaced, never duplicated, never fused, never twisted backwards, never bending in impossible directions. " +
+  "Correct bone structure, correct muscle mass, correct skeletal alignment, spine in natural posture, shoulders level, hips level, symmetric limb length (left arm same length as right arm, left leg same length as right leg). " +
+  "Hands and fingers must look REAL: natural finger spacing, correct knuckles, visible nails, natural grip and gesture — NO extra fingers, NO missing fingers, NO fused fingers, NO bent-the-wrong-way joints, NO mutated hands, NO claw hands. " +
+  "If the person is sitting, standing, walking or interacting with an object, the pose must be physically plausible and biomechanically correct — center of gravity makes sense, contact points match, clothing folds follow the body underneath. " +
+  "If multiple people appear, every single one of them must independently respect this anatomy lock and their bodies must not merge, overlap incorrectly or share limbs.";
+
+
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   const userTheme = (userPrompt || "").trim();
