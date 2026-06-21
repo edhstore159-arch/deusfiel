@@ -278,7 +278,10 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-3">
           <Badge className="bg-gold-50 text-gold-700 hover:bg-gold-50 border border-gold-200 gap-1.5 px-3 py-1.5 rounded-full font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-gold-500 animate-pulse-soft" /> WhatsApp conectado
+            <span className="w-1.5 h-1.5 rounded-full bg-gold-500 animate-pulse-soft" /> {whatsAppCenter.connected ? "WhatsApp conectado" : "WhatsApp"}
+          </Badge>
+          <Badge variant="outline" className="border-nude-200 bg-white text-nude-700 px-3 py-1.5 rounded-full font-mono">
+            Central: {centerPhoneLabel}
           </Badge>
         </div>
       </div>
@@ -360,9 +363,13 @@ export default function Dashboard() {
                 </Avatar>
                 <div className="flex-1">
                   <div className="font-semibold text-sm">{activeContact.name}</div>
-                  <div className="text-xs text-nude-500">{activeContact.phone}</div>
+                  <div className="text-xs text-nude-500">{formatWhatsAppPhone(activeContact.phone)}</div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8"><Phone className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                  <a href={`tel:+${extractWhatsAppDigits(activeContact.phone)}`} aria-label="Telefonar">
+                    <Phone className="w-4 h-4" />
+                  </a>
+                </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="w-4 h-4" /></Button>
               </div>
 
@@ -502,7 +509,7 @@ export default function Dashboard() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="font-display font-semibold text-base mt-3">{activeContact.name}</div>
-                  <div className="text-xs text-nude-500 mt-0.5">{activeContact.phone}</div>
+                  <div className="text-xs text-nude-500 mt-0.5">{formatWhatsAppPhone(activeContact.phone)}</div>
                 </div>
 
                 {appointments.length > 0 && (
