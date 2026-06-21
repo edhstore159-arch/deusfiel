@@ -177,6 +177,7 @@ export default function FloatingVoiceOrb() {
   }, [supported]);
 
   const toggleAlwaysOn = () => {
+    unlockSpeech();
     if (!supported) { toast.error("Reconhecimento de voz não suportado."); return; }
     const rec = recognitionRef.current; if (!rec) return;
     if (alwaysOnRef.current) {
