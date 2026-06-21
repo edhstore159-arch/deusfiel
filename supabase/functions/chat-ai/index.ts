@@ -223,6 +223,36 @@ function recentAssistantReplies(history: Array<{ role: string; content: string }
     .slice(-4);
 }
 
+// Extrai fatos já informados pelo cliente para evitar repetir perguntas.
+function extractClientFacts(history: Array<{ role: string; content: string }>, currentMessage: string): string[] {
+  const userText = [...history.filter((m) => m.role === "user").map((m) => m.content), currentMessage]
+    .map((t) => String(t || "")).join("\n");
+  const facts: string[] = [];
+
+  const email = userText.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+  if (email) facts.push(`E-mail: ${email[0]}`);
+
+  const phone = userText.match(/(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/);
+  if (phone) facts.push(`Telefone: ${phone[0]}`);
+
+  const nome = userText.match(/\b(?:meu nome [eé]|me chamo|sou (?:o|a)\s+)([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/i);
+  if (nome) facts.push(`Nome: ${nome[1].trim()}`);
+
+  const cidade = userText.match(/\b(?:moro em|sou de|cidade[:\s]+)\s*([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:[\s-][\wÀ-ÿ]+){0,3})(?:\s*[\/\-]\s*([A-Z]{2}))?/i);
+  if (cidade) facts.push(`Localidade: ${cidade[1]}${cidade[2] ? "/" + cidade[2] : ""}`);
+
+  const area = caseAreaMatchers.find((m) => m.words.test(userText));
+  if (area) facts.push(`Área jurídica: ${area.area}`);
+
+  const data = userText.match(/\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b|\b\d{1,2}\s+de\s+(?:janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i);
+  if (data) facts.push(`Data mencionada: ${data[0]}`);
+
+  const hora = userText.match(/\b\d{1,2}[:h]\d{2}\b/i);
+  if (hora) facts.push(`Horário mencionado: ${hora[0]}`);
+
+  return Array.from(new Set(facts));
+}
+
 function isNearDuplicateReply(reply: string, history: Array<{ role: string; content: string }>): boolean {
   const normalizedReply = normalizeForSimilarity(reply);
   if (!normalizedReply) return false;
@@ -424,6 +454,11 @@ Deno.serve(async (req) => {
       ? `\n\nANTI-REPETIÇÃO OPERACIONAL:\n- As últimas respostas da secretária foram:\n${assistantReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n- Não repita nenhuma delas, nem a mesma saudação, nem a mesma pergunta. Responda diretamente à última mensagem do cliente com avanço real na conversa.`
       : "";
 
+    const clientFacts = extractClientFacts(history, userMessage);
+    const clientFactsContext = clientFacts.length
+      ? `\n\nDADOS JÁ COLETADOS DO CLIENTE (NUNCA peça novamente — use-os diretamente):\n${clientFacts.map((f) => `- ${f}`).join("\n")}\n- Se precisar avançar, pergunte APENAS algo que NÃO esteja na lista acima.`
+      : "";
+
     const systemContent = `${extraPrompt}
 
 CONTEXTO TEMPORAL INTERNO (fuso America/Sao_Paulo):
@@ -453,7 +488,7 @@ VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 5. Garanta que a resposta seja direta, em português, no tom de secretária da Kênia Garcia, e avance a conversa (não devolva a mesma pergunta).
 6. Se for a primeira mensagem, confirme que começou com "${saudacao}!". Se o cliente perguntou se você está bem, confirme que afirmou e devolveu a pergunta.
 7. NUNCA repita ou parafraseie a pergunta do cliente antes de responder. NUNCA escreva rótulos como "Cliente:", "Você:", "Secretária:", "Resposta:" — escreva apenas a resposta direta, em uma única voz (a sua). NUNCA gere a próxima fala do cliente.
-Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitionContext}`;
+Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitionContext}${clientFactsContext}`;
 
     const extraContext: string = String(body.context || "").trim();
     const overrideSystem: string = String(body.system_prompt || "").trim();
