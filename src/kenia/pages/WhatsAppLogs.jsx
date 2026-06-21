@@ -250,7 +250,7 @@ function LogRow({ msg }) {
   const time = new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const date = new Date(msg.created_at).toLocaleDateString("pt-BR");
   const displayPhone = formatBrPhone(msg.contact_phone);
-  const telDigits = String(msg.contact_phone || "").replace(/^whatsapp:/i, "").replace(/\D/g, "");
+  const telDigits = normalizeBrDigits(msg.contact_phone);
   const tagColor = isIn
     ? "bg-blue-100 text-blue-800"
     : isBot
