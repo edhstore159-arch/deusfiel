@@ -8,15 +8,14 @@ const corsHeaders = {
 };
 
 const REALISM =
-  "RAW photo, ultra realistic photograph captured on a professional full-frame DSLR (Canon 5D / Sony A7) at ISO 200, " +
-  "photojournalism / documentary photography style, 85mm or 50mm prime lens at f/2.0, shallow depth of field with softly blurred background (creamy bokeh), tack-sharp focus on the subject's eyes, " +
-  "8K ultra high resolution, micro-detail, hyper-detailed facial features, individual hair strands visible, eyebrows with individual hairs, eyelashes clearly defined, fine peach-fuzz on the skin, " +
-  "photorealistic skin with real pores, subtle freckles or moles, natural under-eye texture, small visible veins where realistic, light asymmetric imperfections that make the face human, slight stubble where appropriate, " +
-  "lifelike eyes with detailed iris patterns and fibers, wet sclera with subtle red vessels, sharp catchlights from the main light source, soft eyelid shadow, natural eye moisture, " +
-  "natural soft lighting (preferably window light) wrapping the face, gentle realistic shadows under the chin and nose, balanced contrast (no exaggerated HDR), " +
-  "natural color grading and accurate skin tones (no Instagram filter, no oversaturation, no orange-and-teal), " +
-  "authentic emotional expression with micro-expressions, real fabric folds and wrinkles in clothing, natural ISO grain (no artificial denoising, no waxy skin), " +
-  "everyday real environment with natural imperfections (objects slightly out of place, real textures, light dust, wear)";
+  "unedited RAW photograph straight out of camera, shot on Canon EOS R5 or Sony A7R IV full-frame sensor, 50mm or 85mm prime lens at f/1.8-f/2.2, ISO 200-400, 1/200s shutter, " +
+  "photojournalism and documentary photography aesthetic in the style of Magnum Photos and National Geographic, candid real moment (NOT posed, NOT stock photo, NOT AI-looking), " +
+  "16K hyper-detailed resolution with extreme micro-detail on skin: visible pores across the entire face, fine peach fuzz catching the light, subtle freckles, real moles, tiny skin imperfections, faint under-eye shadows, natural skin oiliness on the T-zone, light redness on cheeks and nose tip, fine expression lines where age-appropriate, " +
+  "individual hair strands clearly separated with natural flyaways and stray hairs, eyebrow hairs individually visible with natural irregularity, lower lashes defined, light stubble where appropriate, " +
+  "ultra-realistic eyes: detailed iris fiber patterns with radial striations and depth, dark limbal ring, wet glossy sclera with subtle red capillaries, sharp pinpoint catchlights that match the real light source position, natural tear line, soft eyelid shadow, subsurface scattering on the eyelid, " +
+  "soft directional natural window light wrapping the face, realistic soft-edged shadows, subsurface scattering on ears, nose and fingers, balanced low-contrast color grading with accurate Brazilian skin tones, slight green-magenta tint of real ambient light, " +
+  "authentic environment with real clutter, dust particles floating in light beams, fabric with real folds and weave texture, natural ISO grain preserved (NO denoising, NO smoothing, NO beauty filter), slight chromatic aberration at high-contrast edges, very subtle motion blur on moving parts, " +
+  "imperfect candid framing with the subject slightly off-center, genuine micro-expressions, looks exactly like a real photo captured by a human photographer in a real place";
 
 const NEG =
   "digital art, illustration, painting, cartoon, anime, 3d render, CGI, plastic skin, perfect skin, airbrushed, beauty filter, " +
