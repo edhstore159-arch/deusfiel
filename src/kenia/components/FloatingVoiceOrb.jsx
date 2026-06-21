@@ -793,7 +793,7 @@ export default function FloatingVoiceOrb() {
 
       {open && (
         <div
-          className="fixed right-5 top-24 z-50 w-72 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4"
+          className="fixed right-5 bottom-32 z-50 w-72 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4"
           data-testid="voice-orb-panel"
         >
           <div className="flex items-center justify-between mb-2">
