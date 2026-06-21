@@ -42,6 +42,7 @@ export default function FloatingVoiceOrb() {
   const [open, setOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [scrolled, setScrolled] = useState(false);
   const recognitionRef = useRef(null);
   const supported =
     typeof window !== "undefined" &&
@@ -59,6 +60,30 @@ export default function FloatingVoiceOrb() {
   const speechResumeTimerRef = useRef(null);
   const [alwaysOn, setAlwaysOn] = useState(false);
   useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
+
+  useEffect(() => {
+    const getScrollTop = () => {
+      const appScroller = document.querySelector("[data-app-scroll-container]");
+      return Math.max(
+        window.scrollY || 0,
+        document.documentElement?.scrollTop || 0,
+        document.body?.scrollTop || 0,
+        appScroller?.scrollTop || 0
+      );
+    };
+
+    const updatePosition = () => setScrolled(getScrollTop() > 48);
+    const appScroller = document.querySelector("[data-app-scroll-container]");
+
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, { passive: true, capture: true });
+    appScroller?.addEventListener("scroll", updatePosition, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", updatePosition, { capture: true });
+      appScroller?.removeEventListener("scroll", updatePosition);
+    };
+  }, []);
 
   const restartContinuousRecognition = (delay = 300) => {
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
@@ -761,7 +786,14 @@ export default function FloatingVoiceOrb() {
 
   return (
     <>
-      <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-0 p-0" data-testid="voice-orb-wrap">
+      <div
+        className={`fixed z-50 flex flex-col gap-0 p-0 transition-all duration-500 ease-out ${
+          scrolled
+            ? "right-4 bottom-5 items-end translate-x-0"
+            : "top-2 left-1/2 -translate-x-1/2 items-center"
+        }`}
+        data-testid="voice-orb-wrap"
+      >
         <button
           type="button"
           onClick={() => {
@@ -793,7 +825,11 @@ export default function FloatingVoiceOrb() {
 
       {open && (
         <div
-          className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-72 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4"
+          className={`fixed z-50 w-72 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4 transition-all duration-500 ease-out ${
+            scrolled
+              ? "right-4 bottom-28"
+              : "top-24 left-1/2 -translate-x-1/2"
+          }`}
           data-testid="voice-orb-panel"
         >
           <div className="flex items-center justify-between mb-2">
