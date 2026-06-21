@@ -595,7 +595,11 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
       if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
-    const appointment = parseAppointmentBlock(rawReply) || extractAppointmentFromText(userMessage, history);
+    const appointment =
+      parseAppointmentBlock(rawReply) ||
+      extractAppointmentFromText(userMessage, history) ||
+      extractAppointmentFromText(rawReply, [...history, { role: "user", content: userMessage }]);
+    console.log("[chat-ai] appointment detectado?", !!appointment, appointment ? { date: appointment.appointment_date, time: appointment.appointment_time, name: appointment.client_name } : null);
     let reply = cleanRepeatedText(removeUserEcho(removeRoleLabels(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage)), userMessage));
     if (!reply || reply.length < 2) {
       reply = userAskedTemporalInfo(userMessage)
@@ -684,14 +688,23 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
             .maybeSingle();
           assigneeId = adminRow?.user_id ?? null;
         }
-        await supabase.from("appointments").insert({
-          user_id: assigneeId,
-          session_id: sessionId,
-          ...appointment,
-          raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente" },
-          source: "chat_ai",
-          status: "scheduled",
-        });
+        const { data: inserted, error: apptErr } = await supabase
+          .from("appointments")
+          .insert({
+            user_id: assigneeId,
+            session_id: sessionId,
+            ...appointment,
+            raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente" },
+            source: "chat_ai",
+            status: "scheduled",
+          })
+          .select("id")
+          .maybeSingle();
+        if (apptErr) {
+          console.error("[chat-ai] falha ao inserir appointment:", apptErr);
+        } else {
+          console.log("[chat-ai] appointment salvo id=", inserted?.id, "user_id=", assigneeId);
+        }
         (appointment as any).meeting_link = meetUrl;
         (appointment as any).meet_url = meetUrl;
         (appointment as any).assigned_to = assigneeId;
