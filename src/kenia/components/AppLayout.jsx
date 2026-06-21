@@ -205,7 +205,7 @@ export default function AppLayout() {
           <button
             type="button"
             onClick={() => navigate("/app/agenda")}
-            className="fixed right-5 bottom-5 z-40 inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-900/20 hover:bg-rose-700"
+            className="fixed right-24 bottom-5 z-40 inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-900/20 hover:bg-rose-700"
             data-testid="deadline-floating-alert"
             aria-label={`${deadlineCount} prazo(s) vencendo`}
           >
