@@ -48,6 +48,22 @@ Deno.serve(async (req) => {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    // Local SVG fallback não edita de fato — devolve a imagem original.
+    // Para edição, isso é considerado falha: o usuário precisa saber.
+    if (result.provider === "local-fallback") {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error:
+            "A IA de edição está indisponível no momento (Lovable AI, Gemini e Emergent falharam). " +
+            "A imagem não foi alterada. Tente novamente em instantes.",
+          provider: result.provider,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+
 
     return new Response(
       JSON.stringify({ ok: true, image: result.url, image_b64: result.url, provider: result.provider }),
