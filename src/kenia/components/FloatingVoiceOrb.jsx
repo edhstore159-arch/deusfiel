@@ -315,13 +315,23 @@ export default function FloatingVoiceOrb() {
   const loadClientContext = async () => {
     if (contextRef.current && Date.now() - contextAtRef.current < 60_000) return contextRef.current;
     const safe = async (p) => { try { const { data } = await api.get(p); return data; } catch { return null; } };
-    const [leads, contacts, processes, appointments, analyses, logs, deadlines] = await Promise.all([
+    const safeSb = async (table) => {
+      try {
+        const { data } = await supabase.from(table).select("*").limit(500);
+        return Array.isArray(data) ? data : [];
+      } catch { return []; }
+    };
+    const [leads, contacts, processes, appointments, analyses, logs, deadlines, sbAppointments, sbConversations] = await Promise.all([
       safe("/leads"), safe("/whatsapp/contacts"), safe("/processes"), safe("/appointments"), safe("/case-analyses"), safe("/whatsapp/logs"), safe("/legal-deadlines"),
+      safeSb("appointments"), safeSb("conversations"),
     ]);
     const pick = (d) => Array.isArray(d) ? d : (Array.isArray(d?.items) ? d.items : []);
+    const apptList = pick(appointments);
     const ctx = {
       leads: pick(leads), contacts: pick(contacts), processes: pick(processes),
-      appointments: pick(appointments), analyses: pick(analyses), logs: pick(logs), deadlines: pick(deadlines),
+      appointments: apptList.length ? apptList : sbAppointments,
+      analyses: pick(analyses), logs: pick(logs), deadlines: pick(deadlines),
+      conversations: sbConversations,
     };
     contextRef.current = ctx;
     contextAtRef.current = Date.now();
@@ -331,7 +341,7 @@ export default function FloatingVoiceOrb() {
   const findClient = (name, ctx) => {
     const n = norm(name);
     if (!n) return null;
-    const pools = [...(ctx?.contacts || []), ...(ctx?.leads || [])];
+    const pools = [...(ctx?.contacts || []), ...(ctx?.leads || []), ...(ctx?.appointments || [])];
     return pools.find((c) => norm(c.name || c.client_name).includes(n)) || null;
   };
 
@@ -341,14 +351,15 @@ export default function FloatingVoiceOrb() {
     try {
       const ctx = await loadClientContext().catch(() => null);
       const ctxSummary = ctx ? [
-        `RESUMO: ${ctx.contacts.length} contatos na central de mensagens, ${ctx.leads.length} leads no CRM, ${ctx.processes.length} processos, ${ctx.appointments.length} agendamentos, ${ctx.logs.length} mensagens registradas, ${ctx.deadlines.length} prazos.`,
-        `Leads: ${JSON.stringify(ctx.leads.slice(0, 30).map((l) => ({ nome: l.name, tel: l.phone, area: l.case_type, etapa: l.stage, desc: l.description })))}`,
-        `Contatos (central de mensagens): ${JSON.stringify(ctx.contacts.slice(0, 50).map((c) => ({ nome: c.name, tel: c.phone, nao_lidas: c.unread, ultima: c.last_message })))}`,
-        `Processos: ${JSON.stringify(ctx.processes.slice(0, 30).map((p) => ({ cliente: p.client_name, numero: p.process_number, area: p.case_type, vara: p.court, status: p.status, proxima_audiencia: p.next_hearing })))}`,
-        `Agendamentos: ${JSON.stringify(ctx.appointments.slice(0, 30).map((a) => ({ titulo: a.title, cliente: a.client_name, quando: a.starts_at, local: a.location, status: a.status })))}`,
-        `Prazos: ${JSON.stringify(ctx.deadlines.slice(0, 20).map((d) => ({ cliente: d.client_name, titulo: d.title, vencimento: d.due_at, urgencia: d.urgency })))}`,
-        `Mensagens recentes: ${JSON.stringify(ctx.logs.slice(-20).map((l) => ({ contato: l.contact_name, tel: l.contact_phone, texto: l.text, eu: l.from_me })))}`,
-        `Análises de caso: ${JSON.stringify(ctx.analyses.slice(0, 20).map((a) => ({ cliente: a.visitor_name, tel: a.visitor_phone, area: a.area, resumo: a.resumo })))}`,
+        `RESUMO: ${ctx.contacts.length} contatos, ${ctx.leads.length} leads, ${ctx.processes.length} processos, ${ctx.appointments.length} agendamentos, ${ctx.logs.length} mensagens, ${ctx.deadlines.length} prazos, ${(ctx.conversations||[]).length} conversas IA.`,
+        `Leads COMPLETOS: ${JSON.stringify((ctx.leads||[]).slice(0, 200).map((l) => ({ nome: l.name, tel: l.phone, email: l.email, area: l.case_type, etapa: l.stage, cidade: l.city, descricao: l.description, caso: l.case_summary, valor: l.value, origem: l.source, criado: l.created_at, notas: l.notes })))}`,
+        `Contatos COMPLETOS: ${JSON.stringify((ctx.contacts||[]).slice(0, 200).map((c) => ({ nome: c.name, tel: c.phone, email: c.email, nao_lidas: c.unread, ultima_msg: c.last_message, ultimo_contato: c.last_contact_at, tags: c.tags, notas: c.notes })))}`,
+        `Processos COMPLETOS: ${JSON.stringify((ctx.processes||[]).slice(0, 200).map((p) => ({ cliente: p.client_name, tel: p.client_phone, numero: p.process_number, area: p.case_type, vara: p.court, status: p.status, proxima_audiencia: p.next_hearing, valor_causa: p.case_value, parte_contraria: p.opposing_party, descricao: p.description, observacoes: p.notes })))}`,
+        `Agendamentos COMPLETOS: ${JSON.stringify((ctx.appointments||[]).slice(0, 200).map((a) => ({ cliente: a.client_name, tel: a.phone, email: a.email, data: a.appointment_date || a.starts_at, hora: a.appointment_time, area: a.legal_area, cidade: a.city, resumo_caso: a.case_summary, status: a.status, origem: a.source })))}`,
+        `Prazos COMPLETOS: ${JSON.stringify((ctx.deadlines||[]).slice(0, 100).map((d) => ({ cliente: d.client_name, titulo: d.title, descricao: d.description, vencimento: d.due_at, urgencia: d.urgency, processo: d.process_number })))}`,
+        `Mensagens COMPLETAS: ${JSON.stringify((ctx.logs||[]).slice(-100).map((l) => ({ contato: l.contact_name, tel: l.contact_phone, texto: l.text, eu: l.from_me, quando: l.created_at })))}`,
+        `Análises de caso COMPLETAS: ${JSON.stringify((ctx.analyses||[]).slice(0, 100).map((a) => ({ cliente: a.visitor_name, tel: a.visitor_phone, email: a.visitor_email, area: a.area, resumo: a.resumo, detalhes: a.details, recomendacao: a.recommendation, criado: a.created_at })))}`,
+        `Conversas IA recentes: ${JSON.stringify((ctx.conversations||[]).slice(-50).map((c) => ({ msg: c.message, resp: c.response, sess: c.session_id, quando: c.created_at })))}`,
       ].join("\n") : "";
 
       // Busca no Jusbrasil quando a pergunta é jurídica
