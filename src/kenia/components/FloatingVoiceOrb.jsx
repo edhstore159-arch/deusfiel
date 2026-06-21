@@ -772,7 +772,7 @@ export default function FloatingVoiceOrb() {
           });
           // NÃO mexer em alwaysOn/recognition — escuta contínua segue ativa mesmo minimizado.
         }}
-        className="fixed left-5 bottom-5 z-50 w-16 h-16 rounded-full overflow-hidden shadow-xl ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white"
+        className="fixed right-5 bottom-5 z-50 w-16 h-16 rounded-full overflow-hidden shadow-xl ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white"
         aria-label="Assistente de voz Kênia"
         data-testid="voice-orb"
       >
