@@ -3,10 +3,7 @@ import { useEffect } from "react";
 /**
  * DebugErrorThrower
  *
- * Escuta "lovable-debug-error" e converte a instrução em erro fatal de runtime,
- * para escapar até o overlay global da Lovable e habilitar o "Try to Fix".
- *
- * NÃO envolver em ErrorBoundary/Suspense. NÃO trocar throw por console/log.
+ * Escuta "lovable-debug-error" e registra a instrução sem derrubar a aplicação.
  */
 export const DebugErrorThrower = () => {
   useEffect(() => {
