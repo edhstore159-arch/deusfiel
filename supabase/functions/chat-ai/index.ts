@@ -381,15 +381,18 @@ function parseAppointmentBlock(text: string) {
 // Procura uma intenção de agendamento + data + hora explícitos.
 function extractAppointmentFromText(text: string, history: Array<{ role: string; content: string }> = []) {
   const t = String(text || "");
-  if (!/\b(agendar|agendamento|marcar|marca[cç][aã]o|consulta|reuni[aã]o|atendimento|hor[aá]rio)\b/i.test(t)) return null;
+  const all = [...history.map(h => h.content), t].join("\n");
+  if (!/\b(agendar|agendamento|marcar|marca[cç][aã]o|consulta|reuni[aã]o|atendimento|hor[aá]rio)\b/i.test(all)) return null;
 
   // Hora: 14:30, 14h, 14h30, às 14, para 14.
   // Evita capturar pedaços de telefone ou datas como 20/06.
-  const timeMatch = t.match(/\b(?:[aàá]s|as|para|pra)\s*(\d{1,2})(?::(\d{2})|h(\d{2})?)?\b|\b(\d{1,2})(?::(\d{2})|h(\d{2})?)\b/i);
+  const timeMatch = t.match(/\b(?:[aàá]s|as|para|pra)\s*(\d{1,2})(?::(\d{2})|h(\d{2})?)?\b|\b(\d{1,2})(?::(\d{2})|h(\d{2})?)\b/i)
+    || all.match(/\b(?:[aàá]s|as|para|pra)\s*(\d{1,2})(?::(\d{2})|h(\d{2})?)?\b|\b(\d{1,2})(?::(\d{2})|h(\d{2})?)\b/i);
   // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
-  const todayMatch = /(^|\s)hoje(\s|$|[,.!?])/i.test(t);
-  const tomorrowMatch = /amanh[aã]/i.test(t);
-  const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+  const todayMatch = /(^|\s)hoje(\s|$|[,.!?])/i.test(t) || /(^|\s)hoje(\s|$|[,.!?])/i.test(all);
+  const tomorrowMatch = /amanh[aã]/i.test(t) || /amanh[aã]/i.test(all);
+  const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/)
+    || all.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
 
   if (!timeMatch || (!todayMatch && !tomorrowMatch && !dateMatch)) return null;
 
@@ -421,7 +424,6 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
 
   // Tenta achar nome/telefone/email no histórico+mensagem
-  const all = [...history.map(h => h.content), t].join("\n");
   const phone = (all.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?\d{4,5}-?\d{4}/) || [])[0] || null;
   const email = (all.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0] || null;
   const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?|nome\s*[:\-]?\s*)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
