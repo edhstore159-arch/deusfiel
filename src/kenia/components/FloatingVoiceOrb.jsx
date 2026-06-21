@@ -304,10 +304,12 @@ export default function FloatingVoiceOrb() {
   const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
   const isWakeOnlyPrompt = (text) => /^(?:fala|fale|conversa|converse|atenda|atende|escuta|escute|ouve|ouca)(?:\s+(?:comigo|me|aqui))?$/i.test(norm(text).trim());
 
+  const userMinimizedRef = useRef(false);
   const activateCommandSession = () => {
     commandSessionActiveRef.current = true;
     awakeUntilRef.current = 0;
-    setOpen(true);
+    // Se o usuário minimizou de propósito, mantemos minimizado — a escuta segue ativa em background.
+    if (!userMinimizedRef.current) setOpen(true);
   };
 
   const loadClientContext = async () => {
