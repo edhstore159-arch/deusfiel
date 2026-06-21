@@ -5,6 +5,7 @@ import { Button } from "@/kenia/components/ui/button";
 import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Input } from "@/kenia/components/ui/input";
+import { extractWhatsAppDigits, formatWhatsAppPhone } from "@/kenia/lib/phone";
 import { toast } from "sonner";
 import {
   ArrowDownLeft, ArrowUpRight, Bot, RefreshCw, CheckCheck,
@@ -210,47 +211,13 @@ function StatCard({ label, value, color = "slate", Icon }) {
   );
 }
 
-// Normaliza um telefone para o formato real do WhatsApp BR (com 9º dígito).
-// Retorna apenas dígitos no padrão E.164 sem o "+": 55DDDNNNNNNNNN (13 dígitos).
-function normalizeBrDigits(raw) {
-  if (!raw) return "";
-  let d = String(raw).replace(/^whatsapp:/i, "").replace(/\D/g, "");
-  // remove zeros à esquerda
-  d = d.replace(/^0+/, "");
-  // se já vier com DDI 55, mantém; senão prefixa
-  if (!d.startsWith("55")) {
-    // 10 (DDD+8) ou 11 (DDD+9) dígitos locais → adiciona DDI
-    if (d.length === 10 || d.length === 11) d = "55" + d;
-  }
-  // Agora deve estar como 55 + DDD(2) + numero(8 ou 9)
-  if (d.startsWith("55") && d.length === 12) {
-    // 55 + DDD + 8 dígitos antigos → insere 9º dígito (WhatsApp BR usa o 9)
-    d = d.slice(0, 4) + "9" + d.slice(4);
-  }
-  return d;
-}
-
-function formatBrPhone(raw) {
-  if (!raw) return "—";
-  const d = normalizeBrDigits(raw);
-  if (d.startsWith("55") && d.length === 13) {
-    // +55 (DD) 9XXXX-XXXX
-    return `+55 (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9)}`;
-  }
-  if (d.startsWith("55") && d.length === 12) {
-    return `+55 (${d.slice(2, 4)}) ${d.slice(4, 8)}-${d.slice(8)}`;
-  }
-  return d ? `+${d}` : String(raw);
-}
-
-
 function LogRow({ msg }) {
   const isIn = !msg.from_me;
   const isBot = !!msg.bot;
   const time = new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const date = new Date(msg.created_at).toLocaleDateString("pt-BR");
-  const displayPhone = formatBrPhone(msg.contact_phone);
-  const telDigits = normalizeBrDigits(msg.contact_phone);
+  const displayPhone = formatWhatsAppPhone(msg.contact_phone);
+  const telDigits = extractWhatsAppDigits(msg.contact_phone);
   const tagColor = isIn
     ? "bg-blue-100 text-blue-800"
     : isBot
