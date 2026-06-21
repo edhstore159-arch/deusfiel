@@ -454,6 +454,11 @@ Deno.serve(async (req) => {
       ? `\n\nANTI-REPETIÇÃO OPERACIONAL:\n- As últimas respostas da secretária foram:\n${assistantReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n- Não repita nenhuma delas, nem a mesma saudação, nem a mesma pergunta. Responda diretamente à última mensagem do cliente com avanço real na conversa.`
       : "";
 
+    const clientFacts = extractClientFacts(history, userMessage);
+    const clientFactsContext = clientFacts.length
+      ? `\n\nDADOS JÁ COLETADOS DO CLIENTE (NUNCA peça novamente — use-os diretamente):\n${clientFacts.map((f) => `- ${f}`).join("\n")}\n- Se precisar avançar, pergunte APENAS algo que NÃO esteja na lista acima.`
+      : "";
+
     const systemContent = `${extraPrompt}
 
 CONTEXTO TEMPORAL INTERNO (fuso America/Sao_Paulo):
