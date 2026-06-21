@@ -122,9 +122,12 @@ Deno.serve(async (req) => {
       "",
       FACE_LOCK,
       "",
-      `Negative prompt: ${NEG}`,
-      "--style raw --no artificial --no smooth skin --no CGI --photorealism high",
+      ANATOMY_LOCK,
+      "",
+      `Negative prompt: ${NEG}, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, dismembered, mangled body`,
+      "--style raw --no artificial --no smooth skin --no CGI --photorealism high --no displaced_limbs --no dislocated_limbs --no extra_limbs --no missing_limbs",
     ].join("\n");
+
 
     const toDataUrl = (b64: string) =>
       b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
