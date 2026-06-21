@@ -761,7 +761,7 @@ export default function FloatingVoiceOrb() {
 
   return (
     <>
-      <div className="fixed right-5 top-5 z-50 flex flex-col items-center gap-1 p-4 rounded-2xl bg-nude-50/90 ring-1 ring-nude-200 shadow-lg backdrop-blur-sm" data-testid="voice-orb-wrap">
+      <div className="fixed right-5 bottom-5 z-50 flex flex-col items-center gap-1 p-4 rounded-2xl bg-nude-50/90 ring-1 ring-nude-200 shadow-lg backdrop-blur-sm" data-testid="voice-orb-wrap">
         <button
           type="button"
           onClick={() => {
@@ -793,7 +793,7 @@ export default function FloatingVoiceOrb() {
 
       {open && (
         <div
-          className="fixed right-5 top-24 z-50 w-72 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4"
+          className="fixed right-5 bottom-32 z-50 w-72 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4"
           data-testid="voice-orb-panel"
         >
           <div className="flex items-center justify-between mb-2">
