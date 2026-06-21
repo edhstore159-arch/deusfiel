@@ -387,8 +387,8 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   // Evita capturar pedaços de telefone ou datas como 20/06.
   const timeMatch = t.match(/\b(?:[aàá]s|as|para|pra)\s*(\d{1,2})(?::(\d{2})|h(\d{2})?)?\b|\b(\d{1,2})(?::(\d{2})|h(\d{2})?)\b/i);
   // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
-  const todayMatch = /\bhoje\b/i.test(t);
-  const tomorrowMatch = /\bamanh[aã]\b/i.test(t);
+  const todayMatch = /(^|\s)hoje(\s|$|[,.!?])/i.test(t);
+  const tomorrowMatch = /amanh[aã]/i.test(t);
   const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
 
   if (!timeMatch || (!todayMatch && !tomorrowMatch && !dateMatch)) return null;
