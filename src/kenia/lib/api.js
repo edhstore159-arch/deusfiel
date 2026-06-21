@@ -614,6 +614,14 @@ const staticPost = (url, body = {}) => {
       try {
         const start = body.starts_at ? new Date(body.starts_at) : new Date();
         const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: null }));
+        const rawPayload = {
+          ...body,
+          title: body.title || `Consulta — ${body.area || body.legal_area || "Atendimento jurídico"}`,
+          starts_at: start.toISOString(),
+          duration_min: body.duration_min || 60,
+          location: body.location || "Google Meet",
+          meeting_link: body.meeting_link || body.meet_url || buildJitsiLink(`${body.client_name || "consulta"}-${Date.now()}`),
+        };
         const { data, error } = await supabase
           .from("appointments")
           .insert({
@@ -627,7 +635,7 @@ const staticPost = (url, body = {}) => {
             appointment_time: start.toTimeString().slice(0, 5),
             source: body.source || "panel",
             status: body.status === "confirmado" ? "scheduled" : body.status || "scheduled",
-            raw_payload: body,
+            raw_payload: rawPayload,
           })
           .select("*")
           .single();
