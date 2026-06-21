@@ -403,6 +403,7 @@ export default function Creatives() {
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
+        <CreativeAssetsLibrary onPick={(dataUrl) => { setRefImage(dataUrl); setOpen(true); }} />
         
         {items.length === 0 ? (
           <Card className="p-12 border-dashed border-nude-300 text-center">
