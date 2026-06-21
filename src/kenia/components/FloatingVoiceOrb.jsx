@@ -424,11 +424,12 @@ export default function FloatingVoiceOrb() {
     }
   };
 
-  // Parse data em PT-BR: "hoje 15:00", "amanha 10h", "25/12 14:30", "25/12/2026 09:00"
+  // Parse data em PT-BR: "hoje 15:00", "amanha 10h", "sexta 14h", "25/12 14:30"
   const parseDateTimePt = (raw) => {
     if (!raw) return null;
     const s = String(raw).toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").trim();
-    const hm = s.match(/(\d{1,2})(?:[h:](\d{2}))?/);
+    const timeMatches = [...s.matchAll(/(?:\bas\s*)?(\d{1,2})(?:\s*h|:)(\d{2})?/g)];
+    const hm = timeMatches.at(-1) || s.match(/\b(?:as|às)\s+(\d{1,2})\b/);
     let hour = hm ? parseInt(hm[1], 10) : 10;
     let min = hm && hm[2] ? parseInt(hm[2], 10) : 0;
     if (isNaN(hour) || hour > 23) { hour = 10; min = 0; }
@@ -444,7 +445,14 @@ export default function FloatingVoiceOrb() {
         let year = dm[3] ? parseInt(dm[3], 10) : d.getFullYear();
         if (year < 100) year += 2000;
         d.setFullYear(year, month, day);
-      } else { return null; }
+      } else {
+        const weekDays = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+        const idx = weekDays.findIndex((day) => new RegExp(`\\b(?:proxim[ao]\\s+)?${day}\\b`).test(s));
+        if (idx < 0) return null;
+        let delta = (idx - d.getDay() + 7) % 7;
+        if (delta === 0 || /\bproxim[ao]\b/.test(s)) delta += 7;
+        d.setDate(d.getDate() + delta);
+      }
     }
     d.setHours(hour, min, 0, 0);
     return d;
