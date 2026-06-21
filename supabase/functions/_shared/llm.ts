@@ -154,7 +154,7 @@ async function chatOllama(opts: ChatOptions) {
       data: { choices: [{ message: { role: "assistant", content } }] },
     };
   } catch (error) {
-    return { ok: false as const, status: 0, error: String(error?.message || error) };
+    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
   } finally {
     clearTimeout(timeout);
   }
