@@ -688,14 +688,23 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
             .maybeSingle();
           assigneeId = adminRow?.user_id ?? null;
         }
-        await supabase.from("appointments").insert({
-          user_id: assigneeId,
-          session_id: sessionId,
-          ...appointment,
-          raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente" },
-          source: "chat_ai",
-          status: "scheduled",
-        });
+        const { data: inserted, error: apptErr } = await supabase
+          .from("appointments")
+          .insert({
+            user_id: assigneeId,
+            session_id: sessionId,
+            ...appointment,
+            raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente" },
+            source: "chat_ai",
+            status: "scheduled",
+          })
+          .select("id")
+          .maybeSingle();
+        if (apptErr) {
+          console.error("[chat-ai] falha ao inserir appointment:", apptErr);
+        } else {
+          console.log("[chat-ai] appointment salvo id=", inserted?.id, "user_id=", assigneeId);
+        }
         (appointment as any).meeting_link = meetUrl;
         (appointment as any).meet_url = meetUrl;
         (appointment as any).assigned_to = assigneeId;
