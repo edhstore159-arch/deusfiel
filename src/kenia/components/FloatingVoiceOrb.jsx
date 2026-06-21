@@ -73,14 +73,34 @@ export default function FloatingVoiceOrb() {
     };
 
     const updatePosition = () => setScrolled(getScrollTop() > 48);
+    const handleWheel = (event) => {
+      if (event.deltaY > 6) setScrolled(true);
+      if (event.deltaY < -6 && getScrollTop() <= 48) setScrolled(false);
+    };
+    let lastTouchY = 0;
+    const handleTouchStart = (event) => {
+      lastTouchY = event.touches?.[0]?.clientY || 0;
+    };
+    const handleTouchMove = (event) => {
+      const currentY = event.touches?.[0]?.clientY || 0;
+      if (lastTouchY && lastTouchY - currentY > 6) setScrolled(true);
+      if (lastTouchY && currentY - lastTouchY > 6 && getScrollTop() <= 48) setScrolled(false);
+      lastTouchY = currentY;
+    };
     const appScroller = document.querySelector("[data-app-scroll-container]");
 
     updatePosition();
     window.addEventListener("scroll", updatePosition, { passive: true, capture: true });
+    window.addEventListener("wheel", handleWheel, { passive: true });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
     appScroller?.addEventListener("scroll", updatePosition, { passive: true });
 
     return () => {
       window.removeEventListener("scroll", updatePosition, { capture: true });
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
       appScroller?.removeEventListener("scroll", updatePosition);
     };
   }, []);
