@@ -494,6 +494,42 @@ export default function FloatingVoiceOrb() {
     }
   };
 
+  const createAppointmentByVoice = async ({ name, whenExpr, notes = "" }) => {
+    setThinking(true);
+    try {
+      const when = parseDateTimePt(whenExpr);
+      if (!name || !when) {
+        const msg = "Para agendar, diga o nome da pessoa e a data com horário. Exemplo: agendar João amanhã às 15h.";
+        setReply(msg); speak(msg); return;
+      }
+      const ctx = await loadClientContext().catch(() => null);
+      const c = findClient(name, ctx);
+      const clientName = c?.name || c?.client_name || name;
+      const payload = {
+        title: `Consulta — ${clientName}`,
+        client_name: clientName,
+        phone: c?.phone || c?.client_phone || null,
+        email: c?.email || null,
+        starts_at: when.toISOString(),
+        duration_min: 60,
+        location: "Google Meet",
+        notes: notes || `Agendado por comando de voz: ${transcript || name}`,
+        status: "confirmado",
+        source: "voice_orb",
+      };
+      const { data } = await api.post("/appointments", payload);
+      contextRef.current = null;
+      const msg = `Agendamento confirmado para ${clientName} em ${fmtDateTime(data?.starts_at || payload.starts_at)}. Já está na agenda e no painel.`;
+      setReply(msg); speak(msg); toast.success(msg);
+      navigate("/app/agenda");
+    } catch (e) {
+      toast.error("Falha ao criar agendamento: " + (e?.message || e));
+      speak("Não consegui confirmar o agendamento agora.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
   const sendWhatsAppTo = async (name, message) => {
     setThinking(true);
     try {
