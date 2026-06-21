@@ -51,7 +51,7 @@ function PageFallback() {
 function App() {
   return (
     <div className="App">
-      {/* DebugErrorThrower DEVE ficar fora de qualquer ErrorBoundary/Suspense */}
+      {/* Captura instruções de debug sem interromper a experiência do app */}
       <DebugErrorThrower />
       <AuthProvider>
         <BrowserRouter>
