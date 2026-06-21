@@ -49,6 +49,14 @@ const ANATOMY_LOCK =
   "If the person is sitting, standing, walking or interacting with an object, the pose must be physically plausible and biomechanically correct — center of gravity makes sense, contact points match, clothing folds follow the body underneath. " +
   "If multiple people appear, every single one of them must independently respect this anatomy lock and their bodies must not merge, overlap incorrectly or share limbs.";
 
+const HAND_LOCK =
+  "HAND LOCK (CRITICAL — inspect and correct every visible hand before final output): every visible hand must be photorealistic, anatomically normal and proportional to the person's body. " +
+  "Each hand has exactly five fingers: one opposable thumb and four fingers, with correct knuckle count, natural nail placement, realistic palm structure, natural webbing between fingers, and believable skin folds. " +
+  "Finger lengths must be natural (middle longest, ring/index slightly shorter, pinky shortest, thumb lower and angled), with no duplicate fingertips, no extra nails, no fused fingers, no missing fingers, no claw-like fingers, no rubbery fingers, no broken joints and no fingers bending backward. " +
+  "Hands must be attached correctly at the wrist, wrists must align with forearms, and gestures must be physically possible for the scene: relaxed resting hands, natural grip, or coherent pointing/holding only when requested. " +
+  "If hands are partially hidden by clothing, objects, crop, or another person, keep the visible parts plausible and avoid inventing extra fingers. " +
+  "For group scenes, apply this hand check independently to every person; no shared hands, no merged hands, no hand growing from another body part, no displaced hands.";
+
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
@@ -71,6 +79,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             "- SCENE: describe the scene faithfully from the user theme.",
             "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise.",
             `- FACE QUALITY: ${FACE_LOCK}`,
+            `- HAND QUALITY: ${HAND_LOCK}`,
             "- ENVIRONMENT: real environment (simple home, office, street, etc.) with natural elements and imperfections (objects slightly out of place, real texture, light dust, wear).",
             "- LIGHTING: realistic cinematic lighting — soft natural window light, soft realistic shadows, balanced contrast, no exaggerated HDR.",
             "- CAMERA: 50mm or 85mm lens, shallow depth of field (slightly blurred background), focus on the face, DSLR photography style, natural ISO, no artificial noise.",
@@ -124,8 +133,10 @@ Deno.serve(async (req) => {
       "",
       ANATOMY_LOCK,
       "",
-      `Negative prompt: ${NEG}, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, dismembered, mangled body`,
-      "--style raw --no artificial --no smooth skin --no CGI --photorealism high --no displaced_limbs --no dislocated_limbs --no extra_limbs --no missing_limbs",
+      HAND_LOCK,
+      "",
+      `Negative prompt: ${NEG}, bad hands, abnormal hands, deformed hands, distorted hands, malformed hands, mutated hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, broken fingers, bent-backwards fingers, claw hands, rubber fingers, long unnatural fingers, tiny hands, oversized hands, wrong thumb placement, detached hands, floating hands, hands growing from wrong place, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, dismembered, mangled body`,
+      "--style raw --no artificial --no smooth skin --no CGI --photorealism high --no bad_hands --no deformed_hands --no extra_fingers --no missing_fingers --no fused_fingers --no displaced_limbs --no dislocated_limbs --no extra_limbs --no missing_limbs",
     ].join("\n");
 
 
