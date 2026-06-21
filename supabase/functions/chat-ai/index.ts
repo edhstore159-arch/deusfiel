@@ -672,11 +672,7 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
     // Gera link válido da reunião (Jitsi - sala pública, sem necessidade de login)
     let meetUrl: string | null = null;
     if (appointment) {
-      const room = `kenia-${(appointment.client_name || "consulta")
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "-")
-        .slice(0, 30)}-${Date.now().toString(36)}`;
-      meetUrl = `https://meet.jit.si/${room}`;
+      meetUrl = createValidMeetingLink(appointment.client_name || "consulta");
       const dateStr = appointment.appointment_date || "";
       const timeStr = appointment.appointment_time || "";
       if (!reply.includes(meetUrl)) {
@@ -698,7 +694,7 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
         response: reply,
       });
       if (appointment) {
-        const finalMeetUrl = meetUrl || `https://meet.jit.si/kenia-${Date.now().toString(36)}`;
+        const finalMeetUrl = meetUrl || createValidMeetingLink(appointment.client_name || "consulta");
         const enrichedPayload = {
           ...(appointment.raw_payload || {}),
           meeting_link: finalMeetUrl,
