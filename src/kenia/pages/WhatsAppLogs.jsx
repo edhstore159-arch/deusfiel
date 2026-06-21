@@ -210,20 +210,39 @@ function StatCard({ label, value, color = "slate", Icon }) {
   );
 }
 
+// Normaliza um telefone para o formato real do WhatsApp BR (com 9º dígito).
+// Retorna apenas dígitos no padrão E.164 sem o "+": 55DDDNNNNNNNNN (13 dígitos).
+function normalizeBrDigits(raw) {
+  if (!raw) return "";
+  let d = String(raw).replace(/^whatsapp:/i, "").replace(/\D/g, "");
+  // remove zeros à esquerda
+  d = d.replace(/^0+/, "");
+  // se já vier com DDI 55, mantém; senão prefixa
+  if (!d.startsWith("55")) {
+    // 10 (DDD+8) ou 11 (DDD+9) dígitos locais → adiciona DDI
+    if (d.length === 10 || d.length === 11) d = "55" + d;
+  }
+  // Agora deve estar como 55 + DDD(2) + numero(8 ou 9)
+  if (d.startsWith("55") && d.length === 12) {
+    // 55 + DDD + 8 dígitos antigos → insere 9º dígito (WhatsApp BR usa o 9)
+    d = d.slice(0, 4) + "9" + d.slice(4);
+  }
+  return d;
+}
+
 function formatBrPhone(raw) {
   if (!raw) return "—";
-  // remove "whatsapp:" prefix, spaces, anything non-digit/+
-  let digits = String(raw).replace(/^whatsapp:/i, "").replace(/\D/g, "");
-  // strip leading country code 55 if Brazilian
-  if (digits.startsWith("55") && digits.length > 11) digits = digits.slice(2);
-  if (digits.length === 11) {
-    return `+55 (${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  const d = normalizeBrDigits(raw);
+  if (d.startsWith("55") && d.length === 13) {
+    // +55 (DD) 9XXXX-XXXX
+    return `+55 (${d.slice(2, 4)}) ${d.slice(4, 9)}-${d.slice(9)}`;
   }
-  if (digits.length === 10) {
-    return `+55 (${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  if (d.startsWith("55") && d.length === 12) {
+    return `+55 (${d.slice(2, 4)}) ${d.slice(4, 8)}-${d.slice(8)}`;
   }
-  return `+${String(raw).replace(/^whatsapp:\+?/i, "").replace(/\D/g, "")}`;
+  return d ? `+${d}` : String(raw);
 }
+
 
 function LogRow({ msg }) {
   const isIn = !msg.from_me;
