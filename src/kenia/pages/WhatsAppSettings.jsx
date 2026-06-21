@@ -107,8 +107,15 @@ export default function WhatsAppSettings() {
 
 
   const baileysLogout = async () => {
-    const confirmed = window.confirm("Isso desconecta o WhatsApp e apaga a sessão atual. Deseja realmente gerar um novo QR Code?");
-    if (!confirmed) return;
+    const c1 = window.confirm("⚠️ ATENÇÃO: isso vai DESCONECTAR o WhatsApp e apagar a sessão atual.\n\nVocê precisará escanear um novo QR Code para reconectar.\n\nDeseja realmente continuar?");
+    if (!c1) return;
+    const c2 = window.confirm("Tem CERTEZA? Esta ação é irreversível — todas as mensagens em andamento podem ser interrompidas.");
+    if (!c2) return;
+    const typed = window.prompt('Para confirmar, digite exatamente: DESCONECTAR');
+    if ((typed || "").trim().toUpperCase() !== "DESCONECTAR") {
+      toast.info("Desconexão cancelada.");
+      return;
+    }
     setBaileysLoggingOut(true);
     try {
       await api.post("/whatsapp/baileys/logout");
@@ -121,6 +128,7 @@ export default function WhatsAppSettings() {
       setBaileysLoggingOut(false);
     }
   };
+
 
   const baileysReconnect = async () => {
     if (!HAS_BACKEND || baileysStatus?.state === "static") {
