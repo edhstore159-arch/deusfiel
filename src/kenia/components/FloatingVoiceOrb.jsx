@@ -613,6 +613,15 @@ export default function FloatingVoiceOrb() {
   const handleCommand = (text) => {
     if (!text?.trim()) return;
     const lower = text.toLowerCase();
+    // Minimizar / fechar o painel da assistente (continua escutando, bolinha verde)
+    if (/\b(minimiza[r]?|minimize|recolhe[r]?|recolha|esconde[r]?|esconda|some|sumir|fecha[r]?\s+(?:o\s+)?(?:quadro|painel|janela|caixa)|fecha[r]?\s+voc[eê])\b/i.test(lower)) {
+      userMinimizedRef.current = true;
+      setOpen(false);
+      const m = "Minimizado. Continuo escutando.";
+      setReply(m); speak(m);
+      return;
+    }
+
     // Fechar / parar música ou aba do YouTube
     if (/\b(fech[ae]r?|fecha|para|pare|parar|encerra[r]?|desliga[r]?|stop|pause|pausa[r]?)\b[\s\S]*\b(m[uú]sica|som|v[ií]deo|youtube|yt|aba|player)\b/i.test(lower)
         || /\b(m[uú]sica|som|v[ií]deo|youtube|aba|player)\b[\s\S]*\b(fech[ae]r?|fecha|para|pare|parar|encerra[r]?|desliga[r]?|stop|pause|pausa[r]?)\b/i.test(lower)) {
