@@ -761,33 +761,35 @@ export default function FloatingVoiceOrb() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          unlockSpeech();
-          setOpen((v) => {
-            const next = !v;
-            userMinimizedRef.current = !next; // se está fechando, marca como minimizado pelo usuário
-            return next;
-          });
-          // NÃO mexer em alwaysOn/recognition — escuta contínua segue ativa mesmo minimizado.
-        }}
-        className="fixed right-5 top-5 z-50 w-16 h-16 rounded-full overflow-hidden ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white shadow-[0_0_18px_2px_rgba(212,175,55,0.45)]"
-        aria-label="Assistente de voz Kênia"
-        data-testid="voice-orb"
-      >
-        <img src={LOGO} alt="Kênia" className="w-full h-full object-cover" />
-        {listening && (
-          <span className="absolute inset-0 rounded-full ring-4 ring-rose-500 animate-pulse pointer-events-none" />
-        )}
-        {alwaysOn && (
-          <span
-            className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"
-            title="Escuta contínua ativa"
-          />
-        )}
-        <span className="pointer-events-none absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-gold-700 whitespace-nowrap">Fale comigo</span>
-      </button>
+      <div className="fixed right-5 top-5 z-50 flex flex-col items-center gap-1" data-testid="voice-orb-wrap">
+        <button
+          type="button"
+          onClick={() => {
+            unlockSpeech();
+            setOpen((v) => {
+              const next = !v;
+              userMinimizedRef.current = !next; // se está fechando, marca como minimizado pelo usuário
+              return next;
+            });
+            // NÃO mexer em alwaysOn/recognition — escuta contínua segue ativa mesmo minimizado.
+          }}
+          className="relative w-16 h-16 rounded-full overflow-hidden ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white shadow-[0_0_18px_2px_rgba(212,175,55,0.45)]"
+          aria-label="Assistente de voz Kênia"
+          data-testid="voice-orb"
+        >
+          <img src={LOGO} alt="Kênia" className="w-full h-full object-cover" />
+          {listening && (
+            <span className="absolute inset-0 rounded-full ring-4 ring-rose-500 animate-pulse pointer-events-none" />
+          )}
+          {alwaysOn && (
+            <span
+              className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"
+              title="Escuta contínua ativa"
+            />
+          )}
+        </button>
+        <span className="pointer-events-none text-[10px] font-semibold tracking-wide text-gold-700 whitespace-nowrap drop-shadow-sm">Fale comigo</span>
+      </div>
 
       {open && (
         <div
