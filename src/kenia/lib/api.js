@@ -438,31 +438,6 @@ const normalizeAppointment = (item) => {
   };
 };
 
-const toAppointmentDbPayload = (body = {}, existing = null) => {
-  const start = body.starts_at
-    ? new Date(body.starts_at)
-    : body.appointment_date
-      ? new Date(`${body.appointment_date}T${String(body.appointment_time || "10:00").slice(0, 5)}:00`)
-      : null;
-  const raw = { ...(existing?.raw_payload || {}), ...body };
-  const payload = { raw_payload: raw };
-  if (body.client_name != null) payload.client_name = body.client_name || "Cliente";
-  if (body.phone !== undefined) payload.phone = body.phone || null;
-  if (body.email !== undefined) payload.email = body.email || null;
-  if (body.city !== undefined) payload.city = body.city || null;
-  if (body.area !== undefined || body.legal_area !== undefined || body.title !== undefined) {
-    payload.legal_area = body.area || body.legal_area || body.title || "Atendimento jurídico";
-  }
-  if (body.notes !== undefined || body.case_summary !== undefined) payload.case_summary = body.notes || body.case_summary || null;
-  if (start && !Number.isNaN(start.getTime())) {
-    payload.appointment_date = start.toISOString().slice(0, 10);
-    payload.appointment_time = start.toTimeString().slice(0, 5);
-  }
-  if (body.source !== undefined) payload.source = body.source || "panel";
-  if (body.status !== undefined) payload.status = body.status === "confirmado" ? "scheduled" : body.status || "scheduled";
-  return payload;
-};
-
 const getMetrics = () => {
   const leads = read("leads", seedLeads);
   const processes = read("processes", seedProcesses);
@@ -614,14 +589,6 @@ const staticPost = (url, body = {}) => {
       try {
         const start = body.starts_at ? new Date(body.starts_at) : new Date();
         const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: null }));
-        const rawPayload = {
-          ...body,
-          title: body.title || `Consulta — ${body.area || body.legal_area || "Atendimento jurídico"}`,
-          starts_at: start.toISOString(),
-          duration_min: body.duration_min || 60,
-          location: body.location || "Google Meet",
-          meeting_link: body.meeting_link || body.meet_url || buildJitsiLink(`${body.client_name || "consulta"}-${Date.now()}`),
-        };
         const { data, error } = await supabase
           .from("appointments")
           .insert({
@@ -635,7 +602,7 @@ const staticPost = (url, body = {}) => {
             appointment_time: start.toTimeString().slice(0, 5),
             source: body.source || "panel",
             status: body.status === "confirmado" ? "scheduled" : body.status || "scheduled",
-            raw_payload: rawPayload,
+            raw_payload: body,
           })
           .select("*")
           .single();
@@ -773,25 +740,6 @@ const staticPut = (url, body = {}) => {
 
 const staticPatch = (url, body = {}) => {
   const [path] = String(url).split("?");
-  const updateAppointment = async () => {
-    const id = path.split("/").pop();
-    try {
-      const { data: current, error: currentError } = await supabase.from("appointments").select("*").eq("id", id).maybeSingle();
-      if (currentError) throw currentError;
-      const { data, error } = await supabase
-        .from("appointments")
-        .update(toAppointmentDbPayload(body, current))
-        .eq("id", id)
-        .select("*")
-        .single();
-      if (error) throw error;
-      return response(normalizeAppointment(data));
-    } catch {
-      const items = read("appointments", seedAppointments).map((item) => (item.id === id ? normalizeAppointment({ ...item, ...body }) : item));
-      write("appointments", items);
-      return response(items.find((item) => item.id === id) || { ok: true });
-    }
-  };
   const updateCollection = (key, fallback) => {
     const id = path.split("/").pop();
     const items = read(key, fallback).map((item) => (item.id === id ? { ...item, ...body } : item));
@@ -800,7 +748,7 @@ const staticPatch = (url, body = {}) => {
   };
   if (path.startsWith("/leads/")) return updateCollection("leads", seedLeads);
   if (path.startsWith("/finance/transactions/")) return updateCollection("transactions", seedTransactions);
-  if (path.startsWith("/appointments/")) return updateAppointment();
+  if (path.startsWith("/appointments/")) return updateCollection("appointments", seedAppointments);
   if (path.startsWith("/legal-deadlines/")) return updateCollection("legal_deadlines", seedLegalDeadlines);
   if (path.startsWith("/admin/case-analyses/")) return updateCollection("case_analyses", seedAnalyses);
   return response({ ok: true, fallback: true });
@@ -921,7 +869,6 @@ export const api = HAS_BACKEND
       put: liveApi.put.bind(liveApi),
       patch: (url, body, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/appointments/")) return staticPatch(url, body);
         if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticPatch(url, body);
         }
@@ -929,7 +876,6 @@ export const api = HAS_BACKEND
       },
       delete: (url, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/appointments/")) return staticDelete(url);
         if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticDelete(url);
         }
