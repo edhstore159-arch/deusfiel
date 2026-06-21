@@ -648,6 +648,21 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
       console.error("Erro ao gerar análise:", err);
     }
 
+    // Gera link válido da reunião (Jitsi - sala pública, sem necessidade de login)
+    let meetUrl: string | null = null;
+    if (appointment) {
+      const room = `kenia-${(appointment.client_name || "consulta")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "-")
+        .slice(0, 30)}-${Date.now().toString(36)}`;
+      meetUrl = `https://meet.jit.si/${room}`;
+      const dateStr = appointment.appointment_date || "";
+      const timeStr = appointment.appointment_time || "";
+      if (!reply.includes(meetUrl)) {
+        reply = `${reply}\n\n✅ Agendamento confirmado para ${dateStr} às ${timeStr}.\n🔗 Link da reunião: ${meetUrl}`.trim();
+      }
+    }
+
     // Gera áudio (TTS ElevenLabs) se o cliente pediu
     const wantAudio = body.want_audio !== false; // default true
     const audio_base64 = wantAudio ? await synthesizeSpeech(reply) : null;
@@ -662,16 +677,12 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
         response: reply,
       });
       if (appointment) {
-        const room = `kenia-${(appointment.client_name || "consulta")
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, "-")
-          .slice(0, 30)}-${Date.now().toString(36)}`;
-        const meetUrl = `https://meet.jit.si/${room}`;
+        const finalMeetUrl = meetUrl || `https://meet.jit.si/kenia-${Date.now().toString(36)}`;
         const enrichedPayload = {
           ...(appointment.raw_payload || {}),
-          meeting_link: meetUrl,
-          meet_url: meetUrl,
-          location: "Google Meet",
+          meeting_link: finalMeetUrl,
+          meet_url: finalMeetUrl,
+          location: "Jitsi Meet",
           duration_min: 60,
         };
         // Garante que o agendamento sempre fique vinculado a um atendente
@@ -705,8 +716,8 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
         } else {
           console.log("[chat-ai] appointment salvo id=", inserted?.id, "user_id=", assigneeId);
         }
-        (appointment as any).meeting_link = meetUrl;
-        (appointment as any).meet_url = meetUrl;
+        (appointment as any).meeting_link = finalMeetUrl;
+        (appointment as any).meet_url = finalMeetUrl;
         (appointment as any).assigned_to = assigneeId;
       }
     } catch (err) {
