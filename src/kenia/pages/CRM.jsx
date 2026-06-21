@@ -122,7 +122,19 @@ export default function CRM() {
             const stageLeads = leads.filter(l => l.stage === stage.id);
             const c = COLOR_MAP[stage.color] || COLOR_MAP.blue;
             return (
-              <div key={stage.id} className="w-80 shrink-0 flex flex-col" data-testid={`column-${stage.id}`}>
+              <div
+                key={stage.id}
+                className="w-80 shrink-0 flex flex-col rounded-md transition-all"
+                data-testid={`column-${stage.id}`}
+                onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("ring-2", "ring-gold-400"); }}
+                onDragLeave={(e) => e.currentTarget.classList.remove("ring-2", "ring-gold-400")}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove("ring-2", "ring-gold-400");
+                  const id = e.dataTransfer.getData("text/lead-id");
+                  if (id) moveStage(id, stage.id);
+                }}
+              >
                 <div className={`${c.bg} rounded-md border border-nude-200 px-3 py-2.5 flex items-center justify-between mb-2`}>
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${c.dot}`} />
@@ -132,7 +144,13 @@ export default function CRM() {
                 </div>
                 <div className="flex-1 space-y-2 overflow-y-auto pb-4 pr-1">
                   {stageLeads.map(lead => (
-                    <Card key={lead.id} className="p-3 border-nude-200 hover:shadow-sm hover:border-nude-300 transition-all" data-testid={`lead-card-${lead.id}`}>
+                    <Card
+                      key={lead.id}
+                      draggable
+                      onDragStart={(e) => e.dataTransfer.setData("text/lead-id", lead.id)}
+                      className="p-3 border-nude-200 hover:shadow-sm hover:border-nude-300 transition-all cursor-grab active:cursor-grabbing"
+                      data-testid={`lead-card-${lead.id}`}
+                    >
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="font-medium text-sm leading-tight">{lead.name}</div>
                         <Badge className="bg-nude-900 hover:bg-nude-900 text-white text-[10px] shrink-0">
@@ -165,10 +183,10 @@ export default function CRM() {
                         </div>
                       )}
                       <div className="flex items-center gap-1 mt-3 pt-2 border-t border-nude-100">
-                        <Select value={lead.stage} onValueChange={(v) => moveStage(lead.id, v)}>
-                          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
+                        <Select value="" onValueChange={(v) => moveStage(lead.id, v)}>
+                          <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Mover para..." /></SelectTrigger>
                           <SelectContent>
-                            {stages.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                            {stages.filter(s => s.id !== lead.stage).map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => removeLead(lead.id)} data-testid={`delete-lead-${lead.id}`}>
@@ -178,7 +196,7 @@ export default function CRM() {
                     </Card>
                   ))}
                   {stageLeads.length === 0 && (
-                    <div className="text-xs text-nude-400 text-center py-6">Sem leads</div>
+                    <div className="text-xs text-nude-400 text-center py-6 border border-dashed border-nude-200 rounded-md">Arraste leads para cá</div>
                   )}
                 </div>
               </div>
