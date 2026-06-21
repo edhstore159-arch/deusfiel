@@ -103,7 +103,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    const fullPrompt = await elaboratePrompt(prompt, style);
+    const userElaborated = await elaboratePrompt(prompt, style);
+    // Reinforce realism + face lock on every request so people look photoreal.
+    const fullPrompt = [
+      userElaborated,
+      "",
+      `REALISM REQUIREMENTS: ${REALISM}`,
+      "",
+      FACE_LOCK,
+      "",
+      `Negative prompt: ${NEG}`,
+      "--style raw --no artificial --no smooth skin --no CGI --photorealism high",
+    ].join("\n");
 
     const toDataUrl = (b64: string) =>
       b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
