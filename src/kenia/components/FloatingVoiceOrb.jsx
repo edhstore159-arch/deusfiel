@@ -424,11 +424,12 @@ export default function FloatingVoiceOrb() {
     }
   };
 
-  // Parse data em PT-BR: "hoje 15:00", "amanha 10h", "25/12 14:30", "25/12/2026 09:00"
+  // Parse data em PT-BR: "hoje 15:00", "amanha 10h", "sexta 14h", "25/12 14:30"
   const parseDateTimePt = (raw) => {
     if (!raw) return null;
     const s = String(raw).toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").trim();
-    const hm = s.match(/(\d{1,2})(?:[h:](\d{2}))?/);
+    const timeMatches = [...s.matchAll(/(?:\bas\s*)?(\d{1,2})(?:\s*h|:)(\d{2})?/g)];
+    const hm = timeMatches.at(-1) || s.match(/\b(?:as|às)\s+(\d{1,2})\b/);
     let hour = hm ? parseInt(hm[1], 10) : 10;
     let min = hm && hm[2] ? parseInt(hm[2], 10) : 0;
     if (isNaN(hour) || hour > 23) { hour = 10; min = 0; }
@@ -444,7 +445,14 @@ export default function FloatingVoiceOrb() {
         let year = dm[3] ? parseInt(dm[3], 10) : d.getFullYear();
         if (year < 100) year += 2000;
         d.setFullYear(year, month, day);
-      } else { return null; }
+      } else {
+        const weekDays = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+        const idx = weekDays.findIndex((day) => new RegExp(`\\b(?:proxim[ao]\\s+)?${day}\\b`).test(s));
+        if (idx < 0) return null;
+        let delta = (idx - d.getDay() + 7) % 7;
+        if (delta === 0 || /\bproxim[ao]\b/.test(s)) delta += 7;
+        d.setDate(d.getDate() + delta);
+      }
     }
     d.setHours(hour, min, 0, 0);
     return d;
@@ -481,6 +489,42 @@ export default function FloatingVoiceOrb() {
     } catch (e) {
       toast.error("Falha ao alterar agendamento: " + (e?.message || e));
       speak("Não consegui alterar o agendamento.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const createAppointmentByVoice = async ({ name, whenExpr, notes = "" }) => {
+    setThinking(true);
+    try {
+      const when = parseDateTimePt(whenExpr);
+      if (!name || !when) {
+        const msg = "Para agendar, diga o nome da pessoa e a data com horário. Exemplo: agendar João amanhã às 15h.";
+        setReply(msg); speak(msg); return;
+      }
+      const ctx = await loadClientContext().catch(() => null);
+      const c = findClient(name, ctx);
+      const clientName = c?.name || c?.client_name || name;
+      const payload = {
+        title: `Consulta — ${clientName}`,
+        client_name: clientName,
+        phone: c?.phone || c?.client_phone || null,
+        email: c?.email || null,
+        starts_at: when.toISOString(),
+        duration_min: 60,
+        location: "Google Meet",
+        notes: notes || `Agendado por comando de voz: ${transcript || name}`,
+        status: "confirmado",
+        source: "voice_orb",
+      };
+      const { data } = await api.post("/appointments", payload);
+      contextRef.current = null;
+      const msg = `Agendamento confirmado para ${clientName} em ${fmtDateTime(data?.starts_at || payload.starts_at)}. Já está na agenda e no painel.`;
+      setReply(msg); speak(msg); toast.success(msg);
+      navigate("/app/agenda");
+    } catch (e) {
+      toast.error("Falha ao criar agendamento: " + (e?.message || e));
+      speak("Não consegui confirmar o agendamento agora.");
     } finally {
       setThinking(false);
     }
@@ -628,6 +672,12 @@ export default function FloatingVoiceOrb() {
     // Intenção: agendamentos do dia / de hoje
     if (/\bagendamento[s]?\b/.test(lower) && /\b(hoje|do dia|de hoje|para hoje)\b/.test(lower)) {
       reportTodayAppointments();
+      return;
+    }
+    // Criar agendamento por voz: "agendar consulta com João amanhã às 15h"
+    const createApptMatch = text.match(/\b(?:agendar|marcar|agenda|marque|agende)\s+(?:uma\s+)?(?:consulta|reuniao|reunião|atendimento|hor[aá]rio)?\s*(?:com|para|pro|pra|ao|a)?\s+(.+?)\s+(?:para|pra|pro|em|no|na)\s+(.+)/i);
+    if (createApptMatch) {
+      createAppointmentByVoice({ name: createApptMatch[1].trim(), whenExpr: createApptMatch[2].trim() });
       return;
     }
     // Enviar mensagem no WhatsApp: "enviar/mandar mensagem/whatsapp para [nome] dizendo/falando/: [texto]"
