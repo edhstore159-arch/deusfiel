@@ -334,17 +334,17 @@ export default function Agenda() {
                           {it.status}
                         </Badge>
                       </div>
-                      <div className="flex gap-1.5 mt-3 pt-3 border-t border-nude-100">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleStatus(it, "confirmado")}>
+                      <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-nude-100">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "confirmado")}>
                           <CheckCircle2 className="w-3 h-3 mr-1 text-gold-600" /> Confirmar
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleStatus(it, "pendente")}>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "pendente")}>
                           <AlertCircle className="w-3 h-3 mr-1 text-gold-600" /> Pendente
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleStatus(it, "cancelado")}>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "cancelado")}>
                           <XCircle className="w-3 h-3 mr-1 text-rose-500" /> Cancelar
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs ml-auto text-rose-500 hover:text-rose-600" onClick={() => remove(it.id)}>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2 sm:ml-auto text-rose-500 hover:text-rose-600" onClick={() => remove(it.id)}>
                           <Trash2 className="w-3 h-3 mr-1" /> Excluir
                         </Button>
                       </div>
