@@ -788,7 +788,7 @@ export default function FloatingVoiceOrb() {
             />
           )}
         </button>
-        <span className="pointer-events-none text-[10px] font-semibold tracking-wide text-gold-700 whitespace-nowrap drop-shadow-sm">Fale comigo</span>
+        <span className="pointer-events-none text-[10px] font-semibold tracking-wide text-gold-700 whitespace-nowrap drop-shadow-sm">Kênia Garcia · atendente virtual</span>
       </div>
 
       {open && (
