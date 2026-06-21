@@ -407,8 +407,8 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   // Hora: 14:30, 14h, 14h30, às 14
   const timeMatch = t.match(/\b(?:[aà]s\s*)?(\d{1,2})(?:[:h](\d{2}))?\s*(h|hs|horas)?\b/i);
   // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
-  const todayMatch = /\bhoje\b/i.test(t);
-  const tomorrowMatch = /\bamanh[aã]\b/i.test(t);
+  const todayMatch = /(^|\W)hoje(\W|$)/i.test(t);
+  const tomorrowMatch = /(^|\W)amanh[ãa](\W|$)/i.test(t);
   const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
 
   if (!timeMatch || (!todayMatch && !tomorrowMatch && !dateMatch)) return null;
@@ -439,7 +439,7 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
 
   // Tenta achar nome/telefone/email no histórico+mensagem
   const all = [...history.map(h => h.content), t].join("\n");
-  const phone = (all.match(/\+?\d{2}\s?\(?\d{2}\)?\s?\d{4,5}-?\d{4}/) || [])[0] || null;
+  const phone = (all.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}/) || [])[0] || null;
   const email = (all.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0] || null;
   const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
   const client_name = nameMatch?.[1]?.trim() || "Cliente do WhatsApp";
