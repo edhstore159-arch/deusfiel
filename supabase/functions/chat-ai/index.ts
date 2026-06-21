@@ -595,7 +595,7 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
       if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
-    const appointment = parseAppointmentBlock(rawReply);
+    const appointment = parseAppointmentBlock(rawReply) || extractAppointmentFromText(userMessage, history);
     let reply = cleanRepeatedText(removeUserEcho(removeRoleLabels(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage)), userMessage));
     if (!reply || reply.length < 2) {
       reply = userAskedTemporalInfo(userMessage)
