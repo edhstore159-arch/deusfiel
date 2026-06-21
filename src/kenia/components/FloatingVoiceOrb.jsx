@@ -674,6 +674,12 @@ export default function FloatingVoiceOrb() {
       reportTodayAppointments();
       return;
     }
+    // Criar agendamento por voz: "agendar consulta com João amanhã às 15h"
+    const createApptMatch = text.match(/\b(?:agendar|marcar|agenda|marque|agende)\s+(?:uma\s+)?(?:consulta|reuniao|reunião|atendimento|hor[aá]rio)?\s*(?:com|para|pro|pra|ao|a)?\s+(.+?)\s+(?:para|pra|pro|em|no|na)\s+(.+)/i);
+    if (createApptMatch) {
+      createAppointmentByVoice({ name: createApptMatch[1].trim(), whenExpr: createApptMatch[2].trim() });
+      return;
+    }
     // Enviar mensagem no WhatsApp: "enviar/mandar mensagem/whatsapp para [nome] dizendo/falando/: [texto]"
     const waMatch = text.match(/\b(?:enviar|mandar|envie|mande)\s+(?:uma\s+)?(?:mensagem|whats?app|zap)\s+(?:para|pro|pra|ao|a|o)\s+(.+?)\s+(?:dizendo|falando|com\s+a\s+mensagem|que|:)\s+(.+)/i);
     if (waMatch) { sendWhatsAppTo(waMatch[1].trim(), waMatch[2].trim()); return; }
