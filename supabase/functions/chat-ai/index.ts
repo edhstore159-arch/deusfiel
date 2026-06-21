@@ -51,6 +51,27 @@ async function synthesizeSpeech(text: string): Promise<string | null> {
   }
 }
 
+function createValidMeetingLink(clientName = "consulta"): string {
+  const cleanName = String(clientName || "consulta")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 30) || "consulta";
+  const room = `kenia-${cleanName}-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+  const url = `https://meet.jit.si/${room}`;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" || parsed.hostname !== "meet.jit.si" || !parsed.pathname.slice(1)) {
+      throw new Error("meeting link inválido");
+    }
+    return parsed.toString();
+  } catch (_err) {
+    return `https://meet.jit.si/kenia-consulta-${crypto.randomUUID()}`;
+  }
+}
+
 const DEFAULT_PROMPT = `Você é a secretária da plataforma, uma pessoa real atendendo o cliente pelo chat/WhatsApp. NUNCA se identifique como "virtual", "IA", "robô", "assistente automática" ou "bot" — fale e aja como uma secretária humana de verdade.
 
 OBJETIVO:
@@ -386,8 +407,8 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   // Hora: 14:30, 14h, 14h30, às 14
   const timeMatch = t.match(/\b(?:[aà]s\s*)?(\d{1,2})(?:[:h](\d{2}))?\s*(h|hs|horas)?\b/i);
   // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
-  const todayMatch = /\bhoje\b/i.test(t);
-  const tomorrowMatch = /\bamanh[aã]\b/i.test(t);
+  const todayMatch = /(^|\W)hoje(\W|$)/i.test(t);
+  const tomorrowMatch = /(^|\W)amanh[ãa](\W|$)/i.test(t);
   const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
 
   if (!timeMatch || (!todayMatch && !tomorrowMatch && !dateMatch)) return null;
@@ -418,7 +439,7 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
 
   // Tenta achar nome/telefone/email no histórico+mensagem
   const all = [...history.map(h => h.content), t].join("\n");
-  const phone = (all.match(/\+?\d{2}\s?\(?\d{2}\)?\s?\d{4,5}-?\d{4}/) || [])[0] || null;
+  const phone = (all.match(/(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?9?\d{4}[-\s]?\d{4}/) || [])[0] || null;
   const email = (all.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0] || null;
   const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
   const client_name = nameMatch?.[1]?.trim() || "Cliente do WhatsApp";
@@ -651,11 +672,7 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
     // Gera link válido da reunião (Jitsi - sala pública, sem necessidade de login)
     let meetUrl: string | null = null;
     if (appointment) {
-      const room = `kenia-${(appointment.client_name || "consulta")
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "-")
-        .slice(0, 30)}-${Date.now().toString(36)}`;
-      meetUrl = `https://meet.jit.si/${room}`;
+      meetUrl = createValidMeetingLink(appointment.client_name || "consulta");
       const dateStr = appointment.appointment_date || "";
       const timeStr = appointment.appointment_time || "";
       if (!reply.includes(meetUrl)) {
@@ -677,7 +694,7 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
         response: reply,
       });
       if (appointment) {
-        const finalMeetUrl = meetUrl || `https://meet.jit.si/kenia-${Date.now().toString(36)}`;
+        const finalMeetUrl = meetUrl || createValidMeetingLink(appointment.client_name || "consulta");
         const enrichedPayload = {
           ...(appointment.raw_payload || {}),
           meeting_link: finalMeetUrl,
