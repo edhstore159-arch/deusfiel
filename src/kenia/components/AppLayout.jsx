@@ -150,9 +150,9 @@ export default function AppLayout() {
               onFocus={() => prefetch(item.to)}
               onTouchStart={() => prefetch(item.to)}
               className={({ isActive }) =>
-                `relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[13px] transition-all duration-200 ${
+                `relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[15px] uppercase tracking-wide transition-all duration-200 ${
                   isActive
-                    ? "bg-gold-50 text-gold-700 font-medium nav-active-accent"
+                    ? "bg-gold-50 text-gold-700 font-semibold nav-active-accent"
                     : "text-nude-600 hover:bg-nude-100 hover:text-nude-900"
                 }`
               }
@@ -160,10 +160,10 @@ export default function AppLayout() {
               {({ isActive }) => (
                 <>
                   <item.icon
-                    className={`w-4 h-4 ${isActive ? "text-gold-500" : "text-nude-500"}`}
+                    className={`w-5 h-5 ${isActive ? "text-gold-500" : "text-nude-500"}`}
                     strokeWidth={1.6}
                   />
-                  <span className="font-medium">{item.label}</span>
+                  <span className="font-semibold">{item.label}</span>
                 </>
               )}
             </NavLink>
