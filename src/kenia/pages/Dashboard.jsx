@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/kenia/lib/api";
+import { extractWhatsAppDigits, formatWhatsAppPhone, pickWhatsAppNumber } from "@/kenia/lib/phone";
 import { Card } from "@/kenia/components/ui/card";
 import { Input } from "@/kenia/components/ui/input";
 import { Button } from "@/kenia/components/ui/button";
@@ -32,12 +33,14 @@ export default function Dashboard() {
   ]);
   const [aiThinking, setAiThinking] = useState(false);
   const [search, setSearch] = useState("");
+  const [whatsAppCenter, setWhatsAppCenter] = useState({ connected: false, phone: "" });
   const aiBoxRef = useRef(null);
 
   useEffect(() => {
     loadContacts();
     loadMetrics();
     loadAppointments();
+    loadWhatsAppCenter();
   }, []);
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export default function Dashboard() {
     const t = setInterval(() => {
       loadContacts();
       loadAppointments();
+      loadWhatsAppCenter();
       if (activeContact) loadMessages(activeContact.id);
     }, 3000);
     return () => clearInterval(t);
@@ -120,6 +124,22 @@ export default function Dashboard() {
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
       setAppointments(upcoming);
     } catch {}
+  };
+
+  const loadWhatsAppCenter = async () => {
+    try {
+      const [{ data: cfg }, { data: status }] = await Promise.all([
+        api.get("/whatsapp/config").catch(() => ({ data: null })),
+        api.get("/whatsapp/baileys/status").catch(() => ({ data: null })),
+      ]);
+      const digits = pickWhatsAppNumber(status, cfg);
+      setWhatsAppCenter({
+        connected: Boolean(status?.connected || digits),
+        phone: digits,
+      });
+    } catch {
+      setWhatsAppCenter({ connected: false, phone: "" });
+    }
   };
 
   const loadLeadForContact = async (phone) => {
@@ -246,6 +266,7 @@ export default function Dashboard() {
   );
 
   const initials = (name) => name.split(" ").map(s => s[0]).slice(0, 2).join("").toUpperCase();
+  const centerPhoneLabel = whatsAppCenter.phone ? formatWhatsAppPhone(whatsAppCenter.phone) : "Número não identificado";
 
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="dashboard-page">
@@ -257,7 +278,10 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-3">
           <Badge className="bg-gold-50 text-gold-700 hover:bg-gold-50 border border-gold-200 gap-1.5 px-3 py-1.5 rounded-full font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-gold-500 animate-pulse-soft" /> WhatsApp conectado
+            <span className="w-1.5 h-1.5 rounded-full bg-gold-500 animate-pulse-soft" /> {whatsAppCenter.connected ? "WhatsApp conectado" : "WhatsApp"}
+          </Badge>
+          <Badge variant="outline" className="border-nude-200 bg-white text-nude-700 px-3 py-1.5 rounded-full font-mono">
+            Central: {centerPhoneLabel}
           </Badge>
         </div>
       </div>
@@ -339,9 +363,13 @@ export default function Dashboard() {
                 </Avatar>
                 <div className="flex-1">
                   <div className="font-semibold text-sm">{activeContact.name}</div>
-                  <div className="text-xs text-nude-500">{activeContact.phone}</div>
+                  <div className="text-xs text-nude-500">{formatWhatsAppPhone(activeContact.phone)}</div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8"><Phone className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                  <a href={`tel:+${extractWhatsAppDigits(activeContact.phone)}`} aria-label="Telefonar">
+                    <Phone className="w-4 h-4" />
+                  </a>
+                </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="w-4 h-4" /></Button>
               </div>
 
@@ -481,7 +509,7 @@ export default function Dashboard() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="font-display font-semibold text-base mt-3">{activeContact.name}</div>
-                  <div className="text-xs text-nude-500 mt-0.5">{activeContact.phone}</div>
+                  <div className="text-xs text-nude-500 mt-0.5">{formatWhatsAppPhone(activeContact.phone)}</div>
                 </div>
 
                 {appointments.length > 0 && (
