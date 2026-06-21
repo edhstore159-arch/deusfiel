@@ -210,11 +210,28 @@ function StatCard({ label, value, color = "slate", Icon }) {
   );
 }
 
+function formatBrPhone(raw) {
+  if (!raw) return "—";
+  // remove "whatsapp:" prefix, spaces, anything non-digit/+
+  let digits = String(raw).replace(/^whatsapp:/i, "").replace(/\D/g, "");
+  // strip leading country code 55 if Brazilian
+  if (digits.startsWith("55") && digits.length > 11) digits = digits.slice(2);
+  if (digits.length === 11) {
+    return `+55 (${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `+55 (${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return `+${String(raw).replace(/^whatsapp:\+?/i, "").replace(/\D/g, "")}`;
+}
+
 function LogRow({ msg }) {
   const isIn = !msg.from_me;
   const isBot = !!msg.bot;
   const time = new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const date = new Date(msg.created_at).toLocaleDateString("pt-BR");
+  const displayPhone = formatBrPhone(msg.contact_phone);
+  const telDigits = String(msg.contact_phone || "").replace(/^whatsapp:/i, "").replace(/\D/g, "");
   const tagColor = isIn
     ? "bg-blue-100 text-blue-800"
     : isBot
