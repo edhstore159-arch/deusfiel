@@ -740,7 +740,7 @@ export default function FloatingVoiceOrb() {
         >
           <div className="flex items-center justify-between mb-2">
             <div className="font-serif text-base text-nude-900">Assistente Kênia</div>
-            <button onClick={() => setOpen(false)} className="text-nude-500 hover:text-nude-900">
+            <button onClick={() => { userMinimizedRef.current = true; setOpen(false); }} className="text-nude-500 hover:text-nude-900" title="Minimizar (escuta continua ativa)">
               <X className="w-4 h-4" />
             </button>
           </div>
