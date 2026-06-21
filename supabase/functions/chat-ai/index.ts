@@ -452,7 +452,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
-    const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
+    let history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
     const sessionId: string | null = body.session_id ? String(body.session_id) : null;
@@ -463,6 +463,31 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // WhatsApp/Twilio envia apenas a última mensagem; recarrega o histórico salvo
+    // para a IA conseguir completar agendamentos em conversas de vários passos.
+    if (history.length === 0 && sessionId) {
+      try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const { data: savedHistory, error: historyError } = await supabase
+          .from("conversations")
+          .select("message,response,created_at")
+          .eq("session_id", sessionId)
+          .order("created_at", { ascending: true })
+          .limit(30);
+        if (historyError) {
+          console.error("[chat-ai] falha ao carregar histórico:", historyError);
+        } else if (Array.isArray(savedHistory) && savedHistory.length > 0) {
+          history = savedHistory.flatMap((row) => [
+            { role: "user", content: String(row.message || "") },
+            { role: "assistant", content: String(row.response || "") },
+          ]).filter((item) => item.content.trim());
+          console.log("[chat-ai] histórico restaurado", { sessionId, turns: savedHistory.length });
+        }
+      } catch (historyErr) {
+        console.error("[chat-ai] erro ao restaurar histórico:", historyErr);
+      }
     }
 
     const now = new Date();
