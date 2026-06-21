@@ -786,6 +786,7 @@ export default function FloatingVoiceOrb() {
             title="Escuta contínua ativa"
           />
         )}
+        <span className="pointer-events-none absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wide text-gold-700 whitespace-nowrap">Fale comigo</span>
       </button>
 
       {open && (
