@@ -921,6 +921,7 @@ export const api = HAS_BACKEND
       put: liveApi.put.bind(liveApi),
       patch: (url, body, config) => {
         const p = String(url).split("?")[0];
+        if (p.startsWith("/appointments/")) return staticPatch(url, body);
         if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticPatch(url, body);
         }
@@ -928,6 +929,7 @@ export const api = HAS_BACKEND
       },
       delete: (url, config) => {
         const p = String(url).split("?")[0];
+        if (p.startsWith("/appointments/")) return staticDelete(url);
         if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticDelete(url);
         }
