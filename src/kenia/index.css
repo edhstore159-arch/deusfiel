@@ -198,15 +198,15 @@ h1, h2, h3, h4, h5, h6, .font-display {
     outline-offset: 2px;
 }
 
-/* Intense sun-like glow for Kênia Garcia virtual assistant orb */
+/* Glow pulse for "Fale comigo" orb */
 @keyframes orb-glow {
     0%, 100% {
-        box-shadow: 0 0 16px 5px rgba(255, 232, 139, 0.95), 0 0 34px 12px rgba(212, 175, 55, 0.68), 0 0 58px 20px rgba(255, 204, 51, 0.36);
+        box-shadow: 0 0 18px 4px rgba(212, 175, 55, 0.55), 0 0 36px 8px rgba(212, 175, 55, 0.35);
     }
     50% {
-        box-shadow: 0 0 24px 8px rgba(255, 248, 202, 1), 0 0 54px 20px rgba(255, 214, 74, 0.85), 0 0 86px 32px rgba(212, 175, 55, 0.55);
+        box-shadow: 0 0 28px 10px rgba(212, 175, 55, 0.9), 0 0 64px 18px rgba(212, 175, 55, 0.55);
     }
 }
 .animate-orb-glow {
-    animation: orb-glow 1.45s ease-in-out infinite;
+    animation: orb-glow 2s ease-in-out infinite;
 }
