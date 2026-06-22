@@ -372,6 +372,8 @@ export default function FloatingVoiceOrb() {
   };
 
   const speak = (text) => {
+    // Em outras abas (não-líder) a secretária permanece em silêncio para não duplicar a fala.
+    if (!isLeaderRef.current) return;
     try {
       const synth = window.speechSynthesis;
       if (audioRef.current) {
