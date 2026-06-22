@@ -213,6 +213,8 @@ export default function FloatingVoiceOrb() {
       awakeUntilRef.current = 0;
       setTranscript("");
       try {
+        rec.continuous = true;
+        rec.interimResults = true;
         if (!recognitionActiveRef.current) rec.start();
         toast.success('Diga "secretária" para ativar.');
         speak("Estou de prontidão. Diga secretária para falar comigo.");
@@ -863,9 +865,11 @@ export default function FloatingVoiceOrb() {
 
   const handleCommand = (text) => {
     if (!text?.trim()) return;
-    const lower = text.toLowerCase();
-    const wakeCommand = hasWakeWord(text) ? stripWake(text) : "";
-    if (hasWakeWord(text) && (!wakeCommand || isWakeOnlyPrompt(wakeCommand))) {
+    const woke = hasWakeWord(text);
+    const commandText = woke ? stripWake(text) : String(text || "").trim();
+    const effectiveText = commandText || String(text || "").trim();
+    const lower = effectiveText.toLowerCase();
+    if (woke && (!commandText || isWakeOnlyPrompt(commandText))) {
       answerWakePrompt();
       return;
     }
@@ -887,8 +891,8 @@ export default function FloatingVoiceOrb() {
       return;
     }
     // Tocar música no YouTube — aceita "toca X", "música X", "ouvir X", com ou sem mencionar YouTube
-    const ytMatch = text.match(/\b(?:toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|p[oõ]r|reproduz|reproduzir|escutar|ouvir|busca[r]?|procura[r]?)\s+(?:a\s+|o\s+|uma\s+|um\s+)?(?:m[uú]sica|son[s]?|som|v[ií]deo|playlist|clipe|audio|[aá]udio|can[cç][aã]o)?\s*(?:do|da|de|dos|das|no|pelo|pela)?\s*(.+?)(?:\s+(?:no|do|pelo|pela|pelo\s+youtube|youtube))?\s*$/i);
-    const musicOnly = text.match(/\b(?:m[uú]sica|can[cç][aã]o|playlist|clipe)\s+(?:do|da|de|dos|das)?\s*(.+)/i);
+    const ytMatch = effectiveText.match(/\b(?:toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|p[oõ]r|reproduz|reproduzir|escutar|ouvir|busca[r]?|procura[r]?)\s+(?:a\s+|o\s+|uma\s+|um\s+)?(?:m[uú]sica|son[s]?|som|v[ií]deo|playlist|clipe|audio|[aá]udio|can[cç][aã]o)?\s*(?:do|da|de|dos|das|no|pelo|pela)?\s*(.+?)(?:\s+(?:no|do|pelo|pela|pelo\s+youtube|youtube))?\s*$/i);
+    const musicOnly = effectiveText.match(/\b(?:m[uú]sica|can[cç][aã]o|playlist|clipe)\s+(?:do|da|de|dos|das)?\s*(.+)/i);
     if (/youtube|y\s*tube|yt\b/i.test(lower) || (ytMatch && /\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|escutar|ouvir)\b/i.test(lower)) || musicOnly) {
       const q = (ytMatch ? ytMatch[1] : (musicOnly ? musicOnly[1] : text)).replace(/youtube/gi, "").replace(/\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|m[uú]sica|som|v[ií]deo|can[cç][aã]o|playlist|clipe)\b/gi, "").trim();
       if (q) { userMinimizedRef.current = false; setOpen(true); playYouTube(q); return; }
@@ -899,10 +903,10 @@ export default function FloatingVoiceOrb() {
       return;
     }
     // Enviar mensagem no WhatsApp: "enviar/mandar mensagem/whatsapp para [nome] dizendo/falando/: [texto]"
-    const waMatch = text.match(/\b(?:enviar|mandar|envie|mande)\s+(?:uma\s+)?(?:mensagem|whats?app|zap)\s+(?:para|pro|pra|ao|a|o)\s+(.+?)\s+(?:dizendo|falando|com\s+a\s+mensagem|que|:)\s+(.+)/i);
+    const waMatch = effectiveText.match(/\b(?:enviar|mandar|envie|mande)\s+(?:uma\s+)?(?:mensagem|whats?app|zap)\s+(?:para|pro|pra|ao|a|o)\s+(.+?)\s+(?:dizendo|falando|com\s+a\s+mensagem|que|:)\s+(.+)/i);
     if (waMatch) { sendWhatsAppTo(waMatch[1].trim(), waMatch[2].trim()); return; }
     // Criar novo agendamento: "agendar/marcar [consulta/reunião] com/para [nome] para/no dia [data/hora]"
-    const newApptMatch = text.match(/\b(?:agendar|agende|marcar|marque|cria[r]?|criar|nova?|novo)\s+(?:um[a]?\s+)?(?:agendamento|consulta|reuni[ãa]o|compromisso|atendimento|hor[áa]rio)?\s*(?:com|para|pro|pra|de|do|da)\s+(.+?)\s+(?:para|pra|pro|no\s+dia|em|às|as)\s+(.+)/i);
+    const newApptMatch = effectiveText.match(/\b(?:agendar|agende|marcar|marque|cria[r]?|criar|nova?|novo)\s+(?:um[a]?\s+)?(?:agendamento|consulta|reuni[ãa]o|compromisso|atendimento|hor[áa]rio)?\s*(?:com|para|pro|pra|de|do|da)\s+(.+?)\s+(?:para|pra|pro|no\s+dia|em|às|as)\s+(.+)/i);
     if (newApptMatch) { scheduleNewAppointment(newApptMatch[1].trim(), newApptMatch[2].trim()); return; }
     // Mudar data do agendamento: "mudar/alterar/remarcar agendamento de [nome] para [data]"
     const chMatch = text.match(/\b(?:mudar|alterar|trocar|remarcar|reagendar|mover|adiar)\s+(?:o\s+|a\s+)?(?:agendamento|reuniao|reunião|consulta|compromisso|hor[aá]rio)?\s*(?:de|do|da|com)?\s*(.+?)\s+(?:para|pra|pro)\s+(.+)/i);
