@@ -909,18 +909,18 @@ export default function FloatingVoiceOrb() {
     const newApptMatch = effectiveText.match(/\b(?:agendar|agende|marcar|marque|cria[r]?|criar|nova?|novo)\s+(?:um[a]?\s+)?(?:agendamento|consulta|reuni[ãa]o|compromisso|atendimento|hor[áa]rio)?\s*(?:com|para|pro|pra|de|do|da)\s+(.+?)\s+(?:para|pra|pro|no\s+dia|em|às|as)\s+(.+)/i);
     if (newApptMatch) { scheduleNewAppointment(newApptMatch[1].trim(), newApptMatch[2].trim()); return; }
     // Mudar data do agendamento: "mudar/alterar/remarcar agendamento de [nome] para [data]"
-    const chMatch = text.match(/\b(?:mudar|alterar|trocar|remarcar|reagendar|mover|adiar)\s+(?:o\s+|a\s+)?(?:agendamento|reuniao|reunião|consulta|compromisso|hor[aá]rio)?\s*(?:de|do|da|com)?\s*(.+?)\s+(?:para|pra|pro)\s+(.+)/i);
+    const chMatch = effectiveText.match(/\b(?:mudar|alterar|trocar|remarcar|reagendar|mover|adiar)\s+(?:o\s+|a\s+)?(?:agendamento|reuniao|reunião|consulta|compromisso|hor[aá]rio)?\s*(?:de|do|da|com)?\s*(.+?)\s+(?:para|pra|pro)\s+(.+)/i);
     if (chMatch) { changeAppointmentDate(chMatch[1].trim(), chMatch[2].trim()); return; }
     // Ligar para [nome]
-    const callMatch = text.match(/\b(?:ligar|telefonar|chamar|ligue|telefone)\s+(?:para|pro|pra|o|a)?\s*(.+)/i);
+    const callMatch = effectiveText.match(/\b(?:ligar|telefonar|chamar|ligue|telefone)\s+(?:para|pro|pra|o|a)?\s*(.+)/i);
     if (callMatch) { callClient(callMatch[1].trim()); return; }
     // Reagendar [nome] (sem data) — abre a agenda
-    const reMatch = text.match(/\b(?:reagendar|remarcar|reagenda|remarca)\s+(?:com|para|o|a)?\s*(.+)/i);
+    const reMatch = effectiveText.match(/\b(?:reagendar|remarcar|reagenda|remarca)\s+(?:com|para|o|a)?\s*(.+)/i);
     if (reMatch) { rescheduleClient(reMatch[1].trim()); return; }
 
-    const route = matchRoute(text);
+    const route = matchRoute(effectiveText);
     // Comandos diretos de navegação ("abrir/ir/vai para X")
-    if (route && /\b(abrir|abra|ir|vai|vá|leva|leve|navegar|abre)\b/i.test(text)) {
+    if (route && /\b(abrir|abra|ir|vai|vá|leva|leve|navegar|abre)\b/i.test(effectiveText)) {
       navigate(route);
       const label = ROUTES.find((r) => r.to === route)?.keys[0] || "página";
       toast.success(`Abrindo ${label}`);
@@ -929,7 +929,7 @@ export default function FloatingVoiceOrb() {
       return;
     }
     // Caso geral: pergunta ao assistente (Ollama via chat-ai)
-    askOllama(text);
+    askOllama(effectiveText);
   };
 
   useEffect(() => {
@@ -961,6 +961,8 @@ export default function FloatingVoiceOrb() {
       setAlwaysOn(false);
       setTranscript("");
       try {
+        rec.continuous = false;
+        rec.interimResults = true;
         rec.start();
         recognitionActiveRef.current = true;
         setListening(true);
