@@ -10,18 +10,9 @@ import { Label } from "@/kenia/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/kenia/components/ui/tabs";
 import { Badge } from "@/kenia/components/ui/badge";
 import { toast } from "sonner";
-import { AlertTriangle, ImagePlus, Wand2, Send, Trash2, X, Download, Paperclip, Lock, Save, RotateCcw } from "lucide-react";
-import {
-  loadAllSecretaryConfig,
-  exportSecretaryConfig,
-  importSecretaryConfig,
-} from "@/kenia/storage";
-import { saveVoiceConfig, VOICE_DEFAULTS } from "@/kenia/storage/voiceSecretary";
-import { saveChatConfig, CHAT_DEFAULTS } from "@/kenia/storage/chatSecretary";
+import { AlertTriangle, ImagePlus, Wand2, Send, Trash2, X, Download, Paperclip } from "lucide-react";
 
 const DEBUG_BUCKET = "debug-uploads";
-const DASHBOARD_CFG_PASSWORD = "DeuseJustica";
-const DASHBOARD_CFG_SESSION_KEY = "kenia:dbg-cfg-unlocked";
 
 export default function DebugTool() {
   const [endpoint, setEndpoint] = useState(
@@ -40,63 +31,7 @@ export default function DebugTool() {
   const [uploadingAttach, setUploadingAttach] = useState(false);
   const attachInputRef = useRef(null);
 
-  // Painel protegido com senha — configurações do Dashboard (prompts, etc.)
-  const [cfgUnlocked, setCfgUnlocked] = useState(
-    () => sessionStorage.getItem(DASHBOARD_CFG_SESSION_KEY) === "1"
-  );
-  const [cfgPassword, setCfgPassword] = useState("");
-  const [voiceCfg, setVoiceCfg] = useState(VOICE_DEFAULTS);
-  const [chatCfg, setChatCfg] = useState(CHAT_DEFAULTS);
-
   useEffect(() => { loadHistory(); }, []);
-
-  useEffect(() => {
-    if (!cfgUnlocked) return;
-    const all = loadAllSecretaryConfig();
-    setVoiceCfg(all.voice);
-    setChatCfg(all.chat);
-  }, [cfgUnlocked]);
-
-  const tryUnlockCfg = () => {
-    if (cfgPassword === DASHBOARD_CFG_PASSWORD) {
-      sessionStorage.setItem(DASHBOARD_CFG_SESSION_KEY, "1");
-      setCfgUnlocked(true);
-      setCfgPassword("");
-      toast.success("Acesso liberado");
-    } else {
-      toast.error("Senha incorreta");
-    }
-  };
-
-  const lockCfg = () => {
-    sessionStorage.removeItem(DASHBOARD_CFG_SESSION_KEY);
-    setCfgUnlocked(false);
-  };
-
-  const saveDashboardCfg = () => {
-    try {
-      saveVoiceConfig(voiceCfg);
-      saveChatConfig(chatCfg);
-      toast.success("Configurações do Dashboard salvas");
-    } catch (e) {
-      toast.error(`Falha ao salvar: ${e?.message || e}`);
-    }
-  };
-
-  const resetDashboardCfg = () => {
-    setVoiceCfg(VOICE_DEFAULTS);
-    setChatCfg(CHAT_DEFAULTS);
-    toast("Valores restaurados (clique em Salvar para aplicar)");
-  };
-
-  const exportCfg = () => {
-    const blob = new Blob([exportSecretaryConfig()], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `kenia-config-${Date.now()}.json`;
-    a.click();
-  };
-
 
   const loadHistory = async () => {
     try {
@@ -288,12 +223,9 @@ export default function DebugTool() {
       <div className="flex-1 overflow-auto p-6">
         <Card className="max-w-3xl mx-auto p-6 border-nude-200">
           <Tabs defaultValue="instruction">
-            <TabsList className="grid grid-cols-3 w-full max-w-2xl">
+            <TabsList className="grid grid-cols-2 w-full max-w-sm">
               <TabsTrigger value="instruction" data-testid="dbg-tab-instr">Instrução</TabsTrigger>
               <TabsTrigger value="merge" data-testid="dbg-tab-merge">Mesclar Imagens</TabsTrigger>
-              <TabsTrigger value="dashcfg" data-testid="dbg-tab-dashcfg">
-                <Lock className="w-3.5 h-3.5 mr-1" /> Configs Dashboard
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="instruction" className="mt-6">
@@ -436,135 +368,6 @@ export default function DebugTool() {
                   <div className="flex justify-end mt-3">
                     <Button variant="outline" size="sm" onClick={download}>
                       <Download className="w-4 h-4 mr-2" /> Baixar PNG
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="dashcfg" className="mt-6">
-              {!cfgUnlocked ? (
-                <div className="max-w-sm mx-auto py-8 text-center">
-                  <Lock className="w-10 h-10 mx-auto text-gold-600 mb-3" />
-                  <div className="font-semibold text-nude-900 mb-1">Área restrita</div>
-                  <div className="text-xs text-nude-500 mb-4">
-                    Digite a senha para visualizar e editar as configurações do Dashboard.
-                  </div>
-                  <Input
-                    type="password"
-                    value={cfgPassword}
-                    onChange={(e) => setCfgPassword(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") tryUnlockCfg(); }}
-                    placeholder="Senha"
-                    data-testid="dbg-cfg-password"
-                  />
-                  <Button onClick={tryUnlockCfg} className="mt-3 w-full bg-gold-600 hover:bg-gold-700">
-                    Acessar
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-nude-600">
-                      Edite os prompts e parâmetros das secretárias (voz + chat) do Dashboard.
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={lockCfg}>
-                      <Lock className="w-4 h-4 mr-1" /> Bloquear
-                    </Button>
-                  </div>
-
-                  <div className="border border-nude-200 rounded-md p-4 bg-white">
-                    <div className="text-xs uppercase tracking-widest text-gold-600 font-semibold mb-2">
-                      Secretária de Voz (Kênia)
-                    </div>
-                    <Label>Prompt da Voz</Label>
-                    <Textarea
-                      rows={6}
-                      value={voiceCfg.prompt}
-                      onChange={(e) => setVoiceCfg({ ...voiceCfg, prompt: e.target.value })}
-                      data-testid="dbg-cfg-voice-prompt"
-                    />
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      <div>
-                        <Label>Idioma</Label>
-                        <Input
-                          value={voiceCfg.lang}
-                          onChange={(e) => setVoiceCfg({ ...voiceCfg, lang: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Nome da Voz</Label>
-                        <Input
-                          value={voiceCfg.voiceName}
-                          onChange={(e) => setVoiceCfg({ ...voiceCfg, voiceName: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Velocidade (rate)</Label>
-                        <Input
-                          type="number" step="0.1" min="0.5" max="2"
-                          value={voiceCfg.rate}
-                          onChange={(e) => setVoiceCfg({ ...voiceCfg, rate: parseFloat(e.target.value) || 1 })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Tom (pitch)</Label>
-                        <Input
-                          type="number" step="0.1" min="0" max="2"
-                          value={voiceCfg.pitch}
-                          onChange={(e) => setVoiceCfg({ ...voiceCfg, pitch: parseFloat(e.target.value) || 1 })}
-                        />
-                      </div>
-                    </div>
-                    <label className="flex items-center gap-2 mt-3 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={!!voiceCfg.alwaysOn}
-                        onChange={(e) => setVoiceCfg({ ...voiceCfg, alwaysOn: e.target.checked })}
-                      />
-                      Sempre ativa (modo escuta contínua)
-                    </label>
-                  </div>
-
-                  <div className="border border-nude-200 rounded-md p-4 bg-white">
-                    <div className="text-xs uppercase tracking-widest text-gold-600 font-semibold mb-2">
-                      Secretária de Chat (Dashboard)
-                    </div>
-                    <Label>Prompt do Chat</Label>
-                    <Textarea
-                      rows={6}
-                      value={chatCfg.prompt}
-                      onChange={(e) => setChatCfg({ ...chatCfg, prompt: e.target.value })}
-                      data-testid="dbg-cfg-chat-prompt"
-                    />
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      <div>
-                        <Label>Modelo</Label>
-                        <Input
-                          value={chatCfg.model}
-                          onChange={(e) => setChatCfg({ ...chatCfg, model: e.target.value })}
-                        />
-                      </div>
-                      <label className="flex items-end gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={!!chatCfg.enabled}
-                          onChange={(e) => setChatCfg({ ...chatCfg, enabled: e.target.checked })}
-                        />
-                        Chat ativo no Dashboard
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Button variant="outline" onClick={exportCfg}>
-                      <Download className="w-4 h-4 mr-2" /> Exportar JSON
-                    </Button>
-                    <Button variant="outline" onClick={resetDashboardCfg}>
-                      <RotateCcw className="w-4 h-4 mr-2" /> Restaurar padrões
-                    </Button>
-                    <Button onClick={saveDashboardCfg} className="bg-gold-600 hover:bg-gold-700 text-white">
-                      <Save className="w-4 h-4 mr-2" /> Salvar tudo
                     </Button>
                   </div>
                 </div>
