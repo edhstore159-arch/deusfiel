@@ -58,6 +58,17 @@ export default function FloatingVoiceOrb() {
   const lastFinalRef = useRef({ text: "", at: 0 });
   const speakingRef = useRef(false);
   const speechResumeTimerRef = useRef(null);
+  // YouTube playback gating: a secretária só fala por cima do YouTube quando o usuário deu um comando.
+  const ytPlayingRef = useRef(false);
+  const userCommandRef = useRef(false);
+  const ytIframeRef = useRef(null);
+  const ytCommand = (func) => {
+    try {
+      const w = ytIframeRef.current?.contentWindow;
+      if (!w) return;
+      w.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
+    } catch {}
+  };
   const [alwaysOn, setAlwaysOn] = useState(() => {
     try { return localStorage.getItem("kenia:voice-always-on") === "1"; } catch { return false; }
   });
