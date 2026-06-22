@@ -406,6 +406,8 @@ export default function FloatingVoiceOrb() {
         if (speechTokenRef.current !== token) return;
         speakingRef.current = false;
         if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+        // Retoma o YouTube após a secretária terminar de falar.
+        if (ytPlayingRef.current) ytCommand("playVideo");
         if (shouldResume && alwaysOnRef.current && shouldRestartRef.current) {
           restartContinuousRecognition(250);
         }
@@ -418,6 +420,8 @@ export default function FloatingVoiceOrb() {
       try { synth.cancel(); } catch {}
       try { synth.resume?.(); } catch {}
       try { recognitionRef.current?.abort?.(); } catch {}
+      // Pausa o YouTube enquanto a secretária fala (só chega aqui se houve comando do usuário).
+      if (ytPlayingRef.current) ytCommand("pauseVideo");
       speakingRef.current = true;
 
       const speakChunk = (index = 0) => {
