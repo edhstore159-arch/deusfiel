@@ -533,6 +533,48 @@ export default function FloatingVoiceOrb() {
     }
   };
 
+  const scheduleNewAppointment = async (name, whenExpr, area) => {
+    setThinking(true);
+    try {
+      const newDate = parseDateTimePt(whenExpr);
+      if (!newDate) {
+        const msg = `Não entendi a data "${whenExpr}". Diga, por exemplo: amanhã às 15h, ou 25/12 às 14:30.`;
+        setReply(msg); speak(msg); return;
+      }
+      const ctx = await loadClientContext();
+      const c = findClient(name, ctx);
+      const client_name = c?.name || c?.client_name || name;
+      const phone = c?.phone || c?.client_phone || null;
+      const email = c?.email || c?.client_email || null;
+      const payload = {
+        client_name,
+        phone,
+        email,
+        legal_area: area || "Atendimento",
+        appointment_date: newDate.toISOString().slice(0, 10),
+        appointment_time: newDate.toTimeString().slice(0, 5),
+        starts_at: newDate.toISOString(),
+        status: "scheduled",
+        source: "voice_orb",
+      };
+      let ok = false;
+      try { await api.post("/appointments", payload); ok = true; } catch {}
+      if (!ok) {
+        const { data: userData } = await supabase.auth.getUser();
+        const { error } = await supabase.from("appointments").insert({ ...payload, user_id: userData?.user?.id ?? null });
+        if (error) throw error;
+      }
+      contextRef.current = null;
+      const msg = `Agendamento criado para ${client_name} em ${fmtDateTime(newDate.toISOString())}.`;
+      setReply(msg); speak(msg); toast.success(msg);
+    } catch (e) {
+      toast.error("Falha ao agendar: " + (e?.message || e));
+      speak("Não consegui criar o agendamento.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
   const sendWhatsAppTo = async (name, message) => {
     setThinking(true);
     try {
