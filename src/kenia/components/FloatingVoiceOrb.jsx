@@ -216,6 +216,7 @@ export default function FloatingVoiceOrb() {
 
   const speechUnlockedRef = useRef(false);
   const voicesRef = useRef([]);
+  const audioRef = useRef(null);
 
   const loadVoices = () => {
     try {
@@ -261,6 +262,10 @@ export default function FloatingVoiceOrb() {
   const speak = (text) => {
     try {
       const synth = window.speechSynthesis;
+      if (audioRef.current) {
+        try { audioRef.current.pause(); audioRef.current.src = ""; } catch {}
+        audioRef.current = null;
+      }
       if (!synth || !text) return;
       const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
       const u = new SpeechSynthesisUtterance(String(text));
@@ -295,6 +300,34 @@ export default function FloatingVoiceOrb() {
       speechResumeTimerRef.current = window.setTimeout(resume, fallbackMs);
       synth.speak(u);
     } catch {}
+  };
+
+  const playAssistantReply = async (text, audioBase64) => {
+    const msg = String(text || "").trim();
+    if (!msg) return;
+    const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
+    if (audioBase64) {
+      try {
+        window.speechSynthesis?.cancel?.();
+        if (shouldResume) {
+          speakingRef.current = true;
+          try { recognitionRef.current?.abort?.(); } catch {}
+        }
+        const audio = new Audio(`data:audio/mpeg;base64,${audioBase64}`);
+        audioRef.current = audio;
+        const resume = () => {
+          speakingRef.current = false;
+          if (shouldResume && alwaysOnRef.current && shouldRestartRef.current) restartContinuousRecognition(250);
+        };
+        audio.onended = resume;
+        audio.onerror = () => { resume(); speak(msg); };
+        await audio.play();
+        return;
+      } catch {
+        speakingRef.current = false;
+      }
+    }
+    speak(msg);
   };
 
   const [thinking, setThinking] = useState(false);
@@ -427,6 +460,7 @@ export default function FloatingVoiceOrb() {
           session_id: "kenia-voice-orb",
           system_prompt: enrichedSystem,
           context: ctxSummary,
+          want_audio: true,
         },
       });
       if (error) throw error;
@@ -435,7 +469,7 @@ export default function FloatingVoiceOrb() {
       historyRef.current.push({ role: "user", content: text });
       historyRef.current.push({ role: "assistant", content: answer });
       setReply(answer);
-      speak(answer);
+      await playAssistantReply(answer, data?.audio_base64);
       const r = matchRoute(answer);
       if (r) navigate(r);
     } catch (e) {
