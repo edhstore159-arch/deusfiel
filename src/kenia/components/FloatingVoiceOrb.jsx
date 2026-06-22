@@ -129,9 +129,7 @@ export default function FloatingVoiceOrb() {
             window.speechSynthesis?.cancel?.();
             activateCommandSession();
             if (!commandText || isWakeOnlyPrompt(commandText)) {
-              const msg = "Pois não? Pode falar.";
-              setReply(msg);
-              speak(msg);
+              answerWakePrompt();
               continue;
             }
           } else if (!commandSessionActiveRef.current) {
@@ -275,7 +273,6 @@ export default function FloatingVoiceOrb() {
       u.onstart = () => {
         if (!shouldResume) return;
         speakingRef.current = true;
-        try { recognitionRef.current?.abort?.(); } catch {}
       };
       const resume = () => {
         speakingRef.current = false;
@@ -289,6 +286,10 @@ export default function FloatingVoiceOrb() {
       synth.cancel();
       // iOS Safari às vezes entra em "paused" — força resume antes de falar.
       try { synth.resume?.(); } catch {}
+      if (shouldResume) {
+        speakingRef.current = true;
+        try { recognitionRef.current?.abort?.(); } catch {}
+      }
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
       const fallbackMs = Math.min(15000, Math.max(2000, String(text || "").length * 80));
       speechResumeTimerRef.current = window.setTimeout(resume, fallbackMs);
@@ -303,7 +304,16 @@ export default function FloatingVoiceOrb() {
   const contextAtRef = useRef(0);
 
   const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-  const isWakeOnlyPrompt = (text) => /^(?:fala|fale|conversa|converse|atenda|atende|escuta|escute|ouve|ouca)(?:\s+(?:comigo|me|aqui))?$/i.test(norm(text).trim());
+  const isWakeOnlyPrompt = (text) => /^(?:fala|fale|conversa|converse|atenda|atende|escuta|escute|ouve|ouca|responda|responde|oi|ola|alo|al[oô]|bom\s+dia|boa\s+tarde|boa\s+noite|esta\s+ai|voce\s+esta\s+ai)(?:\s+(?:comigo|me|aqui|por\s+favor))?$/i.test(norm(text).trim());
+
+  const answerWakePrompt = () => {
+    const msg = "Pois não? Estou aqui, pode falar comigo.";
+    userMinimizedRef.current = false;
+    activateCommandSession();
+    setOpen(true);
+    setReply(msg);
+    speak(msg);
+  };
 
   const userMinimizedRef = useRef(false);
   const activateCommandSession = () => {
