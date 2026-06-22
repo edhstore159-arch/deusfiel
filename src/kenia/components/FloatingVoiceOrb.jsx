@@ -130,7 +130,7 @@ export default function FloatingVoiceOrb() {
   const restartContinuousRecognition = (delay = 300) => {
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
     restartTimerRef.current = window.setTimeout(() => {
-      if (!shouldRestartRef.current || !alwaysOnRef.current || recognitionActiveRef.current) return;
+      if (!shouldRestartRef.current || !alwaysOnRef.current || !isLeaderRef.current || recognitionActiveRef.current) return;
       if (speakingRef.current) {
         restartContinuousRecognition(500);
         return;
