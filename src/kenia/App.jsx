@@ -30,7 +30,7 @@ const DebugTool = lazy(() => import("@/kenia/pages/DebugTool"));
 const ChatIA = lazy(() => import("@/kenia/pages/ChatIA"));
 const AdminCases = lazy(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazy(() => import("@/kenia/pages/SecretaryTasks"));
-const Agents = lazy(() => import("@/kenia/pages/Agents"));
+
 const ResetPassword = lazy(() => import("@/kenia/pages/ResetPassword"));
 const Trust = lazy(() => import("@/kenia/pages/Trust"));
 
@@ -77,7 +77,7 @@ function App() {
                 <Route path="/app/chat-ia" element={<ChatIA />} />
                 <Route path="/app/admin" element={<AdminCases />} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
-                <Route path="/app/agents" element={<Agents />} />
+                
                 <Route path="/app/onboarding" element={<Onboarding />} />
                 <Route path="/app/agenda" element={<Agenda />} />
                 <Route path="/app/crm" element={<CRM />} />

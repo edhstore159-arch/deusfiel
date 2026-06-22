@@ -20,7 +20,7 @@ const NAV = [
   { to: "/app/chat-ia", label: "Chat IA · Análise", icon: Bot, testid: "nav-chat-ia" },
   { to: "/app/admin", label: "Painel Admin · Casos", icon: ShieldCheck, testid: "nav-admin" },
   { to: "/app/secretary-tasks", label: "Tarefas Secretária", icon: MessageSquare, testid: "nav-secretary-tasks" },
-  { to: "/app/agents", label: "Agentes de IA", icon: Bot, testid: "nav-agents" },
+  
   { to: "/app/crm", label: "CRM Pipeline", icon: KanbanSquare, testid: "nav-crm" },
   { to: "/app/agenda", label: "Agenda", icon: CalendarDays, testid: "nav-agenda" },
   { to: "/app/processes", label: "Processos", icon: Scale, testid: "nav-processes" },
@@ -40,7 +40,7 @@ const PREFETCH = {
   "/app/chat-ia": () => import("@/kenia/pages/ChatIA"),
   "/app/admin": () => import("@/kenia/pages/AdminCases"),
   "/app/secretary-tasks": () => import("@/kenia/pages/SecretaryTasks"),
-  "/app/agents": () => import("@/kenia/pages/Agents"),
+  
   "/app/crm": () => import("@/kenia/pages/CRM"),
   "/app/agenda": () => import("@/kenia/pages/Agenda"),
   "/app/processes": () => import("@/kenia/pages/Processes"),
