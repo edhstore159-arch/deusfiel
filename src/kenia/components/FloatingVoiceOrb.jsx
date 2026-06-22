@@ -58,8 +58,27 @@ export default function FloatingVoiceOrb() {
   const lastFinalRef = useRef({ text: "", at: 0 });
   const speakingRef = useRef(false);
   const speechResumeTimerRef = useRef(null);
-  const [alwaysOn, setAlwaysOn] = useState(false);
-  useEffect(() => { alwaysOnRef.current = alwaysOn; }, [alwaysOn]);
+  const [alwaysOn, setAlwaysOn] = useState(() => {
+    try { return localStorage.getItem("kenia:voice-always-on") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    alwaysOnRef.current = alwaysOn;
+    try { localStorage.setItem("kenia:voice-always-on", alwaysOn ? "1" : "0"); } catch {}
+  }, [alwaysOn]);
+
+  // Auto-reativa a escuta contínua ao recarregar, se estava ativa antes
+  useEffect(() => {
+    if (!alwaysOn || !supported) return;
+    const t = setTimeout(() => {
+      try {
+        shouldRestartRef.current = true;
+        const rec = recognitionRef.current;
+        if (rec && !recognitionActiveRef.current) rec.start();
+      } catch {}
+    }, 800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supported]);
 
   const restartContinuousRecognition = (delay = 300) => {
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
