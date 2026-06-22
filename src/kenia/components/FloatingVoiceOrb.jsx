@@ -191,6 +191,10 @@ export default function FloatingVoiceOrb() {
         if (alwaysOnRef.current) {
           const woke = hasWakeWord(finalText);
           const commandText = woke ? stripWake(finalText) : finalText;
+          // Enquanto hino/música estiver tocando, só responde se for explicitamente chamada de "secretária".
+          if (ytPlayingRef.current && !woke) {
+            continue;
+          }
           if (woke) {
             window.speechSynthesis?.cancel?.();
             activateCommandSession();
@@ -882,6 +886,15 @@ export default function FloatingVoiceOrb() {
   const [ytVideoId, setYtVideoId] = useState("");
   const [ytIds, setYtIds] = useState([]);
   const [ytIdx, setYtIdx] = useState(0);
+  const ytPlayingRef = useRef(false);
+  useEffect(() => {
+    ytPlayingRef.current = !!ytVideoId;
+    if (ytVideoId) {
+      // Hino/música tocando: encerra sessão de comando ativa para não interromper.
+      commandSessionActiveRef.current = false;
+      try { window.speechSynthesis?.cancel?.(); } catch {}
+    }
+  }, [ytVideoId]);
 
   const playYouTube = async (query) => {
     const q = (query || "").trim();
