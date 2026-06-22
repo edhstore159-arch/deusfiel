@@ -191,6 +191,10 @@ export default function FloatingVoiceOrb() {
         if (alwaysOnRef.current) {
           const woke = hasWakeWord(finalText);
           const commandText = woke ? stripWake(finalText) : finalText;
+          // Enquanto hino/música estiver tocando, só responde se for explicitamente chamada de "secretária".
+          if (ytPlayingRef.current && !woke) {
+            continue;
+          }
           if (woke) {
             window.speechSynthesis?.cancel?.();
             activateCommandSession();
