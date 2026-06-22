@@ -10,9 +10,18 @@ import { Label } from "@/kenia/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/kenia/components/ui/tabs";
 import { Badge } from "@/kenia/components/ui/badge";
 import { toast } from "sonner";
-import { AlertTriangle, ImagePlus, Wand2, Send, Trash2, X, Download, Paperclip } from "lucide-react";
+import { AlertTriangle, ImagePlus, Wand2, Send, Trash2, X, Download, Paperclip, Lock, Save, RotateCcw } from "lucide-react";
+import {
+  loadAllSecretaryConfig,
+  exportSecretaryConfig,
+  importSecretaryConfig,
+} from "@/kenia/storage";
+import { saveVoiceConfig, VOICE_DEFAULTS } from "@/kenia/storage/voiceSecretary";
+import { saveChatConfig, CHAT_DEFAULTS } from "@/kenia/storage/chatSecretary";
 
 const DEBUG_BUCKET = "debug-uploads";
+const DASHBOARD_CFG_PASSWORD = "DeuseJustica";
+const DASHBOARD_CFG_SESSION_KEY = "kenia:dbg-cfg-unlocked";
 
 export default function DebugTool() {
   const [endpoint, setEndpoint] = useState(
