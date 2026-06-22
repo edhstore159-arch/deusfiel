@@ -931,6 +931,9 @@ export default function FloatingVoiceOrb() {
 
   const handleCommand = (text) => {
     if (!text?.trim()) return;
+    // Marca: este speak() decorre de um comando do usuário; libera interromper o YouTube.
+    userCommandRef.current = true;
+    setTimeout(() => { userCommandRef.current = false; }, 30000);
     const woke = hasWakeWord(text);
     const commandText = woke ? stripWake(text) : String(text || "").trim();
     const effectiveText = commandText || String(text || "").trim();
