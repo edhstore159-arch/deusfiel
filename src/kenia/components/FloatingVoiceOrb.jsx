@@ -1137,9 +1137,10 @@ export default function FloatingVoiceOrb() {
               <div className="aspect-video w-full rounded overflow-hidden bg-black flex items-center justify-center">
                 {ytVideoId ? (
                   <iframe
+                    ref={ytIframeRef}
                     title="YouTube"
                     className="w-full h-full"
-                    src={`https://www.youtube-nocookie.com/embed/${ytVideoId}?autoplay=1&rel=0`}
+                    src={`https://www.youtube-nocookie.com/embed/${ytVideoId}?autoplay=1&rel=0&enablejsapi=1`}
                     allow="autoplay; encrypted-media; picture-in-picture"
                     allowFullScreen
                   />
