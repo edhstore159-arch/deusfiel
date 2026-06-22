@@ -373,9 +373,27 @@ export default function FloatingVoiceOrb() {
     ]);
     const pick = (d) => Array.isArray(d) ? d : (Array.isArray(d?.items) ? d.items : []);
     const apptList = pick(appointments);
+    const mergedAppts = apptList.length ? apptList : sbAppointments;
+    const pickedContacts = pick(contacts);
+    // Fallback: monta a lista de contatos a partir dos agendamentos (com telefone real do banco)
+    // quando a API externa /whatsapp/contacts não retornar nada — assim a Kênia sempre tem os
+    // números reais dos clientes para informar no chat.
+    const fallbackContacts = (() => {
+      const map = new Map();
+      for (const a of mergedAppts) {
+        const phone = a.phone || a.client_phone || "";
+        const name = a.client_name || a.customer_name || a.lead_name || "Cliente";
+        const key = (phone || name).toString().trim();
+        if (!key) continue;
+        if (!map.has(key)) {
+          map.set(key, { name, phone, email: a.email || null, last_contact_at: a.created_at, source: "appointment" });
+        }
+      }
+      return Array.from(map.values());
+    })();
     const ctx = {
-      leads: pick(leads), contacts: pick(contacts), processes: pick(processes),
-      appointments: apptList.length ? apptList : sbAppointments,
+      leads: pick(leads), contacts: pickedContacts.length ? pickedContacts : fallbackContacts, processes: pick(processes),
+      appointments: mergedAppts,
       analyses: pick(analyses), logs: pick(logs), deadlines: pick(deadlines),
       conversations: sbConversations,
     };
