@@ -533,6 +533,48 @@ export default function FloatingVoiceOrb() {
     }
   };
 
+  const scheduleNewAppointment = async (name, whenExpr, area) => {
+    setThinking(true);
+    try {
+      const newDate = parseDateTimePt(whenExpr);
+      if (!newDate) {
+        const msg = `Não entendi a data "${whenExpr}". Diga, por exemplo: amanhã às 15h, ou 25/12 às 14:30.`;
+        setReply(msg); speak(msg); return;
+      }
+      const ctx = await loadClientContext();
+      const c = findClient(name, ctx);
+      const client_name = c?.name || c?.client_name || name;
+      const phone = c?.phone || c?.client_phone || null;
+      const email = c?.email || c?.client_email || null;
+      const payload = {
+        client_name,
+        phone,
+        email,
+        legal_area: area || "Atendimento",
+        appointment_date: newDate.toISOString().slice(0, 10),
+        appointment_time: newDate.toTimeString().slice(0, 5),
+        starts_at: newDate.toISOString(),
+        status: "scheduled",
+        source: "voice_orb",
+      };
+      let ok = false;
+      try { await api.post("/appointments", payload); ok = true; } catch {}
+      if (!ok) {
+        const { data: userData } = await supabase.auth.getUser();
+        const { error } = await supabase.from("appointments").insert({ ...payload, user_id: userData?.user?.id ?? null });
+        if (error) throw error;
+      }
+      contextRef.current = null;
+      const msg = `Agendamento criado para ${client_name} em ${fmtDateTime(newDate.toISOString())}.`;
+      setReply(msg); speak(msg); toast.success(msg);
+    } catch (e) {
+      toast.error("Falha ao agendar: " + (e?.message || e));
+      speak("Não consegui criar o agendamento.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
   const sendWhatsAppTo = async (name, message) => {
     setThinking(true);
     try {
@@ -690,6 +732,9 @@ export default function FloatingVoiceOrb() {
     // Enviar mensagem no WhatsApp: "enviar/mandar mensagem/whatsapp para [nome] dizendo/falando/: [texto]"
     const waMatch = text.match(/\b(?:enviar|mandar|envie|mande)\s+(?:uma\s+)?(?:mensagem|whats?app|zap)\s+(?:para|pro|pra|ao|a|o)\s+(.+?)\s+(?:dizendo|falando|com\s+a\s+mensagem|que|:)\s+(.+)/i);
     if (waMatch) { sendWhatsAppTo(waMatch[1].trim(), waMatch[2].trim()); return; }
+    // Criar novo agendamento: "agendar/marcar [consulta/reunião] com/para [nome] para/no dia [data/hora]"
+    const newApptMatch = text.match(/\b(?:agendar|agende|marcar|marque|cria[r]?|criar|nova?|novo)\s+(?:um[a]?\s+)?(?:agendamento|consulta|reuni[ãa]o|compromisso|atendimento|hor[áa]rio)?\s*(?:com|para|pro|pra|de|do|da)\s+(.+?)\s+(?:para|pra|pro|no\s+dia|em|às|as)\s+(.+)/i);
+    if (newApptMatch) { scheduleNewAppointment(newApptMatch[1].trim(), newApptMatch[2].trim()); return; }
     // Mudar data do agendamento: "mudar/alterar/remarcar agendamento de [nome] para [data]"
     const chMatch = text.match(/\b(?:mudar|alterar|trocar|remarcar|reagendar|mover|adiar)\s+(?:o\s+|a\s+)?(?:agendamento|reuniao|reunião|consulta|compromisso|hor[aá]rio)?\s*(?:de|do|da|com)?\s*(.+?)\s+(?:para|pra|pro)\s+(.+)/i);
     if (chMatch) { changeAppointmentDate(chMatch[1].trim(), chMatch[2].trim()); return; }
