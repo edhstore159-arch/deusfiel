@@ -385,6 +385,8 @@ export default function FloatingVoiceOrb() {
   const speak = (text) => {
     // Em outras abas (não-líder) a secretária permanece em silêncio para não duplicar a fala.
     if (!isLeaderRef.current) return;
+    // Se o YouTube está tocando, só interrompe quando o usuário deu um comando explícito ("secretária ...").
+    if (ytPlayingRef.current && !userCommandRef.current) return;
     try {
       const synth = window.speechSynthesis;
       if (audioRef.current) {
