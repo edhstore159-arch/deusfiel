@@ -30,7 +30,7 @@ const DebugTool = lazy(() => import("@/kenia/pages/DebugTool"));
 const ChatIA = lazy(() => import("@/kenia/pages/ChatIA"));
 const AdminCases = lazy(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazy(() => import("@/kenia/pages/SecretaryTasks"));
-const Agents = lazy(() => import("@/kenia/pages/Agents"));
+
 const ResetPassword = lazy(() => import("@/kenia/pages/ResetPassword"));
 const Trust = lazy(() => import("@/kenia/pages/Trust"));
 
