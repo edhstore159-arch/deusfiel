@@ -320,6 +320,7 @@ export default function FloatingVoiceOrb() {
   const toggleAlwaysOn = () => {
     unlockSpeech();
     if (!supported) { toast.error("Reconhecimento de voz não suportado."); return; }
+    if (!ensureVoiceLeadership()) return;
     const rec = recognitionRef.current; if (!rec) return;
     if (alwaysOnRef.current) {
       shouldRestartRef.current = false;
@@ -526,6 +527,7 @@ export default function FloatingVoiceOrb() {
   const playAssistantReply = async (text, audioBase64) => {
     const msg = String(text || "").trim();
     if (!msg) return;
+    if (!isLeaderRef.current) return;
     const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
     if (audioBase64) {
       try {
@@ -1078,6 +1080,7 @@ export default function FloatingVoiceOrb() {
       toast.error("Reconhecimento de voz não suportado neste navegador.");
       return;
     }
+    if (!ensureVoiceLeadership()) return;
     const rec = recognitionRef.current;
     if (!rec) return;
     if (listening || recognitionActiveRef.current) {
