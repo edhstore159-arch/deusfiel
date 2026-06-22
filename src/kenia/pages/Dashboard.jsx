@@ -27,11 +27,28 @@ export default function Dashboard() {
   const [appointments, setAppointments] = useState([]);
   const [draft, setDraft] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
-  const [aiSession, setAiSession] = useState(null);
-  const [aiMessages, setAiMessages] = useState([
-    { role: "assistant", content: "Olá! Sou o copiloto jurídico. Posso te ajudar a redigir uma resposta para o cliente, sugerir próximos passos do caso ou pesquisar precedentes. Como posso ajudar?" }
-  ]);
+  const AI_WELCOME = { role: "assistant", content: "Olá! Sou o copiloto jurídico. Posso te ajudar a redigir uma resposta para o cliente, sugerir próximos passos do caso ou pesquisar precedentes. Como posso ajudar?" };
+  const [aiSession, setAiSession] = useState(() => {
+    try { return localStorage.getItem("kenia:dashboard-ai-session") || null; } catch { return null; }
+  });
+  const [aiMessages, setAiMessages] = useState(() => {
+    try {
+      const raw = localStorage.getItem("kenia:dashboard-ai-messages");
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+    return [AI_WELCOME];
+  });
   const [aiThinking, setAiThinking] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem("kenia:dashboard-ai-messages", JSON.stringify(aiMessages)); } catch {}
+  }, [aiMessages]);
+  useEffect(() => {
+    try {
+      if (aiSession) localStorage.setItem("kenia:dashboard-ai-session", aiSession);
+    } catch {}
+  }, [aiSession]);
   const [search, setSearch] = useState("");
   const [whatsAppCenter, setWhatsAppCenter] = useState({ connected: false, phone: "" });
   const aiBoxRef = useRef(null);
