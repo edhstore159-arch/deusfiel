@@ -455,6 +455,8 @@ export default function FloatingVoiceOrb() {
       const enrichedSystem = renderKeniaPrompt(loadKeniaPrompt(), { dateContext, ctxSummary, jusContext });
 
 
+      const { data: authData } = await supabase.auth.getUser();
+      const authUserId = authData?.user?.id || null;
       const { data, error } = await supabase.functions.invoke("chat-ai", {
         body: {
           message: text,
@@ -463,6 +465,7 @@ export default function FloatingVoiceOrb() {
           system_prompt: enrichedSystem,
           context: ctxSummary,
           want_audio: true,
+          user_id: authUserId,
         },
       });
       if (error) throw error;
