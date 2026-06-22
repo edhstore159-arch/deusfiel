@@ -77,7 +77,7 @@ function App() {
                 <Route path="/app/chat-ia" element={<ChatIA />} />
                 <Route path="/app/admin" element={<AdminCases />} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
-                <Route path="/app/agents" element={<Agents />} />
+                
                 <Route path="/app/onboarding" element={<Onboarding />} />
                 <Route path="/app/agenda" element={<Agenda />} />
                 <Route path="/app/crm" element={<CRM />} />
