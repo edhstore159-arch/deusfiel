@@ -40,7 +40,63 @@ export default function DebugTool() {
   const [uploadingAttach, setUploadingAttach] = useState(false);
   const attachInputRef = useRef(null);
 
+  // Painel protegido com senha — configurações do Dashboard (prompts, etc.)
+  const [cfgUnlocked, setCfgUnlocked] = useState(
+    () => sessionStorage.getItem(DASHBOARD_CFG_SESSION_KEY) === "1"
+  );
+  const [cfgPassword, setCfgPassword] = useState("");
+  const [voiceCfg, setVoiceCfg] = useState(VOICE_DEFAULTS);
+  const [chatCfg, setChatCfg] = useState(CHAT_DEFAULTS);
+
   useEffect(() => { loadHistory(); }, []);
+
+  useEffect(() => {
+    if (!cfgUnlocked) return;
+    const all = loadAllSecretaryConfig();
+    setVoiceCfg(all.voice);
+    setChatCfg(all.chat);
+  }, [cfgUnlocked]);
+
+  const tryUnlockCfg = () => {
+    if (cfgPassword === DASHBOARD_CFG_PASSWORD) {
+      sessionStorage.setItem(DASHBOARD_CFG_SESSION_KEY, "1");
+      setCfgUnlocked(true);
+      setCfgPassword("");
+      toast.success("Acesso liberado");
+    } else {
+      toast.error("Senha incorreta");
+    }
+  };
+
+  const lockCfg = () => {
+    sessionStorage.removeItem(DASHBOARD_CFG_SESSION_KEY);
+    setCfgUnlocked(false);
+  };
+
+  const saveDashboardCfg = () => {
+    try {
+      saveVoiceConfig(voiceCfg);
+      saveChatConfig(chatCfg);
+      toast.success("Configurações do Dashboard salvas");
+    } catch (e) {
+      toast.error(`Falha ao salvar: ${e?.message || e}`);
+    }
+  };
+
+  const resetDashboardCfg = () => {
+    setVoiceCfg(VOICE_DEFAULTS);
+    setChatCfg(CHAT_DEFAULTS);
+    toast("Valores restaurados (clique em Salvar para aplicar)");
+  };
+
+  const exportCfg = () => {
+    const blob = new Blob([exportSecretaryConfig()], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `kenia-config-${Date.now()}.json`;
+    a.click();
+  };
+
 
   const loadHistory = async () => {
     try {
