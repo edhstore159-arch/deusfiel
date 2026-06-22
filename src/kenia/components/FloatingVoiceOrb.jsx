@@ -300,7 +300,18 @@ export default function FloatingVoiceOrb() {
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
       const fallbackMs = Math.min(15000, Math.max(2000, String(text || "").length * 80));
       speechResumeTimerRef.current = window.setTimeout(resume, fallbackMs);
-      synth.speak(u);
+      // Chrome bug: cancel() seguido imediato de speak() é ignorado.
+      // Pequeno delay garante que o motor processe o cancel antes de falar.
+      const doSpeak = () => {
+        try {
+          if (synth.paused) synth.resume?.();
+          synth.speak(u);
+          // Chrome trava em "pending" se o reconhecimento estava ativo — força um nudge.
+          if (synth.paused) synth.resume?.();
+        } catch {}
+      };
+      setTimeout(doSpeak, 120);
+
     } catch {}
   };
 
