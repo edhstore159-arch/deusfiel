@@ -698,12 +698,14 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
     // Salva conversa e agendamento no banco (não bloqueia resposta se falhar)
     try {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-      await supabase.from("conversations").insert({
+      const { error: convErr } = await supabase.from("conversations").insert({
         user_id: userId,
         session_id: sessionId,
         message: userMessage,
         response: reply,
       });
+      if (convErr) console.error("[chat-ai] falha ao salvar conversa:", convErr);
+      else console.log("[chat-ai] conversa salva user_id=", userId, "session=", sessionId);
       if (appointment) {
         const finalMeetUrl = meetUrl || `https://meet.jit.si/kenia-${Date.now().toString(36)}`;
         const enrichedPayload = {
