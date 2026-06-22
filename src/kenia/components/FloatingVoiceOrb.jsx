@@ -711,6 +711,11 @@ export default function FloatingVoiceOrb() {
   const handleCommand = (text) => {
     if (!text?.trim()) return;
     const lower = text.toLowerCase();
+    const wakeCommand = hasWakeWord(text) ? stripWake(text) : "";
+    if (hasWakeWord(text) && (!wakeCommand || isWakeOnlyPrompt(wakeCommand))) {
+      answerWakePrompt();
+      return;
+    }
     // Minimizar / fechar o painel da assistente (continua escutando, bolinha verde)
     if (/\b(minimiza[r]?|minimize|recolhe[r]?|recolha|esconde[r]?|esconda|some|sumir|fecha[r]?\s+(?:o\s+)?(?:quadro|painel|janela|caixa)|fecha[r]?\s+voc[eê])\b/i.test(lower)) {
       userMinimizedRef.current = true;
