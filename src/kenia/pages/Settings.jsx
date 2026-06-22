@@ -4,13 +4,15 @@ import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
+import { Textarea } from "@/kenia/components/ui/textarea";
 import { Badge } from "@/kenia/components/ui/badge";
 import { Separator } from "@/kenia/components/ui/separator";
 import { toast } from "sonner";
 import {
   Key, MessageSquare, Image, Loader2, CheckCircle2,
-  XCircle, Sparkles, Save, Info, Eye, EyeOff,
+  XCircle, Sparkles, Save, Info, Eye, EyeOff, Mic, RotateCcw,
 } from "lucide-react";
+import { loadKeniaPrompt, saveKeniaPrompt, DEFAULT_KENIA_PROMPT } from "@/kenia/lib/keniaPrompt";
 
 export default function Settings() {
   const [settings, setSettings] = useState(null);
@@ -23,8 +25,9 @@ export default function Settings() {
   const [testingImage, setTestingImage] = useState(false);
   const [textResult, setTextResult] = useState(null);
   const [imageResult, setImageResult] = useState(null);
+  const [keniaPrompt, setKeniaPrompt] = useState("");
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); setKeniaPrompt(loadKeniaPrompt()); }, []);
 
   const load = async () => {
     const fallback = {
@@ -116,6 +119,38 @@ export default function Settings() {
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4 max-w-4xl">
+        <Card className="p-5 border-gold-300">
+          <div className="flex items-start gap-3 mb-3">
+            <Mic className="w-5 h-5 text-gold-700 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-display font-semibold text-lg">Prompt da atendente virtual de voz (Kênia)</div>
+              <div className="text-xs text-nude-600">
+                Edite como a Kênia responde. Placeholders: <code>{"{dateContext}"}</code>, <code>{"{ctxSummary}"}</code>, <code>{"{jusContext}"}</code>.
+              </div>
+            </div>
+          </div>
+          <Textarea
+            value={keniaPrompt}
+            onChange={(e) => setKeniaPrompt(e.target.value)}
+            rows={14}
+            className="font-mono text-xs"
+          />
+          <div className="flex gap-2 mt-3">
+            <Button
+              onClick={() => { saveKeniaPrompt(keniaPrompt); toast.success("Prompt da Kênia salvo"); }}
+              className="bg-nude-900 hover:bg-nude-800"
+            >
+              <Save className="w-4 h-4 mr-2" /> Salvar prompt
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { setKeniaPrompt(DEFAULT_KENIA_PROMPT); saveKeniaPrompt(DEFAULT_KENIA_PROMPT); toast.success("Prompt restaurado para o padrão"); }}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" /> Restaurar padrão
+            </Button>
+          </div>
+        </Card>
+
         <Card className="p-4 bg-blue-50 border-blue-200">
           <div className="flex items-start gap-3">
             <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
@@ -127,6 +162,7 @@ export default function Settings() {
             </div>
           </div>
         </Card>
+
 
         <Card className="border-nude-200 p-5">
           <div className="flex items-start justify-between mb-4">

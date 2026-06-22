@@ -4,6 +4,7 @@ import { Mic, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/kenia/lib/api";
+import { loadKeniaPrompt, renderKeniaPrompt } from "@/kenia/lib/keniaPrompt";
 
 
 
@@ -406,7 +407,7 @@ export default function FloatingVoiceOrb() {
       const fmtISO = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(nowBR);
       const dateContext = `DATA E HORA ATUAL (fuso America/Sao_Paulo, use SEMPRE esta como referência de "hoje", "agora", "ontem", "amanhã" — NUNCA invente outra data): ${fmtFull}, ${fmtTime} (ISO: ${fmtISO}).`;
 
-      const enrichedSystem = `Você é Kênia, assistente virtual de voz da Dra. Kênia Garcia. Você é uma assistente COMPLETA e GENERALISTA: responde sobre QUALQUER tema (direito, saúde, finanças, tecnologia, relacionamentos, carreira, educação, culinária, viagens, esportes, cultura, autoajuda, etc.) e pode dar conselhos práticos e opiniões fundamentadas em diversas áreas da vida. NUNCA recuse um tema dizendo "não posso falar sobre isso" ou "sou apenas uma assistente jurídica" — você conversa sobre tudo de forma natural, acolhedora e útil.\n\n${dateContext}\n\nVocê também TEM ACESSO COMPLETO aos dados internos do escritório abaixo (contatos, leads, processos, agendamentos, mensagens, prazos). Quando a pergunta for sobre o escritório/clientes, use SEMPRE esses dados com precisão e NUNCA diga "não tenho acesso". Quando a pergunta for sobre temas gerais ou conselhos, responda com seu conhecimento geral, sem precisar usar os dados do escritório. Para temas jurídicos, baseie-se também nos RESULTADOS DA BUSCA NO JUSBRASIL quando fornecidos, citando títulos e links.\n\nEstilo: respostas faladas, claras, calorosas, em português do Brasil, no máximo 3-5 frases quando possível.\n\nDADOS DO ESCRITÓRIO (use apenas se a pergunta for sobre o escritório):\n${ctxSummary}${jusContext}`;
+      const enrichedSystem = renderKeniaPrompt(loadKeniaPrompt(), { dateContext, ctxSummary, jusContext });
 
 
       const { data, error } = await supabase.functions.invoke("chat-ai", {
