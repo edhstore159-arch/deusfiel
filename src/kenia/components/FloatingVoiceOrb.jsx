@@ -347,10 +347,12 @@ export default function FloatingVoiceOrb() {
         }
       };
 
-      synth.cancel();
+      // No Chrome, criar e enfileirar o utterance precisa ser SÍNCRONO em relação
+      // à intenção do usuário; setTimeout antes de new SpeechSynthesisUtterance
+      // faz a chamada falhar silenciosamente. Cancelamos o que estava na fila
+      // e disparamos o primeiro chunk imediatamente.
+      try { synth.cancel(); } catch {}
       try { synth.resume?.(); } catch {}
-      // No Chrome/Google, a voz pode não sair enquanto o reconhecimento ainda está ativo.
-      // Pausa o microfone antes de falar e, na escuta contínua, reinicia após a fala.
       try { recognitionRef.current?.abort?.(); } catch {}
       speakingRef.current = true;
 
@@ -369,7 +371,8 @@ export default function FloatingVoiceOrb() {
           if (done) return;
           done = true;
           if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
-          window.setTimeout(() => speakChunk(index + 1), 80);
+          // próximo chunk síncrono (sem await) para manter o contexto do gesto.
+          speakChunk(index + 1);
         };
         u.onstart = () => { speakingRef.current = true; };
         u.onend = next;
@@ -380,12 +383,15 @@ export default function FloatingVoiceOrb() {
         try {
           if (synth.paused) synth.resume?.();
           synth.speak(u);
+          // Chrome bug: às vezes a fila fica em "pending" por ~15s.
+          // Forçar resume periodicamente mantém o áudio fluindo.
           window.setTimeout(() => { try { synth.resume?.(); } catch {} }, 250);
+          window.setTimeout(() => { try { synth.resume?.(); } catch {} }, 1000);
         } catch { next(); }
       };
 
-      // Chrome bug: cancel() seguido imediato de speak() às vezes é ignorado.
-      window.setTimeout(() => speakChunk(0), 160);
+      // Dispara imediatamente — sem setTimeout — para preservar a confiança do gesto.
+      speakChunk(0);
 
     } catch {}
   };
