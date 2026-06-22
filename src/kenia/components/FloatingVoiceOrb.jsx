@@ -236,6 +236,8 @@ export default function FloatingVoiceOrb() {
   const speechUnlockedRef = useRef(false);
   const voicesRef = useRef([]);
   const audioRef = useRef(null);
+  const speechTokenRef = useRef(0);
+  const speechQueueRef = useRef([]);
 
   const loadVoices = () => {
     try {
@@ -278,6 +280,48 @@ export default function FloatingVoiceOrb() {
     );
   };
 
+  const splitSpeechText = (text) => {
+    const clean = String(text || "")
+      .replace(/<AGENDAMENTO>[\s\S]*?<\/AGENDAMENTO>/g, "")
+      .replace(/https?:\/\/\S+/g, "link")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!clean) return [];
+    const sentences = clean.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [clean];
+    const chunks = [];
+    let current = "";
+    const pushWords = (value) => {
+      const words = String(value || "").trim().split(/\s+/).filter(Boolean);
+      let part = "";
+      for (const word of words) {
+        if ((part + " " + word).trim().length > 210) {
+          if (part) chunks.push(part.trim());
+          part = word;
+        } else {
+          part = `${part} ${word}`.trim();
+        }
+      }
+      if (part) chunks.push(part.trim());
+    };
+    for (const sentence of sentences) {
+      const s = sentence.trim();
+      if (!s) continue;
+      if (s.length > 210) {
+        if (current) { chunks.push(current.trim()); current = ""; }
+        pushWords(s);
+        continue;
+      }
+      if ((current + " " + s).trim().length > 210) {
+        if (current) chunks.push(current.trim());
+        current = s;
+      } else {
+        current = `${current} ${s}`.trim();
+      }
+    }
+    if (current) chunks.push(current.trim());
+    return chunks.slice(0, 16);
+  };
+
   const speak = (text) => {
     try {
       const synth = window.speechSynthesis;
@@ -286,50 +330,62 @@ export default function FloatingVoiceOrb() {
         audioRef.current = null;
       }
       if (!synth || !text) return;
+      loadVoices();
+      const chunks = splitSpeechText(text);
+      if (!chunks.length) return;
       const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
-      const u = new SpeechSynthesisUtterance(String(text));
-      u.lang = "pt-BR";
-      u.rate = 1;
-      u.pitch = 1;
-      u.volume = 1;
-      const v = pickPtVoice();
-      if (v) u.voice = v;
-      u.onstart = () => {
-        if (!shouldResume) return;
-        speakingRef.current = true;
-      };
-      const resume = () => {
+      const token = Date.now() + Math.random();
+      speechTokenRef.current = token;
+      speechQueueRef.current = chunks;
+
+      const finishSpeaking = () => {
+        if (speechTokenRef.current !== token) return;
         speakingRef.current = false;
         if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
         if (shouldResume && alwaysOnRef.current && shouldRestartRef.current) {
           restartContinuousRecognition(250);
         }
       };
-      u.onend = resume;
-      u.onerror = resume;
+
       synth.cancel();
-      // iOS Safari às vezes entra em "paused" — força resume antes de falar.
       try { synth.resume?.(); } catch {}
       // No Chrome/Google, a voz pode não sair enquanto o reconhecimento ainda está ativo.
       // Pausa o microfone antes de falar e, na escuta contínua, reinicia após a fala.
       try { recognitionRef.current?.abort?.(); } catch {}
-      if (shouldResume) {
-        speakingRef.current = true;
-      }
-      if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
-      const fallbackMs = Math.min(15000, Math.max(2000, String(text || "").length * 80));
-      speechResumeTimerRef.current = window.setTimeout(resume, fallbackMs);
-      // Chrome bug: cancel() seguido imediato de speak() é ignorado.
-      // Pequeno delay garante que o motor processe o cancel antes de falar.
-      const doSpeak = () => {
+      speakingRef.current = true;
+
+      const speakChunk = (index = 0) => {
+        if (speechTokenRef.current !== token) return;
+        if (index >= chunks.length) { finishSpeaking(); return; }
+        const u = new SpeechSynthesisUtterance(chunks[index]);
+        u.lang = "pt-BR";
+        u.rate = 1;
+        u.pitch = 1;
+        u.volume = 1;
+        const v = pickPtVoice();
+        if (v) u.voice = v;
+        let done = false;
+        const next = () => {
+          if (done) return;
+          done = true;
+          if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+          window.setTimeout(() => speakChunk(index + 1), 80);
+        };
+        u.onstart = () => { speakingRef.current = true; };
+        u.onend = next;
+        u.onerror = next;
+        const fallbackMs = Math.min(12000, Math.max(2500, chunks[index].length * 90));
+        if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+        speechResumeTimerRef.current = window.setTimeout(next, fallbackMs);
         try {
           if (synth.paused) synth.resume?.();
           synth.speak(u);
-          // Chrome trava em "pending" se o reconhecimento estava ativo — força um nudge.
-          if (synth.paused) synth.resume?.();
-        } catch {}
+          window.setTimeout(() => { try { synth.resume?.(); } catch {} }, 250);
+        } catch { next(); }
       };
-      setTimeout(doSpeak, 120);
+
+      // Chrome bug: cancel() seguido imediato de speak() às vezes é ignorado.
+      window.setTimeout(() => speakChunk(0), 160);
 
     } catch {}
   };
