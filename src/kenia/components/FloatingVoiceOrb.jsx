@@ -899,6 +899,7 @@ export default function FloatingVoiceOrb() {
   const [ytVideoId, setYtVideoId] = useState("");
   const [ytIds, setYtIds] = useState([]);
   const [ytIdx, setYtIdx] = useState(0);
+  useEffect(() => { ytPlayingRef.current = Boolean(ytVideoId); }, [ytVideoId]);
 
   const playYouTube = async (query) => {
     const q = (query || "").trim();
