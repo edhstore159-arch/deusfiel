@@ -66,9 +66,56 @@ export default function FloatingVoiceOrb() {
     try { localStorage.setItem("kenia:voice-always-on", alwaysOn ? "1" : "0"); } catch {}
   }, [alwaysOn]);
 
+  // ===== Multi-aba: apenas UMA aba pode rodar a secretária de voz por vez =====
+  // Usa Web Locks API (com fallback BroadcastChannel) para eleger uma "aba líder".
+  // Abas não-líderes ficam silenciosas (não escutam nem falam) para evitar conflito.
+  const isLeaderRef = useRef(false);
+  const [isLeader, setIsLeader] = useState(false);
+  useEffect(() => {
+    let release;
+    let cancelled = false;
+    const become = () => { if (!cancelled) { isLeaderRef.current = true; setIsLeader(true); } };
+    const yieldLead = () => { isLeaderRef.current = false; setIsLeader(false); };
+
+    if (typeof navigator !== "undefined" && navigator.locks?.request) {
+      navigator.locks.request("kenia-voice-secretary", { mode: "exclusive" }, () => {
+        become();
+        return new Promise((res) => { release = res; });
+      }).catch(() => {});
+    } else if (typeof BroadcastChannel !== "undefined") {
+      // Fallback simples: a primeira aba que não recebe "claim" em 300ms vira líder.
+      const bc = new BroadcastChannel("kenia-voice-secretary");
+      let conflict = false;
+      bc.onmessage = (e) => {
+        if (e.data === "claim") conflict = true;
+        if (e.data === "ping" && isLeaderRef.current) bc.postMessage("claim");
+      };
+      bc.postMessage("ping");
+      const t = setTimeout(() => { if (!conflict) { become(); bc.postMessage("claim"); } }, 300);
+      release = () => { clearTimeout(t); try { bc.close(); } catch {} };
+    } else {
+      become();
+    }
+
+    return () => {
+      cancelled = true;
+      yieldLead();
+      try { release && release(); } catch {}
+    };
+  }, []);
+
+  // Quando esta aba perde a liderança, encerra qualquer escuta/fala em andamento.
+  useEffect(() => {
+    if (isLeader) return;
+    try { recognitionRef.current?.abort?.(); } catch {}
+    try { window.speechSynthesis?.cancel?.(); } catch {}
+    recognitionActiveRef.current = false;
+    setListening(false);
+  }, [isLeader]);
+
   // Auto-reativa a escuta contínua ao recarregar, se estava ativa antes
   useEffect(() => {
-    if (!alwaysOn || !supported) return;
+    if (!alwaysOn || !supported || !isLeader) return;
     const t = setTimeout(() => {
       try {
         shouldRestartRef.current = true;
@@ -78,7 +125,7 @@ export default function FloatingVoiceOrb() {
     }, 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supported]);
+  }, [supported, isLeader]);
 
   const restartContinuousRecognition = (delay = 300) => {
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
