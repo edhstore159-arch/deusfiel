@@ -894,7 +894,7 @@ export default function FloatingVoiceOrb() {
     const ytMatch = effectiveText.match(/\b(?:toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|p[oõ]r|reproduz|reproduzir|escutar|ouvir|busca[r]?|procura[r]?)\s+(?:a\s+|o\s+|uma\s+|um\s+)?(?:m[uú]sica|son[s]?|som|v[ií]deo|playlist|clipe|audio|[aá]udio|can[cç][aã]o)?\s*(?:do|da|de|dos|das|no|pelo|pela)?\s*(.+?)(?:\s+(?:no|do|pelo|pela|pelo\s+youtube|youtube))?\s*$/i);
     const musicOnly = effectiveText.match(/\b(?:m[uú]sica|can[cç][aã]o|playlist|clipe)\s+(?:do|da|de|dos|das)?\s*(.+)/i);
     if (/youtube|y\s*tube|yt\b/i.test(lower) || (ytMatch && /\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|escutar|ouvir)\b/i.test(lower)) || musicOnly) {
-      const q = (ytMatch ? ytMatch[1] : (musicOnly ? musicOnly[1] : text)).replace(/youtube/gi, "").replace(/\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|m[uú]sica|som|v[ií]deo|can[cç][aã]o|playlist|clipe)\b/gi, "").trim();
+      const q = (ytMatch ? ytMatch[1] : (musicOnly ? musicOnly[1] : effectiveText)).replace(/youtube/gi, "").replace(/\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|m[uú]sica|som|v[ií]deo|can[cç][aã]o|playlist|clipe)\b/gi, "").trim();
       if (q) { userMinimizedRef.current = false; setOpen(true); playYouTube(q); return; }
     }
     // Intenção: agendamentos do dia / de hoje
