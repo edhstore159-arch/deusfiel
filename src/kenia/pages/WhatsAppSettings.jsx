@@ -66,9 +66,11 @@ export default function WhatsAppSettings() {
     return () => clearInterval(t);
   }, [cfg?.provider]);
 
-  // Contador de falhas consecutivas para evitar flapping (desconexões falsas)
+  // Contadores de flapping para evitar desconexões falsas por glitch de rede/sidecar
   const failureCountRef = useRef(0);
+  const disconnectCountRef = useRef(0);
   const MAX_FAILURES_BEFORE_OFFLINE = 5;
+  const MAX_DISCONNECTS_BEFORE_OFFLINE = 3;
 
   const load = async () => {
     try {
@@ -84,15 +86,28 @@ export default function WhatsAppSettings() {
       const { data: st } = await api.get("/whatsapp/baileys/status");
       const normalized = normalizeBaileysStatus(st);
       failureCountRef.current = 0;
-      setBaileysStatus(normalized);
-      if (!normalized.connected) {
-        try {
-          const { data: qr } = await api.get("/whatsapp/baileys/qr");
-          setBaileysQr(qr);
-        } catch { /* ignore qr fetch errors */ }
-      } else {
+      if (normalized.connected) {
+        disconnectCountRef.current = 0;
+        setBaileysStatus(normalized);
         setBaileysQr(null);
         if (cfg?.provider !== "baileys") setCfg((current) => current ? { ...current, provider: "baileys", bot_enabled: true } : current);
+      } else {
+        // Tolerância: se já estava conectado, exige N status "desconectado" seguidos
+        // antes de baixar o estado, evitando flapping enquanto o sidecar renegocia.
+        disconnectCountRef.current += 1;
+        setBaileysStatus((prev) => {
+          if (prev?.connected && disconnectCountRef.current < MAX_DISCONNECTS_BEFORE_OFFLINE) {
+            return prev;
+          }
+          return normalized;
+        });
+        // Só busca QR depois de confirmada a desconexão, evitando piscar QR à toa
+        if (disconnectCountRef.current >= MAX_DISCONNECTS_BEFORE_OFFLINE) {
+          try {
+            const { data: qr } = await api.get("/whatsapp/baileys/qr");
+            setBaileysQr(qr);
+          } catch { /* ignore qr fetch errors */ }
+        }
       }
     } catch (e) {
       // Tolerância a falhas transitórias: só marca offline após N falhas seguidas.
