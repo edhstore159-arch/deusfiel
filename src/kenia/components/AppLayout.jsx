@@ -40,7 +40,7 @@ const PREFETCH = {
   "/app/chat-ia": () => import("@/kenia/pages/ChatIA"),
   "/app/admin": () => import("@/kenia/pages/AdminCases"),
   "/app/secretary-tasks": () => import("@/kenia/pages/SecretaryTasks"),
-  "/app/agents": () => import("@/kenia/pages/Agents"),
+  
   "/app/crm": () => import("@/kenia/pages/CRM"),
   "/app/agenda": () => import("@/kenia/pages/Agenda"),
   "/app/processes": () => import("@/kenia/pages/Processes"),
