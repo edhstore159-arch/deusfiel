@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 /**
  * DebugErrorThrower
  *
- * Antes este componente transformava instruções de debug em erro fatal.
- * Isso derrubava o app inteiro e causava tela branca no preview.
- * Agora ele apenas registra a mensagem para diagnóstico, sem interromper a UI.
+ * Escuta "lovable-debug-error" e converte a instrução em erro fatal de runtime,
+ * para escapar até o overlay global da Lovable e habilitar o "Try to Fix".
+ *
+ * NÃO envolver em ErrorBoundary/Suspense. NÃO trocar throw por console/log.
  */
 export const DebugErrorThrower = () => {
   const [message, setMessage] = useState<string | null>(null);
@@ -22,7 +23,8 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
-    console.warn("lovable-debug-error capturado sem derrubar o app:", message);
+    // Intencional: erro fatal para acionar o overlay global da Lovable.
+    throw new Error(message);
   }
 
   return null;

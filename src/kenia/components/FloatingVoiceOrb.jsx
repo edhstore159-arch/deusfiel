@@ -346,21 +346,6 @@ export default function FloatingVoiceOrb() {
     return pools.find((c) => norm(c.name || c.client_name).includes(n)) || null;
   };
 
-  const buildVoiceFallback = (text, ctx) => {
-    const lower = norm(text);
-    const appointments = ctx?.appointments || [];
-    if (/agendamento|agenda|consulta|horario|horário/.test(lower) && appointments.length) {
-      const soon = appointments.slice(0, 5).map((a, i) => {
-        const who = a.client_name || a.customer_name || a.lead_name || "cliente";
-        const when = fmtDateTime(a.starts_at || a.appointment_date || a.date || a.scheduled_at);
-        const area = a.legal_area || a.case_type || a.area || "atendimento";
-        return `${i + 1}. ${who}, ${when}, ${area}`;
-      }).join("; ");
-      return `Encontrei estes agendamentos: ${soon}.`;
-    }
-    return "Estou ouvindo você. Tive uma instabilidade na resposta da IA, mas posso abrir páginas, consultar agenda, criar agendamentos e responder novamente se você repetir o pedido.";
-  };
-
   const askOllama = async (text) => {
     setThinking(true);
     setReply("");
@@ -425,23 +410,16 @@ export default function FloatingVoiceOrb() {
       const enrichedSystem = renderKeniaPrompt(loadKeniaPrompt(), { dateContext, ctxSummary, jusContext });
 
 
-      const requestBody = {
-        message: text,
-        history: historyRef.current.slice(-8),
-        session_id: "kenia-voice-orb",
-        system_prompt: enrichedSystem,
-        context: ctxSummary,
-      };
-      let data = null;
-      try {
-        const result = await supabase.functions.invoke("chat-ai", { body: requestBody });
-        if (result.error) throw result.error;
-        data = result.data;
-      } catch (primaryError) {
-        const fallback = await api.post("/chat/message", requestBody).catch(() => null);
-        data = fallback?.data;
-        if (!data?.response && !data?.reply && !data?.message && !data?.text) throw primaryError;
-      }
+      const { data, error } = await supabase.functions.invoke("chat-ai", {
+        body: {
+          message: text,
+          history: historyRef.current.slice(-8),
+          session_id: "kenia-voice-orb",
+          system_prompt: enrichedSystem,
+          context: ctxSummary,
+        },
+      });
+      if (error) throw error;
       const answer = String(data?.response || data?.reply || data?.message || data?.text || "").trim();
       if (!answer) throw new Error("Resposta vazia");
       historyRef.current.push({ role: "user", content: text });
@@ -452,9 +430,7 @@ export default function FloatingVoiceOrb() {
       if (r) navigate(r);
     } catch (e) {
       toast.error("Falha ao consultar Kênia (Ollama): " + (e?.message || e));
-      const fallback = buildVoiceFallback(text, contextRef.current);
-      setReply(fallback);
-      speak(fallback);
+      speak("Não consegui processar agora.");
     } finally {
       setThinking(false);
     }
