@@ -58,6 +58,17 @@ export default function FloatingVoiceOrb() {
   const lastFinalRef = useRef({ text: "", at: 0 });
   const speakingRef = useRef(false);
   const speechResumeTimerRef = useRef(null);
+  // YouTube playback gating: a secretária só fala por cima do YouTube quando o usuário deu um comando.
+  const ytPlayingRef = useRef(false);
+  const userCommandRef = useRef(false);
+  const ytIframeRef = useRef(null);
+  const ytCommand = (func) => {
+    try {
+      const w = ytIframeRef.current?.contentWindow;
+      if (!w) return;
+      w.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
+    } catch {}
+  };
   const [alwaysOn, setAlwaysOn] = useState(() => {
     try { return localStorage.getItem("kenia:voice-always-on") === "1"; } catch { return false; }
   });
@@ -374,6 +385,8 @@ export default function FloatingVoiceOrb() {
   const speak = (text) => {
     // Em outras abas (não-líder) a secretária permanece em silêncio para não duplicar a fala.
     if (!isLeaderRef.current) return;
+    // Se o YouTube está tocando, só interrompe quando o usuário deu um comando explícito ("secretária ...").
+    if (ytPlayingRef.current && !userCommandRef.current) return;
     try {
       const synth = window.speechSynthesis;
       if (audioRef.current) {
@@ -393,6 +406,8 @@ export default function FloatingVoiceOrb() {
         if (speechTokenRef.current !== token) return;
         speakingRef.current = false;
         if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+        // Retoma o YouTube após a secretária terminar de falar.
+        if (ytPlayingRef.current) ytCommand("playVideo");
         if (shouldResume && alwaysOnRef.current && shouldRestartRef.current) {
           restartContinuousRecognition(250);
         }
@@ -405,6 +420,8 @@ export default function FloatingVoiceOrb() {
       try { synth.cancel(); } catch {}
       try { synth.resume?.(); } catch {}
       try { recognitionRef.current?.abort?.(); } catch {}
+      // Pausa o YouTube enquanto a secretária fala (só chega aqui se houve comando do usuário).
+      if (ytPlayingRef.current) ytCommand("pauseVideo");
       speakingRef.current = true;
 
       const speakChunk = (index = 0) => {
@@ -882,6 +899,7 @@ export default function FloatingVoiceOrb() {
   const [ytVideoId, setYtVideoId] = useState("");
   const [ytIds, setYtIds] = useState([]);
   const [ytIdx, setYtIdx] = useState(0);
+  useEffect(() => { ytPlayingRef.current = Boolean(ytVideoId); }, [ytVideoId]);
 
   const playYouTube = async (query) => {
     const q = (query || "").trim();
@@ -914,6 +932,9 @@ export default function FloatingVoiceOrb() {
 
   const handleCommand = (text) => {
     if (!text?.trim()) return;
+    // Marca: este speak() decorre de um comando do usuário; libera interromper o YouTube.
+    userCommandRef.current = true;
+    setTimeout(() => { userCommandRef.current = false; }, 30000);
     const woke = hasWakeWord(text);
     const commandText = woke ? stripWake(text) : String(text || "").trim();
     const effectiveText = commandText || String(text || "").trim();
@@ -1116,9 +1137,10 @@ export default function FloatingVoiceOrb() {
               <div className="aspect-video w-full rounded overflow-hidden bg-black flex items-center justify-center">
                 {ytVideoId ? (
                   <iframe
+                    ref={ytIframeRef}
                     title="YouTube"
                     className="w-full h-full"
-                    src={`https://www.youtube-nocookie.com/embed/${ytVideoId}?autoplay=1&rel=0`}
+                    src={`https://www.youtube-nocookie.com/embed/${ytVideoId}?autoplay=1&rel=0&enablejsapi=1`}
                     allow="autoplay; encrypted-media; picture-in-picture"
                     allowFullScreen
                   />
