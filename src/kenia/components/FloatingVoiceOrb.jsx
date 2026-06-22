@@ -475,8 +475,10 @@ export default function FloatingVoiceOrb() {
       const r = matchRoute(answer);
       if (r) navigate(r);
     } catch (e) {
-      toast.error("Falha ao consultar Kênia (Ollama): " + (e?.message || e));
-      speak("Não consegui processar agora.");
+      const fallback = "Estou aqui. Não consegui acessar a resposta completa agora, mas pode repetir sua solicitação que vou tentar novamente.";
+      setReply(fallback);
+      toast.error("Falha ao consultar Kênia: " + (e?.message || e));
+      speak(fallback);
     } finally {
       setThinking(false);
     }
