@@ -450,7 +450,9 @@ export default function FloatingVoiceOrb() {
       const fmtFull = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(nowBR);
       const fmtTime = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(nowBR);
       const fmtISO = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(nowBR);
-      const dateContext = `DATA E HORA ATUAL (fuso America/Sao_Paulo, use SEMPRE esta como referência de "hoje", "agora", "ontem", "amanhã" — NUNCA invente outra data): ${fmtFull}, ${fmtTime} (ISO: ${fmtISO}).`;
+      const hourBR = Number(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(nowBR));
+      const greeting = hourBR < 12 ? "Bom dia" : hourBR < 18 ? "Boa tarde" : "Boa noite";
+      const dateContext = `DATA E HORA ATUAL (fuso America/Sao_Paulo, use SEMPRE esta como referência de "hoje", "agora", "ontem", "amanhã" — NUNCA invente outra data): ${fmtFull}, ${fmtTime} (ISO: ${fmtISO}). SAUDAÇÃO OBRIGATÓRIA: sempre inicie a resposta cumprimentando o cliente com "${greeting}" de acordo com este horário de Brasília — nunca use outra saudação.`;
 
       const enrichedSystem = renderKeniaPrompt(loadKeniaPrompt(), { dateContext, ctxSummary, jusContext });
 
