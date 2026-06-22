@@ -288,9 +288,12 @@ export default function DebugTool() {
       <div className="flex-1 overflow-auto p-6">
         <Card className="max-w-3xl mx-auto p-6 border-nude-200">
           <Tabs defaultValue="instruction">
-            <TabsList className="grid grid-cols-2 w-full max-w-sm">
+            <TabsList className="grid grid-cols-3 w-full max-w-2xl">
               <TabsTrigger value="instruction" data-testid="dbg-tab-instr">Instrução</TabsTrigger>
               <TabsTrigger value="merge" data-testid="dbg-tab-merge">Mesclar Imagens</TabsTrigger>
+              <TabsTrigger value="dashcfg" data-testid="dbg-tab-dashcfg">
+                <Lock className="w-3.5 h-3.5 mr-1" /> Configs Dashboard
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="instruction" className="mt-6">
