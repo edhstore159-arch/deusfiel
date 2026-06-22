@@ -291,9 +291,11 @@ export default function FloatingVoiceOrb() {
       synth.cancel();
       // iOS Safari às vezes entra em "paused" — força resume antes de falar.
       try { synth.resume?.(); } catch {}
+      // No Chrome/Google, a voz pode não sair enquanto o reconhecimento ainda está ativo.
+      // Pausa o microfone antes de falar e, na escuta contínua, reinicia após a fala.
+      try { recognitionRef.current?.abort?.(); } catch {}
       if (shouldResume) {
         speakingRef.current = true;
-        try { recognitionRef.current?.abort?.(); } catch {}
       }
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
       const fallbackMs = Math.min(15000, Math.max(2000, String(text || "").length * 80));
