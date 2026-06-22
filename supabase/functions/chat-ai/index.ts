@@ -17,16 +17,44 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+function cleanTextForSpeech(text: string): string {
+  return String(text || "")
+    .replace(/<AGENDAMENTO>[\s\S]*?<\/AGENDAMENTO>/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .trim()
+    .slice(0, 1500);
+}
+
 async function synthesizeSpeech(text: string): Promise<string | null> {
-  if (!ELEVENLABS_API_KEY || !text?.trim()) return null;
+  const clean = cleanTextForSpeech(text);
+  if (!clean) return null;
+
+  if (LOVABLE_API_KEY) {
+    try {
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini-tts",
+          input: clean,
+          voice: "coral",
+          instructions: "Fale em português do Brasil como uma atendente jurídica humana, calorosa, clara e natural.",
+          response_format: "mp3",
+          stream_format: "audio",
+        }),
+      });
+      if (resp.ok) {
+        const buf = await resp.arrayBuffer();
+        return bytesToBase64(new Uint8Array(buf));
+      }
+      console.error("Lovable TTS error:", resp.status, await resp.text());
+    } catch (e) {
+      console.error("Lovable TTS exception:", e);
+    }
+  }
+
+  if (!ELEVENLABS_API_KEY) return null;
   try {
-    // Remove blocos JSON de agendamento e marcações para a voz
-    const clean = text
-      .replace(/<AGENDAMENTO>[\s\S]*?<\/AGENDAMENTO>/g, "")
-      .replace(/```[\s\S]*?```/g, "")
-      .trim()
-      .slice(0, 1500);
-    if (!clean) return null;
     const resp = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}?output_format=mp3_44100_128`,
       {
