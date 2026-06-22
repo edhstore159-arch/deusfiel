@@ -707,6 +707,11 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
       if (convErr) console.error("[chat-ai] falha ao salvar conversa:", convErr);
       else console.log("[chat-ai] conversa salva user_id=", userId, "session=", sessionId);
       if (appointment) {
+        // Se a sessão for um número de telefone (ex.: WhatsApp), usa como telefone real do cliente quando o texto não trouxe um.
+        const sessionLooksLikePhone = !!sessionId && /^\+?\d{6,}$/.test(sessionId);
+        if (!appointment.phone && sessionLooksLikePhone) {
+          appointment.phone = sessionId;
+        }
         const finalMeetUrl = meetUrl || `https://meet.jit.si/kenia-${Date.now().toString(36)}`;
         const enrichedPayload = {
           ...(appointment.raw_payload || {}),
