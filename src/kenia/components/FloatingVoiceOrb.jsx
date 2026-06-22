@@ -66,43 +66,115 @@ export default function FloatingVoiceOrb() {
     try { localStorage.setItem("kenia:voice-always-on", alwaysOn ? "1" : "0"); } catch {}
   }, [alwaysOn]);
 
-  // ===== Multi-aba: apenas UMA aba pode rodar a secretária de voz por vez =====
-  // Usa Web Locks API (com fallback BroadcastChannel) para eleger uma "aba líder".
-  // Abas não-líderes ficam silenciosas (não escutam nem falam) para evitar conflito.
+  // ===== Multi-aba / Chrome: apenas a aba ativa pode usar microfone e voz =====
+  // A Web Speech API do Chrome entra em conflito quando várias abas tentam
+  // escutar/falar ao mesmo tempo. Por isso usamos uma liderança por aba com
+  // lease curto em localStorage + BroadcastChannel: ao focar uma aba, ela assume;
+  // as outras param microfone e speechSynthesis imediatamente.
   const isLeaderRef = useRef(false);
   const [isLeader, setIsLeader] = useState(false);
+  const tabIdRef = useRef(`kenia-tab-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const requestLeadershipRef = useRef(null);
   useEffect(() => {
-    let release;
+    const LEADER_KEY = "kenia:voice-active-tab";
+    const LEASE_MS = 4500;
+    const tabId = tabIdRef.current;
     let cancelled = false;
-    const become = () => { if (!cancelled) { isLeaderRef.current = true; setIsLeader(true); } };
-    const yieldLead = () => { isLeaderRef.current = false; setIsLeader(false); };
+    let bc = null;
 
-    if (typeof navigator !== "undefined" && navigator.locks?.request) {
-      navigator.locks.request("kenia-voice-secretary", { mode: "exclusive" }, () => {
-        become();
-        return new Promise((res) => { release = res; });
-      }).catch(() => {});
-    } else if (typeof BroadcastChannel !== "undefined") {
-      // Fallback simples: a primeira aba que não recebe "claim" em 300ms vira líder.
-      const bc = new BroadcastChannel("kenia-voice-secretary");
-      let conflict = false;
+    const readLease = () => {
+      try { return JSON.parse(localStorage.getItem(LEADER_KEY) || "null"); } catch { return null; }
+    };
+    const isVisible = () => typeof document === "undefined" || document.visibilityState !== "hidden";
+    const stopVoiceActivity = () => {
+      try { recognitionRef.current?.abort?.(); } catch {}
+      try { window.speechSynthesis?.cancel?.(); } catch {}
+      recognitionActiveRef.current = false;
+      setListening(false);
+    };
+    const yieldLead = (releaseLease = false) => {
+      if (!cancelled) setIsLeader(false);
+      isLeaderRef.current = false;
+      if (releaseLease) {
+        const current = readLease();
+        if (current?.id === tabId) {
+          try { localStorage.removeItem(LEADER_KEY); } catch {}
+        }
+      }
+      stopVoiceActivity();
+    };
+    const become = (reason = "claim") => {
+      if (cancelled || !isVisible()) return false;
+      const lease = { id: tabId, at: Date.now(), reason };
+      try { localStorage.setItem(LEADER_KEY, JSON.stringify(lease)); } catch {}
+      isLeaderRef.current = true;
+      setIsLeader(true);
+      try { bc?.postMessage({ type: "leader", id: tabId, at: lease.at }); } catch {}
+      return true;
+    };
+    const shouldClaim = () => {
+      const lease = readLease();
+      return !lease?.id || lease.id === tabId || Date.now() - Number(lease.at || 0) > LEASE_MS;
+    };
+    const claimIfAvailable = (reason) => {
+      if (!isVisible()) { yieldLead(true); return false; }
+      if (shouldClaim() || reason === "focus" || reason === "manual") return become(reason);
+      return false;
+    };
+
+    requestLeadershipRef.current = () => claimIfAvailable("manual");
+    if (typeof BroadcastChannel !== "undefined") {
+      bc = new BroadcastChannel("kenia-voice-secretary");
       bc.onmessage = (e) => {
-        if (e.data === "claim") conflict = true;
-        if (e.data === "ping" && isLeaderRef.current) bc.postMessage("claim");
+        const data = e.data || {};
+        if (data.type === "leader" && data.id !== tabId) yieldLead(false);
       };
-      bc.postMessage("ping");
-      const t = setTimeout(() => { if (!conflict) { become(); bc.postMessage("claim"); } }, 300);
-      release = () => { clearTimeout(t); try { bc.close(); } catch {} };
-    } else {
-      become();
     }
+
+    const onStorage = (e) => {
+      if (e.key !== LEADER_KEY) return;
+      const lease = readLease();
+      if (lease?.id && lease.id !== tabId) yieldLead(false);
+      if (!lease?.id && isVisible()) claimIfAvailable("empty");
+    };
+    const onFocus = () => claimIfAvailable("focus");
+    const onVisibility = () => {
+      if (isVisible()) claimIfAvailable("visible");
+      else yieldLead(true);
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    claimIfAvailable("mount");
+    const heartbeat = window.setInterval(() => {
+      if (isLeaderRef.current) {
+        if (!isVisible()) { yieldLead(true); return; }
+        become("heartbeat");
+      } else if (isVisible() && shouldClaim()) {
+        claimIfAvailable("stale");
+      }
+    }, 1500);
 
     return () => {
       cancelled = true;
-      yieldLead();
-      try { release && release(); } catch {}
+      requestLeadershipRef.current = null;
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearInterval(heartbeat);
+      yieldLead(true);
+      try { bc?.close?.(); } catch {}
     };
   }, []);
+
+  const ensureVoiceLeadership = () => {
+    if (isLeaderRef.current) return true;
+    try { requestLeadershipRef.current?.(); } catch {}
+    if (isLeaderRef.current) return true;
+    toast.message("A secretária está ativa em outra aba. Clique nesta janela e tente novamente.");
+    return false;
+  };
 
   // Quando esta aba perde a liderança, encerra qualquer escuta/fala em andamento.
   useEffect(() => {
@@ -248,6 +320,7 @@ export default function FloatingVoiceOrb() {
   const toggleAlwaysOn = () => {
     unlockSpeech();
     if (!supported) { toast.error("Reconhecimento de voz não suportado."); return; }
+    if (!ensureVoiceLeadership()) return;
     const rec = recognitionRef.current; if (!rec) return;
     if (alwaysOnRef.current) {
       shouldRestartRef.current = false;
@@ -454,6 +527,7 @@ export default function FloatingVoiceOrb() {
   const playAssistantReply = async (text, audioBase64) => {
     const msg = String(text || "").trim();
     if (!msg) return;
+    if (!isLeaderRef.current) return;
     const shouldResume = alwaysOnRef.current && shouldRestartRef.current;
     if (audioBase64) {
       try {
@@ -1006,6 +1080,7 @@ export default function FloatingVoiceOrb() {
       toast.error("Reconhecimento de voz não suportado neste navegador.");
       return;
     }
+    if (!ensureVoiceLeadership()) return;
     const rec = recognitionRef.current;
     if (!rec) return;
     if (listening || recognitionActiveRef.current) {
