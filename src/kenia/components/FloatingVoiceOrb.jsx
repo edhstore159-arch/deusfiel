@@ -468,19 +468,6 @@ export default function FloatingVoiceOrb() {
           user_id: authUserId,
         },
       });
-      // Fallback: garante que a conversa fique salva mesmo se o edge function falhar em persistir
-      if (authUserId) {
-        try {
-          await supabase.from("conversations").insert({
-            user_id: authUserId,
-            session_id: "kenia-voice-orb",
-            message: text,
-            response: String(data?.response || data?.reply || "").slice(0, 4000) || null,
-          });
-        } catch (persistErr) {
-          console.warn("[orb] falha ao registrar conversa local:", persistErr);
-        }
-      }
       if (error) throw error;
       const answer = String(data?.response || data?.reply || data?.message || data?.text || "").trim();
       if (!answer) throw new Error("Resposta vazia");
