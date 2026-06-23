@@ -179,6 +179,22 @@ export default function FloatingVoiceOrb() {
     rec.onresult = (e) => {
       const txt = Array.from(e.results).map((r) => r[0].transcript).join(" ");
       setTranscript(txt);
+      // Interrupção imediata: se a palavra "secretária" aparecer mesmo nos
+      // resultados parciais (interim) enquanto a assistente está falando,
+      // cancela a fala na hora — não espera o resultado final.
+      if (alwaysOnRef.current && speakingRef.current) {
+        for (let i = e.resultIndex; i < e.results.length; i += 1) {
+          const partial = e.results[i]?.[0]?.transcript;
+          if (partial && hasWakeWord(partial)) {
+            try { window.speechSynthesis?.cancel?.(); } catch {}
+            try { if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; audioRef.current = null; } } catch {}
+            speechTokenRef.current = 0;
+            speakingRef.current = false;
+            activateCommandSession();
+            break;
+          }
+        }
+      }
       for (let i = e.resultIndex; i < e.results.length; i += 1) {
         const result = e.results[i];
         if (!result?.isFinal) continue;
