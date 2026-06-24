@@ -988,9 +988,16 @@ export default function FloatingVoiceOrb() {
       const q = (ytMatch ? ytMatch[1] : (musicOnly ? musicOnly[1] : effectiveText)).replace(/youtube/gi, "").replace(/\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|m[uú]sica|som|v[ií]deo|can[cç][aã]o|playlist|clipe)\b/gi, "").trim();
       if (q) { userMinimizedRef.current = false; setOpen(true); playYouTube(q); return; }
     }
-    // Intenção: agendamentos do dia / de hoje
-    if (/\bagendamento[s]?\b/.test(lower) && /\b(hoje|do dia|de hoje|para hoje)\b/.test(lower)) {
-      reportTodayAppointments();
+    // Intenção: agendamentos (hoje, amanhã, semana, todos)
+    if (/\b(agendamento[s]?|agenda|compromisso[s]?|consulta[s]?)\b/.test(lower)) {
+      let scope = "today";
+      if (/\b(amanh[aã])\b/.test(lower)) scope = "tomorrow";
+      else if (/\b(semana|pr[oó]xim[oa]s\s+dias|esta\s+semana)\b/.test(lower)) scope = "week";
+      else if (/\b(tod[oa]s|todos\s+os|completa|geral|lista|listar|mostrar?\s+(?:todos|tudo))\b/.test(lower)) scope = "all";
+      else if (/\b(hoje|do\s+dia|de\s+hoje|para\s+hoje|agora)\b/.test(lower)) scope = "today";
+      else if (/\b(quais|qual|listar?|mostrar?|ver|me\s+(?:fala|diga|mostre))\b/.test(lower)) scope = "all";
+      else scope = "today";
+      reportAppointments(scope);
       return;
     }
     // Enviar mensagem no WhatsApp: "enviar/mandar mensagem/whatsapp para [nome] dizendo/falando/: [texto]"
