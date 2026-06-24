@@ -842,28 +842,53 @@ export default function FloatingVoiceOrb() {
     } catch { return false; }
   };
 
-  const reportTodayAppointments = async () => {
+  // scope: "today" | "tomorrow" | "week" | "all"
+  const reportAppointments = async (scope = "today") => {
     setThinking(true);
     setReply("");
     try {
-      const { data } = await api.get("/appointments");
-      const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : (Array.isArray(data?.appointments) ? data.appointments : []));
+      // Sempre tenta a API externa primeiro e cai para o Supabase como fallback,
+      // garantindo que a secretária de voz veja TODOS os agendamentos do banco.
+      let list = [];
+      try {
+        const { data } = await api.get("/appointments");
+        list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : (Array.isArray(data?.appointments) ? data.appointments : []));
+      } catch {}
+      if (!list.length) {
+        try {
+          const { data: sb } = await supabase.from("appointments").select("*").order("appointment_date", { ascending: true }).limit(500);
+          list = Array.isArray(sb) ? sb : [];
+        } catch {}
+      }
+
+      const getDate = (a) => a.starts_at || a.start_at || a.scheduled_at || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || "00:00"}` : a.date);
       const today = new Date();
-      const todays = list
-        .filter((a) => isSameDay(a.starts_at || a.start_at || a.date || a.scheduled_at, today))
-        .sort((a, b) => new Date(a.starts_at || a.start_at || a.date) - new Date(b.starts_at || b.start_at || b.date));
-      if (!todays.length) {
-        const msg = "Não há agendamentos para hoje.";
+      const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+      const weekEnd = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      let filtered = list;
+      let label = "";
+      if (scope === "today") { filtered = list.filter((a) => isSameDay(getDate(a), today)); label = "hoje"; }
+      else if (scope === "tomorrow") { filtered = list.filter((a) => isSameDay(getDate(a), tomorrow)); label = "amanhã"; }
+      else if (scope === "week") {
+        filtered = list.filter((a) => { const d = new Date(getDate(a)); return d >= today && d <= weekEnd; });
+        label = "nesta semana";
+      } else { label = "no total"; }
+
+      filtered = filtered.sort((a, b) => new Date(getDate(a)) - new Date(getDate(b)));
+
+      if (!filtered.length) {
+        const msg = `Não há agendamentos ${label}.`;
         setReply(msg); speak(msg); return;
       }
-      const lines = todays.map((a, i) => {
-        const when = fmtDateTime(a.starts_at || a.start_at || a.date || a.scheduled_at);
+      const lines = filtered.map((a, i) => {
+        const when = fmtDateTime(getDate(a));
         const who = a.client_name || a.customer_name || a.lead_name || a.patient_name || a.contact_name || "Cliente";
         const phone = a.phone || a.client_phone || a.whatsapp || "";
         const assignee = a.assigned_to || a.attendant || a.therapist_name || a.responsible || "";
-        const title = a.title || a.service || a.subject || a.area || "Atendimento";
+        const title = a.title || a.service || a.subject || a.legal_area || a.area || "Atendimento";
         const status = a.status || "";
-        const notes = a.notes || a.description || "";
+        const notes = a.notes || a.description || a.case_summary || "";
         const link = a.meet_url || a.meeting_link || a.room_url || "";
         const parts = [
           `${i + 1}. ${when} — ${title}`,
@@ -875,15 +900,15 @@ export default function FloatingVoiceOrb() {
         ].filter(Boolean);
         return parts.join("\n");
       });
-      const header = `Você tem ${todays.length} agendamento${todays.length > 1 ? "s" : ""} hoje:`;
-      const full = `${header}\n${lines.join("\n")}`;
-      setReply(full);
-      // Resumo curto na voz
-      const spoken = `${header} ` + todays.map((a, i) => {
-        const t = new Date(a.starts_at || a.start_at || a.date).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const header = `Você tem ${filtered.length} agendamento${filtered.length > 1 ? "s" : ""} ${label}:`;
+      setReply(`${header}\n${lines.join("\n")}`);
+      const spoken = `${header} ` + filtered.slice(0, 12).map((a, i) => {
+        const d = new Date(getDate(a));
+        const t = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        const day = scope === "today" || scope === "tomorrow" ? "" : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " ";
         const who = a.client_name || a.customer_name || a.lead_name || a.patient_name || "cliente";
         const assignee = a.assigned_to || a.therapist_name || a.attendant || "";
-        return `${i + 1}: às ${t} com ${who}${assignee ? ", responsável " + assignee : ""}.`;
+        return `${i + 1}: ${day}às ${t} com ${who}${assignee ? ", responsável " + assignee : ""}.`;
       }).join(" ");
       speak(spoken);
     } catch (e) {
@@ -893,6 +918,7 @@ export default function FloatingVoiceOrb() {
       setThinking(false);
     }
   };
+  const reportTodayAppointments = () => reportAppointments("today");
 
   const [ytQuery, setYtQuery] = useState("");
   const [ytVideoId, setYtVideoId] = useState("");
@@ -962,9 +988,16 @@ export default function FloatingVoiceOrb() {
       const q = (ytMatch ? ytMatch[1] : (musicOnly ? musicOnly[1] : effectiveText)).replace(/youtube/gi, "").replace(/\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|m[uú]sica|som|v[ií]deo|can[cç][aã]o|playlist|clipe)\b/gi, "").trim();
       if (q) { userMinimizedRef.current = false; setOpen(true); playYouTube(q); return; }
     }
-    // Intenção: agendamentos do dia / de hoje
-    if (/\bagendamento[s]?\b/.test(lower) && /\b(hoje|do dia|de hoje|para hoje)\b/.test(lower)) {
-      reportTodayAppointments();
+    // Intenção: agendamentos (hoje, amanhã, semana, todos)
+    if (/\b(agendamento[s]?|agenda|compromisso[s]?|consulta[s]?)\b/.test(lower)) {
+      let scope = "today";
+      if (/\b(amanh[aã])\b/.test(lower)) scope = "tomorrow";
+      else if (/\b(semana|pr[oó]xim[oa]s\s+dias|esta\s+semana)\b/.test(lower)) scope = "week";
+      else if (/\b(tod[oa]s|todos\s+os|completa|geral|lista|listar|mostrar?\s+(?:todos|tudo))\b/.test(lower)) scope = "all";
+      else if (/\b(hoje|do\s+dia|de\s+hoje|para\s+hoje|agora)\b/.test(lower)) scope = "today";
+      else if (/\b(quais|qual|listar?|mostrar?|ver|me\s+(?:fala|diga|mostre))\b/.test(lower)) scope = "all";
+      else scope = "today";
+      reportAppointments(scope);
       return;
     }
     // Enviar mensagem no WhatsApp: "enviar/mandar mensagem/whatsapp para [nome] dizendo/falando/: [texto]"
