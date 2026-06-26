@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/kenia/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
@@ -9,7 +10,7 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/kenia/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kenia/components/ui/select";
-import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, X as XIcon, CalendarClock, Pencil } from "lucide-react";
+import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, X as XIcon, CalendarClock, Pencil, Film } from "lucide-react";
 import { toast } from "sonner";
 import SocialConnections from "@/kenia/components/SocialConnections";
 import CreativeAssetsLibrary from "@/kenia/components/CreativeAssetsLibrary";
@@ -281,6 +282,12 @@ export default function Creatives() {
           </div>
           <h1 className="font-display font-bold text-2xl">Criativos para Redes Sociais</h1>
         </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button asChild variant="outline" className="border-gold-300 bg-white text-nude-900 hover:bg-gold-50">
+            <Link to="/app/viral-video">
+              <Film className="w-4 h-4 mr-2" /> Gerar vídeo
+            </Link>
+          </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="bg-nude-900 hover:bg-nude-800" data-testid="ai-generate-post-btn">
@@ -401,6 +408,7 @@ export default function Creatives() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
