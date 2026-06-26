@@ -1,12 +1,13 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import JSZip from "jszip";
 import { api } from "@/kenia/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
-import { Combine, Upload, Loader2, Download, X, Sparkles, ImageIcon, Package, Info, Wand2 } from "lucide-react";
+import { Combine, Upload, Loader2, Download, X, Sparkles, ImageIcon, Package, Info, Wand2, Trash2, CreditCard, Lock } from "lucide-react";
 import SocialConnections from "@/kenia/components/SocialConnections";
 
 // Preset de rejuvenescimento facial preservando identidade
@@ -147,6 +148,76 @@ export default function ImageFusion() {
   const [result, setResult] = useState(null);
   const [variants, setVariants] = useState([]); // {preset, dataUrl, blob}
   const [generatingVariants, setGeneratingVariants] = useState(false);
+  const [saved, setSaved] = useState([]); // {id, url, prompt, paid, storage_path}
+  const [paying, setPaying] = useState(null);
+
+  useEffect(() => { loadSaved(); }, []);
+
+  const loadSaved = async () => {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) return;
+      const { data } = await supabase
+        .from("generated_images")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(60);
+      const items = await Promise.all((data || []).map(async (r) => {
+        const { data: signed } = await supabase.storage
+          .from("creative-assets")
+          .createSignedUrl(r.storage_path, 60 * 60 * 24);
+        return { ...r, url: signed?.signedUrl || null };
+      }));
+      setSaved(items.filter((x) => x.url));
+    } catch (e) {
+      console.warn("loadSaved", e);
+    }
+  };
+
+  const persistImage = async (sourceUrl, promptText) => {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth?.user?.id;
+      if (!uid) { toast.error("Faça login para salvar a imagem"); return; }
+      const res = await fetch(sourceUrl);
+      const blob = await res.blob();
+      const path = `${uid}/fusion-${Date.now()}.png`;
+      const { error: upErr } = await supabase.storage
+        .from("creative-assets")
+        .upload(path, blob, { contentType: blob.type || "image/png", upsert: true });
+      if (upErr) throw upErr;
+      const { error: insErr } = await supabase.from("generated_images").insert({
+        user_id: uid, storage_path: path, prompt: promptText || null, kind: "fusion", paid: false,
+      });
+      if (insErr) throw insErr;
+      toast.success("Imagem salva na sua galeria");
+      loadSaved();
+    } catch (e) {
+      toast.error("Não foi possível salvar: " + (e.message || e));
+    }
+  };
+
+  const removeSaved = async (item) => {
+    if (!confirm("Excluir esta imagem salva?")) return;
+    await supabase.storage.from("creative-assets").remove([item.storage_path]);
+    await supabase.from("generated_images").delete().eq("id", item.id);
+    loadSaved();
+  };
+
+  const payForImage = async (item) => {
+    setPaying(item.id);
+    try {
+      // Placeholder de pagamento: marca como pago localmente.
+      // Para cobrança real, ative o Stripe e troque por uma edge function `create-checkout`.
+      await supabase.from("generated_images").update({ paid: true }).eq("id", item.id);
+      toast.success("Pagamento confirmado · download HD liberado");
+      loadSaved();
+    } catch (e) {
+      toast.error("Falha no pagamento: " + (e.message || e));
+    } finally {
+      setPaying(null);
+    }
+  };
 
   const fuse = async () => {
     if (!img1 || !img2) { toast.error("Envie as duas imagens antes de gerar"); return; }
@@ -161,7 +232,9 @@ export default function ImageFusion() {
       );
       if (data.ok && data.image) {
         setResult(data.image);
-        toast.success("Imagem gerada! Gerando variações para redes sociais...");
+        toast.success("Imagem gerada! Salvando e criando variações...");
+        // Persistir imediatamente — URL externa expira
+        persistImage(data.image, prompt);
         await generateVariants(data.image);
       } else {
         toast.error(data.error || "Não foi possível gerar a imagem");
@@ -172,6 +245,7 @@ export default function ImageFusion() {
       setLoading(false);
     }
   };
+
 
   const generateVariants = async (sourceUrl) => {
     setGeneratingVariants(true);
@@ -362,6 +436,59 @@ export default function ImageFusion() {
             </div>
           </Card>
         )}
+
+        <Card className="max-w-5xl mx-auto p-5 bg-nude-900/60 border-gold-900/40 mt-5">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+              <Label className="text-gold-200 text-base">Galeria salva ({saved.length})</Label>
+              <p className="text-xs text-nude-400 mt-0.5">Imagens guardadas permanentemente. Pague para liberar download em HD sem marca d'água.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={loadSaved}
+              className="border-gold-700/50 text-gold-200 hover:bg-gold-500/10 hover:text-gold-100">
+              Atualizar
+            </Button>
+          </div>
+          {saved.length === 0 ? (
+            <div className="py-8 text-center text-nude-500 text-sm">Nenhuma imagem salva ainda. Gere uma fusão acima.</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {saved.map((s) => (
+                <div key={s.id} className="bg-nude-950 border border-gold-900/40 rounded-md overflow-hidden flex flex-col">
+                  <div className="relative aspect-square bg-black/40">
+                    <img src={s.url} alt="" className={`w-full h-full object-cover ${s.paid ? "" : "blur-[2px] brightness-90"}`} />
+                    {!s.paid && (
+                      <div className="absolute inset-0 grid place-items-center bg-black/30">
+                        <Lock className="w-6 h-6 text-gold-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2 flex flex-col gap-1.5">
+                    <div className="text-[10px] text-nude-500 truncate">{new Date(s.created_at).toLocaleString()}</div>
+                    {s.paid ? (
+                      <a href={s.url} download className="text-[11px] py-1 rounded bg-gold-600/30 hover:bg-gold-500/40 text-gold-100 flex items-center justify-center gap-1">
+                        <Download className="w-3 h-3" /> Baixar HD
+                      </a>
+                    ) : (
+                      <button
+                        onClick={() => payForImage(s)}
+                        disabled={paying === s.id}
+                        className="text-[11px] py-1 rounded bg-gradient-to-r from-gold-500 to-gold-700 text-nude-950 font-semibold flex items-center justify-center gap-1 disabled:opacity-60"
+                      >
+                        <CreditCard className="w-3 h-3" /> {paying === s.id ? "Processando..." : "Pagar R$ 9,90"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => removeSaved(s)}
+                      className="text-[10px] py-1 rounded bg-rose-600/20 hover:bg-rose-500/30 text-rose-200 flex items-center justify-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" /> Excluir
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   );
