@@ -34,8 +34,8 @@ const HAND_NEGATIVE_PROMPT =
 
 const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo)\b/i;
 
-function hasHumanSubject(prompt = "") {
-  return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|criança)\b/i.test(prompt);
+export function hasHumanSubject(prompt = "") {
+  return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao])\b/i.test(prompt);
 }
 
 // Corrige erros comuns de digitação em PT-BR e traduz frutas/objetos para inglês
@@ -67,7 +67,10 @@ function normalizePromptTypos(raw: string): string {
 
 
 function withFaceSafety(prompt: string) {
-  return hasHumanSubject(prompt) ? `${prompt}. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.` : prompt;
+  if (!hasHumanSubject(prompt)) {
+    return `${prompt}. Standalone non-human subject lock: if the requested subject is a fruit, food, product, object, animal, landscape, symbol, or abstract scene, render ONLY that subject and its environment. Do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features. Keep objects/fruits clearly separated from anything human; no fruit-human hybrid, no object fused with fingers, no hands holding the object unless the user explicitly requested hands.`;
+  }
+  return `${prompt}. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.`;
 }
 
 function handInstructionFor(prompt: string) {
