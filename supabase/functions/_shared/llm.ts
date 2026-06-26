@@ -292,19 +292,27 @@ function buildFluxPrompt(raw: string): string {
 
   // Non-human subjects (fruit, objects, scenery): keep prompt faithful, no portrait lock.
   if (!hasHumanSubject(base)) {
-    const STYLE = "photorealistic, high detail, natural lighting, sharp focus, 8k";
-    const NEG = "negative: blurry, low quality, text, watermark, logo, deformed, extra limbs";
+    const isFruit = /\b(fruit|apple|maçã|maca|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi)\b/i.test(base);
+    const FRUIT_STYLE = isFruit
+      ? ", whole intact fruit, perfectly ripe, smooth natural skin, anatomically correct natural shape, intact stem, no bites, no cuts, no deformation, studio product photography, soft diffused lighting, clean white background, macro detail"
+      : "";
+    const STYLE = `photorealistic, high detail, natural lighting, sharp focus, 8k${FRUIT_STYLE}`;
+    const NEG = "negative: blurry, low quality, text, watermark, logo, deformed, mutated, disfigured, melted, warped, extra parts, duplicated, asymmetrical, cartoon, illustration, painting, CGI";
     return `${base}, ${STYLE}. ${NEG}`;
   }
+  const HAND_DETAIL =
+    "anatomically perfect human hand with exactly five fingers (one thumb + four fingers), correct finger count, natural finger proportions, individually defined fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement, natural wrist";
   const STYLE =
     "photorealistic, professional portrait photography, real skin texture, natural skin pores, " +
     "correct facial anatomy, symmetrical eyes, realistic pupils, natural mouth and nose, " +
-    "chest-up composition, hands completely out of frame, no visible hands, no visible fingers, " +
+    "chest-up composition, hands preferably out of frame; if hands appear they must be flawless: " +
+    HAND_DETAIL + ", " +
     "cinematic lighting, shallow depth of field, sharp focus, 8k";
   const NEG =
-    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, ${HAND_NEGATIVE_PROMPT}, visible hands, visible fingers, unrealistic, cartoon, oversaturated, text, watermark, logo`;
-  return `${base}, ${STYLE}. ${HAND_SAFE_PROMPT}. ${NEG}`;
+    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, ${HAND_NEGATIVE_PROMPT}, six fingers, seven fingers, four fingers, three fingers, two thumbs, missing thumb, extra thumb, fused fingers, mutated hand, unrealistic, cartoon, oversaturated, text, watermark, logo`;
+  return `${base}, ${STYLE}. ${HAND_SAFE_PROMPT} ${HAND_DETAIL}. ${NEG}`;
 }
+
 
 // Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
 async function imagePollinations(opts: ImageOptions) {
