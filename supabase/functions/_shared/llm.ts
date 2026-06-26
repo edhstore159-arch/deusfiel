@@ -32,7 +32,8 @@ const HAND_SAFE_PROMPT =
 const HAND_NEGATIVE_PROMPT =
   "bad hands, malformed hands, deformed hands, mutated hands, distorted hands, broken hands, ugly hands, extra fingers, six fingers, seven fingers, four fingers, three fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, duplicate thumbs, two thumbs, missing thumb, extra nails, missing nails, wrong thumb placement, wrong knuckle count, impossible joints, bent-backwards fingers, claw hands, rubber fingers, sausage fingers, baguette fingers, long unnatural fingers, tiny hands, oversized hands, detached hands, floating hands, hands growing from wrong place, twisted wrists, broken wrists";
 
-const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo)\b/i;
+const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|eating|feeding|cutting|serving|holding\s+(a\s+)?(fork|spoon|knife|plate|cake)|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo|comendo|alimentando|cortando|servindo|segurando\s+(um\s+|uma\s+)?(garfo|colher|faca|prato|bolo))\b/i;
+const EATING_CAKE_RE = /\b(eating|feeding|taking\s+a\s+bite|bite|biting|comendo|alimentando|mordendo|dar\s+uma\s+mordida|cortando|servindo)\b[\s\S]{0,80}\b(cake|birthday\s+cake|bolo|bolo\s+de\s+anivers[áa]rio|slice\s+of\s+cake|fatia\s+de\s+bolo)\b|\b(cake|birthday\s+cake|bolo|bolo\s+de\s+anivers[áa]rio|slice\s+of\s+cake|fatia\s+de\s+bolo)\b[\s\S]{0,80}\b(eating|feeding|taking\s+a\s+bite|bite|biting|comendo|alimentando|mordendo|dar\s+uma\s+mordida|cortando|servindo)\b/i;
 
 export function hasHybridRequest(prompt = "") {
   return /\bcom\s+(cara|rosto|face|olhos|boca|sorriso|express[ãa]o)\s+humana?s?\b/i.test(prompt)
@@ -85,6 +86,9 @@ function withFaceSafety(prompt: string) {
 }
 
 function handInstructionFor(prompt: string) {
+  if (EATING_CAKE_RE.test(prompt)) {
+    return "Cake-eating interaction lock: render the birthday cake eating scene like a real documentary photo, but protect anatomy by using a medium close-up or waist-up crop with wrists partly hidden by the table edge. Show cake on a plate or fork/spoon near the mouth; avoid close-up fingers. If a hand is visible, show only one natural hand holding a fork or plate with all fingers plausible, exactly five fingers, correct thumb placement, no merged fingers, no cake fused with skin, no extra hands, no duplicated hands.";
+  }
   if (HANDS_ARE_REQUESTED.test(prompt)) {
     return "Visible hands were requested: render only necessary hands, fully visible where possible, photorealistic and anatomically normal. Each visible hand must have exactly five fingers: one opposable thumb and four fingers, correct thumb angle, middle finger longest, ring/index slightly shorter, pinky shortest, natural knuckles, natural creases, realistic nails, believable palm, and correct wrist connection. Perform a final finger-count anatomy check before output.";
   }
@@ -347,12 +351,15 @@ function buildFluxPrompt(raw: string): string {
     "anatomically perfect human hand with exactly five fingers per hand (one opposable thumb + four fingers), correct finger count, no extra fingers, no missing fingers, natural finger proportions, individually separated fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement and angle, natural wrist connection, realistic palm structure";
   const BODY_DETAIL =
     "anatomically correct full human body, realistic proportions (Vitruvian proportions: head ~1/7.5 of body height), natural shoulder width, correct spine curvature, two arms with correct elbow and wrist joints, two legs with correct knee and ankle joints, hands and feet at correct ends of limbs, no extra or missing limbs, no twisted or dislocated joints, natural standing/walking posture, realistic clothing draping with correct fabric folds";
+  const isEatingCake = EATING_CAKE_RE.test(base);
   const isMultiPerson = /\b(people|persons|pessoas|crowd|multid[ãa]o|grupo|group|family|fam[íi]lia|couple|casal|tourists|turistas|friends|amigos)\b/i.test(base);
   const isFullBody = isMultiPerson || /\b(full body|corpo inteiro|de corpo inteiro|standing|walking|running|sentad[ao]|de p[ée]|andando|correndo|posando|posing|dan[çc]ando|dancing|jogando|playing|na frente|in front of|na torre|at the tower|no monumento|at the monument|na praia|at the beach|na rua|on the street|na cidade|in the city|landmark|eiffel|cristo redentor|coliseu|colosseum|big ben|taj mahal)\b/i.test(base);
   const subjectClause = isMultiPerson
     ? "multiple realistic human subjects, each with consistent anatomy"
     : "single real human subject";
-  const compositionClause = isFullBody
+  const compositionClause = isEatingCake
+    ? "documentary birthday cake eating composition: medium close-up at dining table, faces and cake clearly visible, wrists cropped or hidden by table edge, fork/spoon and cake slice used to imply eating, no finger close-up"
+    : isFullBody
     ? "wide full-body composition with environment visible, subjects positioned naturally within the scene, complete bodies (head, torso, arms, legs, hands and feet all visible and anatomically correct)"
     : "chest-up composition, hands preferably out of frame";
   const STYLE =
@@ -361,16 +368,18 @@ function buildFluxPrompt(raw: string): string {
     "correct facial anatomy, two natural asymmetric eyes, realistic iris and pupils with catchlights, individual eyelashes, natural eyebrows, " +
     "symmetric realistic nose, natural lips with fine lines, natural teeth with slight variation, " +
     `${compositionClause}, ` +
-    (isFullBody ? BODY_DETAIL + ", " : "") +
+    (isFullBody || isEatingCake ? BODY_DETAIL + ", " : "") +
     "if hands appear they must pass strict anatomy: " +
     HAND_DETAIL + ", " +
     "cinematic natural lighting, sharp focus, 8k, unedited, no beauty filter, no AI-generated look";
-  const BODY_NEG = isFullBody
+  const BODY_NEG = isFullBody || isEatingCake
     ? ", deformed body, mutated body, disfigured body, distorted body, malformed body, twisted torso, broken spine, wrong proportions, extra arms, extra legs, missing arms, missing legs, extra limbs, missing limbs, fused limbs, duplicated limbs, floating limbs, detached limbs, disjointed limbs, dislocated joints, impossible pose, broken knees, broken elbows, backwards joints, limbs growing from wrong place, conjoined people, merged people, fused faces, identical clones, bad anatomy, bad proportions, gigantic head, tiny head, long neck, short neck, no neck"
     : "";
   const NEG =
     `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, mutated face, disfigured, facial asymmetry caused by generation error, mismatched eyes, different sized eyes, asymmetric eyes (unnatural), cross-eyed, lazy eye, dead eyes, glassy eyes, empty stare, extra eyes, fused eyes, third eye, double pupils, wrong pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, body parts fused with object, object merged with body${BODY_NEG}, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
-  const handsClause = isFullBody
+  const handsClause = isEatingCake
+    ? `${handInstructionFor(base)} ${HAND_DETAIL}. Keep cake, fork, plate and fingers separated with correct contact shadows; never merge cake frosting with hands, mouth, arms, or skin.`
+    : isFullBody
     ? `${HAND_DETAIL}. Hands and feet must be fully formed and natural — not melted, not warped, not fused.`
     : `${handInstructionFor(base)} ${HAND_SAFE_PROMPT} ${HAND_DETAIL}.`;
   return `${base}, ${STYLE}. ${handsClause} ${NEG}`;
