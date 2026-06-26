@@ -827,6 +827,50 @@ export default function Dashboard() {
                           </div>
                         </div>
                       )}
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <div className="bg-white/80 border border-gold-100 rounded-md p-1.5">
+                          <div className="text-nude-500">Probabilidade</div>
+                          <div className="font-semibold text-nude-800">{caseAnalysisForContact.probabilidade_exito || "—"}</div>
+                        </div>
+                        <div className="bg-white/80 border border-gold-100 rounded-md p-1.5">
+                          <div className="text-nude-500">Complexidade</div>
+                          <div className="font-semibold text-nude-800">{caseAnalysisForContact.complexidade || "—"}</div>
+                        </div>
+                        <div className="bg-white/80 border border-gold-100 rounded-md p-1.5">
+                          <div className="text-nude-500">Potencial financeiro</div>
+                          <div className="font-semibold text-nude-800">{caseAnalysisForContact.potencial_financeiro || "—"}</div>
+                        </div>
+                        <div className="bg-white/80 border border-gold-100 rounded-md p-1.5">
+                          <div className="text-nude-500">Score viabilidade</div>
+                          <div className="font-semibold text-nude-800">{Math.round(Number(caseAnalysisForContact.score_viabilidade) || 0)}/100</div>
+                        </div>
+                      </div>
+                      {caseAnalysisForContact.provas && (
+                        <div className="text-[11px] text-nude-700 bg-white/80 border border-gold-100 rounded-md p-2">
+                          <span className="font-semibold">Provas:</span>{" "}
+                          {["documentos","testemunhas","mensagens","suficientes"].map((k) => (
+                            <span key={k} className="mr-2">{k}: {caseAnalysisForContact.provas[k] ? "✓" : "—"}</span>
+                          ))}
+                        </div>
+                      )}
+                      {caseAnalysisForContact.risco_prazo && (
+                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Risco de prazo:</span> {caseAnalysisForContact.risco_prazo}</div>
+                      )}
+                      {Array.isArray(caseAnalysisForContact.pontos_favoraveis) && caseAnalysisForContact.pontos_favoraveis.length > 0 && (
+                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Pontos favoráveis:</span> {caseAnalysisForContact.pontos_favoraveis.join("; ")}</div>
+                      )}
+                      {Array.isArray(caseAnalysisForContact.pontos_atencao) && caseAnalysisForContact.pontos_atencao.length > 0 && (
+                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Pontos de atenção:</span> {caseAnalysisForContact.pontos_atencao.join("; ")}</div>
+                      )}
+                      {Array.isArray(caseAnalysisForContact.documentos_necessarios) && caseAnalysisForContact.documentos_necessarios.length > 0 && (
+                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Documentos necessários:</span> {caseAnalysisForContact.documentos_necessarios.join("; ")}</div>
+                      )}
+                      {Array.isArray(caseAnalysisForContact.informacoes_faltantes) && caseAnalysisForContact.informacoes_faltantes.length > 0 && (
+                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Informações faltantes:</span> {caseAnalysisForContact.informacoes_faltantes.join("; ")}</div>
+                      )}
+                      {caseAnalysisForContact.recomendacao && (
+                        <div className="text-[11px] text-nude-700 bg-white/80 border border-gold-100 rounded-md p-2"><span className="font-semibold">Recomendação ao advogado:</span> {caseAnalysisForContact.recomendacao}</div>
+                      )}
                       {caseAnalysisForContact.proxima_pergunta && (
                         <div className="text-[11px] text-nude-600">
                           <span className="font-semibold">Próxima pergunta:</span> {caseAnalysisForContact.proxima_pergunta}
