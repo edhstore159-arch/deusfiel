@@ -88,10 +88,23 @@ function handCompositionGuard(userPrompt = "") {
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   const userTheme = (userPrompt || "").trim();
+  const hybrid = hasHybridRequest(userTheme);
   const humanSubject = hasHumanSubject(userTheme);
-  const objectSubject = !humanSubject || FRUIT_OR_OBJECT.test(userTheme);
+  const objectSubject = !hybrid && (!humanSubject || FRUIT_OR_OBJECT.test(userTheme));
+
+  if (hybrid) {
+    return [
+      `Surreal photorealistic hybrid rendering of: ${userTheme}.`,
+      "The subject is a surreal anthropomorphic hybrid — for example a fruit/object whose surface features a real human face (eyes, nose, mouth) seamlessly integrated into its natural shape, like a Magritte or Pixar-style surreal still life.",
+      "Render the base object (fruit/product/etc.) with realistic texture and natural form, and gently morph the requested human features INTO its surface — not a separate person holding the object. Keep facial features anatomically correct (two symmetric eyes, one nose, one mouth) and emotionally expressive. Do NOT add arms, legs, hands or fingers unless requested.",
+      "Photoreal lighting, soft natural light, sharp focus, shallow depth of field, studio still-life aesthetic.",
+      "Negative: extra limbs, hands, fingers, arms, legs, body parts, deformed face, asymmetric eyes, duplicated features, melted, warped, low quality, cartoon (unless requested), text, watermark.",
+      "--style raw --photorealism high",
+    ].join(" ");
+  }
 
   if (objectSubject && !humanSubject) {
+
     return [
       `Faithful photorealistic rendering of: ${userTheme}.`,
       OBJECT_LOCK,
