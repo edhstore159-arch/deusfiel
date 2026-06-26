@@ -25,6 +25,8 @@ const NEG =
   "deformed nose, crooked nose, double nose, deformed mouth, crooked mouth, extra mouth, missing mouth, bad teeth, extra teeth, missing teeth, fake smile, " +
   "deformed ears, extra ears, deformed jaw, deformed chin, extra heads, two heads, multiple faces, floating head, detached head, " +
   "deformed body, distorted anatomy, bad proportions, extra limbs, missing limbs, extra arms, extra legs, extra fingers, missing fingers, fused fingers, broken hands, deformed hands, " +
+  "bad hands, abnormal hands, malformed hands, mutated hands, distorted hands, ugly hands, duplicated fingers, duplicate fingertips, extra nails, missing nails, webbed fingers, broken fingers, bent-backwards fingers, claw hands, rubber fingers, sausage fingers, baguette fingers, long unnatural fingers, tiny hands, oversized hands, wrong thumb placement, detached hands, floating hands, hands growing from wrong place, twisted wrists, broken wrists, " +
+  "unrequested visible hands, unnecessary visible fingers, close-up hands, hand gesture when not requested, " +
   "close-up only, face only, cropped body, blurry, low quality, watermark, logo, text, typography";
 
 const FACE_LOCK =
@@ -61,12 +63,21 @@ const HAND_LOCK =
 // IA de imagem ainda erra anatomia das mãos com frequência — esconder reduz drasticamente artefatos.
 const HAND_AVOIDANCE =
   "HAND AVOIDANCE STRATEGY (apply whenever the user prompt does NOT explicitly require visible hands or a hand gesture): " +
-  "compose the framing to keep hands out of view or naturally concealed. Prefer one of these solutions: " +
-  "(1) crop the frame above the wrists (portrait, medium close-up, headshot, chest-up shot); " +
+  "compose the framing to keep hands COMPLETELY out of view or naturally concealed. Prefer one of these solutions: " +
+  "(1) crop the frame above the wrists as a chest-up portrait, medium close-up or head-and-shoulders shot; " +
   "(2) place hands inside pockets, behind the back, under a desk, inside long sleeves, or holding a coherent object that hides the fingers (folder, mug, phone seen from behind, book against the chest); " +
   "(3) angle the body so hands fall outside the frame or are occluded by furniture, clothing or other people. " +
-  "Only render fully visible hands when the user explicitly asked for a gesture, a handshake, holding something specific, or when the hands are the subject. " +
+  "Do not show loose fingers at the bottom or edges of the image. Only render fully visible hands when the user explicitly asked for a gesture, a handshake, holding something specific, or when the hands are the subject. " +
   "If hands MUST appear, show them relaxed, at rest, partially occluded, and never in extreme close-up. Never invent gesturing hands that were not requested.";
+
+const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo)\b/i;
+
+function handCompositionGuard(userPrompt = "") {
+  if (HANDS_ARE_REQUESTED.test(userPrompt)) {
+    return "VISIBLE HANDS WERE REQUESTED: show hands only as necessary, never close-up unless requested, and run a strict final anatomy check: exactly five fingers per hand, natural thumb placement, natural knuckles, realistic nails, correct wrist connection, no extra/missing/fused fingers.";
+  }
+  return "NO HANDS REQUESTED: the final image must use a chest-up, head-and-shoulders, or above-the-wrist crop. Hands and fingers must not be visible anywhere, including image edges and foreground. Hide them behind the frame, pockets, sleeves, desk, folder, book, or body. Do not invent hands or gestures.";
+}
 
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
@@ -92,6 +103,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             `- FACE QUALITY: ${FACE_LOCK}`,
             `- HAND QUALITY: ${HAND_LOCK}`,
             `- HAND FRAMING: ${HAND_AVOIDANCE}`,
+            "DEFAULT HAND RULE: when hands are not explicitly requested by the user theme, do not render hands or fingers at all. Use a chest-up crop above the wrists.",
             "- ENVIRONMENT: real environment (simple home, office, street, etc.) with natural elements and imperfections (objects slightly out of place, real texture, light dust, wear).",
             "- LIGHTING: realistic cinematic lighting — soft natural window light, soft realistic shadows, balanced contrast, no exaggerated HDR.",
             "- CAMERA: 50mm or 85mm lens, shallow depth of field (slightly blurred background), focus on the face, DSLR photography style, natural ISO, no artificial noise.",
@@ -135,6 +147,7 @@ Deno.serve(async (req) => {
     }
 
     const userElaborated = await elaboratePrompt(prompt, style);
+    const handGuard = handCompositionGuard(prompt);
     // Reinforce realism + face lock on every request so people look photoreal.
     const fullPrompt = [
       userElaborated,
@@ -145,12 +158,14 @@ Deno.serve(async (req) => {
       "",
       ANATOMY_LOCK,
       "",
+      handGuard,
+      "",
       HAND_LOCK,
       "",
       HAND_AVOIDANCE,
       "",
-      `Negative prompt: ${NEG}, bad hands, abnormal hands, deformed hands, distorted hands, malformed hands, mutated hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, broken fingers, bent-backwards fingers, claw hands, rubber fingers, long unnatural fingers, tiny hands, oversized hands, wrong thumb placement, detached hands, floating hands, hands growing from wrong place, baguette fingers, sausage fingers, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, dismembered, mangled body`,
-      "--style raw --no artificial --no smooth skin --no CGI --photorealism high --no bad_hands --no deformed_hands --no extra_fingers --no missing_fingers --no fused_fingers --no displaced_limbs --no dislocated_limbs --no extra_limbs --no missing_limbs",
+      `Negative prompt: ${NEG}, visible hands when not requested, visible fingers when not requested, bad hands, abnormal hands, deformed hands, distorted hands, malformed hands, mutated hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, broken fingers, bent-backwards fingers, claw hands, rubber fingers, long unnatural fingers, tiny hands, oversized hands, wrong thumb placement, detached hands, floating hands, hands growing from wrong place, baguette fingers, sausage fingers, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, dismembered, mangled body`,
+      "--style raw --no artificial --no smooth skin --no CGI --photorealism high --no visible_hands --no visible_fingers --no bad_hands --no deformed_hands --no extra_fingers --no missing_fingers --no fused_fingers --no displaced_limbs --no dislocated_limbs --no extra_limbs --no missing_limbs",
     ].join("\n");
 
 
