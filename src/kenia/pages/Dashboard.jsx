@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
 import { Separator } from "@/kenia/components/ui/separator";
 import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Flame, Tag, Calendar, AlertTriangle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/kenia/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const URG_COLORS = {
   baixa: "bg-nude-100 text-nude-700",
@@ -19,6 +21,7 @@ const URG_COLORS = {
 };
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [contacts, setContacts] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -53,6 +56,85 @@ export default function Dashboard() {
   const [whatsAppCenter, setWhatsAppCenter] = useState({ connected: false, phone: "" });
   const aiBoxRef = useRef(null);
 
+  const messageCacheKey = (cid) => `kenia:whatsapp-messages:${cid}`;
+  const readCachedMessages = (cid) => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(messageCacheKey(cid)) || "[]");
+      return Array.isArray(cached) ? cached : [];
+    } catch {
+      return [];
+    }
+  };
+  const persistCachedMessages = (cid, list) => {
+    try { localStorage.setItem(messageCacheKey(cid), JSON.stringify(list)); } catch {}
+  };
+  const stableMessageId = (contact, msg) => {
+    const rawId = msg?.id || msg?.provider_message_id || msg?.key?.id;
+    if (rawId) return String(rawId);
+    const signature = [
+      contact?.id || "sem-contato",
+      msg?.from_me ? "enviada" : "recebida",
+      msg?.created_at || msg?.timestamp || "sem-data",
+      msg?.text || msg?.message || msg?.body || msg?.content || "",
+    ].join("|");
+    let hash = 0;
+    for (let i = 0; i < signature.length; i += 1) hash = ((hash << 5) - hash + signature.charCodeAt(i)) | 0;
+    return `sig-${Math.abs(hash).toString(36)}`;
+  };
+  const loadPersistedWhatsAppMessages = async (contact) => {
+    if (!contact?.id) return [];
+    try {
+      const { data, error } = await supabase
+        .from("whatsapp_messages")
+        .select("id,contact_id,contact_name,contact_phone,text,from_me,provider_message_id,created_at")
+        .eq("contact_id", String(contact.id))
+        .order("created_at", { ascending: true })
+        .limit(300);
+      if (error) return [];
+      return (data || []).map((row) => ({
+        id: row.provider_message_id || `saved-${row.id}`,
+        text: row.text,
+        from_me: Boolean(row.from_me),
+        created_at: row.created_at,
+        saved_in_platform: true,
+      }));
+    } catch {
+      return [];
+    }
+  };
+  const savePersistedWhatsAppMessage = async (contact, msg) => {
+    if (!contact?.id || !msg?.text) return;
+    try {
+      const { error } = await supabase.from("whatsapp_messages").upsert({
+        user_id: user?.id || null,
+        contact_id: String(contact.id),
+        contact_name: contact.name || null,
+        contact_phone: contact.phone || null,
+        text: msg.text,
+        from_me: Boolean(msg.from_me),
+        provider_message_id: stableMessageId(contact, msg),
+        created_at: msg.created_at || new Date().toISOString(),
+      }, { onConflict: "user_id,contact_id,provider_message_id" });
+      if (error) console.warn("Não foi possível salvar a mensagem do atendimento:", error.message);
+    } catch {}
+  };
+  const dedupeMessages = (list = []) => {
+    const seen = new Set();
+    const unique = [];
+    for (const raw of list || []) {
+      const m = {
+        ...raw,
+        text: raw?.text ?? raw?.message ?? raw?.body ?? raw?.content ?? "",
+        created_at: raw?.created_at || raw?.timestamp || new Date().toISOString(),
+      };
+      const key = m.provider_message_id || m.id || `${m.from_me ? "1" : "0"}|${m.created_at}|${m.text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(m);
+    }
+    return unique.sort((a, b) => new Date(a.created_at || a.timestamp || 0) - new Date(b.created_at || b.timestamp || 0));
+  };
+
   useEffect(() => {
     loadContacts();
     loadMetrics();
@@ -62,7 +144,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (activeContact) {
-      loadMessages(activeContact.id);
+      loadMessages(activeContact);
       loadLeadForContact(activeContact.phone);
     }
   }, [activeContact]);
@@ -77,7 +159,7 @@ export default function Dashboard() {
       loadContacts();
       loadAppointments();
       loadWhatsAppCenter();
-      if (activeContact) loadMessages(activeContact.id);
+      if (activeContact) loadMessages(activeContact);
     }, 3000);
     return () => clearInterval(t);
   }, [activeContact]);
@@ -108,20 +190,25 @@ export default function Dashboard() {
     }
   };
 
-  const loadMessages = async (cid) => {
+  const loadMessages = async (contactOrCid) => {
+    const contact = typeof contactOrCid === "object" ? contactOrCid : activeContact;
+    const cid = typeof contactOrCid === "object" ? contactOrCid?.id : contactOrCid;
+    if (!cid) return;
     try {
-      const { data } = await api.get(`/whatsapp/messages/${cid}`);
-      // Dedupe by id; se nao tiver id, dedupe por (text + timestamp + from_me)
-      const seen = new Set();
-      const unique = [];
-      for (const m of data || []) {
-        const key = m.id || `${m.from_me ? "1" : "0"}|${m.timestamp || m.created_at || ""}|${m.text || ""}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        unique.push(m);
+      const [{ data }, persisted] = await Promise.all([
+        api.get(`/whatsapp/messages/${cid}`),
+        loadPersistedWhatsAppMessages(contact),
+      ]);
+      const cached = readCachedMessages(cid);
+      const unique = dedupeMessages([...(cached || []), ...(persisted || []), ...(data || [])]);
+      persistCachedMessages(cid, unique);
+      if (contact) {
+        Promise.allSettled(unique.map((msg) => savePersistedWhatsAppMessage(contact, msg))).catch(() => {});
       }
       setMessages(unique);
-    } catch {}
+    } catch {
+      setMessages(dedupeMessages(readCachedMessages(cid)));
+    }
   };
 
   const loadMetrics = async () => {
@@ -172,24 +259,29 @@ export default function Dashboard() {
 
   const sendWhatsApp = async () => {
     if (!draft.trim() || !activeContact) return;
+    const textToSend = draft.trim();
+    const localMsg = { id: `local-${Date.now()}`, text: textToSend, from_me: true, created_at: new Date().toISOString(), pending_local: true };
     try {
       const { data } = await api.post("/whatsapp/send", {
         contact_id: activeContact.id,
         contact_phone: activeContact.phone,
         phone: activeContact.phone,
-        text: draft,
+        text: textToSend,
       });
       // Backend retorna {message, provider_result} — extrai a mensagem pura
-      const msg = data?.message || data;
+      const msg = data?.message || (data?.text || data?.body || data?.content ? data : null) || localMsg;
+      const finalMsg = { ...localMsg, ...msg, text: msg.text ?? msg.message ?? msg.body ?? msg.content ?? textToSend, from_me: true, pending_local: false };
+      persistCachedMessages(activeContact.id, dedupeMessages([...readCachedMessages(activeContact.id), finalMsg]));
+      await savePersistedWhatsAppMessage(activeContact, finalMsg);
       setMessages((prev) => {
-        if (!msg) return prev;
-        const exists = prev.some((p) => p.id && msg.id && p.id === msg.id);
-        return exists ? prev : [...prev, msg];
+        const next = dedupeMessages([...prev, finalMsg]);
+        persistCachedMessages(activeContact.id, next);
+        return next;
       });
       setDraft("");
       loadContacts();
       // Recarrega mensagens do servidor em 1s para pegar resposta do bot
-      setTimeout(() => activeContact && loadMessages(activeContact.id), 1200);
+      setTimeout(() => activeContact && loadMessages(activeContact), 1200);
     } catch (e) {
       const detail = e?.response?.data?.error || e?.message || "Erro ao enviar";
       toast.error(detail);
@@ -210,6 +302,7 @@ export default function Dashboard() {
       const { data } = await api.post("/chat/message", {
         message: contextual,
         session_id: aiSession,
+        user_id: user?.id || null,
         visitor_name: activeContact?.name || null,
         visitor_phone: activeContact?.phone || null,
         want_audio: true,

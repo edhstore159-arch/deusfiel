@@ -546,11 +546,12 @@ const staticPost = (url, body = {}) => {
       try {
         const { data, error } = await supabase.functions.invoke("chat-ai", {
           body: {
+            ...body,
             message: body.message || body.text || "",
             history: body.history || [],
             session_id: sessionId,
             user_id: body.user_id || null,
-            want_audio: false,
+            want_audio: body.want_audio !== undefined ? body.want_audio : false,
           },
         });
         if (!error && data?.response) {
@@ -793,9 +794,9 @@ liveApi.interceptors.response.use(
 );
 
 const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today"]);
-const cloudFirstPostPaths = new Set(["/creatives/generate", "/creatives/fuse-images", "/creatives/edit", "/appointments", "/legal-deadlines", "/legal-deadlines/sync", "/leads", "/public/leads"]);
+const cloudFirstPostPaths = new Set(["/chat/message", "/creatives/generate", "/creatives/fuse-images", "/creatives/edit", "/appointments", "/legal-deadlines", "/legal-deadlines/sync", "/leads", "/public/leads"]);
 const staticOnlyMutationPrefixes = ["/leads/"];
-const liveFirstWithStaticFallbackPostPaths = new Set(["/chat/message"]);
+const liveFirstWithStaticFallbackPostPaths = new Set([]);
 const fallbackToStaticPostPaths = new Set(["/debug/instruction"]);
 
 // Caminhos que, quando o backend live (Render) falha ou devolve lista vazia,
