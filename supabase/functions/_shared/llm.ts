@@ -344,7 +344,8 @@ async function imagePollinations(opts: ImageOptions) {
     const [w, h] = (opts.size || "1024x1024").split("x").map((n) => parseInt(n, 10) || 1024);
     const seed = Math.floor(Math.random() * 1_000_000);
     const flux = buildFluxPrompt(opts.prompt);
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=true&model=flux`;
+    const model = hasHumanSubject(opts.prompt) ? "flux-realism" : "flux";
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=true&model=${model}`;
     const resp = await fetch(url);
     if (!resp.ok) return { ok: false as const, error: `Pollinations ${resp.status}` };
     const buf = new Uint8Array(await resp.arrayBuffer());
