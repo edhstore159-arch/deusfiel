@@ -19,6 +19,7 @@ const Processes = lazy(() => import("@/kenia/pages/Processes"));
 const Finance = lazy(() => import("@/kenia/pages/Finance"));
 const Creatives = lazy(() => import("@/kenia/pages/Creatives"));
 const ImageFusion = lazy(() => import("@/kenia/pages/ImageFusion"));
+const ViralVideoStudio = lazy(() => import("@/kenia/pages/ViralVideoStudio"));
 const Analytics = lazy(() => import("@/kenia/pages/Analytics"));
 const WhatsAppSettings = lazy(() => import("@/kenia/pages/WhatsAppSettings"));
 const WhatsAppLogs = lazy(() => import("@/kenia/pages/WhatsAppLogs"));
@@ -85,6 +86,7 @@ function App() {
                 <Route path="/app/finance" element={<Finance />} />
                 <Route path="/app/creatives" element={<Creatives />} />
                 <Route path="/app/image-fusion" element={<ImageFusion />} />
+                <Route path="/app/viral-video" element={<ViralVideoStudio />} />
                 <Route path="/app/analytics" element={<Analytics />} />
                 <Route path="/app/whatsapp" element={<WhatsAppSettings />} />
                 <Route path="/app/whatsapp-logs" element={<WhatsAppLogs />} />

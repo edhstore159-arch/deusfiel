@@ -84,6 +84,70 @@ function canvasToBlob(canvas, type = "image/png", quality = 0.92) {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
+function drawCover(ctx, img, w, h, dx = 0, dy = 0, dw = w, dh = h) {
+  const ir = img.width / img.height;
+  const tr = dw / dh;
+  let sx = 0;
+  let sy = 0;
+  let sw = img.width;
+  let sh = img.height;
+  if (ir > tr) {
+    sw = img.height * tr;
+    sx = (img.width - sw) / 2;
+  } else {
+    sh = img.width / tr;
+    sy = (img.height - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+}
+
+function drawContain(ctx, img, maxW, maxH, cx, cy) {
+  const scale = Math.min(maxW / img.width, maxH / img.height);
+  const w = img.width * scale;
+  const h = img.height * scale;
+  const x = cx - w / 2;
+  const y = cy - h / 2;
+  ctx.drawImage(img, x, y, w, h);
+}
+
+async function buildClientFusionFallback(personSrc, sceneSrc) {
+  const [person, scene] = await Promise.all([loadImage(personSrc), loadImage(sceneSrc)]);
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#0b0907";
+  ctx.fillRect(0, 0, 1024, 1024);
+  ctx.save();
+  ctx.filter = "blur(14px) saturate(1.08) brightness(0.86)";
+  drawCover(ctx, scene, 1024, 1024, -34, -34, 1092, 1092);
+  ctx.restore();
+  const grad = ctx.createRadialGradient(512, 440, 80, 512, 512, 720);
+  grad.addColorStop(0, "rgba(255, 232, 170, 0.08)");
+  grad.addColorStop(0.56, "rgba(16, 13, 10, 0.08)");
+  grad.addColorStop(1, "rgba(0, 0, 0, 0.42)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 1024, 1024);
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
+  ctx.shadowBlur = 52;
+  ctx.shadowOffsetY = 28;
+  drawContain(ctx, person, 840, 900, 512, 540);
+  ctx.restore();
+  return canvas.toDataURL("image/png", 0.95);
+}
+
+async function normalizeImageForStorage(sourceUrl) {
+  const response = await fetch(sourceUrl);
+  const blob = await response.blob();
+  if (blob.type === "image/svg+xml" || sourceUrl.startsWith("data:image/svg+xml")) {
+    const img = await loadImage(sourceUrl);
+    const canvas = renderPresetToCanvas(img, 1024, 1024);
+    return await canvasToBlob(canvas, "image/png");
+  }
+  return blob;
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -179,12 +243,11 @@ export default function ImageFusion() {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth?.user?.id;
       if (!uid) { toast.error("Faça login para salvar a imagem"); return; }
-      const res = await fetch(sourceUrl);
-      const blob = await res.blob();
+      const blob = await normalizeImageForStorage(sourceUrl);
       const path = `${uid}/fusion-${Date.now()}.png`;
       const { error: upErr } = await supabase.storage
         .from("creative-assets")
-        .upload(path, blob, { contentType: blob.type || "image/png", upsert: true });
+        .upload(path, blob, { contentType: "image/png", upsert: true });
       if (upErr) throw upErr;
       const { error: insErr } = await supabase.from("generated_images").insert({
         user_id: uid, storage_path: path, prompt: promptText || null, kind: "fusion", paid: false,
@@ -224,6 +287,12 @@ export default function ImageFusion() {
     setLoading(true);
     setResult(null);
     setVariants([]);
+    const finishWithImage = async (imageUrl, successMessage = "Imagem gerada! Salvando e criando variações...") => {
+      setResult(imageUrl);
+      toast.success(successMessage);
+      persistImage(imageUrl, prompt);
+      await generateVariants(imageUrl);
+    };
     try {
       const { data } = await api.post(
         "/creatives/fuse-images",
@@ -231,16 +300,18 @@ export default function ImageFusion() {
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
-        setResult(data.image);
-        toast.success("Imagem gerada! Salvando e criando variações...");
-        // Persistir imediatamente — URL externa expira
-        persistImage(data.image, prompt);
-        await generateVariants(data.image);
+        await finishWithImage(data.image);
       } else {
-        toast.error(data.error || "Não foi possível gerar a imagem");
+        const fallback = await buildClientFusionFallback(img1, img2);
+        await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
       }
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Erro ao gerar imagem");
+      try {
+        const fallback = await buildClientFusionFallback(img1, img2);
+        await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
+      } catch (fallbackError) {
+        toast.error(e.response?.data?.detail || fallbackError?.message || "Erro ao gerar imagem");
+      }
     } finally {
       setLoading(false);
     }
