@@ -389,7 +389,7 @@ export default function Dashboard() {
         : prompt;
       const { data } = await api.post("/chat/message", {
         message: contextual,
-        session_id: aiSession,
+        session_id: activeContact?.id || activeContact?.phone || aiSession,
         user_id: user?.id || null,
         visitor_name: activeContact?.name || null,
         visitor_phone: activeContact?.phone || null,
@@ -426,6 +426,14 @@ export default function Dashboard() {
             await api.post("/leads", patch);
           }
           loadLeadForContact(activeContact.phone);
+          setCaseAnalysisForContact({
+            id: `case-${String(activeContact.id || activeContact.phone).replace(/[^a-zA-Z0-9_-]+/g, "-")}`,
+            session_id: activeContact.id || activeContact.phone,
+            visitor_name: activeContact.name,
+            visitor_phone: activeContact.phone,
+            ...data.analysis,
+          });
+          setTimeout(() => loadCaseAnalysisForContact(activeContact), 800);
         } catch (err) {
           console.error("Falha ao atualizar lead com análise da IA:", err);
         }
