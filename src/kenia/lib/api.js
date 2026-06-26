@@ -975,10 +975,15 @@ const staticPatch = async (url, body = {}) => {
   if (path.startsWith("/appointments/")) return updateCollection("appointments", seedAppointments);
   if (path.startsWith("/legal-deadlines/")) return updateCollection("legal_deadlines", seedLegalDeadlines);
   if (path.startsWith("/admin/case-analyses/")) {
-    const res = await updateCollection("case_analyses", seedAnalyses);
-    const updated = res?.data;
-    if (updated?.id) await persistCloudCaseAnalysis(normalizeCaseAnalysisRecord(updated), []);
-    return res;
+    const id = path.split("/").pop();
+    const localItems = read("case_analyses", seedAnalyses).map((item) => normalizeCaseAnalysisRecord(item));
+    const cloudItems = await loadCloudCaseAnalyses();
+    const current = mergeCaseAnalysisItems(localItems, cloudItems).find((item) => item.id === id || item.session_id === id) || { id };
+    const updated = normalizeCaseAnalysisRecord({ ...current, ...body, updated_at: nowIso() });
+    const without = localItems.filter((item) => item.id !== updated.id && item.session_id !== updated.session_id);
+    write("case_analyses", [updated, ...without]);
+    await persistCloudCaseAnalysis(updated, []);
+    return response(updated);
   }
   return response({ ok: true, fallback: true });
 };
