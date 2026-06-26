@@ -571,7 +571,9 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
     const isWhatsApp = !!sessionId && !isVoiceOrb && /^\+?\d{6,}$/.test(sessionId);
 
     let jusbrasilContext = "";
-    if (isWhatsApp) {
+    const legalIntentRe = /\b(aposentad|inss|auxili|bpc|loas|pens[aã]o|benef[ií]cio|previd|div[oó]rcio|guarda|pens[aã]o\s+alimen|invent[aá]rio|partilha|heran[cç]a|uni[aã]o\s+est[aá]vel|trabalh|rescis[aã]o|fgts|horas?\s+extras?|ass[eé]dio|consumidor|cdc|garantia|reembolso|cobran[cç]a|negativa[cç][aã]o|serasa|spc|banc[aá]rio|empr[eé]stimo|consignado|contrato|processo|audi[eê]ncia|intima[cç][aã]o|crime|criminal|tribut[aá]rio|imposto|im[oó]vel|usucapi[aã]o|loca[cç][aã]o|despejo|advogad|direito|lei|jur[ií]dic|requisito|elegib|me\s+aposent|tenho\s+direito)\b/i;
+    const shouldFetchJus = isWhatsApp || legalIntentRe.test(userMessage);
+    if (shouldFetchJus) {
       try {
         const jr = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/jusbrasil-search`, {
           method: "POST",
@@ -584,7 +586,7 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
         });
         const jd = await jr.json().catch(() => ({}));
         if (jr.ok && jd?.summary) {
-          jusbrasilContext = `\n\nFONTE OBRIGATÓRIA (Jusbrasil) — baseie a resposta nestes resultados:\n${jd.summary}`;
+          jusbrasilContext = `\n\nFONTE OBRIGATÓRIA (Jusbrasil) — baseie a resposta nestes resultados, citando títulos/links quando útil:\n${jd.summary}\n\nQuando o cliente perguntar sobre um direito (ex.: "como faço para me aposentar?", "tenho direito a...?"), RESPONDA primeiro com: (1) os requisitos legais atualizados do Brasil em formato 1) 2) 3); (2) se o cliente parece se enquadrar ou o que falta; (3) próximos passos práticos. Use os resultados do Jusbrasil acima para fundamentar.`;
         }
       } catch (_e) { /* ignora */ }
     }
