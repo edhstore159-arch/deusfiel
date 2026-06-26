@@ -35,6 +35,7 @@ const HAND_NEGATIVE_PROMPT =
 const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo)\b/i;
 
 export function hasHumanSubject(prompt = "") {
+  if (/\b(non-human subject lock|non-human object lock|object isolation lock|standalone non-human subject)\b/i.test(prompt)) return false;
   return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao])\b/i.test(prompt);
 }
 
@@ -233,7 +234,7 @@ export async function chatCompletion(opts: ChatOptions) {
 
 async function imageLovable(opts: ImageOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, error: "LOVABLE_API_KEY ausente" };
-  const safePrompt = withFaceSafety(opts.prompt);
+  const safePrompt = opts.prompt;
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
@@ -256,7 +257,7 @@ async function imageGemini(opts: ImageOptions) {
   if (!GEMINI_KEY) return { ok: false as const, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
-  const safePrompt = withFaceSafety(opts.prompt);
+  const safePrompt = opts.prompt;
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -276,7 +277,7 @@ async function imageGemini(opts: ImageOptions) {
 
 async function imageEmergent(opts: ImageOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, error: "EMERGENT_API_KEY ausente" };
-  const safePrompt = withFaceSafety(opts.prompt);
+  const safePrompt = opts.prompt;
   const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
