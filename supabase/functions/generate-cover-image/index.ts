@@ -59,6 +59,9 @@ const HAND_LOCK =
   "If hands are partially hidden by clothing, objects, crop, or another person, keep the visible parts plausible and avoid inventing extra fingers. " +
   "For group scenes, apply this hand check independently to every person; no shared hands, no merged hands, no hand growing from another body part, no displaced hands.";
 
+const CAKE_EATING_LOCK =
+  "CAKE EATING LOCK (CRITICAL for birthday/cake scenes): if the prompt asks for people eating, cutting, serving or taking a bite of birthday cake, render it as a candid real-life documentary photo at a dining table. Use a medium close-up or waist-up crop, keep the face, cake, plate and fork/spoon clear, and crop or hide wrists/fingers behind the table edge when possible. If a hand must appear, show only a simple natural grip on a fork, spoon or plate; exactly five fingers per visible hand, correct thumb placement, natural knuckles, realistic nails, no duplicated hands, no extra fingers, no missing fingers, no fused fingers. Keep cake, frosting, fork, plate, mouth, hands and skin as separate objects with realistic contact shadows — never merge cake with fingers, mouth, face, arms or body.";
+
 // Estratégia preventiva: evitar mostrar mãos quando não forem essenciais ao pedido.
 // IA de imagem ainda erra anatomia das mãos com frequência — esconder reduz drasticamente artefatos.
 const HAND_AVOIDANCE =
@@ -70,7 +73,8 @@ const HAND_AVOIDANCE =
   "Do not show loose fingers at the bottom or edges of the image. Only render fully visible hands when the user explicitly asked for a gesture, a handshake, holding something specific, or when the hands are the subject. " +
   "If hands MUST appear, show them relaxed, at rest, partially occluded, and never in extreme close-up. Never invent gesturing hands that were not requested.";
 
-const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo)\b/i;
+const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|eating|feeding|cutting|serving|holding\s+(a\s+)?(fork|spoon|knife|plate|cake)|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo|comendo|alimentando|cortando|servindo|segurando\s+(um\s+|uma\s+)?(garfo|colher|faca|prato|bolo))\b/i;
+const EATING_CAKE_RE = /\b(eating|feeding|taking\s+a\s+bite|bite|biting|comendo|alimentando|mordendo|dar\s+uma\s+mordida|cortando|servindo)\b[\s\S]{0,80}\b(cake|birthday\s+cake|bolo|bolo\s+de\s+anivers[áa]rio|slice\s+of\s+cake|fatia\s+de\s+bolo)\b|\b(cake|birthday\s+cake|bolo|bolo\s+de\s+anivers[áa]rio|slice\s+of\s+cake|fatia\s+de\s+bolo)\b[\s\S]{0,80}\b(eating|feeding|taking\s+a\s+bite|bite|biting|comendo|alimentando|mordendo|dar\s+uma\s+mordida|cortando|servindo)\b/i;
 
 const FRUIT_RE = /\b(fruit|fruta|apple|maçã|maca|macan|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi)\b/i;
 const LANDMARK_RE = /\b(torre\s+eiffel|eiffel\s+tower|cristo\s+redentor|estatua\s+da\s+liberdade|statue\s+of\s+liberty|big\s+ben|coliseu|colosseum|taj\s+mahal|pir[âa]mide|pyramid|monumento|monument|cathedral|catedral|igreja|church|castelo|castle|ponte|bridge|arranha-c[ée]u|skyscraper|edif[íi]cio|building|pr[ée]dio|arquitetura|architecture|landmark|skyline|cidade|city|paisagem urbana)\b/i;
@@ -85,17 +89,22 @@ function objectLockFor(prompt: string) {
 }
 
 function eventSceneFor(prompt: string) {
+  const cakeEating = EATING_CAKE_RE.test(prompt);
   return [
     `Faithful photorealistic candid photograph of a real-life ${prompt} scene.`,
     "EVENT/CELEBRATION SCENE LOCK: this is a social celebration moment with people interacting naturally — render a documentary-style event photograph with appropriate decorations, props and atmosphere for the specific occasion (for a birthday: birthday cake with lit candles, balloons, party hats, gifts, festive table; for a wedding: bride/groom attire, flowers, ceremony or reception setting; for Christmas: tree, lights, presents; adapt to whatever the user described).",
+    cakeEating ? CAKE_EATING_LOCK : "",
     "Real Brazilian people of varied ages when applicable, authentic emotions (joy, surprise, warmth), natural posture, real environment, warm cinematic lighting, soft natural light mixed with festive ambient light (candles, string lights, lamps), shallow depth of field, 50mm or 85mm lens, documentary photojournalism aesthetic.",
-    "Do NOT replace the celebration with random fruit, food still life, abstract objects, landmarks, product photography or empty scenes. Do NOT add unrelated fruit. Faces and hands must respect the FACE LOCK and HAND LOCK rules.",
-    "Negative: stock photo, AI look, plastic skin, empty room, isolated fruit, isolated object, product shot, landmark substitution, deformed faces, asymmetric eyes, malformed hands, extra fingers, missing fingers, extra limbs, melted, warped, cartoon, illustration, text, watermark, logo.",
+    "Do NOT replace the celebration with random fruit, food still life, abstract objects, landmarks, product photography or empty scenes. Do NOT add unrelated fruit. Faces, bodies and hands must respect the FACE LOCK, ANATOMY LOCK and HAND LOCK rules.",
+    "Negative: stock photo, AI look, plastic skin, empty room, isolated fruit, isolated object, product shot, landmark substitution, deformed faces, asymmetric eyes, malformed hands, extra fingers, missing fingers, fused fingers, duplicated hands, extra limbs, body-object fusion, cake fused with fingers, frosting fused with skin, melted, warped, cartoon, illustration, text, watermark, logo.",
     "--style raw --photorealism high",
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
 function handCompositionGuard(userPrompt = "") {
+  if (EATING_CAKE_RE.test(userPrompt)) {
+    return `${CAKE_EATING_LOCK} Avoid extreme hand close-ups; prefer fork/spoon/plate contact and partial wrist occlusion instead of exposed complex fingers.`;
+  }
   if (HANDS_ARE_REQUESTED.test(userPrompt)) {
     return "VISIBLE HANDS WERE REQUESTED: show hands only as necessary, never close-up unless requested, and run a strict final anatomy check: exactly five fingers per hand, natural thumb placement, natural knuckles, realistic nails, correct wrist connection, no extra/missing/fused fingers.";
   }
@@ -165,6 +174,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             `- FACE QUALITY: ${FACE_LOCK}`,
             `- HAND QUALITY: ${HAND_LOCK}`,
             `- HAND FRAMING: ${HAND_AVOIDANCE}`,
+            `- CAKE EATING SCENES: ${CAKE_EATING_LOCK}`,
             "DEFAULT HAND RULE: when hands are not explicitly requested by the user theme, do not render hands or fingers at all. Use a chest-up crop above the wrists.",
             "- ENVIRONMENT: real environment (simple home, office, street, etc.) with natural elements and imperfections (objects slightly out of place, real texture, light dust, wear).",
             "- LIGHTING: realistic cinematic lighting — soft natural window light, soft realistic shadows, balanced contrast, no exaggerated HDR.",
@@ -213,6 +223,7 @@ Deno.serve(async (req) => {
     const eventSubject = EVENT_RE.test(prompt) && !hybridSubject;
     const humanSubject = (hasHumanSubject(prompt) || eventSubject) && !hybridSubject;
     const handGuard = handCompositionGuard(prompt);
+    const cakeEating = EATING_CAKE_RE.test(prompt);
     const fullPrompt = hybridSubject ? [
       userElaborated,
       "",
@@ -231,13 +242,15 @@ Deno.serve(async (req) => {
       "",
       ANATOMY_LOCK,
       "",
+      cakeEating ? CAKE_EATING_LOCK : "",
+      "",
       handGuard,
       "",
       HAND_LOCK,
       "",
       HAND_AVOIDANCE,
       "",
-      `Negative prompt: ${NEG}, visible hands when not requested, visible fingers when not requested, bad hands, abnormal hands, deformed hands, distorted hands, malformed hands, mutated hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, broken fingers, bent-backwards fingers, claw hands, rubber fingers, long unnatural fingers, tiny hands, oversized hands, wrong thumb placement, detached hands, floating hands, hands growing from wrong place, baguette fingers, sausage fingers, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, dismembered, mangled body`,
+      `Negative prompt: ${NEG}, visible hands when not requested, visible fingers when not requested, bad hands, abnormal hands, deformed hands, distorted hands, malformed hands, mutated hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, broken fingers, bent-backwards fingers, claw hands, rubber fingers, long unnatural fingers, tiny hands, oversized hands, wrong thumb placement, detached hands, floating hands, hands growing from wrong place, baguette fingers, sausage fingers, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, cake fused with fingers, frosting fused with skin, food merged with mouth, fork fused with hand, plate fused with body, dismembered, mangled body`,
       "--style raw --no artificial --no smooth skin --no CGI --photorealism high --no visible_hands --no visible_fingers --no bad_hands --no deformed_hands --no extra_fingers --no missing_fingers --no fused_fingers --no displaced_limbs --no dislocated_limbs --no extra_limbs --no missing_limbs",
     ].join("\n") : [
       userElaborated,
