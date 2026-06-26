@@ -8,6 +8,7 @@ import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
 import { Separator } from "@/kenia/components/ui/separator";
+import { Progress } from "@/kenia/components/ui/progress";
 import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Flame, Tag, Calendar, AlertTriangle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/kenia/contexts/AuthContext";
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [activeContact, setActiveContact] = useState(null);
   const [messages, setMessages] = useState([]);
   const [leadForContact, setLeadForContact] = useState(null);
+  const [caseAnalysisForContact, setCaseAnalysisForContact] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [draft, setDraft] = useState("");
