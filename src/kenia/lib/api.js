@@ -1016,7 +1016,7 @@ liveApi.interceptors.response.use(
   }
 );
 
-const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today"]);
+const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today", "/admin/case-analyses"]);
 const cloudFirstPostPaths = new Set(["/chat/message", "/creatives/generate", "/creatives/fuse-images", "/creatives/edit", "/appointments", "/legal-deadlines", "/legal-deadlines/sync", "/leads", "/public/leads"]);
 const staticOnlyMutationPrefixes = ["/leads/"];
 const liveFirstWithStaticFallbackPostPaths = new Set([]);
@@ -1058,6 +1058,7 @@ export const api = HAS_BACKEND
       get: async (url, config) => {
         const [path] = String(url).split("?");
         const isCaseDetail = path.startsWith("/admin/case-analyses/");
+        if (isCaseDetail) return staticGet(url, config);
         if (cloudFirstGetPaths.has(path)) return staticGet(url, config);
         try {
           const res = await liveApi.get(url, config);
