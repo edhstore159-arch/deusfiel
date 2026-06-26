@@ -210,7 +210,8 @@ Deno.serve(async (req) => {
 
     const userElaborated = await elaboratePrompt(prompt, style);
     const hybridSubject = hasHybridRequest(prompt);
-    const humanSubject = hasHumanSubject(prompt) && !hybridSubject;
+    const eventSubject = EVENT_RE.test(prompt) && !hybridSubject;
+    const humanSubject = (hasHumanSubject(prompt) || eventSubject) && !hybridSubject;
     const handGuard = handCompositionGuard(prompt);
     const fullPrompt = hybridSubject ? [
       userElaborated,
