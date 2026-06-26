@@ -116,9 +116,10 @@ function handCompositionGuard(userPrompt = "") {
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   const userTheme = (userPrompt || "").trim();
   const hybrid = hasHybridRequest(userTheme);
-  const humanSubject = hasHumanSubject(userTheme);
-  const isEvent = EVENT_RE.test(userTheme);
-  const objectSubject = !hybrid && !isEvent && (!humanSubject || (FRUIT_OR_OBJECT.test(userTheme) && !EVENT_RE.test(userTheme)));
+  const isolatedOnly = isIsolatedObjectOnly(userTheme);
+  const humanSubject = !isolatedOnly && hasHumanSubject(userTheme);
+  const isEvent = !isolatedOnly && EVENT_RE.test(userTheme);
+  const objectSubject = !hybrid && !isEvent && (!humanSubject || (FRUIT_OR_OBJECT.test(userTheme) && !EVENT_RE.test(userTheme))) || isolatedOnly;
 
   if (isEvent && !hybrid) {
     return eventSceneFor(userTheme);
