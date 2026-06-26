@@ -91,6 +91,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise.",
             `- FACE QUALITY: ${FACE_LOCK}`,
             `- HAND QUALITY: ${HAND_LOCK}`,
+            `- HAND FRAMING: ${HAND_AVOIDANCE}`,
             "- ENVIRONMENT: real environment (simple home, office, street, etc.) with natural elements and imperfections (objects slightly out of place, real texture, light dust, wear).",
             "- LIGHTING: realistic cinematic lighting — soft natural window light, soft realistic shadows, balanced contrast, no exaggerated HDR.",
             "- CAMERA: 50mm or 85mm lens, shallow depth of field (slightly blurred background), focus on the face, DSLR photography style, natural ISO, no artificial noise.",
