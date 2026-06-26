@@ -324,15 +324,18 @@ function buildFluxPrompt(raw: string): string {
   const HAND_DETAIL =
     "anatomically perfect human hand with exactly five fingers per hand (one opposable thumb + four fingers), correct finger count, no extra fingers, no missing fingers, natural finger proportions, individually separated fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement and angle, natural wrist connection, realistic palm structure";
   const STYLE =
-    "photorealistic, professional portrait photography, real skin texture, natural skin pores, " +
-    "correct facial anatomy, symmetrical eyes, realistic pupils, natural mouth and nose, " +
+    "RAW photo, photorealistic, professional editorial portrait photography, shot on Canon EOS R5 with 85mm f/1.4 lens, ISO 200, natural window light, " +
+    "real human skin with visible pores, peach fuzz, subtle imperfections, subsurface scattering, " +
+    "correct facial anatomy, two natural asymmetric eyes, realistic iris and pupils with catchlights, individual eyelashes, natural eyebrows, " +
+    "symmetric realistic nose, natural lips with fine lines, natural teeth with slight variation, " +
     "chest-up composition, hands preferably out of frame; if hands appear they must pass strict anatomy: " +
     HAND_DETAIL + ", " +
-    "cinematic lighting, shallow depth of field, sharp focus, 8k";
+    "cinematic Rembrandt lighting, shallow depth of field, sharp focus on the eyes, 8k, unedited, no beauty filter";
   const NEG =
-    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, cartoon, oversaturated, text, watermark, logo`;
+    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, mutated face, disfigured, asymmetric eyes (unnatural), cross-eyed, lazy eye, extra eyes, fused eyes, third eye, double pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
   return `${base}, ${STYLE}. ${handInstructionFor(base)} ${HAND_SAFE_PROMPT} ${HAND_DETAIL}. ${NEG}`;
 }
+
 
 
 // Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
