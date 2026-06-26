@@ -15,9 +15,17 @@ import {
   CalendarPlus, CalendarCheck, X, Mic, MicOff, Paperclip, FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/kenia/contexts/AuthContext";
 
 const SCHEDULE_REGEX = /\b(agendar|agendamento|marcar|marca[cç][aã]o|hor[aá]rio|consulta|reuni[aã]o|atendimento|appointment|schedule)\b/i;
 const WAIT_FOLLOW_UP_MS = 65000;
+const initialChatMessages = [
+  {
+    role: "assistant",
+    content: "Olá! Sou a secretária da Kênia Garcia. Como posso ajudar?",
+    audio_base64: null,
+  },
+];
 
 // Gera link de videoconferência (Jitsi — funciona como Google Meet, sem necessidade de login)
 // Pode ser substituído por integração oficial com Google Calendar API no futuro.
@@ -257,14 +265,8 @@ const buildLocalAnalysis = (history, currentMessage, previous = null) => {
 };
 
 export default function ChatIA() {
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content:
-        "Olá! Sou a secretária da Kênia Garcia. Como posso ajudar?",
-      audio_base64: null,
-    },
-  ]);
+  const { user } = useAuth();
+  const [messages, setMessages] = useState(initialChatMessages);
   const [input, setInput] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -291,6 +293,77 @@ export default function ChatIA() {
   const waitFollowUpTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const hydratedRef = useRef(false);
+  const storageKey = `kenia:chatia-atendimento:${user?.id || "local"}`;
+
+  const saveChatState = (next = {}) => {
+    if (!hydratedRef.current) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({
+        messages,
+        sessionId,
+        analysis,
+        name,
+        phone,
+        updatedAt: new Date().toISOString(),
+        ...next,
+      }));
+    } catch {}
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    hydratedRef.current = false;
+    const hydrate = async () => {
+      let restored = false;
+      try {
+        const raw = localStorage.getItem(storageKey);
+        const saved = raw ? JSON.parse(raw) : null;
+        if (saved?.messages?.length) {
+          setMessages(saved.messages);
+          setSessionId(saved.sessionId || null);
+          setAnalysis(saved.analysis || null);
+          setName(saved.name || "");
+          setPhone(saved.phone || "");
+          restored = true;
+        }
+      } catch {}
+
+      if (user?.id) {
+        try {
+          const { data, error } = await supabase
+            .from("conversations")
+            .select("session_id,message,response,created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(40);
+          if (!cancelled && !error && Array.isArray(data) && data.length && !restored) {
+            const latestSession = data.find((row) => row.session_id)?.session_id || data[0].session_id || null;
+            const rows = data
+              .filter((row) => !latestSession || row.session_id === latestSession)
+              .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            const restoredMessages = [initialChatMessages[0]];
+            rows.forEach((row) => {
+              if (row.message) restoredMessages.push({ role: "user", content: row.message });
+              if (row.response) restoredMessages.push({ role: "assistant", content: row.response, audio_base64: null });
+            });
+            setMessages(restoredMessages);
+            setSessionId(latestSession);
+          }
+        } catch (err) {
+          console.warn("Não consegui restaurar conversas salvas:", err);
+        }
+      }
+
+      if (!cancelled) hydratedRef.current = true;
+    };
+    hydrate();
+    return () => { cancelled = true; };
+  }, [storageKey, user?.id]);
+
+  useEffect(() => {
+    saveChatState();
+  }, [messages, sessionId, analysis, name, phone, storageKey]);
 
   const sanitizeFolder = (s) =>
     String(s || "anonimo").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "anonimo";
@@ -775,6 +848,7 @@ export default function ChatIA() {
           message: msg,
           history: historySnapshot,
           session_id: sessionId,
+          user_id: user?.id || null,
           visitor_name: name || null,
           visitor_phone: phone || null,
           voice,
@@ -842,15 +916,11 @@ export default function ChatIA() {
 
   const reset = () => {
     setMessages([
-      {
-        role: "assistant",
-        content:
-          "Olá! Sou a secretária da Kênia Garcia. Como posso ajudar?",
-        audio_base64: null,
-      },
+      initialChatMessages[0],
     ]);
     setSessionId(null);
     setAnalysis(null);
+    try { localStorage.removeItem(storageKey); } catch {}
     stopAudio();
   };
 

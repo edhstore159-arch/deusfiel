@@ -10,6 +10,7 @@ const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const ELEVENLABS_VOICE_ID = Deno.env.get("ELEVENLABS_VOICE_ID") || "EXAVITQu4vr4xnSDxMaL"; // Sarah (PT-BR natural)
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -483,8 +484,20 @@ Deno.serve(async (req) => {
     const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
-    const sessionId: string | null = body.session_id ? String(body.session_id) : null;
-    const userId: string | null = body.user_id ? String(body.user_id) : null;
+    const sessionId: string = body.session_id ? String(body.session_id) : `chat-${crypto.randomUUID()}`;
+    let userId: string | null = body.user_id ? String(body.user_id) : null;
+    const authHeader = req.headers.get("Authorization") || "";
+    if (authHeader && SUPABASE_ANON_KEY) {
+      try {
+        const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: authData, error: authError } = await userClient.auth.getUser();
+        if (!authError && authData?.user?.id) userId = authData.user.id;
+      } catch (err) {
+        console.warn("[chat-ai] não foi possível validar usuário autenticado:", err);
+      }
+    }
 
     if (!userMessage) {
       return new Response(JSON.stringify({ error: "message vazio" }), {
@@ -832,6 +845,7 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
     return new Response(
       JSON.stringify({
         response: reply,
+        session_id: sessionId,
         appointment,
         audio_base64,
         handoff,
