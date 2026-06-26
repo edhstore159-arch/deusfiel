@@ -35,6 +35,34 @@ function hasHumanSubject(prompt = "") {
   return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|criança)\b/i.test(prompt);
 }
 
+// Corrige erros comuns de digitação em PT-BR e traduz frutas/objetos para inglês
+// para melhorar a fidelidade da geração de imagens (ex.: "macan" → "maçã apple fruit").
+const PROMPT_TYPO_MAP: Array<[RegExp, string]> = [
+  [/\bmac[ãa]+n?s?\b/gi, "maçã (apple fruit, red apple, fresh fruit)"],
+  [/\bmaca\b/gi, "maçã (apple fruit, red apple, fresh fruit)"],
+  [/\bbanan[ao]s?\b/gi, "banana (ripe yellow banana fruit)"],
+  [/\blaranj[ao]s?\b/gi, "laranja (orange fruit, citrus)"],
+  [/\buv[ao]s?\b/gi, "uva (grapes, bunch of purple grapes)"],
+  [/\bmorang[ao]s?\b/gi, "morango (strawberry fruit)"],
+  [/\babacax[ií]s?\b/gi, "abacaxi (pineapple fruit)"],
+  [/\bmel[ãa]+n?cias?\b/gi, "melancia (watermelon fruit)"],
+  [/\bmam[ãa]+n?o?s?\b/gi, "mamão (papaya fruit)"],
+  [/\bp[êe]ras?\b/gi, "pera (pear fruit)"],
+  [/\bcachorr[ao]s?\b/gi, "cachorro (dog)"],
+  [/\bgat[ao]s?\b/gi, "gato (cat)"],
+  [/\bcarr[ao]s?\b/gi, "carro (car automobile)"],
+  [/\bcas[ao]s?\b/gi, "casa (house, residential home)"],
+  [/\bflor(es)?\b/gi, "flor (flower, blooming)"],
+];
+
+function normalizePromptTypos(raw: string): string {
+  let out = (raw || "").trim();
+  if (!out) return out;
+  for (const [re, rep] of PROMPT_TYPO_MAP) out = out.replace(re, rep);
+  return out;
+}
+
+
 function withFaceSafety(prompt: string) {
   return hasHumanSubject(prompt) ? `${prompt}. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.` : prompt;
 }
@@ -255,11 +283,13 @@ async function imageEmergent(opts: ImageOptions) {
 
 // Compact Flux-friendly prompt: short, dense English, subject→look→scene→light→style + negative.
 function buildFluxPrompt(raw: string): string {
-  const base = raw
+  const fixed = normalizePromptTypos(raw);
+  const base = fixed
     .replace(/\[[^\]]+\]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 280);
+    .slice(0, 320);
+
   // Non-human subjects (fruit, objects, scenery): keep prompt faithful, no portrait lock.
   if (!hasHumanSubject(base)) {
     const STYLE = "photorealistic, high detail, natural lighting, sharp focus, 8k";
