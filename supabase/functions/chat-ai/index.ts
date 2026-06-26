@@ -302,15 +302,43 @@ function normalizeCaseAnalysis(analysis: any, fallback: any = {}) {
   const qualificacao = ["qualificado", "necessita_mais_info", "nao_qualificado"].includes(rawQual)
     ? rawQual
     : fallback.qualificacao || "necessita_mais_info";
+  const probMap: Record<string, string> = { alta: "Alta", media: "Media", média: "Media", baixa: "Baixa", insuficiente: "Insuficiente", insuficientes: "Insuficiente" };
+  const probRaw = String(source.probabilidade_exito || "").toLowerCase().trim();
+  const probabilidade_exito = probMap[probRaw] || fallback.probabilidade_exito || "Insuficiente";
+  const cxMap: Record<string, string> = { simples: "Simples", moderado: "Moderado", moderada: "Moderado", complexo: "Complexo", complexa: "Complexo" };
+  const cxRaw = String(source.complexidade || "").toLowerCase().trim();
+  const complexidade = cxMap[cxRaw] || fallback.complexidade || "Moderado";
+  const pfMap: Record<string, string> = { alto: "Alto", medio: "Medio", médio: "Medio", baixo: "Baixo" };
+  const pfRaw = String(source.potencial_financeiro || "").toLowerCase().trim();
+  const potencial_financeiro = pfMap[pfRaw] || fallback.potencial_financeiro || "Medio";
+  const provasSrc = source.provas && typeof source.provas === "object" ? source.provas : {};
+  const provas = {
+    documentos: !!provasSrc.documentos,
+    testemunhas: !!provasSrc.testemunhas,
+    mensagens: !!provasSrc.mensagens,
+    suficientes: !!provasSrc.suficientes,
+  };
+  const arr = (v: any) => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
   return {
     acertividade: clampPercent(source.acertividade, fallback.acertividade ?? 40),
     chance_exito: clampPercent(source.chance_exito, fallback.chance_exito ?? 35),
+    score_viabilidade: clampPercent(source.score_viabilidade, fallback.score_viabilidade ?? 50),
     qualificacao,
     area: String(source.area || fallback.area || "Em análise jurídica"),
     resumo: String(source.resumo || fallback.resumo || "Análise inicial do atendimento em andamento."),
     motivo: String(source.motivo || fallback.motivo || "A avaliação será refinada conforme mais detalhes forem informados."),
     proxima_pergunta: String(source.proxima_pergunta || fallback.proxima_pergunta || ""),
     fundamentos: Array.isArray(source.fundamentos) ? source.fundamentos : Array.isArray(fallback.fundamentos) ? fallback.fundamentos : [],
+    probabilidade_exito,
+    complexidade,
+    potencial_financeiro,
+    risco_prazo: String(source.risco_prazo || fallback.risco_prazo || ""),
+    provas,
+    pontos_favoraveis: arr(source.pontos_favoraveis).length ? arr(source.pontos_favoraveis) : arr(fallback.pontos_favoraveis),
+    pontos_atencao: arr(source.pontos_atencao).length ? arr(source.pontos_atencao) : arr(fallback.pontos_atencao),
+    documentos_necessarios: arr(source.documentos_necessarios).length ? arr(source.documentos_necessarios) : arr(fallback.documentos_necessarios),
+    informacoes_faltantes: arr(source.informacoes_faltantes).length ? arr(source.informacoes_faltantes) : arr(fallback.informacoes_faltantes),
+    recomendacao: String(source.recomendacao || fallback.recomendacao || ""),
   };
 }
 
@@ -888,7 +916,30 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
           {
             role: "system",
             content:
-              "Você analisa conversas jurídicas e responde APENAS um JSON válido (sem markdown) com os campos: area (string), resumo (string curta), motivo (string), acertividade (0-100), chance_exito (0-100), qualificacao (\"qualificado\"|\"necessita_mais_info\"|\"desqualificado\"), proxima_pergunta (string), fundamentos (array de strings com base legal).",
+              `Você é um assistente jurídico responsável por realizar ANÁLISE PRELIMINAR do caso. Analise EXCLUSIVAMENTE as informações fornecidas pelo cliente. Regras: não dar parecer definitivo, não prometer ganho de causa, não estimar valores de indenização sem dados concretos, indicar claramente quando faltar informação.
+
+Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
+{
+  "area": string (Área do Direito),
+  "resumo": string (resumo objetivo dos fatos),
+  "motivo": string (justificativa da avaliação),
+  "acertividade": number 0-100,
+  "chance_exito": number 0-100,
+  "qualificacao": "qualificado" | "necessita_mais_info" | "desqualificado",
+  "proxima_pergunta": string,
+  "fundamentos": string[] (base legal),
+  "probabilidade_exito": "Alta" | "Media" | "Baixa" | "Insuficiente",
+  "complexidade": "Simples" | "Moderado" | "Complexo",
+  "potencial_financeiro": "Alto" | "Medio" | "Baixo",
+  "risco_prazo": string (há prescrição/decadência/audiência marcada? quanto tempo do fato?),
+  "provas": { "documentos": boolean, "testemunhas": boolean, "mensagens": boolean, "suficientes": boolean },
+  "pontos_favoraveis": string[],
+  "pontos_atencao": string[],
+  "documentos_necessarios": string[],
+  "informacoes_faltantes": string[],
+  "recomendacao": string (recomendação ao advogado),
+  "score_viabilidade": number 0-100 (some +20 para cada: documentos enviados; provas robustas; relato claro e completo; prazo válido; objetivo juridicamente possível)
+}`,
           },
           { role: "user", content: `Conversa:\n${convoText}\n\nGere o JSON de análise.` },
         ],
