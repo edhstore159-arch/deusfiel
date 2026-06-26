@@ -36,7 +36,7 @@ const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshak
 
 export function hasHumanSubject(prompt = "") {
   if (/\b(non-human subject lock|non-human object lock|object isolation lock|standalone non-human subject)\b/i.test(prompt)) return false;
-  return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao])\b/i.test(prompt);
+  return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao]|viol[êe]ncia|agress[ãa]o|hematoma|ematoma|les[ãa]o|les[õo]es|ferid[ao]|machucad[ao]|corpo|bra[cç]o|perna|pele humana|bruise|injury|wound|assault)\b/i.test(prompt);
 }
 
 // Corrige erros comuns de digitação em PT-BR e traduz frutas/objetos para inglês
