@@ -729,7 +729,7 @@ const staticPost = (url, body = {}) => {
 
       // Persiste/atualiza a análise do caso para que apareça na tela "Casos analisados pela IA",
       // mesmo quando for um caso totalmente novo (ex.: Erik).
-      const persistAnalysis = (analysis, replyText) => {
+      const persistAnalysis = (analysis, replyText, syncCloud = true) => {
         try {
           const items = read("case_analyses", seedAnalyses);
           const idx = items.findIndex((i) => i.session_id === sessionId);
@@ -757,7 +757,7 @@ const staticPost = (url, body = {}) => {
           ];
           transcripts[sessionId] = next.slice(-100);
           write("case_transcripts", transcripts);
-          persistCloudCaseAnalysis(merged, next.slice(-2)).catch(() => {});
+          if (syncCloud) persistCloudCaseAnalysis(merged, next.slice(-2)).catch(() => {});
         } catch (err) {
           console.warn("Falha ao persistir análise do caso", err);
         }
@@ -780,7 +780,7 @@ const staticPost = (url, body = {}) => {
             ? buildNonRepeatingFallback(userMessage)
             : cleanedResponse;
           const finalAnalysis = normalizeCaseAnalysis(data.analysis, localAnalysis);
-          persistAnalysis(finalAnalysis, responseText);
+          persistAnalysis(finalAnalysis, responseText, false);
           return response({
             session_id: data.session_id || sessionId,
             response: responseText,
@@ -795,7 +795,7 @@ const staticPost = (url, body = {}) => {
       } catch (e) {
         console.warn("chat-ai falhou; usando resposta local de contingência", e);
       }
-      persistAnalysis(localAnalysis, fallbackReply);
+      persistAnalysis(localAnalysis, fallbackReply, true);
       return response({
         session_id: sessionId,
         response: fallbackReply,
