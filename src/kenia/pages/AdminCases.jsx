@@ -73,7 +73,7 @@ export default function AdminCases() {
     try {
       await api.patch(`/admin/case-analyses/${selected.id}`, {
         qualificacao: q,
-        notes: adminNotes,
+        admin_notes: adminNotes,
       });
       toast.success("Qualificação atualizada");
       await load();

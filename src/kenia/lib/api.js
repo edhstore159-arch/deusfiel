@@ -379,6 +379,173 @@ const write = (key, value) => {
 const response = (data, status = 200, headers = {}) => Promise.resolve({ data: clone(data), status, statusText: "OK", headers, config: {} });
 const nextId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+const safeCaseId = (sessionId) => {
+  const raw = String(sessionId || nextId("session"));
+  const safe = raw.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 90);
+  return `case-${safe || Date.now()}`;
+};
+
+const getQueryParam = (url, key) => {
+  try {
+    return new URL(String(url), "https://kenia.local").searchParams.get(key);
+  } catch {
+    return null;
+  }
+};
+
+const normalizeCaseAnalysisRecord = (row = {}, fallback = {}) => {
+  const normalized = normalizeCaseAnalysis(row, fallback);
+  return {
+    ...fallback,
+    ...row,
+    ...normalized,
+    id: String(row.id || fallback.id || safeCaseId(row.session_id || fallback.session_id)),
+    session_id: row.session_id || fallback.session_id || null,
+    visitor_name: row.visitor_name || fallback.visitor_name || "Cliente",
+    visitor_phone: row.visitor_phone || fallback.visitor_phone || "",
+    admin_notes: row.admin_notes ?? row.notes ?? fallback.admin_notes ?? "",
+    created_at: row.created_at || fallback.created_at || nowIso(),
+    updated_at: row.updated_at || fallback.updated_at || row.created_at || fallback.created_at || nowIso(),
+  };
+};
+
+const mergeCaseAnalysisItems = (localItems = [], cloudItems = []) => {
+  const byKey = new Map();
+  const put = (raw) => {
+    const item = normalizeCaseAnalysisRecord(raw);
+    const key = item.session_id || item.id;
+    const prev = byKey.get(key);
+    if (!prev || new Date(item.updated_at || item.created_at || 0) >= new Date(prev.updated_at || prev.created_at || 0)) {
+      byKey.set(key, item);
+    }
+  };
+  (localItems || []).forEach(put);
+  (cloudItems || []).forEach(put);
+  return Array.from(byKey.values()).sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0));
+};
+
+const getCaseAnalysesPayload = (items = []) => ({
+  total: items.length,
+  qualificados: items.filter((i) => i.qualificacao === "qualificado").length,
+  nao_qualificados: items.filter((i) => i.qualificacao === "nao_qualificado").length,
+  necessita_mais_info: items.filter((i) => i.qualificacao === "necessita_mais_info").length,
+  avg_acertividade: items.length ? Math.round(items.reduce((s, i) => s + Number(i.acertividade || 0), 0) / items.length) : 0,
+  items,
+});
+
+const loadCloudCaseAnalyses = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("case_analyses")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .limit(300);
+    if (error) throw error;
+    return (data || []).map((row) => normalizeCaseAnalysisRecord(row));
+  } catch (err) {
+    if (!String(err?.message || "").includes("does not exist")) {
+      console.warn("Não foi possível carregar análises salvas no Supabase:", err?.message || err);
+    }
+    return [];
+  }
+};
+
+const loadCloudTranscript = async (analysis) => {
+  if (!analysis?.id && !analysis?.session_id) return [];
+  try {
+    let query = supabase
+      .from("case_transcripts")
+      .select("role,content,created_at")
+      .order("created_at", { ascending: true })
+      .limit(200);
+    query = analysis.id ? query.eq("analysis_id", analysis.id) : query.eq("session_id", analysis.session_id);
+    let { data, error } = await query;
+    if ((!data || data.length === 0) && analysis.session_id) {
+      const retry = await supabase
+        .from("case_transcripts")
+        .select("role,content,created_at")
+        .eq("session_id", analysis.session_id)
+        .order("created_at", { ascending: true })
+        .limit(200);
+      data = retry.data;
+      error = retry.error;
+    }
+    if (error) throw error;
+    return (data || []).map((m) => ({ role: m.role, content: m.content, created_at: m.created_at }));
+  } catch {
+    return [];
+  }
+};
+
+const loadConversationTranscript = async (sessionId) => {
+  if (!sessionId) return [];
+  try {
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("message,response,created_at")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true })
+      .limit(100);
+    if (error) throw error;
+    const messages = [];
+    (data || []).forEach((row) => {
+      if (row.message) messages.push({ role: "user", content: row.message, created_at: row.created_at });
+      if (row.response) messages.push({ role: "assistant", content: row.response, created_at: row.created_at });
+    });
+    return messages;
+  } catch {
+    return [];
+  }
+};
+
+const persistCloudCaseAnalysis = async (record, transcript = []) => {
+  try {
+    const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: null }));
+    const userId = record.user_id || authData?.user?.id || null;
+    if (!userId) return null;
+    const normalized = normalizeCaseAnalysisRecord(record);
+    const payload = {
+      id: normalized.id,
+      user_id: userId,
+      session_id: normalized.session_id,
+      visitor_name: normalized.visitor_name,
+      visitor_phone: normalized.visitor_phone,
+      area: normalized.area,
+      qualificacao: normalized.qualificacao,
+      acertividade: normalized.acertividade,
+      chance_exito: normalized.chance_exito,
+      resumo: normalized.resumo,
+      motivo: normalized.motivo,
+      proxima_pergunta: normalized.proxima_pergunta,
+      fundamentos: normalized.fundamentos || [],
+      admin_notes: normalized.admin_notes || "",
+      updated_at: nowIso(),
+    };
+    const { data, error } = await supabase
+      .from("case_analyses")
+      .upsert(payload, { onConflict: "id" })
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    if (transcript.length) {
+      await supabase.from("case_transcripts").insert(transcript.map((m) => ({
+        user_id: userId,
+        analysis_id: normalized.id,
+        session_id: normalized.session_id,
+        role: m.role,
+        content: m.content,
+        created_at: m.ts || m.created_at || nowIso(),
+      })));
+    }
+    return data;
+  } catch (err) {
+    if (!String(err?.message || "").includes("does not exist")) {
+      console.warn("Não foi possível persistir análise no Supabase:", err?.message || err);
+    }
+    return null;
+  }
+};
+
 const compactImageForStorage = (src, maxSide = 768, quality = 0.82) => new Promise((resolve) => {
   const value = String(src || "");
   if (!value.startsWith("data:image/") || value.startsWith("data:image/svg")) return resolve(value);
@@ -495,17 +662,26 @@ const staticGet = async (url, config = {}) => {
   if (path === "/whatsapp/bot-delivery-stats") return response({ total_bot: 1, total_failures: 0, recent_failures: [] });
   if (path === "/debug/instructions") return response(read("debug_instructions", []));
   if (path === "/admin/case-analyses") {
-    const items = read("case_analyses", seedAnalyses);
-    return response({ total: items.length, qualificados: items.filter((i) => i.qualificacao === "qualificado").length, nao_qualificados: items.filter((i) => i.qualificacao === "nao_qualificado").length, necessita_mais_info: items.filter((i) => i.qualificacao === "necessita_mais_info").length, avg_acertividade: items.length ? Math.round(items.reduce((s, i) => s + i.acertividade, 0) / items.length) : 0, items });
+    const localItems = read("case_analyses", seedAnalyses).map((item) => normalizeCaseAnalysisRecord(item));
+    const cloudItems = await loadCloudCaseAnalyses();
+    let items = mergeCaseAnalysisItems(localItems, cloudItems);
+    const qualificacao = getQueryParam(url, "qualificacao");
+    if (qualificacao && qualificacao !== "all") items = items.filter((i) => i.qualificacao === qualificacao);
+    return response(getCaseAnalysesPayload(items));
   }
   if (path.startsWith("/admin/case-analyses/")) {
     const id = path.split("/").pop();
-    const items = read("case_analyses", seedAnalyses);
-    const analysis = items.find((i) => i.id === id) || items[0] || seedAnalyses[0];
+    const localItems = read("case_analyses", seedAnalyses).map((item) => normalizeCaseAnalysisRecord(item));
+    const cloudItems = await loadCloudCaseAnalyses();
+    const items = mergeCaseAnalysisItems(localItems, cloudItems);
+    const analysis = items.find((i) => i.id === id || i.session_id === id) || items[0] || normalizeCaseAnalysisRecord(seedAnalyses[0]);
     const transcripts = read("case_transcripts", {});
-    const messages = (analysis?.session_id && Array.isArray(transcripts[analysis.session_id]))
+    const localMessages = (analysis?.session_id && Array.isArray(transcripts[analysis.session_id]))
       ? transcripts[analysis.session_id]
       : (seedMessages["contact-1"] || []);
+    const cloudMessages = await loadCloudTranscript(analysis);
+    const conversationMessages = cloudMessages.length ? [] : await loadConversationTranscript(analysis?.session_id);
+    const messages = cloudMessages.length ? cloudMessages : (conversationMessages.length ? conversationMessages : localMessages);
     return response({ analysis, messages });
   }
   if (path === "/legislation/today") {
@@ -553,12 +729,12 @@ const staticPost = (url, body = {}) => {
 
       // Persiste/atualiza a análise do caso para que apareça na tela "Casos analisados pela IA",
       // mesmo quando for um caso totalmente novo (ex.: Erik).
-      const persistAnalysis = (analysis, replyText) => {
+      const persistAnalysis = (analysis, replyText, syncCloud = true) => {
         try {
           const items = read("case_analyses", seedAnalyses);
           const idx = items.findIndex((i) => i.session_id === sessionId);
-          const base = idx >= 0 ? items[idx] : { id: `case-${sessionId}`, session_id: sessionId, created_at: nowIso() };
-          const merged = {
+          const base = idx >= 0 ? items[idx] : { id: safeCaseId(sessionId), session_id: sessionId, created_at: nowIso() };
+          const merged = normalizeCaseAnalysisRecord({
             ...base,
             ...analysis,
             session_id: sessionId,
@@ -566,7 +742,7 @@ const staticPost = (url, body = {}) => {
             visitor_phone: body.visitor_phone || base.visitor_phone || "",
             updated_at: nowIso(),
             admin_notes: base.admin_notes || "",
-          };
+          });
           if (idx >= 0) items[idx] = merged;
           else items.unshift(merged);
           write("case_analyses", items);
@@ -581,6 +757,7 @@ const staticPost = (url, body = {}) => {
           ];
           transcripts[sessionId] = next.slice(-100);
           write("case_transcripts", transcripts);
+          if (syncCloud) persistCloudCaseAnalysis(merged, next.slice(-2)).catch(() => {});
         } catch (err) {
           console.warn("Falha ao persistir análise do caso", err);
         }
@@ -603,7 +780,7 @@ const staticPost = (url, body = {}) => {
             ? buildNonRepeatingFallback(userMessage)
             : cleanedResponse;
           const finalAnalysis = normalizeCaseAnalysis(data.analysis, localAnalysis);
-          persistAnalysis(finalAnalysis, responseText);
+          persistAnalysis(finalAnalysis, responseText, false);
           return response({
             session_id: data.session_id || sessionId,
             response: responseText,
@@ -618,7 +795,7 @@ const staticPost = (url, body = {}) => {
       } catch (e) {
         console.warn("chat-ai falhou; usando resposta local de contingência", e);
       }
-      persistAnalysis(localAnalysis, fallbackReply);
+      persistAnalysis(localAnalysis, fallbackReply, true);
       return response({
         session_id: sessionId,
         response: fallbackReply,
@@ -785,7 +962,7 @@ const staticPut = (url, body = {}) => {
   return response({ ok: true, fallback: true });
 };
 
-const staticPatch = (url, body = {}) => {
+const staticPatch = async (url, body = {}) => {
   const [path] = String(url).split("?");
   const updateCollection = (key, fallback) => {
     const id = path.split("/").pop();
@@ -797,7 +974,17 @@ const staticPatch = (url, body = {}) => {
   if (path.startsWith("/finance/transactions/")) return updateCollection("transactions", seedTransactions);
   if (path.startsWith("/appointments/")) return updateCollection("appointments", seedAppointments);
   if (path.startsWith("/legal-deadlines/")) return updateCollection("legal_deadlines", seedLegalDeadlines);
-  if (path.startsWith("/admin/case-analyses/")) return updateCollection("case_analyses", seedAnalyses);
+  if (path.startsWith("/admin/case-analyses/")) {
+    const id = path.split("/").pop();
+    const localItems = read("case_analyses", seedAnalyses).map((item) => normalizeCaseAnalysisRecord(item));
+    const cloudItems = await loadCloudCaseAnalyses();
+    const current = mergeCaseAnalysisItems(localItems, cloudItems).find((item) => item.id === id || item.session_id === id) || { id };
+    const updated = normalizeCaseAnalysisRecord({ ...current, ...body, updated_at: nowIso() });
+    const without = localItems.filter((item) => item.id !== updated.id && item.session_id !== updated.session_id);
+    write("case_analyses", [updated, ...without]);
+    await persistCloudCaseAnalysis(updated, []);
+    return response(updated);
+  }
   return response({ ok: true, fallback: true });
 };
 
@@ -839,7 +1026,7 @@ liveApi.interceptors.response.use(
   }
 );
 
-const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today"]);
+const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today", "/admin/case-analyses"]);
 const cloudFirstPostPaths = new Set(["/chat/message", "/creatives/generate", "/creatives/fuse-images", "/creatives/edit", "/appointments", "/legal-deadlines", "/legal-deadlines/sync", "/leads", "/public/leads"]);
 const staticOnlyMutationPrefixes = ["/leads/"];
 const liveFirstWithStaticFallbackPostPaths = new Set([]);
@@ -881,6 +1068,7 @@ export const api = HAS_BACKEND
       get: async (url, config) => {
         const [path] = String(url).split("?");
         const isCaseDetail = path.startsWith("/admin/case-analyses/");
+        if (isCaseDetail) return staticGet(url, config);
         if (cloudFirstGetPaths.has(path)) return staticGet(url, config);
         try {
           const res = await liveApi.get(url, config);
@@ -916,7 +1104,7 @@ export const api = HAS_BACKEND
       put: liveApi.put.bind(liveApi),
       patch: (url, body, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+        if (p.startsWith("/admin/case-analyses/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticPatch(url, body);
         }
         return liveApi.patch(url, body, config);

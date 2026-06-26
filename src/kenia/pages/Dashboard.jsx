@@ -8,6 +8,7 @@ import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
 import { Separator } from "@/kenia/components/ui/separator";
+import { Progress } from "@/kenia/components/ui/progress";
 import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Flame, Tag, Calendar, AlertTriangle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/kenia/contexts/AuthContext";
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [activeContact, setActiveContact] = useState(null);
   const [messages, setMessages] = useState([]);
   const [leadForContact, setLeadForContact] = useState(null);
+  const [caseAnalysisForContact, setCaseAnalysisForContact] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [draft, setDraft] = useState("");
@@ -198,6 +200,7 @@ export default function Dashboard() {
     if (activeContact) {
       loadMessages(activeContact);
       loadLeadForContact(activeContact.phone);
+      loadCaseAnalysisForContact(activeContact);
     }
   }, [activeContact]);
 
@@ -212,6 +215,7 @@ export default function Dashboard() {
       loadAppointments();
       loadWhatsAppCenter();
       if (activeContact) loadMessages(activeContact);
+      if (activeContact) loadCaseAnalysisForContact(activeContact);
     }, 3000);
     return () => clearInterval(t);
   }, [activeContact]);
@@ -321,6 +325,27 @@ export default function Dashboard() {
     }
   };
 
+  const loadCaseAnalysisForContact = async (contact) => {
+    if (!contact) return;
+    try {
+      const phoneDigits = extractWhatsAppDigits(contact.phone || contact.id || "");
+      const phoneTail = phoneDigits.length >= 8 ? phoneDigits.slice(-8) : "";
+      const { data } = await api.get("/admin/case-analyses");
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const match = items.find((item) => {
+        const sessionDigits = extractWhatsAppDigits(item.session_id || "");
+        const visitorDigits = extractWhatsAppDigits(item.visitor_phone || "");
+        return (
+          (contact.id && String(item.session_id || "") === String(contact.id)) ||
+          (phoneTail && (sessionDigits.endsWith(phoneTail) || visitorDigits.endsWith(phoneTail)))
+        );
+      });
+      setCaseAnalysisForContact(match || null);
+    } catch {
+      setCaseAnalysisForContact(null);
+    }
+  };
+
   const sendWhatsApp = async () => {
     if (!draft.trim() || !activeContact) return;
     const textToSend = draft.trim();
@@ -365,7 +390,7 @@ export default function Dashboard() {
         : prompt;
       const { data } = await api.post("/chat/message", {
         message: contextual,
-        session_id: aiSession,
+        session_id: activeContact?.id || activeContact?.phone || aiSession,
         user_id: user?.id || null,
         visitor_name: activeContact?.name || null,
         visitor_phone: activeContact?.phone || null,
@@ -402,6 +427,14 @@ export default function Dashboard() {
             await api.post("/leads", patch);
           }
           loadLeadForContact(activeContact.phone);
+          setCaseAnalysisForContact({
+            id: `case-${String(activeContact.id || activeContact.phone).replace(/[^a-zA-Z0-9_-]+/g, "-")}`,
+            session_id: activeContact.id || activeContact.phone,
+            visitor_name: activeContact.name,
+            visitor_phone: activeContact.phone,
+            ...data.analysis,
+          });
+          setTimeout(() => loadCaseAnalysisForContact(activeContact), 800);
         } catch (err) {
           console.error("Falha ao atualizar lead com análise da IA:", err);
         }
@@ -768,6 +801,39 @@ export default function Dashboard() {
                 <Separator />
 
                 <div className="space-y-3">
+                  {caseAnalysisForContact && (
+                    <div className="rounded-xl border border-gold-200 bg-gold-50/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs tracking-widest uppercase font-semibold text-gold-800 flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3" /> Análise em tempo real
+                        </div>
+                        <Badge className="bg-white text-gold-800 border border-gold-200 hover:bg-white">
+                          {caseAnalysisForContact.qualificacao === "qualificado" ? "Qualificado" : caseAnalysisForContact.qualificacao === "nao_qualificado" ? "Não qualificado" : "Precisa de info"}
+                        </Badge>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs text-nude-700 mb-1">
+                          <span>Acertividade do caso</span>
+                          <span className="font-semibold">{Math.round(Number(caseAnalysisForContact.acertividade) || 0)}%</span>
+                        </div>
+                        <Progress value={Math.round(Number(caseAnalysisForContact.acertividade) || 0)} className="h-2" />
+                      </div>
+                      <Field label="Área analisada" value={caseAnalysisForContact.area || "Em análise"} />
+                      {caseAnalysisForContact.resumo && (
+                        <div>
+                          <div className="text-xs text-nude-500 mb-1">Resumo da análise</div>
+                          <div className="text-xs text-nude-700 bg-white/80 border border-gold-100 rounded-md p-2">
+                            {caseAnalysisForContact.resumo}
+                          </div>
+                        </div>
+                      )}
+                      {caseAnalysisForContact.proxima_pergunta && (
+                        <div className="text-[11px] text-nude-600">
+                          <span className="font-semibold">Próxima pergunta:</span> {caseAnalysisForContact.proxima_pergunta}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {activeContact.sinestesic_style && (
                     <div>
                       <div className="text-xs text-nude-500 mb-1">Estilo do cliente (IA)</div>

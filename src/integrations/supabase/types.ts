@@ -110,6 +110,101 @@ export type Database = {
         }
         Relationships: []
       }
+      case_analyses: {
+        Row: {
+          acertividade: number
+          admin_notes: string
+          area: string
+          chance_exito: number
+          created_at: string
+          fundamentos: Json
+          id: string
+          motivo: string | null
+          proxima_pergunta: string | null
+          qualificacao: string
+          resumo: string | null
+          session_id: string | null
+          updated_at: string
+          user_id: string | null
+          visitor_name: string | null
+          visitor_phone: string | null
+        }
+        Insert: {
+          acertividade?: number
+          admin_notes?: string
+          area?: string
+          chance_exito?: number
+          created_at?: string
+          fundamentos?: Json
+          id: string
+          motivo?: string | null
+          proxima_pergunta?: string | null
+          qualificacao?: string
+          resumo?: string | null
+          session_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          visitor_name?: string | null
+          visitor_phone?: string | null
+        }
+        Update: {
+          acertividade?: number
+          admin_notes?: string
+          area?: string
+          chance_exito?: number
+          created_at?: string
+          fundamentos?: Json
+          id?: string
+          motivo?: string | null
+          proxima_pergunta?: string | null
+          qualificacao?: string
+          resumo?: string | null
+          session_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          visitor_name?: string | null
+          visitor_phone?: string | null
+        }
+        Relationships: []
+      }
+      case_transcripts: {
+        Row: {
+          analysis_id: string | null
+          content: string
+          created_at: string
+          id: string
+          role: string
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          analysis_id?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          analysis_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_transcripts_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "case_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           created_at: string
