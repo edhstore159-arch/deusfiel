@@ -255,12 +255,17 @@ async function imageEmergent(opts: ImageOptions) {
 
 // Compact Flux-friendly prompt: short, dense English, subject→look→scene→light→style + negative.
 function buildFluxPrompt(raw: string): string {
-  // Take first ~280 chars of user prompt, strip heavy structure markers.
   const base = raw
     .replace(/\[[^\]]+\]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 280);
+  // Non-human subjects (fruit, objects, scenery): keep prompt faithful, no portrait lock.
+  if (!hasHumanSubject(base)) {
+    const STYLE = "photorealistic, high detail, natural lighting, sharp focus, 8k";
+    const NEG = "negative: blurry, low quality, text, watermark, logo, deformed, extra limbs";
+    return `${base}, ${STYLE}. ${NEG}`;
+  }
   const STYLE =
     "photorealistic, professional portrait photography, real skin texture, natural skin pores, " +
     "correct facial anatomy, symmetrical eyes, realistic pupils, natural mouth and nose, " +
