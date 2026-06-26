@@ -540,14 +540,51 @@ const staticPost = (url, body = {}) => {
   if (path === "/chat/message") {
     return (async () => {
       const sessionId = body.session_id || nextId("session");
-      const localAnalysis = buildLocalCaseAnalysis(body.history || [], body.message || body.text || "");
+      const userMessage = body.message || body.text || "";
+      const localAnalysis = buildLocalCaseAnalysis(body.history || [], userMessage);
       const fallbackReply =
         "Tive uma instabilidade momentânea. Estou aqui para te ajudar; pode me contar o que aconteceu em uma frase curta?";
+
+      // Persiste/atualiza a análise do caso para que apareça na tela "Casos analisados pela IA",
+      // mesmo quando for um caso totalmente novo (ex.: Erik).
+      const persistAnalysis = (analysis, replyText) => {
+        try {
+          const items = read("case_analyses", seedAnalyses);
+          const idx = items.findIndex((i) => i.session_id === sessionId);
+          const base = idx >= 0 ? items[idx] : { id: `case-${sessionId}`, session_id: sessionId, created_at: nowIso() };
+          const merged = {
+            ...base,
+            ...analysis,
+            session_id: sessionId,
+            visitor_name: body.visitor_name || base.visitor_name || "Cliente",
+            visitor_phone: body.visitor_phone || base.visitor_phone || "",
+            updated_at: nowIso(),
+            admin_notes: base.admin_notes || "",
+          };
+          if (idx >= 0) items[idx] = merged;
+          else items.unshift(merged);
+          write("case_analyses", items);
+
+          // Salva também a transcrição da conversa por session_id para o admin abrir.
+          const transcripts = read("case_transcripts", {});
+          const prev = Array.isArray(transcripts[sessionId]) ? transcripts[sessionId] : [];
+          const next = [
+            ...prev,
+            { role: "user", content: userMessage, ts: nowIso() },
+            { role: "assistant", content: replyText, ts: nowIso() },
+          ];
+          transcripts[sessionId] = next.slice(-100);
+          write("case_transcripts", transcripts);
+        } catch (err) {
+          console.warn("Falha ao persistir análise do caso", err);
+        }
+      };
+
       try {
         const { data, error } = await supabase.functions.invoke("chat-ai", {
           body: {
             ...body,
-            message: body.message || body.text || "",
+            message: userMessage,
             history: body.history || [],
             session_id: sessionId,
             user_id: body.user_id || null,
@@ -557,8 +594,10 @@ const staticPost = (url, body = {}) => {
         if (!error && data?.response) {
           const cleanedResponse = cleanInternalChatMarkers(data.response);
           const responseText = isNearDuplicateReply(cleanedResponse, body.history || [])
-            ? buildNonRepeatingFallback(body.message || body.text || "")
+            ? buildNonRepeatingFallback(userMessage)
             : cleanedResponse;
+          const finalAnalysis = normalizeCaseAnalysis(data.analysis, localAnalysis);
+          persistAnalysis(finalAnalysis, responseText);
           return response({
             session_id: data.session_id || sessionId,
             response: responseText,
@@ -566,13 +605,14 @@ const staticPost = (url, body = {}) => {
             appointment: data.appointment || null,
             handoff: Boolean(data.handoff),
             speaker: data.speaker || null,
-            analysis: normalizeCaseAnalysis(data.analysis, localAnalysis),
+            analysis: finalAnalysis,
             server_time: null,
           });
         }
       } catch (e) {
         console.warn("chat-ai falhou; usando resposta local de contingência", e);
       }
+      persistAnalysis(localAnalysis, fallbackReply);
       return response({
         session_id: sessionId,
         response: fallbackReply,
