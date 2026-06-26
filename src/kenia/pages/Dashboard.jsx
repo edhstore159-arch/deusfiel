@@ -329,6 +329,7 @@ export default function Dashboard() {
     if (!contact) return;
     try {
       const phoneDigits = extractWhatsAppDigits(contact.phone || contact.id || "");
+      const phoneTail = phoneDigits.length >= 8 ? phoneDigits.slice(-8) : "";
       const { data } = await api.get("/admin/case-analyses");
       const items = Array.isArray(data?.items) ? data.items : [];
       const match = items.find((item) => {
@@ -336,7 +337,7 @@ export default function Dashboard() {
         const visitorDigits = extractWhatsAppDigits(item.visitor_phone || "");
         return (
           (contact.id && String(item.session_id || "") === String(contact.id)) ||
-          (phoneDigits && (sessionDigits.endsWith(phoneDigits.slice(-8)) || visitorDigits.endsWith(phoneDigits.slice(-8))))
+          (phoneTail && (sessionDigits.endsWith(phoneTail) || visitorDigits.endsWith(phoneTail)))
         );
       });
       setCaseAnalysisForContact(match || null);
