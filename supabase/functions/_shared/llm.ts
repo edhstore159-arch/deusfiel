@@ -25,12 +25,18 @@ const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
 const FACE_SAFE_PROMPT =
   "Face quality lock: natural human face, aligned eyes, normal eyelids, realistic nose and mouth, natural teeth, correct facial symmetry, relaxed expression, realistic skin texture, no warped facial features, no melted face, no duplicated eyes, no distorted pupils, no plastic smoothing.";
 
+const HAND_SAFE_PROMPT =
+  "Hand safety lock: unless hands are the main subject, compose as a chest-up or waist-up photograph with hands completely outside the frame or naturally hidden behind clothing, a desk, pockets, folders, books, or other objects. No visible fingers. If any hand is visible, it must be anatomically correct with exactly five natural fingers, correct thumb placement, natural knuckles, realistic nails, and normal wrist connection.";
+
+const HAND_NEGATIVE_PROMPT =
+  "bad hands, malformed hands, deformed hands, mutated hands, distorted hands, broken hands, ugly hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, wrong thumb placement, claw hands, rubber fingers, sausage fingers, baguette fingers, long unnatural fingers, tiny hands, oversized hands, detached hands, floating hands, hands growing from wrong place, twisted wrists, broken wrists";
+
 function hasHumanSubject(prompt = "") {
   return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|criança)\b/i.test(prompt);
 }
 
 function withFaceSafety(prompt: string) {
-  return hasHumanSubject(prompt) ? `${prompt}. ${FACE_SAFE_PROMPT}` : prompt;
+  return hasHumanSubject(prompt) ? `${prompt}. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.` : prompt;
 }
 
 // ---------- chat completions ----------
@@ -258,10 +264,11 @@ function buildFluxPrompt(raw: string): string {
   const STYLE =
     "photorealistic, professional portrait photography, real skin texture, natural skin pores, " +
     "correct facial anatomy, symmetrical eyes, realistic pupils, natural mouth and nose, " +
+    "chest-up composition, hands completely out of frame, no visible hands, no visible fingers, " +
     "cinematic lighting, shallow depth of field, sharp focus, 8k";
   const NEG =
-    "negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, bad hands, extra fingers, unrealistic, cartoon, oversaturated, text, watermark, logo";
-  return `${base}, ${STYLE}. ${NEG}`;
+    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, ${HAND_NEGATIVE_PROMPT}, visible hands, visible fingers, unrealistic, cartoon, oversaturated, text, watermark, logo`;
+  return `${base}, ${STYLE}. ${HAND_SAFE_PROMPT}. ${NEG}`;
 }
 
 // Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
