@@ -225,8 +225,9 @@ Deno.serve(async (req) => {
 
     const userElaborated = await elaboratePrompt(prompt, style);
     const hybridSubject = hasHybridRequest(prompt);
-    const eventSubject = EVENT_RE.test(prompt) && !hybridSubject;
-    const humanSubject = (hasHumanSubject(prompt) || eventSubject) && !hybridSubject;
+    const isolatedOnly = isIsolatedObjectOnly(prompt);
+    const eventSubject = !isolatedOnly && EVENT_RE.test(prompt) && !hybridSubject;
+    const humanSubject = !isolatedOnly && (hasHumanSubject(prompt) || eventSubject) && !hybridSubject;
     const handGuard = handCompositionGuard(prompt);
     const cakeEating = EATING_CAKE_RE.test(prompt);
     const fullPrompt = hybridSubject ? [
