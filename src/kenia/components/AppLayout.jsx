@@ -27,6 +27,7 @@ const NAV = [
   { to: "/app/finance", label: "Financeiro", icon: Wallet, testid: "nav-finance" },
   { to: "/app/creatives", label: "Criativos", icon: Sparkles, testid: "nav-creatives" },
   { to: "/app/image-fusion", label: "Fusão de Imagens", icon: Combine, testid: "nav-image-fusion" },
+  { to: "/app/viral-video", label: "Vídeos Virais", icon: Clapperboard, testid: "nav-viral-video" },
   { to: "/app/analytics", label: "Métricas", icon: BarChart3, testid: "nav-analytics" },
   { to: "/app/whatsapp", label: "WhatsApp", icon: MessageSquare, testid: "nav-whatsapp" },
   { to: "/app/whatsapp-logs", label: "Logs WhatsApp", icon: Radio, testid: "nav-whatsapp-logs" },
