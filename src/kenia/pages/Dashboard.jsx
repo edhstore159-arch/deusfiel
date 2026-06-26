@@ -800,6 +800,39 @@ export default function Dashboard() {
                 <Separator />
 
                 <div className="space-y-3">
+                  {caseAnalysisForContact && (
+                    <div className="rounded-xl border border-gold-200 bg-gold-50/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs tracking-widest uppercase font-semibold text-gold-800 flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3" /> Análise em tempo real
+                        </div>
+                        <Badge className="bg-white text-gold-800 border border-gold-200 hover:bg-white">
+                          {caseAnalysisForContact.qualificacao === "qualificado" ? "Qualificado" : caseAnalysisForContact.qualificacao === "nao_qualificado" ? "Não qualificado" : "Precisa de info"}
+                        </Badge>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs text-nude-700 mb-1">
+                          <span>Acertividade do caso</span>
+                          <span className="font-semibold">{Math.round(Number(caseAnalysisForContact.acertividade) || 0)}%</span>
+                        </div>
+                        <Progress value={Math.round(Number(caseAnalysisForContact.acertividade) || 0)} className="h-2" />
+                      </div>
+                      <Field label="Área analisada" value={caseAnalysisForContact.area || "Em análise"} />
+                      {caseAnalysisForContact.resumo && (
+                        <div>
+                          <div className="text-xs text-nude-500 mb-1">Resumo da análise</div>
+                          <div className="text-xs text-nude-700 bg-white/80 border border-gold-100 rounded-md p-2">
+                            {caseAnalysisForContact.resumo}
+                          </div>
+                        </div>
+                      )}
+                      {caseAnalysisForContact.proxima_pergunta && (
+                        <div className="text-[11px] text-nude-600">
+                          <span className="font-semibold">Próxima pergunta:</span> {caseAnalysisForContact.proxima_pergunta}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {activeContact.sinestesic_style && (
                     <div>
                       <div className="text-xs text-nude-500 mb-1">Estilo do cliente (IA)</div>
