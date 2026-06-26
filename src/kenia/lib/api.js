@@ -962,7 +962,7 @@ const staticPut = (url, body = {}) => {
   return response({ ok: true, fallback: true });
 };
 
-const staticPatch = (url, body = {}) => {
+const staticPatch = async (url, body = {}) => {
   const [path] = String(url).split("?");
   const updateCollection = (key, fallback) => {
     const id = path.split("/").pop();
@@ -974,7 +974,12 @@ const staticPatch = (url, body = {}) => {
   if (path.startsWith("/finance/transactions/")) return updateCollection("transactions", seedTransactions);
   if (path.startsWith("/appointments/")) return updateCollection("appointments", seedAppointments);
   if (path.startsWith("/legal-deadlines/")) return updateCollection("legal_deadlines", seedLegalDeadlines);
-  if (path.startsWith("/admin/case-analyses/")) return updateCollection("case_analyses", seedAnalyses);
+  if (path.startsWith("/admin/case-analyses/")) {
+    const res = updateCollection("case_analyses", seedAnalyses);
+    const updated = res?.data;
+    if (updated?.id) await persistCloudCaseAnalysis(normalizeCaseAnalysisRecord(updated), []);
+    return res;
+  }
   return response({ ok: true, fallback: true });
 };
 
