@@ -302,15 +302,43 @@ function normalizeCaseAnalysis(analysis: any, fallback: any = {}) {
   const qualificacao = ["qualificado", "necessita_mais_info", "nao_qualificado"].includes(rawQual)
     ? rawQual
     : fallback.qualificacao || "necessita_mais_info";
+  const probMap: Record<string, string> = { alta: "Alta", media: "Media", média: "Media", baixa: "Baixa", insuficiente: "Insuficiente", insuficientes: "Insuficiente" };
+  const probRaw = String(source.probabilidade_exito || "").toLowerCase().trim();
+  const probabilidade_exito = probMap[probRaw] || fallback.probabilidade_exito || "Insuficiente";
+  const cxMap: Record<string, string> = { simples: "Simples", moderado: "Moderado", moderada: "Moderado", complexo: "Complexo", complexa: "Complexo" };
+  const cxRaw = String(source.complexidade || "").toLowerCase().trim();
+  const complexidade = cxMap[cxRaw] || fallback.complexidade || "Moderado";
+  const pfMap: Record<string, string> = { alto: "Alto", medio: "Medio", médio: "Medio", baixo: "Baixo" };
+  const pfRaw = String(source.potencial_financeiro || "").toLowerCase().trim();
+  const potencial_financeiro = pfMap[pfRaw] || fallback.potencial_financeiro || "Medio";
+  const provasSrc = source.provas && typeof source.provas === "object" ? source.provas : {};
+  const provas = {
+    documentos: !!provasSrc.documentos,
+    testemunhas: !!provasSrc.testemunhas,
+    mensagens: !!provasSrc.mensagens,
+    suficientes: !!provasSrc.suficientes,
+  };
+  const arr = (v: any) => (Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : []);
   return {
     acertividade: clampPercent(source.acertividade, fallback.acertividade ?? 40),
     chance_exito: clampPercent(source.chance_exito, fallback.chance_exito ?? 35),
+    score_viabilidade: clampPercent(source.score_viabilidade, fallback.score_viabilidade ?? 50),
     qualificacao,
     area: String(source.area || fallback.area || "Em análise jurídica"),
     resumo: String(source.resumo || fallback.resumo || "Análise inicial do atendimento em andamento."),
     motivo: String(source.motivo || fallback.motivo || "A avaliação será refinada conforme mais detalhes forem informados."),
     proxima_pergunta: String(source.proxima_pergunta || fallback.proxima_pergunta || ""),
     fundamentos: Array.isArray(source.fundamentos) ? source.fundamentos : Array.isArray(fallback.fundamentos) ? fallback.fundamentos : [],
+    probabilidade_exito,
+    complexidade,
+    potencial_financeiro,
+    risco_prazo: String(source.risco_prazo || fallback.risco_prazo || ""),
+    provas,
+    pontos_favoraveis: arr(source.pontos_favoraveis).length ? arr(source.pontos_favoraveis) : arr(fallback.pontos_favoraveis),
+    pontos_atencao: arr(source.pontos_atencao).length ? arr(source.pontos_atencao) : arr(fallback.pontos_atencao),
+    documentos_necessarios: arr(source.documentos_necessarios).length ? arr(source.documentos_necessarios) : arr(fallback.documentos_necessarios),
+    informacoes_faltantes: arr(source.informacoes_faltantes).length ? arr(source.informacoes_faltantes) : arr(fallback.informacoes_faltantes),
+    recomendacao: String(source.recomendacao || fallback.recomendacao || ""),
   };
 }
 
