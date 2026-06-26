@@ -296,9 +296,10 @@ function buildFluxPrompt(raw: string): string {
     const FRUIT_STYLE = isFruit
       ? ", whole intact fruit, perfectly ripe, smooth natural skin, anatomically correct natural shape, intact stem, no bites, no cuts, no deformation, studio product photography, soft diffused lighting, clean white background, macro detail"
       : "";
-    const STYLE = `photorealistic, high detail, natural lighting, sharp focus, 8k${FRUIT_STYLE}`;
-    const NEG = "negative: blurry, low quality, text, watermark, logo, deformed, mutated, disfigured, melted, warped, extra parts, duplicated, asymmetrical, cartoon, illustration, painting, CGI";
-    return `${base}, ${STYLE}. ${NEG}`;
+    const STYLE = `photorealistic, high detail, natural lighting, sharp focus, 8k${FRUIT_STYLE}, isolated subject, clearly separated from any background element, no human presence`;
+    const NEG = "negative: blurry, low quality, text, watermark, logo, deformed, mutated, disfigured, melted, warped, extra parts, duplicated, asymmetrical, cartoon, illustration, painting, CGI, human hands, fingers, arms, body parts, skin, person holding object, hand holding fruit, fruit merged with hand, fruit fused with fingers, hybrid of fruit and human, object morphing into hand, anthropomorphic fruit";
+    return `${base}, ${STYLE}. Do NOT include any human body parts, hands, or fingers; the subject must be standalone and clearly defined. ${NEG}`;
+
   }
   const HAND_DETAIL =
     "anatomically perfect human hand with exactly five fingers (one thumb + four fingers), correct finger count, natural finger proportions, individually defined fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement, natural wrist";
