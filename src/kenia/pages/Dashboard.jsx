@@ -516,6 +516,40 @@ export default function Dashboard() {
           <div className="p-4 border-b border-nude-200">
             <h2 className="font-display font-semibold text-sm">Dados do Cliente</h2>
           </div>
+          {!activeContact && (
+            <ScrollArea className="flex-1">
+              <div className="p-5 space-y-5">
+                <div>
+                  <div className="text-xs tracking-widest uppercase font-semibold text-nude-500 mb-2 flex items-center gap-1.5">
+                    <Calendar className="w-3 h-3 text-gold-600" /> Próximas reuniões (Meet)
+                  </div>
+                  {appointments.length === 0 ? (
+                    <div className="text-xs text-nude-400">Nenhum agendamento futuro.</div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {appointments.slice(0, 6).map((a) => {
+                        const link = a.meeting_link || a.meet_url;
+                        const when = new Date(a.starts_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+                        return (
+                          <div key={a.id} className="p-2 bg-gold-50 border border-gold-200 rounded-md text-xs">
+                            <div className="font-medium text-nude-900 truncate">{a.client_name || a.title || "Reunião"}</div>
+                            <div className="text-nude-600 flex items-center gap-1 mt-0.5">
+                              <Calendar className="w-3 h-3" /> {when} • {a.duration_min || 60} min
+                            </div>
+                            {link && (
+                              <a href={link} target="_blank" rel="noreferrer" className="text-gold-700 hover:underline truncate block mt-1">
+                                🔗 Entrar no Meet
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+          )}
           {activeContact ? (
             <ScrollArea className="flex-1">
               <div className="p-5 space-y-5">
