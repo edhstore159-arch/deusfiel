@@ -148,6 +148,76 @@ export default function ImageFusion() {
   const [result, setResult] = useState(null);
   const [variants, setVariants] = useState([]); // {preset, dataUrl, blob}
   const [generatingVariants, setGeneratingVariants] = useState(false);
+  const [saved, setSaved] = useState([]); // {id, url, prompt, paid, storage_path}
+  const [paying, setPaying] = useState(null);
+
+  useEffect(() => { loadSaved(); }, []);
+
+  const loadSaved = async () => {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) return;
+      const { data } = await supabase
+        .from("generated_images")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(60);
+      const items = await Promise.all((data || []).map(async (r) => {
+        const { data: signed } = await supabase.storage
+          .from("creative-assets")
+          .createSignedUrl(r.storage_path, 60 * 60 * 24);
+        return { ...r, url: signed?.signedUrl || null };
+      }));
+      setSaved(items.filter((x) => x.url));
+    } catch (e) {
+      console.warn("loadSaved", e);
+    }
+  };
+
+  const persistImage = async (sourceUrl, promptText) => {
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth?.user?.id;
+      if (!uid) { toast.error("Faça login para salvar a imagem"); return; }
+      const res = await fetch(sourceUrl);
+      const blob = await res.blob();
+      const path = `${uid}/fusion-${Date.now()}.png`;
+      const { error: upErr } = await supabase.storage
+        .from("creative-assets")
+        .upload(path, blob, { contentType: blob.type || "image/png", upsert: true });
+      if (upErr) throw upErr;
+      const { error: insErr } = await supabase.from("generated_images").insert({
+        user_id: uid, storage_path: path, prompt: promptText || null, kind: "fusion", paid: false,
+      });
+      if (insErr) throw insErr;
+      toast.success("Imagem salva na sua galeria");
+      loadSaved();
+    } catch (e) {
+      toast.error("Não foi possível salvar: " + (e.message || e));
+    }
+  };
+
+  const removeSaved = async (item) => {
+    if (!confirm("Excluir esta imagem salva?")) return;
+    await supabase.storage.from("creative-assets").remove([item.storage_path]);
+    await supabase.from("generated_images").delete().eq("id", item.id);
+    loadSaved();
+  };
+
+  const payForImage = async (item) => {
+    setPaying(item.id);
+    try {
+      // Placeholder de pagamento: marca como pago localmente.
+      // Para cobrança real, ative o Stripe e troque por uma edge function `create-checkout`.
+      await supabase.from("generated_images").update({ paid: true }).eq("id", item.id);
+      toast.success("Pagamento confirmado · download HD liberado");
+      loadSaved();
+    } catch (e) {
+      toast.error("Falha no pagamento: " + (e.message || e));
+    } finally {
+      setPaying(null);
+    }
+  };
 
   const fuse = async () => {
     if (!img1 || !img2) { toast.error("Envie as duas imagens antes de gerar"); return; }
@@ -162,7 +232,9 @@ export default function ImageFusion() {
       );
       if (data.ok && data.image) {
         setResult(data.image);
-        toast.success("Imagem gerada! Gerando variações para redes sociais...");
+        toast.success("Imagem gerada! Salvando e criando variações...");
+        // Persistir imediatamente — URL externa expira
+        persistImage(data.image, prompt);
         await generateVariants(data.image);
       } else {
         toast.error(data.error || "Não foi possível gerar a imagem");
@@ -173,6 +245,7 @@ export default function ImageFusion() {
       setLoading(false);
     }
   };
+
 
   const generateVariants = async (sourceUrl) => {
     setGeneratingVariants(true);
