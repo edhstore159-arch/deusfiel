@@ -436,6 +436,59 @@ export default function ImageFusion() {
             </div>
           </Card>
         )}
+
+        <Card className="max-w-5xl mx-auto p-5 bg-nude-900/60 border-gold-900/40 mt-5">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div>
+              <Label className="text-gold-200 text-base">Galeria salva ({saved.length})</Label>
+              <p className="text-xs text-nude-400 mt-0.5">Imagens guardadas permanentemente. Pague para liberar download em HD sem marca d'água.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={loadSaved}
+              className="border-gold-700/50 text-gold-200 hover:bg-gold-500/10 hover:text-gold-100">
+              Atualizar
+            </Button>
+          </div>
+          {saved.length === 0 ? (
+            <div className="py-8 text-center text-nude-500 text-sm">Nenhuma imagem salva ainda. Gere uma fusão acima.</div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {saved.map((s) => (
+                <div key={s.id} className="bg-nude-950 border border-gold-900/40 rounded-md overflow-hidden flex flex-col">
+                  <div className="relative aspect-square bg-black/40">
+                    <img src={s.url} alt="" className={`w-full h-full object-cover ${s.paid ? "" : "blur-[2px] brightness-90"}`} />
+                    {!s.paid && (
+                      <div className="absolute inset-0 grid place-items-center bg-black/30">
+                        <Lock className="w-6 h-6 text-gold-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2 flex flex-col gap-1.5">
+                    <div className="text-[10px] text-nude-500 truncate">{new Date(s.created_at).toLocaleString()}</div>
+                    {s.paid ? (
+                      <a href={s.url} download className="text-[11px] py-1 rounded bg-gold-600/30 hover:bg-gold-500/40 text-gold-100 flex items-center justify-center gap-1">
+                        <Download className="w-3 h-3" /> Baixar HD
+                      </a>
+                    ) : (
+                      <button
+                        onClick={() => payForImage(s)}
+                        disabled={paying === s.id}
+                        className="text-[11px] py-1 rounded bg-gradient-to-r from-gold-500 to-gold-700 text-nude-950 font-semibold flex items-center justify-center gap-1 disabled:opacity-60"
+                      >
+                        <CreditCard className="w-3 h-3" /> {paying === s.id ? "Processando..." : "Pagar R$ 9,90"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => removeSaved(s)}
+                      className="text-[10px] py-1 rounded bg-rose-600/20 hover:bg-rose-500/30 text-rose-200 flex items-center justify-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" /> Excluir
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   );
