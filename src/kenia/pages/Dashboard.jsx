@@ -200,6 +200,7 @@ export default function Dashboard() {
     if (activeContact) {
       loadMessages(activeContact);
       loadLeadForContact(activeContact.phone);
+      loadCaseAnalysisForContact(activeContact);
     }
   }, [activeContact]);
 
@@ -214,6 +215,7 @@ export default function Dashboard() {
       loadAppointments();
       loadWhatsAppCenter();
       if (activeContact) loadMessages(activeContact);
+      if (activeContact) loadCaseAnalysisForContact(activeContact);
     }, 3000);
     return () => clearInterval(t);
   }, [activeContact]);
@@ -320,6 +322,26 @@ export default function Dashboard() {
       setLeadForContact(match || null);
     } catch {
       setLeadForContact(null);
+    }
+  };
+
+  const loadCaseAnalysisForContact = async (contact) => {
+    if (!contact) return;
+    try {
+      const phoneDigits = extractWhatsAppDigits(contact.phone || contact.id || "");
+      const { data } = await api.get("/admin/case-analyses");
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const match = items.find((item) => {
+        const sessionDigits = extractWhatsAppDigits(item.session_id || "");
+        const visitorDigits = extractWhatsAppDigits(item.visitor_phone || "");
+        return (
+          (contact.id && String(item.session_id || "") === String(contact.id)) ||
+          (phoneDigits && (sessionDigits.endsWith(phoneDigits.slice(-8)) || visitorDigits.endsWith(phoneDigits.slice(-8))))
+        );
+      });
+      setCaseAnalysisForContact(match || null);
+    } catch {
+      setCaseAnalysisForContact(null);
     }
   };
 
