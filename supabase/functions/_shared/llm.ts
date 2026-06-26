@@ -34,8 +34,15 @@ const HAND_NEGATIVE_PROMPT =
 
 const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo)\b/i;
 
+export function hasHybridRequest(prompt = "") {
+  return /\bcom\s+(cara|rosto|face|olhos|boca|sorriso|express[ãa]o)\s+humana?s?\b/i.test(prompt)
+    || /\b(with|having)\s+(a\s+)?human\s+(face|eyes|mouth|smile|expression)\b/i.test(prompt)
+    || /\b(antropomorf|anthropomorph|surreal hybrid|h[íi]brido surreal|fruta humanizada|humanized fruit)\b/i.test(prompt);
+}
+
 export function hasHumanSubject(prompt = "") {
   if (/\b(non-human subject lock|non-human object lock|object isolation lock|standalone non-human subject)\b/i.test(prompt)) return false;
+  if (hasHybridRequest(prompt)) return true;
   return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao]|viol[êe]ncia|agress[ãa]o|hematoma|ematoma|les[ãa]o|les[õo]es|ferid[ao]|machucad[ao]|corpo|bra[cç]o|perna|pele humana|bruise|injury|wound|assault)\b/i.test(prompt);
 }
 
