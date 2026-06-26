@@ -324,15 +324,22 @@ function buildFluxPrompt(raw: string): string {
   // Non-human subjects (fruit, objects, scenery): keep prompt faithful, no portrait lock.
   if (!hasHumanSubject(base)) {
     const isFruit = /\b(fruit|apple|maçã|maca|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi)\b/i.test(base);
+    const isLandmark = /\b(torre\s+eiffel|eiffel\s+tower|cristo\s+redentor|estatua\s+da\s+liberdade|statue\s+of\s+liberty|big\s+ben|coliseu|colosseum|taj\s+mahal|pir[âa]mide|pyramid|monumento|monument|cathedral|catedral|igreja|church|castelo|castle|ponte|bridge|arranha-c[ée]u|skyscraper|edif[íi]cio|building|pr[ée]dio|arquitetura|architecture|landmark|skyline|cidade|city|paisagem urbana)\b/i.test(base);
+    const SUBJECT_WORD = isFruit ? "fruit" : (isLandmark ? "landmark/architectural structure" : "object");
     const FRUIT_STYLE = isFruit
       ? ", whole intact fruit, perfectly ripe, smooth natural skin, anatomically correct natural shape, intact stem, no bites, no cuts, no deformation, studio product photography, soft diffused lighting, clean white background, macro detail"
       : "";
-    const OBJECT_LOCK = "OBJECT ISOLATION LOCK (critical): this is a non-human subject. Render the requested fruit/object as a standalone, physically coherent item with clean silhouette, correct natural structure, realistic material texture and believable scale. Do not add people, faces, eyes, mouths, arms, hands, fingers, skin, nails, limbs, or any human body part. Do not show a person holding it. Never fuse the object with anatomy. The fruit/object must not become anthropomorphic, must not grow fingers, must not have skin pores, and must not merge into hands or faces.";
-    const STYLE = `photorealistic product photography, high detail, natural lighting, sharp focus, 8k${FRUIT_STYLE}, isolated standalone subject, clear silhouette, object fully separated from background, no human presence`;
-    const NEG = "negative: blurry, low quality, text, watermark, logo, deformed, mutated, disfigured, melted, warped, extra parts, duplicated, asymmetrical, cartoon, illustration, painting, CGI, human hands, fingers, arms, legs, body parts, skin, fingernails, face, eyes, mouth, person holding object, hand holding fruit, fruit merged with hand, fruit fused with fingers, hybrid of fruit and human, object morphing into hand, anthropomorphic fruit, fruit with face, object with limbs";
+    const LANDMARK_STYLE = isLandmark
+      ? ", architectural photography, accurate proportions, true-to-life structure, recognizable silhouette, real-world location, no fantasy elements, no surreal additions"
+      : "";
+    const OBJECT_LOCK = `SUBJECT LOCK (critical): the subject is a ${SUBJECT_WORD}. Render ONLY the requested ${SUBJECT_WORD} as described, with correct real-world structure, scale and materials. Do not add unrelated items, do not add fruits, food, people, faces, eyes, mouths, arms, hands, fingers, skin, nails, limbs or any human body part. Never fuse the subject with anatomy or with any other object category. Stay strictly faithful to the user's literal request.`;
+    const STYLE = `photorealistic photography, high detail, natural lighting, sharp focus, 8k${FRUIT_STYLE}${LANDMARK_STYLE}, isolated standalone subject, clear silhouette, no human presence`;
+    const extraNeg = isFruit ? "" : ", fruit, apple, banana, orange, food, produce, fruit basket, random fruit added to scene";
+    const NEG = `negative: blurry, low quality, text, watermark, logo, deformed, mutated, disfigured, melted, warped, extra parts, duplicated, asymmetrical, cartoon, illustration, painting, CGI, human hands, fingers, arms, legs, body parts, skin, fingernails, face, eyes, mouth, person holding object, anthropomorphic, object with face, object with limbs, unrelated objects, unrequested items${extraNeg}`;
     return `${base}, ${STYLE}. ${OBJECT_LOCK} ${NEG}`;
 
   }
+
   const HAND_DETAIL =
     "anatomically perfect human hand with exactly five fingers per hand (one opposable thumb + four fingers), correct finger count, no extra fingers, no missing fingers, natural finger proportions, individually separated fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement and angle, natural wrist connection, realistic palm structure";
   const STYLE =
