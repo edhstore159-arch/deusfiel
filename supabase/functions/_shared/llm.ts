@@ -290,6 +290,16 @@ function buildFluxPrompt(raw: string): string {
     .trim()
     .slice(0, 320);
 
+  // Forensic/legal context: bruises, injuries, domestic violence evidence imagery.
+  const isForensic = /\b(viol[êe]ncia|agress[ãa]o|agredid[ao]|hematoma|ematoma|machucad[ao]|les[ãa]o|les[õo]es|ferid[ao]|ferimento|cicatriz|soco|chute|tapa|espancad[ao]|abuso|dom[ée]stica|bruise|bruised|injur(y|ies)|wound|assault|battered|forensic|per[íi]cia|laudo)\b/i.test(base);
+  if (isForensic) {
+    const FORENSIC = "realistic forensic photography for legal evidence (laudo pericial), documentary style, clinical neutral lighting, plain background, visible bruises (hematomas) with realistic purple-blue and yellow-green discoloration, swelling, abrasions, scratches consistent with the described injury, anatomically accurate skin, respectful framing, non-sexualized, no graphic blood spray, suitable as judicial evidence";
+    const NEG = "negative: cartoon, illustration, painting, stylized, glamour, fashion editorial, gore exploitation, sexualized, deformed anatomy, extra limbs, text, watermark, logo, low quality, blurry";
+    return `${base}. ${FORENSIC}. ${NEG}`;
+  }
+
+
+
   // Non-human subjects (fruit, objects, scenery): keep prompt faithful, no portrait lock.
   if (!hasHumanSubject(base)) {
     const isFruit = /\b(fruit|apple|maçã|maca|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi)\b/i.test(base);
