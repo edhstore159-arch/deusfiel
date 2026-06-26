@@ -381,6 +381,34 @@ function removeTemporalLeaks(reply: string, userMessage: string): string {
     .trim();
 }
 
+// Remove qualquer trecho que pareça vazar instruções do system prompt para o cliente.
+function stripPromptLeaks(reply: string): string {
+  const promptMarkers = /(INSTRU[ÇC][ÃA]O|CONTEXTO\s+TEMPORAL|FONTE\s+OBRIGAT[ÓO]RIA|DADOS\s+INTERNOS|ANTI[- ]REPETI[ÇC][ÃA]O|BASE\s+DE\s+CONHECIMENTO|REGRAS\s+(GERAIS|DA\s+SECRET[ÁA]RIA|CR[ÍI]TICAS|OPERACIONAIS|DE\s+OURO)|FLUXO\s+(DA\s+CONVERSA|OBRIGAT[ÓO]RIO|DE\s+ATENDIMENTO)|VOC[ÊE]\s+[ÉE]\s+A?\s*SECRET|SYSTEM\s*:|PROMPT\s*:|CORRE[ÇC][ÃA]O\s+OBRIGAT[ÓO]RIA|HANDOFF[_\s-]*K[EÊ]NIA|<\/?AGENDAMENTO>|jusbrasil\.com\.br\b.*\(fonte\)|use[- ]os?\s+literalmente)/i;
+  return String(reply || "")
+    .split(/\n+/)
+    .filter((line) => !promptMarkers.test(line))
+    .join("\n")
+    .replace(/```[\s\S]*?```/g, "")
+    .trim();
+}
+
+// Evita que a IA reapresente a mesma pergunta já feita anteriormente.
+function removeRepeatedQuestion(reply: string, history: Array<{ role: string; content: string }>): string {
+  const priorQuestions = history
+    .filter((m) => m.role === "assistant")
+    .flatMap((m) => String(m.content || "").split(/(?<=\?)\s+|\n+/))
+    .map((q) => q.trim())
+    .filter((q) => q.endsWith("?") && q.length > 8);
+  if (!priorQuestions.length) return reply;
+  const parts = String(reply || "").split(/(?<=[.!?\n])\s+/);
+  const kept = parts.filter((part) => {
+    if (!part.trim().endsWith("?")) return true;
+    return !priorQuestions.some((q) => similarityScore(part, q) >= 0.7);
+  });
+  const result = kept.join(" ").trim();
+  return result || reply;
+}
+
 function parseAppointmentBlock(text: string) {
   const match = String(text || "").match(/<AGENDAMENTO>([\s\S]*?)<\/AGENDAMENTO>/);
   if (!match) return null;
