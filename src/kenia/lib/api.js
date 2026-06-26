@@ -499,8 +499,14 @@ const staticGet = async (url, config = {}) => {
     return response({ total: items.length, qualificados: items.filter((i) => i.qualificacao === "qualificado").length, nao_qualificados: items.filter((i) => i.qualificacao === "nao_qualificado").length, necessita_mais_info: items.filter((i) => i.qualificacao === "necessita_mais_info").length, avg_acertividade: items.length ? Math.round(items.reduce((s, i) => s + i.acertividade, 0) / items.length) : 0, items });
   }
   if (path.startsWith("/admin/case-analyses/")) {
-    const analysis = read("case_analyses", seedAnalyses).find((i) => i.id === path.split("/").pop()) || seedAnalyses[0];
-    return response({ analysis, messages: seedMessages["contact-1"] || [] });
+    const id = path.split("/").pop();
+    const items = read("case_analyses", seedAnalyses);
+    const analysis = items.find((i) => i.id === id) || items[0] || seedAnalyses[0];
+    const transcripts = read("case_transcripts", {});
+    const messages = (analysis?.session_id && Array.isArray(transcripts[analysis.session_id]))
+      ? transcripts[analysis.session_id]
+      : (seedMessages["contact-1"] || []);
+    return response({ analysis, messages });
   }
   if (path === "/legislation/today") {
     const todayKey = new Date().toISOString().slice(0, 10);
