@@ -13,24 +13,43 @@ import AppLayout from "@/kenia/components/AppLayout";
 import ScrollToTop from "@/kenia/components/ScrollToTop";
 
 // Lazy: tudo o resto carrega sob demanda
-const Dashboard = lazy(() => import("@/kenia/pages/Dashboard"));
-const CRM = lazy(() => import("@/kenia/pages/CRM"));
-const Processes = lazy(() => import("@/kenia/pages/Processes"));
-const Finance = lazy(() => import("@/kenia/pages/Finance"));
-const Creatives = lazy(() => import("@/kenia/pages/Creatives"));
-const ImageFusion = lazy(() => import("@/kenia/pages/ImageFusion"));
-const ViralVideoStudio = lazy(() => import("@/kenia/pages/ViralVideoStudio"));
-const Analytics = lazy(() => import("@/kenia/pages/Analytics"));
-const WhatsAppSettings = lazy(() => import("@/kenia/pages/WhatsAppSettings"));
-const WhatsAppLogs = lazy(() => import("@/kenia/pages/WhatsAppLogs"));
-const Agenda = lazy(() => import("@/kenia/pages/Agenda"));
-const Onboarding = lazy(() => import("@/kenia/pages/Onboarding"));
-const Consulta = lazy(() => import("@/kenia/pages/Consulta"));
-const Settings = lazy(() => import("@/kenia/pages/Settings"));
-const DebugTool = lazy(() => import("@/kenia/pages/DebugTool"));
-const ChatIA = lazy(() => import("@/kenia/pages/ChatIA"));
-const AdminCases = lazy(() => import("@/kenia/pages/AdminCases"));
-const SecretaryTasks = lazy(() => import("@/kenia/pages/SecretaryTasks"));
+// Wrapper que recarrega a página quando o chunk hash ficou obsoleto (deploy novo)
+const lazyWithReload = (factory) =>
+  lazy(() =>
+    factory().catch((err) => {
+      const msg = String(err?.message || err || "");
+      if (/Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError/i.test(msg)) {
+        const key = "__chunk_reload_at";
+        const last = Number(sessionStorage.getItem(key) || 0);
+        if (Date.now() - last > 10000) {
+          sessionStorage.setItem(key, String(Date.now()));
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      }
+      throw err;
+    })
+  );
+
+const Dashboard = lazyWithReload(() => import("@/kenia/pages/Dashboard"));
+const CRM = lazyWithReload(() => import("@/kenia/pages/CRM"));
+const Processes = lazyWithReload(() => import("@/kenia/pages/Processes"));
+const Finance = lazyWithReload(() => import("@/kenia/pages/Finance"));
+const Creatives = lazyWithReload(() => import("@/kenia/pages/Creatives"));
+const ImageFusion = lazyWithReload(() => import("@/kenia/pages/ImageFusion"));
+const ViralVideoStudio = lazyWithReload(() => import("@/kenia/pages/ViralVideoStudio"));
+const Analytics = lazyWithReload(() => import("@/kenia/pages/Analytics"));
+const WhatsAppSettings = lazyWithReload(() => import("@/kenia/pages/WhatsAppSettings"));
+const WhatsAppLogs = lazyWithReload(() => import("@/kenia/pages/WhatsAppLogs"));
+const Agenda = lazyWithReload(() => import("@/kenia/pages/Agenda"));
+const Onboarding = lazyWithReload(() => import("@/kenia/pages/Onboarding"));
+const Consulta = lazyWithReload(() => import("@/kenia/pages/Consulta"));
+const Settings = lazyWithReload(() => import("@/kenia/pages/Settings"));
+const DebugTool = lazyWithReload(() => import("@/kenia/pages/DebugTool"));
+const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
+const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
+const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
+
 
 const ResetPassword = lazy(() => import("@/kenia/pages/ResetPassword"));
 const Trust = lazy(() => import("@/kenia/pages/Trust"));
