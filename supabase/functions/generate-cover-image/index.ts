@@ -57,6 +57,17 @@ const HAND_LOCK =
   "If hands are partially hidden by clothing, objects, crop, or another person, keep the visible parts plausible and avoid inventing extra fingers. " +
   "For group scenes, apply this hand check independently to every person; no shared hands, no merged hands, no hand growing from another body part, no displaced hands.";
 
+// Estratégia preventiva: evitar mostrar mãos quando não forem essenciais ao pedido.
+// IA de imagem ainda erra anatomia das mãos com frequência — esconder reduz drasticamente artefatos.
+const HAND_AVOIDANCE =
+  "HAND AVOIDANCE STRATEGY (apply whenever the user prompt does NOT explicitly require visible hands or a hand gesture): " +
+  "compose the framing to keep hands out of view or naturally concealed. Prefer one of these solutions: " +
+  "(1) crop the frame above the wrists (portrait, medium close-up, headshot, chest-up shot); " +
+  "(2) place hands inside pockets, behind the back, under a desk, inside long sleeves, or holding a coherent object that hides the fingers (folder, mug, phone seen from behind, book against the chest); " +
+  "(3) angle the body so hands fall outside the frame or are occluded by furniture, clothing or other people. " +
+  "Only render fully visible hands when the user explicitly asked for a gesture, a handshake, holding something specific, or when the hands are the subject. " +
+  "If hands MUST appear, show them relaxed, at rest, partially occluded, and never in extreme close-up. Never invent gesturing hands that were not requested.";
+
 
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
