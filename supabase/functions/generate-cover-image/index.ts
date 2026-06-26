@@ -108,7 +108,14 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
   const userTheme = (userPrompt || "").trim();
   const hybrid = hasHybridRequest(userTheme);
   const humanSubject = hasHumanSubject(userTheme);
-  const objectSubject = !hybrid && (!humanSubject || FRUIT_OR_OBJECT.test(userTheme));
+  const isEvent = EVENT_RE.test(userTheme);
+  const objectSubject = !hybrid && !isEvent && (!humanSubject || (FRUIT_OR_OBJECT.test(userTheme) && !EVENT_RE.test(userTheme)));
+
+  if (isEvent && !hybrid) {
+    return eventSceneFor(userTheme);
+  }
+
+
 
   if (hybrid) {
     return [
