@@ -220,7 +220,7 @@ export default function Dashboard() {
   const loadContacts = async () => {
     try {
       const [{ data }, persistedContacts] = await Promise.all([
-        api.get("/whatsapp/contacts"),
+        api.get("/whatsapp/contacts").catch(() => ({ data: [] })),
         loadPersistedWhatsAppContacts(),
       ]);
       // Mescla contatos vindos do backend com os contatos reais já salvos no Supabase.
@@ -260,7 +260,7 @@ export default function Dashboard() {
     if (!cid) return;
     try {
       const [{ data }, persisted] = await Promise.all([
-        api.get(`/whatsapp/messages/${cid}`),
+        api.get(`/whatsapp/messages/${cid}`).catch(() => ({ data: [] })),
         loadPersistedWhatsAppMessages(contact),
       ]);
       const cached = readCachedMessages(cid);
