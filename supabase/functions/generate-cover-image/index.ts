@@ -179,9 +179,19 @@ Deno.serve(async (req) => {
     }
 
     const userElaborated = await elaboratePrompt(prompt, style);
-    const humanSubject = hasHumanSubject(prompt);
+    const hybridSubject = hasHybridRequest(prompt);
+    const humanSubject = hasHumanSubject(prompt) && !hybridSubject;
     const handGuard = handCompositionGuard(prompt);
-    const fullPrompt = humanSubject ? [
+    const fullPrompt = hybridSubject ? [
+      userElaborated,
+      "",
+      "SURREAL HYBRID MODE: render the requested object/fruit with the requested human facial features (eyes, nose, mouth, expression) seamlessly morphed INTO its natural surface. Keep the object's correct overall shape; do not add arms, legs, hands or fingers unless explicitly requested.",
+      "",
+      FACE_LOCK,
+      "",
+      "Negative prompt: extra limbs, extra arms, extra legs, visible hands, fingers, body, torso, deformed face, asymmetric eyes, duplicated features, melted, warped, low quality, text, watermark, logo.",
+      "--style raw --photorealism high",
+    ].join("\n") : humanSubject ? [
       userElaborated,
       "",
       `REALISM REQUIREMENTS: ${REALISM}`,
