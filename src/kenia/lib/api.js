@@ -975,7 +975,7 @@ const staticPatch = async (url, body = {}) => {
   if (path.startsWith("/appointments/")) return updateCollection("appointments", seedAppointments);
   if (path.startsWith("/legal-deadlines/")) return updateCollection("legal_deadlines", seedLegalDeadlines);
   if (path.startsWith("/admin/case-analyses/")) {
-    const res = updateCollection("case_analyses", seedAnalyses);
+    const res = await updateCollection("case_analyses", seedAnalyses);
     const updated = res?.data;
     if (updated?.id) await persistCloudCaseAnalysis(normalizeCaseAnalysisRecord(updated), []);
     return res;
