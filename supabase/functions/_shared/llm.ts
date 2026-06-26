@@ -23,7 +23,8 @@ const OLLAMA_MODEL = Deno.env.get("OLLAMA_MODEL") || "qwen3:8b";
 const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
 
 const FACE_SAFE_PROMPT =
-  "Hyper-realistic human face lock: shot on full-frame DSLR with 85mm f/1.4 lens, photojournalistic portrait, ultra-detailed photoreal skin with visible pores, fine peach fuzz, subtle subsurface scattering, natural skin imperfections (faint freckles, small moles, fine lines), realistic asymmetric eyes with detailed iris texture, catchlights in the pupils, individual eyelashes, natural eyebrow hairs, anatomically correct nose and mouth, natural lip texture with subtle moisture, real teeth with slight variation (not perfectly white, not glowing), believable bone structure, natural facial asymmetry, soft cinematic lighting with realistic shadows on the face, sharp focus on eyes, shallow depth of field. Negative face: plastic skin, waxy skin, airbrushed, doll face, CGI face, 3D render, uncanny valley, fake skin, smooth blurred skin, symmetrical perfect face, glowing teeth, cartoon, anime, illustration, painting, AI-generated look, deformed face, melted face, distorted pupils, extra eyes, fused eyes, asymmetric eyes (unnatural), warped features.";
+  "Hyper-realistic human face lock (priority #1): shot on full-frame DSLR (Canon EOS R5 / Sony A7R IV) with 85mm f/1.4 prime lens, ISO 200, photojournalistic portrait, RAW photo, unedited, ultra-detailed photoreal skin with visible pores, fine peach fuzz, subtle subsurface scattering, natural skin imperfections (faint freckles, small moles, fine lines, slight redness), realistic asymmetric eyes (left and right eye not identical) with detailed iris texture, limbal ring, catchlights in the pupils, individual eyelashes, natural eyebrow hairs with stray hairs, anatomically correct symmetric nose with realistic nostrils, natural lips with subtle moisture and visible lip lines, real teeth with slight variation in color and alignment (never perfectly white, never glowing), believable bone structure, natural facial asymmetry, soft Rembrandt or natural window lighting with realistic shadows on the face, sharp tack-focus on the closer eye, shallow depth of field, skin shows real human micro-detail. Final anatomy check: two eyes correctly placed, two ears, one nose, one mouth, normal number of teeth, normal jaw, normal forehead, no melted features, no double pupils, no extra facial parts. Negative face: plastic skin, waxy skin, airbrushed, doll face, porcelain skin, CGI face, 3D render, Unreal Engine, uncanny valley, fake skin, smooth blurred skin, perfectly symmetrical face, glowing teeth, too many teeth, missing teeth, cartoon, anime, illustration, painting, AI-generated look, deformed face, melted face, distorted pupils, cross-eyed, lazy eye (unintentional), extra eyes, fused eyes, third eye, asymmetric eyes (unnatural), warped features, double nose, double mouth, missing ear, deformed ear, mutated face, disfigured, low-res face, blurry face, oversharpened face, beauty filter, instagram filter.";
+
 
 const HAND_SAFE_PROMPT =
   "Hand safety lock: unless hands are the main subject, compose as a chest-up or waist-up photograph with hands completely outside the frame or naturally hidden behind clothing, a desk, pockets, folders, books, or other objects. No visible fingers when hands are not requested. If any hand is visible, it must pass a strict anatomy check: exactly five fingers per hand (one thumb + four fingers), no extra digits, no missing digits, no fused digits, correct thumb opposition and placement, natural palm structure, correct knuckle count, realistic fingernails, natural finger spacing, proportional finger lengths, and a normal wrist connection.";
@@ -323,15 +324,18 @@ function buildFluxPrompt(raw: string): string {
   const HAND_DETAIL =
     "anatomically perfect human hand with exactly five fingers per hand (one opposable thumb + four fingers), correct finger count, no extra fingers, no missing fingers, natural finger proportions, individually separated fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement and angle, natural wrist connection, realistic palm structure";
   const STYLE =
-    "photorealistic, professional portrait photography, real skin texture, natural skin pores, " +
-    "correct facial anatomy, symmetrical eyes, realistic pupils, natural mouth and nose, " +
+    "RAW photo, photorealistic, professional editorial portrait photography, shot on Canon EOS R5 with 85mm f/1.4 lens, ISO 200, natural window light, " +
+    "real human skin with visible pores, peach fuzz, subtle imperfections, subsurface scattering, " +
+    "correct facial anatomy, two natural asymmetric eyes, realistic iris and pupils with catchlights, individual eyelashes, natural eyebrows, " +
+    "symmetric realistic nose, natural lips with fine lines, natural teeth with slight variation, " +
     "chest-up composition, hands preferably out of frame; if hands appear they must pass strict anatomy: " +
     HAND_DETAIL + ", " +
-    "cinematic lighting, shallow depth of field, sharp focus, 8k";
+    "cinematic Rembrandt lighting, shallow depth of field, sharp focus on the eyes, 8k, unedited, no beauty filter";
   const NEG =
-    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, cartoon, oversaturated, text, watermark, logo`;
+    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, mutated face, disfigured, asymmetric eyes (unnatural), cross-eyed, lazy eye, extra eyes, fused eyes, third eye, double pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
   return `${base}, ${STYLE}. ${handInstructionFor(base)} ${HAND_SAFE_PROMPT} ${HAND_DETAIL}. ${NEG}`;
 }
+
 
 
 // Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
@@ -340,7 +344,8 @@ async function imagePollinations(opts: ImageOptions) {
     const [w, h] = (opts.size || "1024x1024").split("x").map((n) => parseInt(n, 10) || 1024);
     const seed = Math.floor(Math.random() * 1_000_000);
     const flux = buildFluxPrompt(opts.prompt);
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=true&model=flux`;
+    const model = hasHumanSubject(opts.prompt) ? "flux-realism" : "flux";
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=true&model=${model}`;
     const resp = await fetch(url);
     if (!resp.ok) return { ok: false as const, error: `Pollinations ${resp.status}` };
     const buf = new Uint8Array(await resp.arrayBuffer());
