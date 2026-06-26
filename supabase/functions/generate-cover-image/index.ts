@@ -1,5 +1,5 @@
 import { generateWithNanoBanana, stripDataUrl } from '../_shared/nano-banana.ts';
-import { generateImage } from '../_shared/llm.ts';
+import { generateImage, hasHumanSubject } from '../_shared/llm.ts';
 import { chatCompletion } from '../_shared/llm.ts';
 
 const corsHeaders = {
@@ -72,6 +72,11 @@ const HAND_AVOIDANCE =
 
 const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo)\b/i;
 
+const FRUIT_OR_OBJECT = /\b(fruit|apple|maçã|maca|macan|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi|fruta|objeto|produto|product|object|food|comida|bolo|p[ãa]o|baguete|book|livro|carro|casa|flor)\b/i;
+
+const OBJECT_LOCK =
+  "NON-HUMAN OBJECT LOCK (CRITICAL): render only the requested fruit, food, product, object, animal, landscape or scene. Do not add people, faces, eyes, mouths, arms, hands, fingers, skin, fingernails, limbs, body parts, portraits, or anthropomorphic traits. The requested object must be standalone with a clean silhouette, correct natural shape, realistic material texture, and must never merge with human anatomy. No person holding it unless the user explicitly asked for a person/hand holding it.";
+
 function handCompositionGuard(userPrompt = "") {
   if (HANDS_ARE_REQUESTED.test(userPrompt)) {
     return "VISIBLE HANDS WERE REQUESTED: show hands only as necessary, never close-up unless requested, and run a strict final anatomy check: exactly five fingers per hand, natural thumb placement, natural knuckles, realistic nails, correct wrist connection, no extra/missing/fused fingers.";
@@ -83,6 +88,20 @@ function handCompositionGuard(userPrompt = "") {
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   const userTheme = (userPrompt || "").trim();
+  const humanSubject = hasHumanSubject(userTheme);
+  const objectSubject = !humanSubject || FRUIT_OR_OBJECT.test(userTheme);
+
+  if (objectSubject && !humanSubject) {
+    return [
+      `Faithful photorealistic rendering of: ${userTheme}.`,
+      OBJECT_LOCK,
+      "Use product/documentary photography, natural light, sharp focus, coherent scale and perspective, realistic textures, clean separation between the subject and background.",
+      "If the subject is fruit or food: whole intact item, natural organic shape, realistic peel/skin texture, no deformation, no bite/cut unless requested.",
+      "Negative: human, person, face, eyes, mouth, hands, fingers, arms, legs, skin, fingernails, portrait, anthropomorphic, hybrid, object fused with hand, fruit fused with fingers, melted, warped, duplicated parts, cartoon, CGI, illustration, text, watermark, logo.",
+      "--style raw --photorealism high --no human --no hands --no fingers --no face --no body_parts --no object_anatomy_fusion",
+    ].join(" ");
+  }
+
   const extraContext = style === "law"
     ? "If — and only if — the user theme does not already specify a subject, you may set the scene in a modern Brazilian law-firm context. Never override or contradict the user's theme."
     : "";
@@ -147,9 +166,9 @@ Deno.serve(async (req) => {
     }
 
     const userElaborated = await elaboratePrompt(prompt, style);
+    const humanSubject = hasHumanSubject(prompt);
     const handGuard = handCompositionGuard(prompt);
-    // Reinforce realism + face lock on every request so people look photoreal.
-    const fullPrompt = [
+    const fullPrompt = humanSubject ? [
       userElaborated,
       "",
       `REALISM REQUIREMENTS: ${REALISM}`,
@@ -166,6 +185,14 @@ Deno.serve(async (req) => {
       "",
       `Negative prompt: ${NEG}, visible hands when not requested, visible fingers when not requested, bad hands, abnormal hands, deformed hands, distorted hands, malformed hands, mutated hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, broken fingers, bent-backwards fingers, claw hands, rubber fingers, long unnatural fingers, tiny hands, oversized hands, wrong thumb placement, detached hands, floating hands, hands growing from wrong place, baguette fingers, sausage fingers, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, dismembered, mangled body`,
       "--style raw --no artificial --no smooth skin --no CGI --photorealism high --no visible_hands --no visible_fingers --no bad_hands --no deformed_hands --no extra_fingers --no missing_fingers --no fused_fingers --no displaced_limbs --no dislocated_limbs --no extra_limbs --no missing_limbs",
+    ].join("\n") : [
+      userElaborated,
+      "",
+      OBJECT_LOCK,
+      "",
+      "Photorealistic non-human subject, faithful to the user's request, realistic material, correct natural form, clean silhouette, no anatomy, no portrait, no skin, no hands, no fingers, no face, no person, no human body parts.",
+      "Negative prompt: person, people, human, face, portrait, eyes, mouth, skin, arm, hand, finger, nails, limb, body, body parts, holding, human-object hybrid, fruit-human hybrid, object fused with hand, fruit fused with fingers, anthropomorphic, mutated, melted, warped, deformed, duplicated parts, CGI, cartoon, illustration, text, watermark, logo.",
+      "--style raw --photorealism high --no human --no face --no hands --no fingers --no skin --no body_parts --no anthropomorphic --no object_anatomy_fusion",
     ].join("\n");
 
 

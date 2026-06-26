@@ -34,8 +34,9 @@ const HAND_NEGATIVE_PROMPT =
 
 const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo)\b/i;
 
-function hasHumanSubject(prompt = "") {
-  return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|criança)\b/i.test(prompt);
+export function hasHumanSubject(prompt = "") {
+  if (/\b(non-human subject lock|non-human object lock|object isolation lock|standalone non-human subject)\b/i.test(prompt)) return false;
+  return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao]|viol[êe]ncia|agress[ãa]o|hematoma|ematoma|les[ãa]o|les[õo]es|ferid[ao]|machucad[ao]|corpo|bra[cç]o|perna|pele humana|bruise|injury|wound|assault)\b/i.test(prompt);
 }
 
 // Corrige erros comuns de digitação em PT-BR e traduz frutas/objetos para inglês
@@ -67,7 +68,10 @@ function normalizePromptTypos(raw: string): string {
 
 
 function withFaceSafety(prompt: string) {
-  return hasHumanSubject(prompt) ? `${prompt}. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.` : prompt;
+  if (!hasHumanSubject(prompt)) {
+    return `${prompt}. Standalone non-human subject lock: if the requested subject is a fruit, food, product, object, animal, landscape, symbol, or abstract scene, render ONLY that subject and its environment. Do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features. Keep objects/fruits clearly separated from anything human; no fruit-human hybrid, no object fused with fingers, no hands holding the object unless the user explicitly requested hands.`;
+  }
+  return `${prompt}. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.`;
 }
 
 function handInstructionFor(prompt: string) {
@@ -230,7 +234,7 @@ export async function chatCompletion(opts: ChatOptions) {
 
 async function imageLovable(opts: ImageOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, error: "LOVABLE_API_KEY ausente" };
-  const safePrompt = withFaceSafety(opts.prompt);
+  const safePrompt = opts.prompt;
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
@@ -253,7 +257,7 @@ async function imageGemini(opts: ImageOptions) {
   if (!GEMINI_KEY) return { ok: false as const, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
-  const safePrompt = withFaceSafety(opts.prompt);
+  const safePrompt = opts.prompt;
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -273,7 +277,7 @@ async function imageGemini(opts: ImageOptions) {
 
 async function imageEmergent(opts: ImageOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, error: "EMERGENT_API_KEY ausente" };
-  const safePrompt = withFaceSafety(opts.prompt);
+  const safePrompt = opts.prompt;
   const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
@@ -316,23 +320,24 @@ function buildFluxPrompt(raw: string): string {
     const FRUIT_STYLE = isFruit
       ? ", whole intact fruit, perfectly ripe, smooth natural skin, anatomically correct natural shape, intact stem, no bites, no cuts, no deformation, studio product photography, soft diffused lighting, clean white background, macro detail"
       : "";
-    const STYLE = `photorealistic, high detail, natural lighting, sharp focus, 8k${FRUIT_STYLE}, isolated subject, clearly separated from any background element, no human presence`;
-    const NEG = "negative: blurry, low quality, text, watermark, logo, deformed, mutated, disfigured, melted, warped, extra parts, duplicated, asymmetrical, cartoon, illustration, painting, CGI, human hands, fingers, arms, body parts, skin, person holding object, hand holding fruit, fruit merged with hand, fruit fused with fingers, hybrid of fruit and human, object morphing into hand, anthropomorphic fruit";
-    return `${base}, ${STYLE}. Do NOT include any human body parts, hands, or fingers; the subject must be standalone and clearly defined. ${NEG}`;
+    const OBJECT_LOCK = "OBJECT ISOLATION LOCK (critical): this is a non-human subject. Render the requested fruit/object as a standalone, physically coherent item with clean silhouette, correct natural structure, realistic material texture and believable scale. Do not add people, faces, eyes, mouths, arms, hands, fingers, skin, nails, limbs, or any human body part. Do not show a person holding it. Never fuse the object with anatomy. The fruit/object must not become anthropomorphic, must not grow fingers, must not have skin pores, and must not merge into hands or faces.";
+    const STYLE = `photorealistic product photography, high detail, natural lighting, sharp focus, 8k${FRUIT_STYLE}, isolated standalone subject, clear silhouette, object fully separated from background, no human presence`;
+    const NEG = "negative: blurry, low quality, text, watermark, logo, deformed, mutated, disfigured, melted, warped, extra parts, duplicated, asymmetrical, cartoon, illustration, painting, CGI, human hands, fingers, arms, legs, body parts, skin, fingernails, face, eyes, mouth, person holding object, hand holding fruit, fruit merged with hand, fruit fused with fingers, hybrid of fruit and human, object morphing into hand, anthropomorphic fruit, fruit with face, object with limbs";
+    return `${base}, ${STYLE}. ${OBJECT_LOCK} ${NEG}`;
 
   }
   const HAND_DETAIL =
     "anatomically perfect human hand with exactly five fingers per hand (one opposable thumb + four fingers), correct finger count, no extra fingers, no missing fingers, natural finger proportions, individually separated fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement and angle, natural wrist connection, realistic palm structure";
   const STYLE =
-    "RAW photo, photorealistic, professional editorial portrait photography, shot on Canon EOS R5 with 85mm f/1.4 lens, ISO 200, natural window light, " +
+    "single real human subject, RAW photo, photorealistic, professional editorial portrait photography, shot on Canon EOS R5 with 85mm f/1.4 lens, ISO 200, natural window light, " +
     "real human skin with visible pores, peach fuzz, subtle imperfections, subsurface scattering, " +
     "correct facial anatomy, two natural asymmetric eyes, realistic iris and pupils with catchlights, individual eyelashes, natural eyebrows, " +
     "symmetric realistic nose, natural lips with fine lines, natural teeth with slight variation, " +
     "chest-up composition, hands preferably out of frame; if hands appear they must pass strict anatomy: " +
     HAND_DETAIL + ", " +
-    "cinematic Rembrandt lighting, shallow depth of field, sharp focus on the eyes, 8k, unedited, no beauty filter";
+    "cinematic Rembrandt lighting, shallow depth of field, sharp focus on the eyes, 8k, unedited, no beauty filter, no AI-generated look";
   const NEG =
-    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, mutated face, disfigured, asymmetric eyes (unnatural), cross-eyed, lazy eye, extra eyes, fused eyes, third eye, double pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
+    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, mutated face, disfigured, facial asymmetry caused by generation error, mismatched eyes, different sized eyes, asymmetric eyes (unnatural), cross-eyed, lazy eye, dead eyes, glassy eyes, empty stare, extra eyes, fused eyes, third eye, double pupils, wrong pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, body parts fused with fruit, fruit merged into face, object merged with body, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
   return `${base}, ${STYLE}. ${handInstructionFor(base)} ${HAND_SAFE_PROMPT} ${HAND_DETAIL}. ${NEG}`;
 }
 
