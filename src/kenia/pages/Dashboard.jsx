@@ -111,6 +111,44 @@ export default function Dashboard() {
       return [];
     }
   };
+  const loadPersistedWhatsAppContacts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("whatsapp_messages")
+        .select("contact_id,contact_name,contact_phone,text,from_me,created_at")
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (error) {
+        console.warn("Não foi possível carregar contatos salvos do atendimento:", error.message);
+        return [];
+      }
+
+      const byContact = new Map();
+      for (const row of data || []) {
+        const id = String(row.contact_id || row.contact_phone || "").trim();
+        if (!id) continue;
+        const current = byContact.get(id);
+        if (!current) {
+          const phone = row.contact_phone || row.contact_id || "";
+          byContact.set(id, {
+            id,
+            name: row.contact_name || formatWhatsAppPhone(phone) || "Cliente",
+            phone,
+            last_message: row.text || "",
+            last_message_at: row.created_at || new Date().toISOString(),
+            unread: row.from_me ? 0 : 1,
+            avatar_color: "bg-gold-600",
+            saved_in_platform: true,
+          });
+        } else if (!row.from_me) {
+          current.unread = Number(current.unread || 0) + 1;
+        }
+      }
+      return Array.from(byContact.values());
+    } catch {
+      return [];
+    }
+  };
   const savePersistedWhatsAppMessage = async (contact, msg) => {
     if (!contact?.id || !msg?.text) return;
     try {
@@ -181,15 +219,27 @@ export default function Dashboard() {
 
   const loadContacts = async () => {
     try {
-      const { data } = await api.get("/whatsapp/contacts");
-      // Dedupe by id (and fallback to phone) — backend pode retornar duplicatas
+      const [{ data }, persistedContacts] = await Promise.all([
+        api.get("/whatsapp/contacts").catch(() => ({ data: [] })),
+        loadPersistedWhatsAppContacts(),
+      ]);
+      // Mescla contatos vindos do backend com os contatos reais já salvos no Supabase.
+      // Assim conversas novas, como a do Erick, aparecem no dashboard mesmo quando
+      // o backend do WhatsApp ainda não devolveu a lista atualizada de contatos.
       const seen = new Set();
       const unique = [];
-      for (const c of data || []) {
+      for (const c of [...(persistedContacts || []), ...(data || [])]) {
         const key = c.id || (c.phone || "").replace(/\D/g, "");
         if (!key || seen.has(key)) continue;
         seen.add(key);
-        unique.push(c);
+        unique.push({
+          ...c,
+          name: c.name || "Cliente",
+          phone: c.phone || c.id,
+          last_message: c.last_message || "",
+          last_message_at: c.last_message_at || new Date().toISOString(),
+          unread: Number(c.unread || 0),
+        });
       }
       // Sort by last_message_at DESC so newest conversations bubble up
       const sorted = unique.sort((a, b) => {
@@ -210,7 +260,7 @@ export default function Dashboard() {
     if (!cid) return;
     try {
       const [{ data }, persisted] = await Promise.all([
-        api.get(`/whatsapp/messages/${cid}`),
+        api.get(`/whatsapp/messages/${cid}`).catch(() => ({ data: [] })),
         loadPersistedWhatsAppMessages(contact),
       ]);
       const cached = readCachedMessages(cid);
