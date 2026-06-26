@@ -340,6 +340,76 @@ function buildLocalCaseAnalysis(history: Array<{ role: string; content: string }
   });
 }
 
+function safeCaseAnalysisId(sessionId: string): string {
+  const safe = String(sessionId || crypto.randomUUID())
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90);
+  return `case-${safe || crypto.randomUUID()}`;
+}
+
+function extractVisitorNameFromText(text: string): string | null {
+  const match = String(text || "").match(/(?:meu nome [eé]|me chamo|sou [oa]?|aqui [eé])\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
+  return match?.[1]?.trim() || null;
+}
+
+async function persistCaseAnalysis(args: {
+  supabase: ReturnType<typeof createClient>;
+  userId: string | null;
+  sessionId: string;
+  userMessage: string;
+  reply: string;
+  history: Array<{ role: string; content: string }>;
+  body: Record<string, unknown>;
+  analysis: any;
+}) {
+  const { supabase, userId, sessionId, userMessage, reply, history, body, analysis } = args;
+  try {
+    const id = safeCaseAnalysisId(sessionId);
+    const sessionLooksLikePhone = !!sessionId && /^\+?\d{6,}$/.test(sessionId);
+    const visitorPhone = String(body.visitor_phone || body.phone || body.contact_phone || (sessionLooksLikePhone ? sessionId : "") || "").trim();
+    const visitorName = String(
+      body.visitor_name ||
+      body.client_name ||
+      body.contact_name ||
+      extractVisitorNameFromText(userMessage) ||
+      (sessionLooksLikePhone ? "Cliente WhatsApp" : "Cliente")
+    ).trim();
+
+    const normalized = normalizeCaseAnalysis(analysis, buildLocalCaseAnalysis(history, userMessage));
+    const { error: analysisErr } = await supabase.from("case_analyses").upsert({
+      id,
+      user_id: userId,
+      session_id: sessionId,
+      visitor_name: visitorName,
+      visitor_phone: visitorPhone,
+      area: normalized.area,
+      qualificacao: normalized.qualificacao,
+      acertividade: normalized.acertividade,
+      chance_exito: normalized.chance_exito,
+      resumo: normalized.resumo,
+      motivo: normalized.motivo,
+      proxima_pergunta: normalized.proxima_pergunta,
+      fundamentos: normalized.fundamentos || [],
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "id" });
+    if (analysisErr) {
+      console.error("[chat-ai] falha ao salvar análise do caso:", analysisErr);
+      return;
+    }
+
+    const createdAt = new Date().toISOString();
+    const { error: transcriptErr } = await supabase.from("case_transcripts").insert([
+      { user_id: userId, analysis_id: id, session_id: sessionId, role: "user", content: userMessage, created_at: createdAt },
+      { user_id: userId, analysis_id: id, session_id: sessionId, role: "assistant", content: reply, created_at: createdAt },
+    ]);
+    if (transcriptErr) console.error("[chat-ai] falha ao salvar transcrição do caso:", transcriptErr);
+    else console.log("[chat-ai] análise do caso salva id=", id, "acertividade=", normalized.acertividade);
+  } catch (err) {
+    console.error("[chat-ai] erro ao persistir análise do caso:", err);
+  }
+}
+
 function userAskedTemporalInfo(text: string): boolean {
   const t = String(text || "").toLowerCase();
   return /(que\s+horas|qual\s+(?:é\s+|e\s+)?(?:a\s+)?hora|hor[áa]rio\s+atual|agora\s+s[aã]o|data\s+de\s+hoje|qual\s+(?:é\s+|e\s+)?(?:a\s+)?data|que\s+data|que\s+dia|hoje\s+[ée]\s+que\s+dia|dia\s+da\s+semana|dia\s+de\s+hoje|que\s+m[eê]s|qual\s+(?:o\s+)?(?:dia|m[eê]s|ano)|me\s+(?:diga|diz|fala|fale|informa|info)[^.?!]*(?:dia|hora|data|m[eê]s|ano)|\bhoje\b|\bagora\b|\bhoras?\b|\bdata\b|que\s+ano|estamos\s+em\s+que)/i.test(t);
