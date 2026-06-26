@@ -1,5 +1,5 @@
 import { generateWithNanoBanana, stripDataUrl } from '../_shared/nano-banana.ts';
-import { generateImage, hasHumanSubject } from '../_shared/llm.ts';
+import { generateImage, hasHumanSubject, hasHybridRequest } from '../_shared/llm.ts';
 import { chatCompletion } from '../_shared/llm.ts';
 
 const corsHeaders = {
