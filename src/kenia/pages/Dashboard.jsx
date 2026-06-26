@@ -81,6 +81,12 @@ export default function Dashboard() {
     for (let i = 0; i < signature.length; i += 1) hash = ((hash << 5) - hash + signature.charCodeAt(i)) | 0;
     return `sig-${Math.abs(hash).toString(36)}`;
   };
+  const getAuthenticatedUserId = async () => {
+    if (user?.id) return user.id;
+    const { data } = await supabase.auth.getUser().catch(() => ({ data: null }));
+    return data?.user?.id || null;
+  };
+
   const loadPersistedWhatsAppMessages = async (contact) => {
     if (!contact?.id) return [];
     try {
@@ -90,7 +96,10 @@ export default function Dashboard() {
         .eq("contact_id", String(contact.id))
         .order("created_at", { ascending: true })
         .limit(300);
-      if (error) return [];
+      if (error) {
+        console.warn("Não foi possível carregar mensagens salvas do atendimento:", error.message);
+        return [];
+      }
       return (data || []).map((row) => ({
         id: row.provider_message_id || `saved-${row.id}`,
         text: row.text,
@@ -105,8 +114,13 @@ export default function Dashboard() {
   const savePersistedWhatsAppMessage = async (contact, msg) => {
     if (!contact?.id || !msg?.text) return;
     try {
+      const userId = await getAuthenticatedUserId();
+      if (!userId) {
+        console.warn("Mensagem do atendimento não salva: usuário autenticado não encontrado.");
+        return;
+      }
       const { error } = await supabase.from("whatsapp_messages").upsert({
-        user_id: user?.id || null,
+        user_id: userId,
         contact_id: String(contact.id),
         contact_name: contact.name || null,
         contact_phone: contact.phone || null,
