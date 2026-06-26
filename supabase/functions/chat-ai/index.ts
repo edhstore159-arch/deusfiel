@@ -741,7 +741,7 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       extractAppointmentFromText(userMessage, history) ||
       extractAppointmentFromText(rawReply, [...history, { role: "user", content: userMessage }]);
     console.log("[chat-ai] appointment detectado?", !!appointment, appointment ? { date: appointment.appointment_date, time: appointment.appointment_time, name: appointment.client_name } : null);
-    let reply = cleanRepeatedText(removeUserEcho(removeRoleLabels(removeTemporalLeaks(stripAppointmentBlock(rawReply), userMessage)), userMessage));
+    let reply = cleanRepeatedText(removeRepeatedQuestion(removeUserEcho(removeRoleLabels(removeTemporalLeaks(stripPromptLeaks(stripAppointmentBlock(rawReply)), userMessage)), userMessage), history));
     if (!reply || reply.length < 2) {
       reply = userAskedTemporalInfo(userMessage)
         ? `Hoje é ${fmtDate}, e agora são ${fmtTime} (horário de Brasília).`
