@@ -26,10 +26,12 @@ const FACE_SAFE_PROMPT =
   "Hyper-realistic human face lock: shot on full-frame DSLR with 85mm f/1.4 lens, photojournalistic portrait, ultra-detailed photoreal skin with visible pores, fine peach fuzz, subtle subsurface scattering, natural skin imperfections (faint freckles, small moles, fine lines), realistic asymmetric eyes with detailed iris texture, catchlights in the pupils, individual eyelashes, natural eyebrow hairs, anatomically correct nose and mouth, natural lip texture with subtle moisture, real teeth with slight variation (not perfectly white, not glowing), believable bone structure, natural facial asymmetry, soft cinematic lighting with realistic shadows on the face, sharp focus on eyes, shallow depth of field. Negative face: plastic skin, waxy skin, airbrushed, doll face, CGI face, 3D render, uncanny valley, fake skin, smooth blurred skin, symmetrical perfect face, glowing teeth, cartoon, anime, illustration, painting, AI-generated look, deformed face, melted face, distorted pupils, extra eyes, fused eyes, asymmetric eyes (unnatural), warped features.";
 
 const HAND_SAFE_PROMPT =
-  "Hand safety lock: unless hands are the main subject, compose as a chest-up or waist-up photograph with hands completely outside the frame or naturally hidden behind clothing, a desk, pockets, folders, books, or other objects. No visible fingers. If any hand is visible, it must be anatomically correct with exactly five natural fingers, correct thumb placement, natural knuckles, realistic nails, and normal wrist connection.";
+  "Hand safety lock: unless hands are the main subject, compose as a chest-up or waist-up photograph with hands completely outside the frame or naturally hidden behind clothing, a desk, pockets, folders, books, or other objects. No visible fingers when hands are not requested. If any hand is visible, it must pass a strict anatomy check: exactly five fingers per hand (one thumb + four fingers), no extra digits, no missing digits, no fused digits, correct thumb opposition and placement, natural palm structure, correct knuckle count, realistic fingernails, natural finger spacing, proportional finger lengths, and a normal wrist connection.";
 
 const HAND_NEGATIVE_PROMPT =
-  "bad hands, malformed hands, deformed hands, mutated hands, distorted hands, broken hands, ugly hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, wrong thumb placement, claw hands, rubber fingers, sausage fingers, baguette fingers, long unnatural fingers, tiny hands, oversized hands, detached hands, floating hands, hands growing from wrong place, twisted wrists, broken wrists";
+  "bad hands, malformed hands, deformed hands, mutated hands, distorted hands, broken hands, ugly hands, extra fingers, six fingers, seven fingers, four fingers, three fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, duplicate thumbs, two thumbs, missing thumb, extra nails, missing nails, wrong thumb placement, wrong knuckle count, impossible joints, bent-backwards fingers, claw hands, rubber fingers, sausage fingers, baguette fingers, long unnatural fingers, tiny hands, oversized hands, detached hands, floating hands, hands growing from wrong place, twisted wrists, broken wrists";
+
+const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo)\b/i;
 
 function hasHumanSubject(prompt = "") {
   return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|criança)\b/i.test(prompt);
@@ -65,6 +67,13 @@ function normalizePromptTypos(raw: string): string {
 
 function withFaceSafety(prompt: string) {
   return hasHumanSubject(prompt) ? `${prompt}. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.` : prompt;
+}
+
+function handInstructionFor(prompt: string) {
+  if (HANDS_ARE_REQUESTED.test(prompt)) {
+    return "Visible hands were requested: render only necessary hands, fully visible where possible, photorealistic and anatomically normal. Each visible hand must have exactly five fingers: one opposable thumb and four fingers, correct thumb angle, middle finger longest, ring/index slightly shorter, pinky shortest, natural knuckles, natural creases, realistic nails, believable palm, and correct wrist connection. Perform a final finger-count anatomy check before output.";
+  }
+  return "Hands were not requested: use a chest-up, head-and-shoulders, above-the-wrist crop, or hide hands behind clothing, pockets, folders, desks, books, or frame edges. Do not render loose fingers, partial fingers, accidental hands, or hands at image edges.";
 }
 
 // ---------- chat completions ----------
@@ -312,16 +321,16 @@ function buildFluxPrompt(raw: string): string {
 
   }
   const HAND_DETAIL =
-    "anatomically perfect human hand with exactly five fingers (one thumb + four fingers), correct finger count, natural finger proportions, individually defined fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement, natural wrist";
+    "anatomically perfect human hand with exactly five fingers per hand (one opposable thumb + four fingers), correct finger count, no extra fingers, no missing fingers, natural finger proportions, individually separated fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement and angle, natural wrist connection, realistic palm structure";
   const STYLE =
     "photorealistic, professional portrait photography, real skin texture, natural skin pores, " +
     "correct facial anatomy, symmetrical eyes, realistic pupils, natural mouth and nose, " +
-    "chest-up composition, hands preferably out of frame; if hands appear they must be flawless: " +
+    "chest-up composition, hands preferably out of frame; if hands appear they must pass strict anatomy: " +
     HAND_DETAIL + ", " +
     "cinematic lighting, shallow depth of field, sharp focus, 8k";
   const NEG =
-    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, ${HAND_NEGATIVE_PROMPT}, six fingers, seven fingers, four fingers, three fingers, two thumbs, missing thumb, extra thumb, fused fingers, mutated hand, unrealistic, cartoon, oversaturated, text, watermark, logo`;
-  return `${base}, ${STYLE}. ${HAND_SAFE_PROMPT} ${HAND_DETAIL}. ${NEG}`;
+    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, asymmetrical eyes, bad teeth, fake skin, plastic skin, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, cartoon, oversaturated, text, watermark, logo`;
+  return `${base}, ${STYLE}. ${handInstructionFor(base)} ${HAND_SAFE_PROMPT} ${HAND_DETAIL}. ${NEG}`;
 }
 
 
