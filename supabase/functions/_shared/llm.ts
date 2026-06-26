@@ -76,7 +76,7 @@ function normalizePromptTypos(raw: string): string {
 
 function withFaceSafety(prompt: string) {
   if (!hasHumanSubject(prompt)) {
-    return `${prompt}. Standalone non-human subject lock: if the requested subject is a fruit, food, product, object, animal, landscape, symbol, or abstract scene, render ONLY that subject and its environment. Do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features. Keep objects/fruits clearly separated from anything human; no fruit-human hybrid, no object fused with fingers, no hands holding the object unless the user explicitly requested hands.`;
+    return `${prompt}. Standalone subject lock: render strictly and only what the user described, with correct real-world structure and materials. Do not add unrelated items, do not add fruits or food unless the user explicitly asked for them, do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features.`;
   }
   return `${prompt}. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.`;
 }
