@@ -21,4 +21,4 @@ USING (auth.uid() = user_id OR user_id IS NULL);
 
 DROP INDEX IF EXISTS public.idx_whatsapp_messages_unique_provider;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_whatsapp_messages_unique_provider
-ON public.whatsapp_messages(user_id, contact_id, provider_message_id) NULLS NOT DISTINCT;
+ON public.whatsapp_messages(user_id, contact_id, provider_message_id);
