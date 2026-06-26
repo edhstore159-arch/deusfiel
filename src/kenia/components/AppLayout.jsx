@@ -5,7 +5,7 @@ import {
   LayoutDashboard, KanbanSquare, Scale, Wallet, Sparkles,
   BarChart3, LogOut, MessageSquare, Wrench, Radio,
   CalendarDays, Settings as SettingsIcon, Combine,
-  ShieldCheck, Bot, Menu, X,
+  ShieldCheck, Bot, Menu, X, Clapperboard,
 } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
@@ -47,6 +47,7 @@ const PREFETCH = {
   "/app/finance": () => import("@/kenia/pages/Finance"),
   "/app/creatives": () => import("@/kenia/pages/Creatives"),
   "/app/image-fusion": () => import("@/kenia/pages/ImageFusion"),
+  "/app/viral-video": () => import("@/kenia/pages/ViralVideoStudio"),
   "/app/analytics": () => import("@/kenia/pages/Analytics"),
   "/app/whatsapp": () => import("@/kenia/pages/WhatsAppSettings"),
   "/app/whatsapp-logs": () => import("@/kenia/pages/WhatsAppLogs"),
