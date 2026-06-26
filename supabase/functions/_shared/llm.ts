@@ -342,17 +342,36 @@ function buildFluxPrompt(raw: string): string {
 
   const HAND_DETAIL =
     "anatomically perfect human hand with exactly five fingers per hand (one opposable thumb + four fingers), correct finger count, no extra fingers, no missing fingers, natural finger proportions, individually separated fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement and angle, natural wrist connection, realistic palm structure";
+  const BODY_DETAIL =
+    "anatomically correct full human body, realistic proportions (Vitruvian proportions: head ~1/7.5 of body height), natural shoulder width, correct spine curvature, two arms with correct elbow and wrist joints, two legs with correct knee and ankle joints, hands and feet at correct ends of limbs, no extra or missing limbs, no twisted or dislocated joints, natural standing/walking posture, realistic clothing draping with correct fabric folds";
+  const isMultiPerson = /\b(people|persons|pessoas|crowd|multid[ãa]o|grupo|group|family|fam[íi]lia|couple|casal|tourists|turistas|friends|amigos)\b/i.test(base);
+  const isFullBody = isMultiPerson || /\b(full body|corpo inteiro|de corpo inteiro|standing|walking|running|sentad[ao]|de p[ée]|andando|correndo|posando|posing|dan[çc]ando|dancing|jogando|playing|na frente|in front of|na torre|at the tower|no monumento|at the monument|na praia|at the beach|na rua|on the street|na cidade|in the city|landmark|eiffel|cristo redentor|coliseu|colosseum|big ben|taj mahal)\b/i.test(base);
+  const subjectClause = isMultiPerson
+    ? "multiple realistic human subjects, each with consistent anatomy"
+    : "single real human subject";
+  const compositionClause = isFullBody
+    ? "wide full-body composition with environment visible, subjects positioned naturally within the scene, complete bodies (head, torso, arms, legs, hands and feet all visible and anatomically correct)"
+    : "chest-up composition, hands preferably out of frame";
   const STYLE =
-    "single real human subject, RAW photo, photorealistic, professional editorial portrait photography, shot on Canon EOS R5 with 85mm f/1.4 lens, ISO 200, natural window light, " +
+    `${subjectClause}, RAW photo, photorealistic, professional editorial photography, shot on Canon EOS R5 with ${isFullBody ? "35mm f/2.0" : "85mm f/1.4"} lens, ISO 200, natural light, ` +
     "real human skin with visible pores, peach fuzz, subtle imperfections, subsurface scattering, " +
     "correct facial anatomy, two natural asymmetric eyes, realistic iris and pupils with catchlights, individual eyelashes, natural eyebrows, " +
     "symmetric realistic nose, natural lips with fine lines, natural teeth with slight variation, " +
-    "chest-up composition, hands preferably out of frame; if hands appear they must pass strict anatomy: " +
+    `${compositionClause}, ` +
+    (isFullBody ? BODY_DETAIL + ", " : "") +
+    "if hands appear they must pass strict anatomy: " +
     HAND_DETAIL + ", " +
-    "cinematic Rembrandt lighting, shallow depth of field, sharp focus on the eyes, 8k, unedited, no beauty filter, no AI-generated look";
+    "cinematic natural lighting, sharp focus, 8k, unedited, no beauty filter, no AI-generated look";
+  const BODY_NEG = isFullBody
+    ? ", deformed body, mutated body, disfigured body, distorted body, malformed body, twisted torso, broken spine, wrong proportions, extra arms, extra legs, missing arms, missing legs, extra limbs, missing limbs, fused limbs, duplicated limbs, floating limbs, detached limbs, disjointed limbs, dislocated joints, impossible pose, broken knees, broken elbows, backwards joints, limbs growing from wrong place, conjoined people, merged people, fused faces, identical clones, bad anatomy, bad proportions, gigantic head, tiny head, long neck, short neck, no neck"
+    : "";
   const NEG =
-    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, mutated face, disfigured, facial asymmetry caused by generation error, mismatched eyes, different sized eyes, asymmetric eyes (unnatural), cross-eyed, lazy eye, dead eyes, glassy eyes, empty stare, extra eyes, fused eyes, third eye, double pupils, wrong pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, body parts fused with fruit, fruit merged into face, object merged with body, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
-  return `${base}, ${STYLE}. ${handInstructionFor(base)} ${HAND_SAFE_PROMPT} ${HAND_DETAIL}. ${NEG}`;
+    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, mutated face, disfigured, facial asymmetry caused by generation error, mismatched eyes, different sized eyes, asymmetric eyes (unnatural), cross-eyed, lazy eye, dead eyes, glassy eyes, empty stare, extra eyes, fused eyes, third eye, double pupils, wrong pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, body parts fused with object, object merged with body${BODY_NEG}, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
+  const handsClause = isFullBody
+    ? `${HAND_DETAIL}. Hands and feet must be fully formed and natural — not melted, not warped, not fused.`
+    : `${handInstructionFor(base)} ${HAND_SAFE_PROMPT} ${HAND_DETAIL}.`;
+  return `${base}, ${STYLE}. ${handsClause} ${NEG}`;
+
 }
 
 
