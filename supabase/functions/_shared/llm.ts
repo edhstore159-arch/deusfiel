@@ -40,9 +40,12 @@ export function hasHybridRequest(prompt = "") {
     || /\b(antropomorf|anthropomorph|surreal hybrid|h[íi]brido surreal|fruta humanizada|humanized fruit)\b/i.test(prompt);
 }
 
+const EVENT_RE_HUMAN = /\b(anivers[áa]rio|birthday|festa|party|casamento|wedding|noivado|engagement|formatura|graduation|batizado|baptism|ch[áa]\s+de\s+beb[êe]|baby\s+shower|comemora[çc][ãa]o|celebration|natal|christmas|ano\s+novo|new\s+year|carnaval|carnival|reveillon|p[áa]scoa|easter|halloween|dia\s+das\s+m[ãa]es|dia\s+dos\s+pais|confraterniza[çc][ãa]o)\b/i;
+
 export function hasHumanSubject(prompt = "") {
   if (/\b(non-human subject lock|non-human object lock|object isolation lock|standalone non-human subject)\b/i.test(prompt)) return false;
   if (hasHybridRequest(prompt)) return true;
+  if (EVENT_RE_HUMAN.test(prompt)) return true;
   return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao]|viol[êe]ncia|agress[ãa]o|hematoma|ematoma|les[ãa]o|les[õo]es|ferid[ao]|machucad[ao]|corpo|bra[cç]o|perna|pele humana|bruise|injury|wound|assault)\b/i.test(prompt);
 }
 
