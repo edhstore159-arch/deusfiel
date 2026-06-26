@@ -74,6 +74,7 @@ const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshak
 
 const FRUIT_RE = /\b(fruit|fruta|apple|maçã|maca|macan|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi)\b/i;
 const LANDMARK_RE = /\b(torre\s+eiffel|eiffel\s+tower|cristo\s+redentor|estatua\s+da\s+liberdade|statue\s+of\s+liberty|big\s+ben|coliseu|colosseum|taj\s+mahal|pir[âa]mide|pyramid|monumento|monument|cathedral|catedral|igreja|church|castelo|castle|ponte|bridge|arranha-c[ée]u|skyscraper|edif[íi]cio|building|pr[ée]dio|arquitetura|architecture|landmark|skyline|cidade|city|paisagem urbana)\b/i;
+const EVENT_RE = /\b(anivers[áa]rio|birthday|festa|party|casamento|wedding|noivado|engagement|formatura|graduation|batizado|baptism|ch[áa]\s+de\s+beb[êe]|baby\s+shower|comemora[çc][ãa]o|celebration|natal|christmas|ano\s+novo|new\s+year|carnaval|carnival|reveillon|p[áa]scoa|easter|halloween|dia\s+das\s+m[ãa]es|dia\s+dos\s+pais|confraterniza[çc][ãa]o)\b/i;
 const FRUIT_OR_OBJECT = /\b(fruit|apple|maçã|maca|macan|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi|fruta|objeto|produto|product|object|food|comida|bolo|p[ãa]o|baguete|book|livro|carro|casa|flor|torre|tower|monumento|monument|building|edif[íi]cio|pr[ée]dio|landmark|cidade|city)\b/i;
 
 function objectLockFor(prompt: string) {
@@ -81,6 +82,17 @@ function objectLockFor(prompt: string) {
   const isLandmark = LANDMARK_RE.test(prompt);
   const subject = isFruit ? "fruit" : (isLandmark ? "landmark / architectural structure" : "object");
   return `SUBJECT LOCK (CRITICAL): the subject is the ${subject} literally described by the user. Render ONLY that subject as requested, with correct real-world structure, proportions and materials. Do not add unrelated items, do not add fruit or food unless the user explicitly asked for fruit, do not add people, faces, eyes, mouths, arms, hands, fingers, skin, fingernails, limbs, body parts, portraits, or anthropomorphic traits.`;
+}
+
+function eventSceneFor(prompt: string) {
+  return [
+    `Faithful photorealistic candid photograph of a real-life ${prompt} scene.`,
+    "EVENT/CELEBRATION SCENE LOCK: this is a social celebration moment with people interacting naturally — render a documentary-style event photograph with appropriate decorations, props and atmosphere for the specific occasion (for a birthday: birthday cake with lit candles, balloons, party hats, gifts, festive table; for a wedding: bride/groom attire, flowers, ceremony or reception setting; for Christmas: tree, lights, presents; adapt to whatever the user described).",
+    "Real Brazilian people of varied ages when applicable, authentic emotions (joy, surprise, warmth), natural posture, real environment, warm cinematic lighting, soft natural light mixed with festive ambient light (candles, string lights, lamps), shallow depth of field, 50mm or 85mm lens, documentary photojournalism aesthetic.",
+    "Do NOT replace the celebration with random fruit, food still life, abstract objects, landmarks, product photography or empty scenes. Do NOT add unrelated fruit. Faces and hands must respect the FACE LOCK and HAND LOCK rules.",
+    "Negative: stock photo, AI look, plastic skin, empty room, isolated fruit, isolated object, product shot, landmark substitution, deformed faces, asymmetric eyes, malformed hands, extra fingers, missing fingers, extra limbs, melted, warped, cartoon, illustration, text, watermark, logo.",
+    "--style raw --photorealism high",
+  ].join(" ");
 }
 
 function handCompositionGuard(userPrompt = "") {
