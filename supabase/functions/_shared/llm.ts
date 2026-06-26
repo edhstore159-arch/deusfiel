@@ -53,6 +53,8 @@ export function hasHumanSubject(prompt = "") {
 // Corrige erros comuns de digitação em PT-BR e traduz frutas/objetos para inglês
 // para melhorar a fidelidade da geração de imagens (ex.: "macan" → "maçã apple fruit").
 const PROMPT_TYPO_MAP: Array<[RegExp, string]> = [
+  [/\bcora[cç][ãa]o\b/gi, "coração (red love heart symbol, classic stylized heart shape, romantic icon, NOT a fruit, NOT an anatomical organ unless requested)"],
+  [/\bcoracoes\b|\bcora[cç][õo]es\b/gi, "corações (red love heart symbols, classic stylized heart shapes)"],
   [/\bmac[ãa]+n?s?\b/gi, "maçã (apple fruit, red apple, fresh fruit)"],
   [/\bmaca\b/gi, "maçã (apple fruit, red apple, fresh fruit)"],
   [/\bbanan[ao]s?\b/gi, "banana (ripe yellow banana fruit)"],
