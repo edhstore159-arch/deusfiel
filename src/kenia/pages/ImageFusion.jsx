@@ -1,12 +1,13 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import JSZip from "jszip";
 import { api } from "@/kenia/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
-import { Combine, Upload, Loader2, Download, X, Sparkles, ImageIcon, Package, Info, Wand2 } from "lucide-react";
+import { Combine, Upload, Loader2, Download, X, Sparkles, ImageIcon, Package, Info, Wand2, Trash2, CreditCard, Lock } from "lucide-react";
 import SocialConnections from "@/kenia/components/SocialConnections";
 
 // Preset de rejuvenescimento facial preservando identidade
