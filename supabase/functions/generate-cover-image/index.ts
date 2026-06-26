@@ -222,12 +222,13 @@ Deno.serve(async (req) => {
     ].join("\n") : [
       userElaborated,
       "",
-      OBJECT_LOCK,
+      objectLockFor(prompt),
       "",
-      "Photorealistic non-human subject, faithful to the user's request, realistic material, correct natural form, clean silhouette, no anatomy, no portrait, no skin, no hands, no fingers, no face, no person, no human body parts.",
-      "Negative prompt: person, people, human, face, portrait, eyes, mouth, skin, arm, hand, finger, nails, limb, body, body parts, holding, human-object hybrid, fruit-human hybrid, object fused with hand, fruit fused with fingers, anthropomorphic, mutated, melted, warped, deformed, duplicated parts, CGI, cartoon, illustration, text, watermark, logo.",
+      "Photorealistic non-human subject, faithful to the user's literal request, realistic material, correct natural form, clean silhouette, no anatomy, no portrait, no skin, no hands, no fingers, no face, no person, no human body parts, no fruit or food unless the user explicitly asked for it.",
+      `Negative prompt: person, people, human, face, portrait, eyes, mouth, skin, arm, hand, finger, nails, limb, body, body parts, holding, human-object hybrid, anthropomorphic, mutated, melted, warped, deformed, duplicated parts, CGI, cartoon, illustration, text, watermark, logo, unrelated objects${FRUIT_RE.test(prompt) ? "" : ", fruit, apple, banana, orange, food, produce, fruit basket"}.`,
       "--style raw --photorealism high --no human --no face --no hands --no fingers --no skin --no body_parts --no anthropomorphic --no object_anatomy_fusion",
     ].join("\n");
+
 
 
     const toDataUrl = (b64: string) =>
