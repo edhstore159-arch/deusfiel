@@ -889,6 +889,16 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       });
       if (convErr) console.error("[chat-ai] falha ao salvar conversa:", convErr);
       else console.log("[chat-ai] conversa salva user_id=", userId, "session=", sessionId);
+      await persistCaseAnalysis({
+        supabase,
+        userId,
+        sessionId,
+        userMessage,
+        reply,
+        history,
+        body,
+        analysis,
+      });
       if (appointment) {
         // Se a sessão for um número de telefone (ex.: WhatsApp), usa como telefone real do cliente quando o texto não trouxe um.
         const sessionLooksLikePhone = !!sessionId && /^\+?\d{6,}$/.test(sessionId);
