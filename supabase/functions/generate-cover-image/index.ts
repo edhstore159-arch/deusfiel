@@ -79,6 +79,10 @@ const EATING_CAKE_RE = /\b(eating|feeding|taking\s+a\s+bite|bite|biting|comendo|
 const FRUIT_RE = /\b(fruit|fruta|apple|maçã|maca|macan|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi)\b/i;
 const LANDMARK_RE = /\b(torre\s+eiffel|eiffel\s+tower|cristo\s+redentor|estatua\s+da\s+liberdade|statue\s+of\s+liberty|big\s+ben|coliseu|colosseum|taj\s+mahal|pir[âa]mide|pyramid|monumento|monument|cathedral|catedral|igreja|church|castelo|castle|ponte|bridge|arranha-c[ée]u|skyscraper|edif[íi]cio|building|pr[ée]dio|arquitetura|architecture|landmark|skyline|cidade|city|paisagem urbana)\b/i;
 const EVENT_RE = /\b(anivers[áa]rio|birthday|festa|party|casamento|wedding|noivado|engagement|formatura|graduation|batizado|baptism|ch[áa]\s+de\s+beb[êe]|baby\s+shower|comemora[çc][ãa]o|celebration|natal|christmas|ano\s+novo|new\s+year|carnaval|carnival|reveillon|p[áa]scoa|easter|halloween|dia\s+das\s+m[ãa]es|dia\s+dos\s+pais|confraterniza[çc][ãa]o)\b/i;
+const ISOLATED_ONLY_RE = /\b(only\s+the\s+\w+|no\s+humans?|no\s+people|no\s+person|no\s+party|no\s+other\s+(subjects?|objects?)|sem\s+pessoas|apenas\s+o\s+\w+|somente\s+o\s+\w+|s[óo]\s+o\s+\w+|isolated|product\s+shot|studio\s+(shot|lighting)|clean\s+background|white\s+background)\b/i;
+function isIsolatedObjectOnly(prompt: string) {
+  return ISOLATED_ONLY_RE.test(prompt);
+}
 const FRUIT_OR_OBJECT = /\b(fruit|apple|maçã|maca|macan|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi|fruta|objeto|produto|product|object|food|comida|bolo|p[ãa]o|baguete|book|livro|carro|casa|flor|torre|tower|monumento|monument|building|edif[íi]cio|pr[ée]dio|landmark|cidade|city)\b/i;
 
 function objectLockFor(prompt: string) {
@@ -116,9 +120,10 @@ function handCompositionGuard(userPrompt = "") {
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   const userTheme = (userPrompt || "").trim();
   const hybrid = hasHybridRequest(userTheme);
-  const humanSubject = hasHumanSubject(userTheme);
-  const isEvent = EVENT_RE.test(userTheme);
-  const objectSubject = !hybrid && !isEvent && (!humanSubject || (FRUIT_OR_OBJECT.test(userTheme) && !EVENT_RE.test(userTheme)));
+  const isolatedOnly = isIsolatedObjectOnly(userTheme);
+  const humanSubject = !isolatedOnly && hasHumanSubject(userTheme);
+  const isEvent = !isolatedOnly && EVENT_RE.test(userTheme);
+  const objectSubject = !hybrid && !isEvent && (!humanSubject || (FRUIT_OR_OBJECT.test(userTheme) && !EVENT_RE.test(userTheme))) || isolatedOnly;
 
   if (isEvent && !hybrid) {
     return eventSceneFor(userTheme);
@@ -220,8 +225,9 @@ Deno.serve(async (req) => {
 
     const userElaborated = await elaboratePrompt(prompt, style);
     const hybridSubject = hasHybridRequest(prompt);
-    const eventSubject = EVENT_RE.test(prompt) && !hybridSubject;
-    const humanSubject = (hasHumanSubject(prompt) || eventSubject) && !hybridSubject;
+    const isolatedOnly = isIsolatedObjectOnly(prompt);
+    const eventSubject = !isolatedOnly && EVENT_RE.test(prompt) && !hybridSubject;
+    const humanSubject = !isolatedOnly && (hasHumanSubject(prompt) || eventSubject) && !hybridSubject;
     const handGuard = handCompositionGuard(prompt);
     const cakeEating = EATING_CAKE_RE.test(prompt);
     const fullPrompt = hybridSubject ? [
