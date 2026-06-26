@@ -916,7 +916,30 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
           {
             role: "system",
             content:
-              "Você analisa conversas jurídicas e responde APENAS um JSON válido (sem markdown) com os campos: area (string), resumo (string curta), motivo (string), acertividade (0-100), chance_exito (0-100), qualificacao (\"qualificado\"|\"necessita_mais_info\"|\"desqualificado\"), proxima_pergunta (string), fundamentos (array de strings com base legal).",
+              `Você é um assistente jurídico responsável por realizar ANÁLISE PRELIMINAR do caso. Analise EXCLUSIVAMENTE as informações fornecidas pelo cliente. Regras: não dar parecer definitivo, não prometer ganho de causa, não estimar valores de indenização sem dados concretos, indicar claramente quando faltar informação.
+
+Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
+{
+  "area": string (Área do Direito),
+  "resumo": string (resumo objetivo dos fatos),
+  "motivo": string (justificativa da avaliação),
+  "acertividade": number 0-100,
+  "chance_exito": number 0-100,
+  "qualificacao": "qualificado" | "necessita_mais_info" | "desqualificado",
+  "proxima_pergunta": string,
+  "fundamentos": string[] (base legal),
+  "probabilidade_exito": "Alta" | "Media" | "Baixa" | "Insuficiente",
+  "complexidade": "Simples" | "Moderado" | "Complexo",
+  "potencial_financeiro": "Alto" | "Medio" | "Baixo",
+  "risco_prazo": string (há prescrição/decadência/audiência marcada? quanto tempo do fato?),
+  "provas": { "documentos": boolean, "testemunhas": boolean, "mensagens": boolean, "suficientes": boolean },
+  "pontos_favoraveis": string[],
+  "pontos_atencao": string[],
+  "documentos_necessarios": string[],
+  "informacoes_faltantes": string[],
+  "recomendacao": string (recomendação ao advogado),
+  "score_viabilidade": number 0-100 (some +20 para cada: documentos enviados; provas robustas; relato claro e completo; prazo válido; objetivo juridicamente possível)
+}`,
           },
           { role: "user", content: `Conversa:\n${convoText}\n\nGere o JSON de análise.` },
         ],
