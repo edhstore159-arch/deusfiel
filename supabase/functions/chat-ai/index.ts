@@ -536,7 +536,11 @@ function parseAppointmentBlock(text: string) {
 // Procura uma intenção de agendamento + data + hora explícitos.
 function extractAppointmentFromText(text: string, history: Array<{ role: string; content: string }> = []) {
   const t = String(text || "");
-  if (!/\b(agendar|agendamento|marcar|marca[cç][aã]o|consulta|reuni[aã]o|atendimento|hor[aá]rio)\b/i.test(t)) return null;
+  const KEYWORD_RE = /\b(agendar|agendamento|marcar|marca[cç][aã]o|marcad[ao]|consulta|reuni[aã]o|atendimento|hor[aá]rio|confirmad[ao]|agendad[ao]|remarcar|reagendar)\b/i;
+  const recentHistoryText = history.slice(-8).map((h) => String(h.content || "")).join("\n");
+  const intentHere = KEYWORD_RE.test(t);
+  const intentInHistory = KEYWORD_RE.test(recentHistoryText);
+  if (!intentHere && !intentInHistory) return null;
 
   // Hora: 14:30, 14h, 14h30, às 14
   const timeMatch = t.match(/\b(?:[aà]s\s*)?(\d{1,2})(?:[:h](\d{2}))?\s*(h|hs|horas)?\b/i);
