@@ -611,8 +611,16 @@ export default function ViralVideoStudio() {
       recorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
       const stopped = new Promise((resolve) => { recorder.onstop = resolve; });
       recorder.start();
+      const scenes = splitScenes(customScene || CATEGORIES[category]?.action);
+      const framesPerScene = Math.max(1, Math.floor(totalFrames / scenes.length));
       for (let frame = 0; frame <= totalFrames; frame += 1) {
-        drawVideoFrame(ctx, frame, totalFrames, width, height, title, category, customScene);
+        if (style === "cartoon") {
+          const sceneIndex = Math.min(scenes.length - 1, Math.floor(frame / framesPerScene));
+          const sceneT = (frame - sceneIndex * framesPerScene) / framesPerScene;
+          drawCartoonFrame(ctx, frame, totalFrames, width, height, title, scenes, sceneIndex, sceneT);
+        } else {
+          drawVideoFrame(ctx, frame, totalFrames, width, height, title, category, customScene);
+        }
         await new Promise((resolve) => setTimeout(resolve, 1000 / fps));
       }
       recorder.stop();
