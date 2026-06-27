@@ -6,6 +6,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kenia/components/ui/select";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { Clapperboard, Copy, Download, Film, Loader2, Sparkles, Wand2 } from "lucide-react";
 
 const CATEGORIES = {
@@ -567,7 +568,36 @@ export default function ViralVideoStudio() {
   const [durationSeconds, setDurationSeconds] = useState(12);
   const [videoUrl, setVideoUrl] = useState("");
   const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
   const lastVideoUrl = useRef("");
+
+  const enhancePrompt = async () => {
+    if (enhancing) return;
+    setEnhancing(true);
+    try {
+      const selected = CATEGORIES[category] || CATEGORIES.dramatico;
+      const { data, error } = await supabase.functions.invoke("enhance-video-prompt", {
+        body: {
+          scene: customScene || selected.action,
+          category: selected.label,
+          mood: selected.mood,
+          durationSeconds: safeDuration,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.prompt) {
+        setCustomScene(data.prompt);
+        toast.success(`Prompt aprimorado via ${data.provider || "IA"}`);
+      } else {
+        toast.error("Não foi possível aprimorar o prompt");
+      }
+    } catch (e) {
+      toast.error(e?.message || "Falha ao aprimorar prompt");
+    } finally {
+      setEnhancing(false);
+    }
+  };
 
   const safeDuration = clampDuration(durationSeconds);
   const prompt = useMemo(() => buildPrompt(category, customScene, safeDuration), [category, customScene, safeDuration]);
@@ -747,6 +777,15 @@ export default function ViralVideoStudio() {
             </div>
 
             <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                onClick={enhancePrompt}
+                disabled={enhancing}
+                variant="outline"
+                className="border-gold-500/70 bg-gold-500/10 text-gold-100 hover:bg-gold-500/20"
+              >
+                {enhancing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                {enhancing ? "Aprimorando..." : "Aprimorar com IA (Ollama)"}
+              </Button>
               <Button
                 onClick={copyPrompt}
                 variant="outline"
