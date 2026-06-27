@@ -1,6 +1,6 @@
-import { Suspense, useRef, useState, useEffect } from "react";
+import { Component, useRef, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, ContactShadows } from "@react-three/drei";
+import { ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 
 /**
@@ -9,6 +9,37 @@ import * as THREE from "three";
  * needed). Idle breathing, natural blink, mouth lip-sync driven by the
  * SpeechSynthesis boundary events, soft look-at-cursor, click reaction.
  */
+
+class AvatarCanvasBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+function AvatarFallback({ state }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-gold-50 to-nude-50">
+      <div className={`relative h-28 w-24 ${state === "speaking" ? "secretary-breathe" : ""}`} aria-hidden="true">
+        <div className="absolute left-1/2 top-2 h-20 w-20 -translate-x-1/2 rounded-full bg-gold-100 shadow-inner" />
+        <div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 rounded-t-full bg-nude-900" />
+        <div className="absolute left-[26px] top-11 h-2 w-2 rounded-full bg-nude-900" />
+        <div className="absolute right-[26px] top-11 h-2 w-2 rounded-full bg-nude-900" />
+        <div className={`absolute left-1/2 top-[62px] h-2 w-8 -translate-x-1/2 rounded-full bg-gold-700 transition-transform ${state === "speaking" ? "scale-y-150" : ""}`} />
+        <div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 rounded-t-full bg-nude-100 ring-1 ring-gold-200" />
+      </div>
+    </div>
+  );
+}
 
 function Bust({ state, mouthOpenRef }) {
   const group = useRef();
@@ -165,33 +196,35 @@ export default function Secretary3DAvatar({ state, mouthOpenRef, onClick, onHove
   const [glow, setGlow] = useState(false);
   return (
     <div
-      className={`relative h-32 w-32 rounded-full overflow-hidden cursor-pointer transition-shadow ${
+      className={`relative h-40 w-40 rounded-full overflow-hidden cursor-pointer transition-shadow sm:h-44 sm:w-44 ${
         state === "speaking" || glow
-          ? "shadow-[0_0_30px_rgba(212,175,55,0.7)] ring-2 ring-amber-300"
-          : "shadow-[0_8px_24px_rgba(212,175,55,0.35)] ring-2 ring-amber-200"
-      } bg-gradient-to-b from-amber-50 to-rose-50`}
+          ? "shadow-2xl ring-4 ring-gold-300"
+          : "shadow-xl ring-4 ring-gold-100"
+      } bg-gradient-to-b from-gold-50 to-nude-50`}
+      style={{ width: "clamp(9.5rem, 14vw, 11rem)", height: "clamp(9.5rem, 14vw, 11rem)" }}
       onClick={onClick}
       onPointerEnter={() => { setGlow(true); onHover?.(); }}
       onPointerLeave={() => setGlow(false)}
       role="button"
       aria-label="Assistente virtual 3D Kênia"
     >
-      <Canvas
-        dpr={[1, 1.8]}
-        camera={{ position: [0, 0.1, 1.9], fov: 32 }}
-        gl={{ antialias: true, alpha: true }}
-      >
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[2, 3, 4]} intensity={1.1} castShadow />
-        <directionalLight position={[-2, 1, 2]} intensity={0.35} color="#ffd9a8" />
-        <Suspense fallback={null}>
+      <AvatarCanvasBoundary fallback={<AvatarFallback state={state} />}>
+        <Canvas
+          dpr={[1, 1.8]}
+          camera={{ position: [0, 0.05, 2.05], fov: 30 }}
+          gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+          style={{ display: "block", width: "100%", height: "100%" }}
+          resize={{ scroll: false, debounce: { scroll: 50, resize: 0 } }}
+        >
+          <ambientLight intensity={0.75} />
+          <directionalLight position={[2, 3, 4]} intensity={1.25} castShadow />
+          <directionalLight position={[-2, 1, 2]} intensity={0.45} color="#ffd9a8" />
           <Bust state={state} mouthOpenRef={mouthOpenRef} />
-          <Environment preset="apartment" />
-        </Suspense>
-        <ContactShadows position={[0, -1.4, 0]} opacity={0.35} blur={2.4} far={3} />
-      </Canvas>
+          <ContactShadows position={[0, -1.4, 0]} opacity={0.32} blur={2.2} far={3} />
+        </Canvas>
+      </AvatarCanvasBoundary>
       {state === "alerting" && (
-        <span className="absolute top-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[11px] font-bold text-white ring-2 ring-white animate-bounce">
+        <span className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground ring-2 ring-background animate-bounce">
           !
         </span>
       )}
