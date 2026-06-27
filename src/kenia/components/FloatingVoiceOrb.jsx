@@ -301,6 +301,8 @@ export default function FloatingVoiceOrb() {
       commandSessionActiveRef.current = false;
       awakeUntilRef.current = 0;
       setTranscript("");
+      lastInterimRef.current = "";
+      finalProcessedRef.current = false;
       try {
         rec.continuous = true;
         rec.interimResults = true;
