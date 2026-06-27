@@ -36,8 +36,16 @@ export default function CRM() {
 
   useEffect(() => {
     api.get("/crm/stages")
-      .then((r) => setStages(Array.isArray(r?.data) ? r.data : []))
-      .catch(() => setStages([]));
+      .then((r) => {
+        const d = r?.data;
+        const list = Array.isArray(d) ? d
+          : Array.isArray(d?.stages) ? d.stages
+          : Array.isArray(d?.data) ? d.data
+          : Array.isArray(d?.items) ? d.items
+          : [];
+        setStages(list.length ? list : FALLBACK_STAGES);
+      })
+      .catch(() => setStages(FALLBACK_STAGES));
     load();
   }, []);
 
