@@ -19,6 +19,14 @@ const STATUS_COLORS = {
   confirmado: "bg-gold-100 text-gold-800",
   pendente: "bg-gold-100 text-gold-800",
   cancelado: "bg-rose-100 text-rose-800",
+  recusado: "bg-rose-100 text-rose-800",
+};
+
+const STATUS_MESSAGES = {
+  confirmado: "Agendamento confirmado",
+  pendente: "Agendamento marcado como pendente",
+  cancelado: "Agendamento cancelado",
+  recusado: "Agendamento recusado e movido para a lista de excluídos",
 };
 
 export default function Agenda() {
@@ -28,6 +36,7 @@ export default function Agenda() {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("list");
   const [cursor, setCursor] = useState(new Date());
+  const [listFilter, setListFilter] = useState("ativos"); // "ativos" | "recusados"
   const [form, setForm] = useState({
     title: "", client_name: "", starts_at: "", duration_min: 60,
     location: "Google Meet", notes: "", status: "confirmado",
@@ -106,8 +115,14 @@ export default function Agenda() {
   };
 
   const toggleStatus = async (item, status) => {
-    await api.patch(`/appointments/${item.id}`, { status });
-    load();
+    try {
+      await api.patch(`/appointments/${item.id}`, { status });
+      toast.success(STATUS_MESSAGES[status] || "Status atualizado");
+      if (status === "recusado") setListFilter("recusados");
+      load();
+    } catch {
+      toast.error("Não foi possível atualizar o status");
+    }
   };
 
   const copyLink = (link) => {
@@ -133,10 +148,13 @@ export default function Agenda() {
     itemsByDay[key].push(i);
   });
 
+  const isRejected = (i) => i.status === "recusado" || i.status === "cancelado";
   const upcoming = appointments
-    .filter(i => new Date(i.starts_at) >= new Date(today.setHours(0, 0, 0, 0)))
+    .filter(i => listFilter === "recusados"
+      ? isRejected(i)
+      : !isRejected(i) && new Date(i.starts_at) >= new Date(today.setHours(0, 0, 0, 0)))
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
-    .slice(0, 20);
+    .slice(0, 50);
 
   return (
     <div className="h-screen flex flex-col bg-nude-50 overflow-hidden">
@@ -291,9 +309,17 @@ export default function Agenda() {
 
         {view === "list" && (
           <div className="space-y-3">
+            <div className="inline-flex border border-nude-200 rounded-md p-0.5 bg-white">
+              <Button size="sm" variant={listFilter === "ativos" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setListFilter("ativos")} data-testid="filter-ativos">
+                Ativos
+              </Button>
+              <Button size="sm" variant={listFilter === "recusados" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setListFilter("recusados")} data-testid="filter-recusados">
+                Recusados / Excluídos ({appointments.filter(isRejected).length})
+              </Button>
+            </div>
             {upcoming.length === 0 ? (
               <Card className="p-10 border-dashed border-nude-300 text-center text-nude-400">
-                Nenhuma reunião agendada. Clique em "Nova reunião" para começar.
+                {listFilter === "recusados" ? "Nenhum agendamento recusado." : 'Nenhuma reunião agendada. Clique em "Nova reunião" para começar.'}
               </Card>
             ) : upcoming.map(it => {
               const d = new Date(it.starts_at);
@@ -343,6 +369,9 @@ export default function Agenda() {
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "cancelado")}>
                           <XCircle className="w-3 h-3 mr-1 text-rose-500" /> Cancelar
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "recusado")} data-testid={`reject-${it.id}`}>
+                          <XCircle className="w-3 h-3 mr-1 text-rose-600" /> Recusar
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 text-xs px-2 sm:ml-auto text-rose-500 hover:text-rose-600" onClick={() => remove(it.id)}>
                           <Trash2 className="w-3 h-3 mr-1" /> Excluir
