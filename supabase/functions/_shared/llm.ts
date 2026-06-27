@@ -58,6 +58,7 @@ export function hasHumanSubject(prompt = "") {
   if (/\bsubject\s+lock\b[\s\S]{0,160}\b(subject\s+is\s+(the\s+)?(object|fruit|landmark|architectural structure)|render\s+only\s+that\s+subject)\b/i.test(prompt)) return false;
   if (/--no\s+(human|face|hands|body_parts)|\bno\s+anatomy\b|\bno\s+portrait\b/i.test(prompt)) return false;
   if (EVENT_RE_HUMAN.test(prompt)) return true;
+  if (/\b(s[ãa]o\s+jorge|nossa\s+senhora|virgem\s+maria|jesus\s+cristo|cristo\s+jesus|sagrado\s+cora[cç][ãa]o\s+de\s+jesus|s[ãa]o\s+francisco|santo\s+ant[ôo]nio|s[ãa]o\s+pedro|s[ãa]o\s+paulo\s+ap[óo]stolo|s[ãa]o\s+miguel|padre\s+c[íi]cero|s[ãa]o\s+benedito|santo\s+s[ãa]o\s+\w+|saint\s+\w+|nossa\s+senhora\s+aparecida)\b/i.test(prompt)) return true;
   return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao]|viol[êe]ncia|agress[ãa]o|hematoma|ematoma|les[ãa]o|les[õo]es|ferid[ao]|machucad[ao]|corpo|bra[cç]o|perna|pele humana|bruise|injury|wound|assault)\b/i.test(prompt);
 }
 
