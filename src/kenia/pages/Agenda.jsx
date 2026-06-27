@@ -370,6 +370,9 @@ export default function Agenda() {
                         <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "cancelado")}>
                           <XCircle className="w-3 h-3 mr-1 text-rose-500" /> Cancelar
                         </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "recusado")} data-testid={`reject-${it.id}`}>
+                          <XCircle className="w-3 h-3 mr-1 text-rose-600" /> Recusar
+                        </Button>
                         <Button variant="ghost" size="sm" className="h-7 text-xs px-2 sm:ml-auto text-rose-500 hover:text-rose-600" onClick={() => remove(it.id)}>
                           <Trash2 className="w-3 h-3 mr-1" /> Excluir
                         </Button>
