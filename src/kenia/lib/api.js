@@ -861,6 +861,11 @@ const staticPost = (url, body = {}) => {
         const { data, error } = await supabase.functions.invoke("generate-cover-image", {
           body: {
             prompt: topic,
+            title: body.title || "",
+            network: body.network || "",
+            format: body.format || "",
+            tone: body.tone || "",
+            case_type: body.case_type || "",
             reference_image_base64: body.reference_image_base64 || null,
             logo_base64: body.logo_base64 || null,
           },

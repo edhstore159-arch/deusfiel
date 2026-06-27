@@ -353,7 +353,7 @@ export default function Creatives() {
 
               <div>
                 <Label>Imagem de referência (opcional)</Label>
-                <p className="text-xs text-nude-500 mb-1.5">Envie uma foto para a IA usar como base/inspiração visual.</p>
+                <p className="text-xs text-nude-500 mb-1.5">Envie um pôster/modelo para a IA manter layout, cores e estilo, trocando só o conteúdo pedido.</p>
                 {refImage ? (
                   <div className="relative inline-block">
                     <img src={refImage} alt="ref" className="h-28 w-28 object-cover rounded-md border border-nude-200" />

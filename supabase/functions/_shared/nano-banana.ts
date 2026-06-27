@@ -9,6 +9,7 @@ type Content =
 export interface NanoBananaOptions {
   prompt: string;
   imageUrls?: string[]; // data URLs or http(s) URLs
+  allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
 }
 
 const FACE_PRESERVATION_LOCK =
@@ -63,6 +64,16 @@ function toBase64Utf8(value: string) {
 function buildLocalFusionFallback(opts: NanoBananaOptions): string | null {
   const images = (opts.imageUrls || []).filter(Boolean).slice(0, 2);
   if (!images.length) return null;
+  if (images.length === 1) {
+    const reference = escapeXml(images[0]);
+    // Reference/template fallback: do NOT invent a new poster. Preserve the
+    // uploaded image as the output when true image-edit providers are unavailable.
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#ffffff"/>
+  <image href="${reference}" x="0" y="0" width="1024" height="1024" preserveAspectRatio="xMidYMid meet"/>
+</svg>`;
+    return `data:image/svg+xml;base64,${toBase64Utf8(svg)}`;
+  }
   const person = escapeXml(images[0]);
   const scene = escapeXml(images[1] || images[0]);
   // Fusão local SEM IA preservando o ROSTO:
@@ -239,13 +250,19 @@ export async function generateWithNanoBanana(
   if (r3.url) return { url: r3.url, provider: "emergent" };
   errs.push(r3.error || "Emergent falhou");
 
-  // Free fallback (no credits required)
-  const rPoll = await callPollinations(opts);
-  if (rPoll.url) {
-    console.warn("ℹ️ Usando Pollinations (gratuito) como fallback:", errs.join(" | "));
-    return { url: rPoll.url, provider: "pollinations-free" };
+  // Free text-to-image fallback (no credits required). It cannot consume
+  // uploaded/base64 reference images, so never use it for edit/template flows
+  // unless explicitly allowed; otherwise it creates a new image and loses the poster reference.
+  if (!opts.imageUrls?.length || opts.allowTextOnlyFallback) {
+    const rPoll = await callPollinations(opts);
+    if (rPoll.url) {
+      console.warn("ℹ️ Usando Pollinations (gratuito) como fallback:", errs.join(" | "));
+      return { url: rPoll.url, provider: "pollinations-free" };
+    }
+    errs.push(rPoll.error || "Pollinations falhou");
+  } else {
+    errs.push("Pollinations ignorado: não aceita imagem de referência/base64");
   }
-  errs.push(rPoll.error || "Pollinations falhou");
 
   const localFallback = buildLocalFusionFallback(opts);
   if (localFallback) {

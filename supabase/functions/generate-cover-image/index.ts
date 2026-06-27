@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { prompt, reference_image_base64, logo_base64, style } = body || {};
+    const { prompt, reference_image_base64, logo_base64, style, title, network, format, tone, case_type } = body || {};
     if (!prompt || typeof prompt !== "string") {
       return new Response(JSON.stringify({ error: "Prompt obrigatório" }), {
         status: 400,
@@ -307,12 +307,14 @@ Deno.serve(async (req) => {
       if (reference_image_base64) {
         imageUrls.push(toDataUrl(reference_image_base64));
         promptParts.push(
-          `EDIT MODE — APPLY USER REQUEST TO THE REFERENCE IMAGE (first image).`,
-          `User request (apply literally to the reference image): "${prompt}".`,
-          `Preserve the original composition, framing, background, lighting and overall layout of the reference image. ` +
-          `If a person is visible, KEEP THE EXACT SAME FACE, identity, hair, skin tone, body proportions and clothing unless the user explicitly asks to change them. ` +
-          `Apply ONLY the modifications described by the user (color change, object swap, text edit, add/remove element, style tweak). Do not redraw the scene from scratch, do not stretch, beautify, smooth or warp facial features. ` +
-          `Output must look like the same reference photo with the requested edit applied — not a different photo.`,
+          `POSTER TEMPLATE EDIT MODE — the first uploaded image is the MASTER REFERENCE POSTER, not just inspiration.`,
+          `User request/new content to apply to that same poster: "${prompt}".`,
+          `Creative context: title="${title || ""}", network="${network || ""}", format="${format || ""}", tone="${tone || ""}", case_type="${case_type || ""}".`,
+          `Recreate the SAME poster/template structure from the reference: same layout grid, margins, spacing, typography style, text hierarchy, color palette, decorative elements, badges, photo placement, background, lighting and overall visual identity.`,
+          `Replace ONLY the text/content requested by the user and only swap/add visual elements explicitly requested. Keep all other visual decisions from the reference poster.`,
+          `If the reference contains a person, preserve the same identity, face, hair, skin tone, clothing and proportions unless the user explicitly asks to change them.`,
+          `Do NOT generate a new unrelated post, do NOT use the reference as mood only, do NOT redesign the layout, do NOT change the palette, do NOT invent a different composition.`,
+          `Output must look like a direct edited/clone version of the uploaded poster with the requested changes applied. Text must be crisp, legible and correctly spelled in Brazilian Portuguese.`,
         );
       } else {
         promptParts.push(fullPrompt);
