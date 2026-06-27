@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { image1_base64, image2_base64, prompt } = await req.json();
+    const { image1_base64, image2_base64, prompt, mode } = await req.json();
     if (!image1_base64) {
       return new Response(JSON.stringify({ ok: false, error: 'Envie ao menos uma imagem.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -114,7 +114,10 @@ Deno.serve(async (req) => {
     }
 
     const isSingle = !image2_base64;
-    const fullPrompt = isSingle ? await elaborateEditPrompt(prompt) : await elaborateFusionPrompt(prompt);
+    const isTemplate = isSingle && mode === 'template';
+    const fullPrompt = isTemplate
+      ? await elaborateTemplatePrompt(prompt)
+      : (isSingle ? await elaborateEditPrompt(prompt) : await elaborateFusionPrompt(prompt));
     const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64];
 
     const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls });
@@ -125,7 +128,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, image: result.url, provider: result.provider, prompt_used: fullPrompt, mode: isSingle ? 'edit' : 'fusion' }), {
+    return new Response(JSON.stringify({ ok: true, image: result.url, provider: result.provider, prompt_used: fullPrompt, mode: isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion') }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
