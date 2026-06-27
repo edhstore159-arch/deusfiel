@@ -486,8 +486,8 @@ async function imageLovable(opts: ImageOptions) {
     body: JSON.stringify({
       model: "openai/gpt-image-2",
       prompt: safePrompt,
-      quality: opts.quality || (hasHumanSubject(safePrompt) ? "high" : "low"),
-      size: opts.size || "1024x1024",
+      quality: opts.quality || "high",
+      size: opts.size || "1536x1536",
       stream: false,
     }),
   });
