@@ -70,6 +70,10 @@ const PROMPT_TYPO_MAP: Array<[RegExp, string]> = [
   [/\bcarr[ao]s?\b/gi, "carro (car automobile)"],
   [/\bcas[ao]s?\b/gi, "casa (house, residential home)"],
   [/\bflor(es)?\b/gi, "flor (flower, blooming)"],
+  [/\bbaguetes?\b/gi, "baguete (French baguette bread, long crusty loaf of bread, golden crust, bakery bread, NOT a fruit)"],
+  [/\bp[ãa]+es?\b/gi, "pão (bread loaf, bakery bread, NOT a fruit)"],
+  [/\bcroissants?\b/gi, "croissant (buttery flaky French pastry, NOT a fruit)"],
+  [/\bbolos?\b/gi, "bolo (cake, frosted cake, NOT a fruit unless specified)"],
 ];
 
 function normalizePromptTypos(raw: string): string {
