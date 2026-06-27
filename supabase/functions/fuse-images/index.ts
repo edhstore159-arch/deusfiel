@@ -7,7 +7,7 @@ const REALISM =
   "real imperfections, aligned eyes, realistic pupils, natural mouth and nose, cinematic lighting, high dynamic range, 4k, sharp focus";
 
 const NEGATIVE =
-  "blurry, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, bad teeth, different person, cartoon, illustration, fake skin, plastic skin, over-smooth, " +
+  "blurry, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, bad teeth, different person, new person, face swap, restyled face, beautified, airbrushed, younger, older, slimmer, heavier, different hair, recolored hair, cartoon, illustration, fake skin, plastic skin, over-smooth, " +
   "extra fingers, mutated, unrealistic proportions, collage, split screen, side-by-side, " +
   "picture-in-picture, frames, borders, text, watermarks, logos";
 
