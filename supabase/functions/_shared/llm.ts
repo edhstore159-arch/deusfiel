@@ -529,7 +529,8 @@ async function imageEmergent(opts: ImageOptions) {
     body: JSON.stringify({
       model: "gpt-image-1",
       prompt: safePrompt,
-      size: opts.size || "1024x1024",
+      size: opts.size || "1536x1536",
+      quality: "high",
       n: 1,
     }),
   });
