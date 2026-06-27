@@ -246,10 +246,30 @@ export default function FloatingVoiceOrb() {
     rec.onend = () => {
       recognitionActiveRef.current = false;
       setListening(false);
+      // Chrome fallback: às vezes encerra sem disparar isFinal=true.
+      // Se nada foi processado, usa o último interim como comando.
+      if (!finalProcessedRef.current) {
+        const pending = (lastInterimRef.current || "").trim();
+        if (pending) {
+          finalProcessedRef.current = true;
+          lastInterimRef.current = "";
+          if (alwaysOnRef.current) {
+            const woke = hasWakeWord(pending);
+            const cmd = woke ? stripWake(pending) : pending;
+            if (woke) activateCommandSession();
+            if ((woke && (!cmd || isWakeOnlyPrompt(cmd))) ) {
+              answerWakePrompt();
+            } else if (woke || commandSessionActiveRef.current) {
+              handleCommandRef.current?.(cmd);
+            }
+          } else {
+            handleCommandRef.current?.(pending);
+          }
+        }
+      }
       if (!shouldRestartRef.current || !alwaysOnRef.current) return;
       restartContinuousRecognition(speakingRef.current ? 700 : 300);
     };
-    recognitionRef.current = rec;
     return () => {
       shouldRestartRef.current = false;
       commandSessionActiveRef.current = false;
