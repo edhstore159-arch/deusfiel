@@ -462,8 +462,17 @@ export default function ImageFusion() {
             placeholder="Ex: Mescle as duas imagens em estilo dourado elegante. Use o botão acima para aplicar o preset de rejuvenescimento facial."
             data-testid="fusion-prompt"
             className="bg-nude-950 border-gold-900/40 text-gold-100 placeholder:text-nude-600 mt-2" />
-          <div className="flex justify-end mt-4">
-            <Button onClick={fuse} disabled={loading || (!img1 && !img2)}
+          <div className="flex justify-end mt-4 gap-2 flex-wrap">
+            {img1 && !img2 && (
+              <Button onClick={() => fuse({ templateMode: true })} disabled={loading || !img1}
+                variant="outline"
+                className="border-gold-500/60 text-gold-200 hover:bg-gold-500/10"
+                data-testid="fusion-clone-template">
+                {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Clonando...</>) :
+                  (<><Combine className="w-4 h-4 mr-2" />🧬 Clonar este modelo (mesmo layout · novo texto/imagens)</>)}
+              </Button>
+            )}
+            <Button onClick={() => fuse()} disabled={loading || (!img1 && !img2)}
               className="bg-gradient-to-r from-gold-500 to-gold-700 hover:from-gold-400 hover:to-gold-600 text-nude-950 font-semibold"
               data-testid="fusion-generate">
               {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Gerando...</>) :
@@ -472,6 +481,7 @@ export default function ImageFusion() {
                   : (<><Wand2 className="w-4 h-4 mr-2" />Editar imagem (1 foto · use o prompt)</>))}
             </Button>
           </div>
+
 
         </Card>
 
