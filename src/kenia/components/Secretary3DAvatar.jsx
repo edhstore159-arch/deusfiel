@@ -28,14 +28,14 @@ class AvatarCanvasBoundary extends Component {
 
 function AvatarFallback({ state }) {
   return (
-    <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-amber-50 to-rose-50">
+    <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-gold-50 to-nude-50">
       <div className={`relative h-28 w-24 ${state === "speaking" ? "secretary-breathe" : ""}`} aria-hidden="true">
-        <div className="absolute left-1/2 top-2 h-20 w-20 -translate-x-1/2 rounded-full bg-[#f1c8a5] shadow-inner" />
-        <div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 rounded-t-full bg-[#3a2218]" />
-        <div className="absolute left-[26px] top-11 h-2 w-2 rounded-full bg-[#3b2a1a]" />
-        <div className="absolute right-[26px] top-11 h-2 w-2 rounded-full bg-[#3b2a1a]" />
-        <div className={`absolute left-1/2 top-[62px] h-2 w-8 -translate-x-1/2 rounded-full bg-[#c6736b] transition-transform ${state === "speaking" ? "scale-y-150" : ""}`} />
-        <div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 rounded-t-full bg-[#f4e6d4] ring-1 ring-amber-200" />
+        <div className="absolute left-1/2 top-2 h-20 w-20 -translate-x-1/2 rounded-full bg-gold-100 shadow-inner" />
+        <div className="absolute left-1/2 top-0 h-14 w-24 -translate-x-1/2 rounded-t-full bg-nude-900" />
+        <div className="absolute left-[26px] top-11 h-2 w-2 rounded-full bg-nude-900" />
+        <div className="absolute right-[26px] top-11 h-2 w-2 rounded-full bg-nude-900" />
+        <div className={`absolute left-1/2 top-[62px] h-2 w-8 -translate-x-1/2 rounded-full bg-gold-700 transition-transform ${state === "speaking" ? "scale-y-150" : ""}`} />
+        <div className="absolute bottom-0 left-1/2 h-14 w-24 -translate-x-1/2 rounded-t-full bg-nude-100 ring-1 ring-gold-200" />
       </div>
     </div>
   );
@@ -198,9 +198,9 @@ export default function Secretary3DAvatar({ state, mouthOpenRef, onClick, onHove
     <div
       className={`relative h-40 w-40 rounded-full overflow-hidden cursor-pointer transition-shadow sm:h-44 sm:w-44 ${
         state === "speaking" || glow
-          ? "shadow-[0_0_38px_rgba(212,175,55,0.72)] ring-4 ring-amber-300"
-          : "shadow-[0_10px_32px_rgba(212,175,55,0.38)] ring-4 ring-amber-100"
-      } bg-gradient-to-b from-amber-50 to-rose-50`}
+          ? "shadow-2xl ring-4 ring-gold-300"
+          : "shadow-xl ring-4 ring-gold-100"
+      } bg-gradient-to-b from-gold-50 to-nude-50`}
       style={{ width: "clamp(9.5rem, 14vw, 11rem)", height: "clamp(9.5rem, 14vw, 11rem)" }}
       onClick={onClick}
       onPointerEnter={() => { setGlow(true); onHover?.(); }}
@@ -224,7 +224,7 @@ export default function Secretary3DAvatar({ state, mouthOpenRef, onClick, onHove
         </Canvas>
       </AvatarCanvasBoundary>
       {state === "alerting" && (
-        <span className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white ring-2 ring-white animate-bounce">
+        <span className="absolute top-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground ring-2 ring-background animate-bounce">
           !
         </span>
       )}
