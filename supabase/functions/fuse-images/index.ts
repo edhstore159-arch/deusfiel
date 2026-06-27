@@ -58,6 +58,13 @@ const EDIT_SINGLE_SYSTEM =
   "If the user mentions a color (e.g. 'azul', 'vermelho', 'dourado'), apply that color clearly and dominantly to the requested area (clothing, hair, object, eyes, background — whichever the user named, defaulting to the main subject). " +
   "Output ONLY the filled prompt as a single line. End with: 'Negative: " + NEGATIVE + "'.";
 
+const TEMPLATE_CLONE_SYSTEM =
+  "You are a graphic-design prompt engineer specialized in CLONING marketing/social-media templates. " +
+  "You receive ONE reference image (a template/layout: post, flyer, story, thumbnail, ad) and a user instruction with the NEW text/content. " +
+  "Produce ONE single-line English prompt that recreates the SAME visual template — preserve layout, grid, typography style, color palette, decorative shapes, frames, badges, brand area, photo placement zones, lighting and overall mood — but REPLACE the text with the user's new copy and REPLACE any photographic subject with the new subject described by the user. " +
+  "Keep fonts and font weights visually equivalent to the reference. Keep alignment, hierarchy and spacing identical. Render all new text as crisp, legible, professionally typeset graphics inside the same text blocks of the original. " +
+  "Output ONLY the filled prompt as a single line. End with: 'Negative: blurry text, garbled text, misspelled words, distorted letters, different layout, different color palette, different style, watermark, logo of unrelated brand, " + NEGATIVE + "'.";
+
 async function elaborateEditPrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || "").trim() || "Re-render the same image preserving identity.";
   try {
@@ -75,6 +82,25 @@ async function elaborateEditPrompt(userPrompt: string): Promise<string> {
   } catch (_e) { /* fallback */ }
   return `Edit the reference image as follows: ${userTheme}. Preserve identity, composition, perspective, lighting and background; apply the requested color/edit clearly and dominantly to the relevant area. ${FACE_LOCK} ${REALISM}. Negative: ${NEGATIVE}`;
 }
+
+async function elaborateTemplatePrompt(userPrompt: string): Promise<string> {
+  const userTheme = (userPrompt || "").trim() || "Replace text and photo with the new content provided by the user.";
+  try {
+    const r = await chatCompletion({
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: TEMPLATE_CLONE_SYSTEM },
+        { role: "user", content: `NEW CONTENT FOR THE CLONED TEMPLATE (replace text and photographic subject, KEEP layout/typography/palette identical to the reference):\n"""${userTheme}"""` },
+      ],
+    });
+    if (r.ok) {
+      const txt = r.data?.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 20) return txt;
+    }
+  } catch (_e) { /* fallback */ }
+  return `Recreate the EXACT same template/layout/typography/color palette/decorative elements as the reference image, but replace the text blocks with: ${userTheme}. Replace any subject photo with the new subject described. Keep alignment, hierarchy, fonts, badges and brand area identical. Render new text crisp and legible. Negative: blurry text, garbled letters, different layout, different palette, ${NEGATIVE}`;
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
