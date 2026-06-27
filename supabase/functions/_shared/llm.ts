@@ -47,8 +47,10 @@ export function hasHybridRequest(prompt = "") {
 const EVENT_RE_HUMAN = /\b(anivers[áa]rio|birthday|festa|party|casamento|wedding|noivado|engagement|formatura|graduation|batizado|baptism|ch[áa]\s+de\s+beb[êe]|baby\s+shower|comemora[çc][ãa]o|celebration|natal|christmas|ano\s+novo|new\s+year|carnaval|carnival|reveillon|p[áa]scoa|easter|halloween|dia\s+das\s+m[ãa]es|dia\s+dos\s+pais|confraterniza[çc][ãa]o)\b/i;
 
 export function hasHumanSubject(prompt = "") {
-  if (/\b(non-human subject lock|non-human object lock|object isolation lock|standalone non-human subject)\b/i.test(prompt)) return false;
   if (hasHybridRequest(prompt)) return true;
+  if (/\b(non-human subject lock|non-human object lock|object isolation lock|standalone non-human subject|photorealistic non-human subject)\b/i.test(prompt)) return false;
+  if (/\bsubject\s+lock\b[\s\S]{0,160}\b(subject\s+is\s+(the\s+)?(object|fruit|landmark|architectural structure)|render\s+only\s+that\s+subject)\b/i.test(prompt)) return false;
+  if (/--no\s+(human|face|hands|body_parts)|\bno\s+anatomy\b|\bno\s+portrait\b/i.test(prompt)) return false;
   if (EVENT_RE_HUMAN.test(prompt)) return true;
   return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao]|viol[êe]ncia|agress[ãa]o|hematoma|ematoma|les[ãa]o|les[õo]es|ferid[ao]|machucad[ao]|corpo|bra[cç]o|perna|pele humana|bruise|injury|wound|assault)\b/i.test(prompt);
 }
@@ -546,8 +548,8 @@ async function imagePollinations(opts: ImageOptions) {
     const [w, h] = (opts.size || "1024x1024").split("x").map((n) => parseInt(n, 10) || 1024);
     const seed = Math.floor(Math.random() * 1_000_000);
     const humanSubject = hasHumanSubject(opts.prompt);
-    const flux = compactText(buildFluxPrompt(opts.prompt), humanSubject ? 900 : 720);
-    const model = hasHumanSubject(opts.prompt) ? "flux-realism" : "flux";
+    const flux = compactText(buildFluxPrompt(opts.prompt), humanSubject ? 560 : 440);
+    const model = humanSubject ? "flux-realism" : "flux";
     const negative = humanSubject
       ? "deformed face, bad eyes, cross-eyed, bad hands, extra fingers, missing limbs, cartoon, CGI, text, watermark, logo"
       : "human, person, face, hands, fingers, body parts, fruit or food unless requested, cartoon, CGI, text, watermark, logo";
