@@ -636,7 +636,7 @@ export default function FloatingVoiceOrb() {
       const { data, error } = await supabase.functions.invoke("chat-ai", {
         body: {
           message: text,
-          history: historyRef.current.slice(-8),
+          history: historyRef.current.slice(-4),
           session_id: "kenia-voice-orb",
           system_prompt: enrichedSystem,
           context: ctxSummary,
