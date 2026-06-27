@@ -778,6 +778,15 @@ export default function ViralVideoStudio() {
 
             <div className="flex flex-wrap justify-end gap-2">
               <Button
+                onClick={enhancePrompt}
+                disabled={enhancing}
+                variant="outline"
+                className="border-gold-500/70 bg-gold-500/10 text-gold-100 hover:bg-gold-500/20"
+              >
+                {enhancing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                {enhancing ? "Aprimorando..." : "Aprimorar com IA (Ollama)"}
+              </Button>
+              <Button
                 onClick={copyPrompt}
                 variant="outline"
                 className="border-gold-700/60 bg-nude-950 text-gold-100 hover:bg-gold-500/10"
