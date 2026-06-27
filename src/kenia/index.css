@@ -249,3 +249,9 @@ h1, h2, h3, h4, h5, h6, .font-display {
     0%, 100% { transform: scale(0.92); opacity: 0.76; }
     50% { transform: scale(1.18); opacity: 1; }
 }
+
+@keyframes secretary-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1.5px) scale(1.015); }
+}
+.secretary-breathe { animation: secretary-breathe 4.2s ease-in-out infinite; transform-origin: center bottom; }
