@@ -283,7 +283,12 @@ export default function ImageFusion() {
   };
 
   const fuse = async () => {
-    if (!img1 || !img2) { toast.error("Envie as duas imagens antes de gerar"); return; }
+    if (!img1 && !img2) { toast.error("Envie ao menos uma imagem"); return; }
+    const singleMode = !!img1 && !img2;
+    if (singleMode && !prompt.trim()) {
+      toast.error("Para editar uma única imagem, descreva a alteração (ex: 'mudar a roupa para azul')");
+      return;
+    }
     setLoading(true);
     setResult(null);
     setVariants([]);
@@ -296,26 +301,33 @@ export default function ImageFusion() {
     try {
       const { data } = await api.post(
         "/creatives/fuse-images",
-        { image1_base64: img1, image2_base64: img2, prompt },
+        { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt },
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
-        await finishWithImage(data.image);
-      } else {
+        await finishWithImage(data.image, singleMode ? "Imagem editada! Salvando..." : "Imagem gerada! Salvando e criando variações...");
+      } else if (!singleMode) {
         const fallback = await buildClientFusionFallback(img1, img2);
         await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
+      } else {
+        toast.error(data.error || "Falha ao editar a imagem");
       }
     } catch (e) {
-      try {
-        const fallback = await buildClientFusionFallback(img1, img2);
-        await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
-      } catch (fallbackError) {
-        toast.error(e.response?.data?.detail || fallbackError?.message || "Erro ao gerar imagem");
+      if (!singleMode) {
+        try {
+          const fallback = await buildClientFusionFallback(img1, img2);
+          await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
+        } catch (fallbackError) {
+          toast.error(e.response?.data?.detail || fallbackError?.message || "Erro ao gerar imagem");
+        }
+      } else {
+        toast.error(e.response?.data?.error || e.message || "Erro ao editar imagem");
       }
     } finally {
       setLoading(false);
     }
   };
+
 
 
   const generateVariants = async (sourceUrl) => {
