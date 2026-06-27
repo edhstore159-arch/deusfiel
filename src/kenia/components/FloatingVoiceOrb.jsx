@@ -181,6 +181,7 @@ export default function FloatingVoiceOrb() {
     rec.onresult = (e) => {
       const txt = Array.from(e.results).map((r) => r[0].transcript).join(" ");
       setTranscript(txt);
+      lastInterimRef.current = txt;
       // Interrupção imediata: se a palavra "secretária" aparecer mesmo nos
       // resultados parciais (interim) enquanto a assistente está falando,
       // cancela a fala na hora — não espera o resultado final.
