@@ -196,49 +196,63 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   return { url: null, error: lastError || "Emergent falhou" };
 }
 
+async function callPollinations(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
+  // Free, unlimited text-to-image. Doesn't accept base64 inputs, so identity
+  // is preserved only via the elaborated prompt (the prompt engineer already
+  // describes the subject from IMAGE 1 in detail).
+  try {
+    const prompt = withFacePreservation(opts.prompt).slice(0, 1800);
+    const seed = Math.floor(Math.random() * 1e9);
+    const url =
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
+      `?width=1024&height=1024&nologo=true&enhance=true&model=flux&seed=${seed}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return { url: null, error: `Pollinations ${resp.status}` };
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.slice(i, i + 0x8000));
+    return { url: `data:image/jpeg;base64,${btoa(bin)}` };
+  } catch (e) {
+    return { url: null, error: `Pollinations erro: ${(e as Error)?.message || e}` };
+  }
+}
+
 export async function generateWithNanoBanana(
   opts: NanoBananaOptions,
 ): Promise<{ url: string | null; provider: string; error?: string }> {
-  let lovableErr = "";
-  let geminiErr = "";
+  const errs: string[] = [];
 
   if (Deno.env.get("LOVABLE_API_KEY")) {
     const r = await callLovableGateway(opts);
     if (r.url) return { url: r.url, provider: "lovable" };
-    lovableErr = r.error || "Lovable falhou";
-    console.warn("⚠️ Lovable falhou, tentando Gemini direto:", lovableErr);
+    errs.push(r.error || "Lovable falhou");
+    console.warn("⚠️ Lovable falhou:", r.error);
   }
 
   if (Deno.env.get("GEMINI_API_KEY")) {
     const r = await callGeminiDirect(opts);
     if (r.url) return { url: r.url, provider: "gemini" };
-    geminiErr = r.error || "Gemini direto falhou";
-    console.warn("⚠️ Gemini direto falhou, tentando Emergent:", geminiErr);
+    errs.push(r.error || "Gemini direto falhou");
+    console.warn("⚠️ Gemini direto falhou:", r.error);
   }
 
   const r3 = await callEmergent(opts);
   if (r3.url) return { url: r3.url, provider: "emergent" };
+  errs.push(r3.error || "Emergent falhou");
 
-  const emergentErr = r3.error || "Emergent falhou";
+  // Free fallback (no credits required)
+  const rPoll = await callPollinations(opts);
+  if (rPoll.url) {
+    console.warn("ℹ️ Usando Pollinations (gratuito) como fallback:", errs.join(" | "));
+    return { url: rPoll.url, provider: "pollinations-free" };
+  }
+  errs.push(rPoll.error || "Pollinations falhou");
+
   const localFallback = buildLocalFusionFallback(opts);
   if (localFallback) {
-    console.warn("⚠️ Todos os provedores de IA falharam; usando composição local sem IA:", [lovableErr, geminiErr, emergentErr].filter(Boolean).join(" | "));
+    console.warn("⚠️ Todos os provedores falharam; usando composição local:", errs.join(" | "));
     return { url: localFallback, provider: "local-fallback" };
   }
-  if (/\b402\b|payment_required|Not enough credits/i.test(lovableErr)) {
-    return {
-      url: null,
-      provider: "none",
-      error:
-        "Créditos da Lovable AI esgotados e fallbacks falharam. " +
-        `Gemini direto: ${geminiErr || "n/a"}. Emergent: ${emergentErr}.`,
-    };
-  }
-  return {
-    url: null,
-    provider: "none",
-    error: [lovableErr, geminiErr, emergentErr].filter(Boolean).join(" | ") || "Sem provedor disponível",
-  };
+  return { url: null, provider: "none", error: errs.filter(Boolean).join(" | ") || "Sem provedor disponível" };
 }
 
 export function stripDataUrl(url: string): string {
