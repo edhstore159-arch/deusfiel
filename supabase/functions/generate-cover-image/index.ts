@@ -299,14 +299,23 @@ Deno.serve(async (req) => {
     const toDataUrl = (b64: string) =>
       b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
 
-    // With reference image and/or logo: Gemini Nano Banana
+    // With reference image and/or logo: Gemini Nano Banana (edit-mode preserving identity)
     if (reference_image_base64 || logo_base64) {
       const imageUrls: string[] = [];
-      const promptParts: string[] = [fullPrompt];
+      const promptParts: string[] = [];
 
       if (reference_image_base64) {
         imageUrls.push(toDataUrl(reference_image_base64));
-        promptParts.push("Use a primeira imagem enviada como referência visual principal. If it contains a person, preserve the face identity and proportions; never redraw, stretch, beautify, smooth, warp, or replace facial features.");
+        promptParts.push(
+          `EDIT MODE — APPLY USER REQUEST TO THE REFERENCE IMAGE (first image).`,
+          `User request (apply literally to the reference image): "${prompt}".`,
+          `Preserve the original composition, framing, background, lighting and overall layout of the reference image. ` +
+          `If a person is visible, KEEP THE EXACT SAME FACE, identity, hair, skin tone, body proportions and clothing unless the user explicitly asks to change them. ` +
+          `Apply ONLY the modifications described by the user (color change, object swap, text edit, add/remove element, style tweak). Do not redraw the scene from scratch, do not stretch, beautify, smooth or warp facial features. ` +
+          `Output must look like the same reference photo with the requested edit applied — not a different photo.`,
+        );
+      } else {
+        promptParts.push(fullPrompt);
       }
       if (logo_base64) {
         imageUrls.push(toDataUrl(logo_base64));
@@ -328,6 +337,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     // Text-to-image: try Lovable Gateway gpt-image-2, fallback to Emergent (gpt-image-1).
     const img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "high" });
