@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
 import { ErrorDebugPopup } from "@/components/ErrorDebugPopup";
 import FloatingVoiceOrb from "@/kenia/components/FloatingVoiceOrb";
 import VirtualSecretaryAvatar from "@/kenia/components/VirtualSecretaryAvatar";
-import KeniaCallButton from "@/kenia/components/KeniaCallButton";
+
 import { api } from "@/kenia/lib/api";
 
 const LOGO_IMG = "https://customer-assets.emergentagent.com/job_nude-gold-dashboard/artifacts/ckw9kwam_IMG-20241228-WA0003.jpg";
@@ -206,7 +206,6 @@ export default function AppLayout() {
         <ErrorDebugPopup />
         <FloatingVoiceOrb />
         <VirtualSecretaryAvatar />
-        <div className="fixed top-4 right-5 z-40"><KeniaCallButton /></div>
         {/* Topbar mobile com botão de menu */}
         {/* Espaçador no mobile para que o orb fixo no topo não cubra a topbar/conteúdo */}
         <div aria-hidden="true" className="lg:hidden h-24 shrink-0" />

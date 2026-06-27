@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import avatarImg from "@/assets/secretary-avatar.png";
+import KeniaCallButton from "@/kenia/components/KeniaCallButton";
 
 /**
  * VirtualSecretaryAvatar
@@ -85,6 +86,9 @@ export default function VirtualSecretaryAvatar() {
           <p className="mt-0.5 leading-snug">{bubble}</p>
         </div>
       )}
+      <div className="pointer-events-auto mb-2 flex justify-end">
+        <KeniaCallButton />
+      </div>
       <button
         type="button"
         onClick={handleClick}
