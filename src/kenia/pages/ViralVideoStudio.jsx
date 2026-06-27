@@ -690,6 +690,26 @@ export default function ViralVideoStudio() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { key: "cinematico", label: "🎬 Cinematográfico realista" },
+                { key: "cartoon", label: "🎨 Cartoon / HeyGen (cenas)" },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setStyle(opt.key)}
+                  className={`rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${style === opt.key ? "border-gold-500 bg-gold-500/15 text-gold-100" : "border-gold-900/40 bg-nude-950/70 text-nude-300 hover:border-gold-700/70"}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {style === "cartoon" && (
+              <p className="text-xs text-nude-400 -mt-2">
+                Dica: separe cenas com linha em branco, <code>---</code> ou <code>||</code>. Cada bloco vira uma cena animada com personagem falando.
+              </p>
+            )}
+
             <div className="grid sm:grid-cols-2 gap-2">
               {Object.entries(CATEGORIES).map(([key, item]) => (
                 <button
