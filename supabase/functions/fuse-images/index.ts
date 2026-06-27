@@ -12,7 +12,7 @@ const NEGATIVE =
   "picture-in-picture, frames, borders, text, watermarks, logos";
 
 const FACE_LOCK =
-  "FACE LOCK: preserve the exact face from IMAGE 1; maintain facial geometry, skin tone, eye spacing, pupils, nose, lips, jawline and expression. Do not beautify, redraw, smooth, stretch, warp, replace or stylize the face.";
+  "FACE LOCK (1:1 identity copy): the face, head shape, hairline, hair color and texture, skin tone, freckles, marks, eye color and spacing, eyebrows, nose, lips, teeth, jawline, ears, neck and expression MUST be a pixel-faithful copy of IMAGE 1. Treat IMAGE 1 as a reference photograph of a real specific person — do NOT generate a similar-looking person, copy the SAME person. Do not beautify, redraw, smooth, stretch, warp, replace, age, de-age or stylize the face. Copy clothing, accessories and body proportions exactly from IMAGE 1.";
 
 const TEMPLATE_SYSTEM =
   "You are a photorealistic image generator prompt engineer that must STRICTLY preserve the original visual identity of the two reference images. " +
