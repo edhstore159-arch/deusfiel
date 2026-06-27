@@ -28,6 +28,16 @@ const COLOR_MAP = {
   red: { bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500" },
 };
 
+const FALLBACK_STAGES = [
+  { id: "novos_leads", label: "Novos Leads", color: "blue" },
+  { id: "em_contato", label: "Em Contato", color: "yellow" },
+  { id: "interessado", label: "Interessado", color: "green" },
+  { id: "qualificado", label: "Qualificado", color: "emerald" },
+  { id: "em_negociacao", label: "Em Negociação", color: "orange" },
+  { id: "convertido", label: "Convertido", color: "purple" },
+  { id: "nao_interessado", label: "Não Interessado", color: "red" },
+];
+
 export default function CRM() {
   const [leads, setLeads] = useState([]);
   const [stages, setStages] = useState([]);
@@ -36,8 +46,16 @@ export default function CRM() {
 
   useEffect(() => {
     api.get("/crm/stages")
-      .then((r) => setStages(Array.isArray(r?.data) ? r.data : []))
-      .catch(() => setStages([]));
+      .then((r) => {
+        const d = r?.data;
+        const list = Array.isArray(d) ? d
+          : Array.isArray(d?.stages) ? d.stages
+          : Array.isArray(d?.data) ? d.data
+          : Array.isArray(d?.items) ? d.items
+          : [];
+        setStages(list.length ? list : FALLBACK_STAGES);
+      })
+      .catch(() => setStages(FALLBACK_STAGES));
     load();
   }, []);
 
