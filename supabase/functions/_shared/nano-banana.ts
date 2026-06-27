@@ -251,18 +251,18 @@ export async function generateWithNanoBanana(
   errs.push(r3.error || "Emergent falhou");
 
   // Free text-to-image fallback (no credits required). It cannot consume
-  // uploaded/base64 reference images, so never use it for edit/template flows
-  // unless explicitly allowed; otherwise it creates a new image and loses the poster reference.
-  if (!opts.imageUrls?.length || opts.allowTextOnlyFallback) {
-    const rPoll = await callPollinations(opts);
-    if (rPoll.url) {
+  // uploaded/base64 reference images, but when all paid providers fail we
+  // still prefer a real generated image over the SVG composition.
+  const rPoll = await callPollinations(opts);
+  if (rPoll.url) {
+    if (opts.imageUrls?.length && !opts.allowTextOnlyFallback) {
+      console.warn("ℹ️ Pollinations usado como último recurso (referência perdida):", errs.join(" | "));
+    } else {
       console.warn("ℹ️ Usando Pollinations (gratuito) como fallback:", errs.join(" | "));
-      return { url: rPoll.url, provider: "pollinations-free" };
     }
-    errs.push(rPoll.error || "Pollinations falhou");
-  } else {
-    errs.push("Pollinations ignorado: não aceita imagem de referência/base64");
+    return { url: rPoll.url, provider: "pollinations-free" };
   }
+  errs.push(rPoll.error || "Pollinations falhou");
 
   const localFallback = buildLocalFusionFallback(opts);
   if (localFallback) {
