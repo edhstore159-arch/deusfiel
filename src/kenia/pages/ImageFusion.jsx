@@ -457,13 +457,16 @@ export default function ImageFusion() {
             data-testid="fusion-prompt"
             className="bg-nude-950 border-gold-900/40 text-gold-100 placeholder:text-nude-600 mt-2" />
           <div className="flex justify-end mt-4">
-            <Button onClick={fuse} disabled={loading || !img1 || !img2}
+            <Button onClick={fuse} disabled={loading || (!img1 && !img2)}
               className="bg-gradient-to-r from-gold-500 to-gold-700 hover:from-gold-400 hover:to-gold-600 text-nude-950 font-semibold"
               data-testid="fusion-generate">
               {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Gerando...</>) :
-               (<><Sparkles className="w-4 h-4 mr-2" />Gerar fusão + pack redes sociais</>)}
+               (img1 && img2
+                  ? (<><Sparkles className="w-4 h-4 mr-2" />Gerar fusão + pack redes sociais</>)
+                  : (<><Wand2 className="w-4 h-4 mr-2" />Editar imagem (1 foto · use o prompt)</>))}
             </Button>
           </div>
+
         </Card>
 
         {(generatingVariants || variants.length > 0) && (
