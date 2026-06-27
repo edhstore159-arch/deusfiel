@@ -115,8 +115,14 @@ export default function Agenda() {
   };
 
   const toggleStatus = async (item, status) => {
-    await api.patch(`/appointments/${item.id}`, { status });
-    load();
+    try {
+      await api.patch(`/appointments/${item.id}`, { status });
+      toast.success(STATUS_MESSAGES[status] || "Status atualizado");
+      if (status === "recusado") setListFilter("recusados");
+      load();
+    } catch {
+      toast.error("Não foi possível atualizar o status");
+    }
   };
 
   const copyLink = (link) => {
