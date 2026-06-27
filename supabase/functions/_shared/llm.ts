@@ -626,7 +626,7 @@ function buildFluxPrompt(raw: string): string {
 // Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
 async function imagePollinations(opts: ImageOptions) {
   try {
-    const [w, h] = (opts.size || "1024x1024").split("x").map((n) => parseInt(n, 10) || 1024);
+    const [w, h] = (opts.size || "1536x1536").split("x").map((n) => parseInt(n, 10) || 1536);
     const seed = Math.floor(Math.random() * 1_000_000);
     const humanSubject = hasHumanSubject(opts.prompt);
     const flux = compactText(buildFluxPrompt(opts.prompt), humanSubject ? 560 : 440);
