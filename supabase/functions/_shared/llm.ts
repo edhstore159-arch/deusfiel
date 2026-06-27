@@ -269,16 +269,52 @@ function normalizePromptTypos(raw: string): string {
   return out;
 }
 
+// Detecta cores explicitamente pedidas pelo usuário (pt-BR / en) e devolve
+// uma diretiva forte para garantir que o gerador respeite a tonalidade.
+const USER_COLOR_MAP: Array<[RegExp, string]> = [
+  [/\b(azul|azuis|blue|azulado[ao]?|azulada)\b/i, "blue (#1e88e5, vivid blue tones)"],
+  [/\b(vermelh[ao]s?|red|avermelhad[ao]s?)\b/i, "red (#e53935, vivid red tones)"],
+  [/\b(verde[s]?|green|esverdead[ao]s?)\b/i, "green (#43a047, vivid green tones)"],
+  [/\b(amarel[ao]s?|yellow)\b/i, "yellow (#fdd835, vivid yellow tones)"],
+  [/\b(rosa|pink|rosad[ao]s?)\b/i, "pink (#ec407a, vivid pink tones)"],
+  [/\b(rox[ao]s?|lil[áa]s|purple|violet[ao]?|violeta)\b/i, "purple/violet (#8e24aa, vivid purple tones)"],
+  [/\b(laranja|orange|alaranjad[ao]s?)\b/i, "orange (#fb8c00, vivid orange tones)"],
+  [/\b(pret[ao]s?|negr[ao]s?|black)\b/i, "black (#111111, deep black tones)"],
+  [/\b(branc[ao]s?|white)\b/i, "white (#fafafa, clean white tones)"],
+  [/\b(cinza|cinzent[ao]s?|gray|grey)\b/i, "gray (#9e9e9e)"],
+  [/\b(marrom|castanh[ao]s?|brown)\b/i, "brown (#6d4c41)"],
+  [/\b(dourad[ao]s?|gold|golden|ouro)\b/i, "gold (#d4af37, metallic gold)"],
+  [/\b(pratead[ao]s?|prata|silver)\b/i, "silver (#bdbdbd, metallic silver)"],
+  [/\b(turquesa|turquoise|ciano|cyan)\b/i, "turquoise/cyan (#26c6da)"],
+  [/\b(magenta|fucsia|f[úu]csia)\b/i, "magenta (#d81b60)"],
+];
+
+function extractUserColors(prompt: string): string {
+  const found: string[] = [];
+  for (const [re, label] of USER_COLOR_MAP) {
+    if (re.test(prompt) && !found.includes(label)) found.push(label);
+  }
+  return found.join(" + ");
+}
+
+function withColorLock(prompt: string): string {
+  const colors = extractUserColors(prompt);
+  if (!colors) return prompt;
+  return `${prompt}. STRICT COLOR LOCK: the main subject MUST be predominantly ${colors}. Apply this color to the primary surfaces (wings/feathers/petals/body/material) of the requested subject. Do not default to natural/generic coloring; the user explicitly asked for this color. negative colors: any other dominant hue that contradicts ${colors}.`;
+}
+
 
 function withFaceSafety(prompt: string) {
-  if (isScenerySubject(prompt)) {
-    return `${prompt}. NATURAL LANDSCAPE LOCK: render a real outdoor landscape/sky phenomenon exactly as described. For sunset/sunrise: show the real sun near the horizon, illuminated clouds, warm atmospheric light, natural sky gradients, realistic terrain/ocean/mountains if implied. Do not add people, faces, eyes, mouths, portraits, silhouettes, hands, fingers, skin, body parts, anthropomorphic shapes, or face-like patterns in the sun or clouds.`;
+  const colored = withColorLock(prompt);
+  if (isScenerySubject(colored)) {
+    return `${colored}. NATURAL LANDSCAPE LOCK: render a real outdoor landscape/sky phenomenon exactly as described. For sunset/sunrise: show the real sun near the horizon, illuminated clouds, warm atmospheric light, natural sky gradients, realistic terrain/ocean/mountains if implied. Do not add people, faces, eyes, mouths, portraits, silhouettes, hands, fingers, skin, body parts, anthropomorphic shapes, or face-like patterns in the sun or clouds.`;
   }
-  if (!hasHumanSubject(prompt)) {
-    return `${prompt}. Standalone subject lock: render strictly and only what the user described, with correct real-world structure and materials. Do not add unrelated items, do not add fruits or food unless the user explicitly asked for them, do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features.`;
+  if (!hasHumanSubject(colored)) {
+    return `${colored}. Standalone subject lock: render strictly and only what the user described, with correct real-world structure, materials AND COLORS. Do not add unrelated items, do not add fruits or food unless the user explicitly asked for them, do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features.`;
   }
-  return `${prompt}. FACE FIRST MODE: prioritize correct facial anatomy over style, background, props and decorative details. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative face anatomy: ${FACE_NEGATIVE_PROMPT}. Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.`;
+  return `${colored}. FACE FIRST MODE: prioritize correct facial anatomy over style, background, props and decorative details. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative face anatomy: ${FACE_NEGATIVE_PROMPT}. Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.`;
 }
+
 
 function handInstructionFor(prompt: string) {
   if (EATING_CAKE_RE.test(prompt)) {
