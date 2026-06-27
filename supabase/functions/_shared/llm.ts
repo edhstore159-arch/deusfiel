@@ -264,6 +264,9 @@ function normalizePromptTypos(raw: string): string {
 
 
 function withFaceSafety(prompt: string) {
+  if (isScenerySubject(prompt)) {
+    return `${prompt}. NATURAL LANDSCAPE LOCK: render a real outdoor landscape/sky phenomenon exactly as described. For sunset/sunrise: show the real sun near the horizon, illuminated clouds, warm atmospheric light, natural sky gradients, realistic terrain/ocean/mountains if implied. Do not add people, faces, eyes, mouths, portraits, silhouettes, hands, fingers, skin, body parts, anthropomorphic shapes, or face-like patterns in the sun or clouds.`;
+  }
   if (!hasHumanSubject(prompt)) {
     return `${prompt}. Standalone subject lock: render strictly and only what the user described, with correct real-world structure and materials. Do not add unrelated items, do not add fruits or food unless the user explicitly asked for them, do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features.`;
   }
@@ -520,6 +523,9 @@ function buildFluxPrompt(raw: string): string {
 
   // Non-human subjects (fruit, objects, scenery): keep prompt faithful, no portrait lock.
   if (!hasHumanSubject(base)) {
+    if (isScenerySubject(base)) {
+      return `${base}, photorealistic natural landscape photography, real sky, real sun, warm golden atmospheric light, illuminated clouds, natural horizon, realistic colors and shadows, high detail, sharp focus. Landscape lock: no humans, no people, no face in the sun, no face in clouds, no eyes, no mouth, no portrait, no silhouettes, no hands, no fingers, no body parts, no anthropomorphic or surreal elements. negative: human, person, face, eyes, mouth, portrait, body parts, anthropomorphic sun, face-shaped clouds, cartoon, CGI, text, watermark, logo`;
+    }
     const isFruit = /\b(fruit|apple|maçã|maca|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi)\b/i.test(base);
     const isLandmark = /\b(torre\s+eiffel|eiffel\s+tower|cristo\s+redentor|estatua\s+da\s+liberdade|statue\s+of\s+liberty|big\s+ben|coliseu|colosseum|taj\s+mahal|pir[âa]mide|pyramid|monumento|monument|cathedral|catedral|igreja|church|castelo|castle|ponte|bridge|arranha-c[ée]u|skyscraper|edif[íi]cio|building|pr[ée]dio|arquitetura|architecture|landmark|skyline|cidade|city|paisagem urbana)\b/i.test(base);
     const SUBJECT_WORD = isFruit ? "fruit" : (isLandmark ? "landmark/architectural structure" : "object");
