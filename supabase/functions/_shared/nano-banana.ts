@@ -250,19 +250,22 @@ export async function generateWithNanoBanana(
   if (r3.url) return { url: r3.url, provider: "emergent" };
   errs.push(r3.error || "Emergent falhou");
 
-  // Free text-to-image fallback (no credits required). It cannot consume
-  // uploaded/base64 reference images, but when all paid providers fail we
-  // still prefer a real generated image over the SVG composition.
-  const rPoll = await callPollinations(opts);
-  if (rPoll.url) {
-    if (opts.imageUrls?.length && !opts.allowTextOnlyFallback) {
-      console.warn("ℹ️ Pollinations usado como último recurso (referência perdida):", errs.join(" | "));
-    } else {
+  const hasReferenceImages = Boolean(opts.imageUrls?.length);
+
+  // Pollinations is text-only and cannot see uploaded reference images. For
+  // edit/template flows, never use it unless the caller explicitly allows a
+  // new image, otherwise it creates an unrelated image and breaks the user's
+  // expectation that the uploaded file is the base canvas.
+  if (!hasReferenceImages || opts.allowTextOnlyFallback) {
+    const rPoll = await callPollinations(opts);
+    if (rPoll.url) {
       console.warn("ℹ️ Usando Pollinations (gratuito) como fallback:", errs.join(" | "));
+      return { url: rPoll.url, provider: "pollinations-free" };
     }
-    return { url: rPoll.url, provider: "pollinations-free" };
+    errs.push(rPoll.error || "Pollinations falhou");
+  } else {
+    errs.push("Fallback Pollinations ignorado porque não preserva imagem de referência");
   }
-  errs.push(rPoll.error || "Pollinations falhou");
 
   const localFallback = buildLocalFusionFallback(opts);
   if (localFallback) {
