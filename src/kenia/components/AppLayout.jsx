@@ -206,7 +206,6 @@ export default function AppLayout() {
         <ErrorDebugPopup />
         <FloatingVoiceOrb />
         <VirtualSecretaryAvatar />
-        <div className="fixed top-4 right-5 z-40"><KeniaCallButton /></div>
         {/* Topbar mobile com botão de menu */}
         {/* Espaçador no mobile para que o orb fixo no topo não cubra a topbar/conteúdo */}
         <div aria-hidden="true" className="lg:hidden h-24 shrink-0" />
