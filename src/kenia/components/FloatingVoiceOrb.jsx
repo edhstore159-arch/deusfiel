@@ -270,6 +270,7 @@ export default function FloatingVoiceOrb() {
       if (!shouldRestartRef.current || !alwaysOnRef.current) return;
       restartContinuousRecognition(speakingRef.current ? 700 : 300);
     };
+    recognitionRef.current = rec;
     return () => {
       shouldRestartRef.current = false;
       commandSessionActiveRef.current = false;
