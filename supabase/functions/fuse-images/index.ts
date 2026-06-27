@@ -52,23 +52,46 @@ async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
   return `Place the person from IMAGE 1 (preserve exact identity, face, skin, hair, clothing, accessories) inside the environment from IMAGE 2 (preserve its lighting, palette, time of day, mood). ${FACE_LOCK} Single seamless photorealistic composition, match perspective and shadows, no collage, no split-screen. ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
 }
 
+const EDIT_SINGLE_SYSTEM =
+  "You are a photorealistic image editor prompt engineer. You receive ONE reference image and a user instruction (often a color change or local edit). " +
+  "Produce ONE single-line English prompt that re-renders the SAME image with the user's edit applied — preserve identity, composition, lighting, perspective, background and all other details. " +
+  "If the user mentions a color (e.g. 'azul', 'vermelho', 'dourado'), apply that color clearly and dominantly to the requested area (clothing, hair, object, eyes, background — whichever the user named, defaulting to the main subject). " +
+  "Output ONLY the filled prompt as a single line. End with: 'Negative: " + NEGATIVE + "'.";
+
+async function elaborateEditPrompt(userPrompt: string): Promise<string> {
+  const userTheme = (userPrompt || "").trim() || "Re-render the same image preserving identity.";
+  try {
+    const r = await chatCompletion({
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: EDIT_SINGLE_SYSTEM },
+        { role: "user", content: `USER EDIT INSTRUCTION (apply exactly, preserve identity and composition):\n"""${userTheme}"""` },
+      ],
+    });
+    if (r.ok) {
+      const txt = r.data?.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 20) return txt;
+    }
+  } catch (_e) { /* fallback */ }
+  return `Edit the reference image as follows: ${userTheme}. Preserve identity, composition, perspective, lighting and background; apply the requested color/edit clearly and dominantly to the relevant area. ${FACE_LOCK} ${REALISM}. Negative: ${NEGATIVE}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
     const { image1_base64, image2_base64, prompt } = await req.json();
-    if (!image1_base64 || !image2_base64) {
-      return new Response(JSON.stringify({ ok: false, error: 'Envie as duas imagens.' }), {
+    if (!image1_base64) {
+      return new Response(JSON.stringify({ ok: false, error: 'Envie ao menos uma imagem.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const fullPrompt = await elaborateFusionPrompt(prompt);
+    const isSingle = !image2_base64;
+    const fullPrompt = isSingle ? await elaborateEditPrompt(prompt) : await elaborateFusionPrompt(prompt);
+    const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64];
 
-    const result = await generateWithNanoBanana({
-      prompt: fullPrompt,
-      imageUrls: [image1_base64, image2_base64],
-    });
+    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls });
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {
@@ -76,7 +99,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, image: result.url, provider: result.provider, prompt_used: fullPrompt }), {
+    return new Response(JSON.stringify({ ok: true, image: result.url, provider: result.provider, prompt_used: fullPrompt, mode: isSingle ? 'edit' : 'fusion' }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
@@ -85,3 +108,4 @@ Deno.serve(async (req) => {
     });
   }
 });
+
