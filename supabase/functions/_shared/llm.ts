@@ -461,20 +461,25 @@ async function imageEmergent(opts: ImageOptions) {
   return { ok: true as const, b64, provider: "emergent" };
 }
 
-// Compact Flux-friendly prompt: short, dense English, subject→look→scene→light→style + negative.
+const compactText = (value: string, max = 420) => (value || "")
+  .replace(/\[[^\]]+\]/g, " ")
+  .replace(/\b(FACE|HAND|ANATOMY|REALISM|Negative|SUBJECT|OBJECT|EVENT|SURREAL|CAKE)[^.:\n]{0,80}[:.]/gi, " ")
+  .replace(/--[a-z0-9_-]+(?:\s+[a-z0-9_-]+)?/gi, " ")
+  .replace(/\s+/g, " ")
+  .trim()
+  .slice(0, max)
+  .replace(/[,.;:\s]+$/g, "");
+
+// Prompt curto para Pollinations/Flux. Esse provider usa URL GET; prompts longos dão HTTP 414.
 function buildFluxPrompt(raw: string): string {
   const fixed = normalizePromptTypos(raw);
-  const base = fixed
-    .replace(/\[[^\]]+\]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 320);
+  const base = compactText(fixed, 360);
 
   // Forensic/legal context: bruises, injuries, domestic violence evidence imagery.
   const isForensic = /\b(viol[êe]ncia|agress[ãa]o|agredid[ao]|hematoma|ematoma|machucad[ao]|les[ãa]o|les[õo]es|ferid[ao]|ferimento|cicatriz|soco|chute|tapa|espancad[ao]|abuso|dom[ée]stica|bruise|bruised|injur(y|ies)|wound|assault|battered|forensic|per[íi]cia|laudo)\b/i.test(base);
   if (isForensic) {
-    const FORENSIC = "realistic forensic photography for legal evidence (laudo pericial), documentary style, clinical neutral lighting, plain background, visible bruises (hematomas) with realistic purple-blue and yellow-green discoloration, swelling, abrasions, scratches consistent with the described injury, anatomically accurate skin, respectful framing, non-sexualized, no graphic blood spray, suitable as judicial evidence";
-    const NEG = "negative: cartoon, illustration, painting, stylized, glamour, fashion editorial, gore exploitation, sexualized, deformed anatomy, extra limbs, text, watermark, logo, low quality, blurry";
+    const FORENSIC = "realistic forensic documentary photo, clinical neutral light, plain background, accurate bruises/injuries, respectful legal evidence style";
+    const NEG = "negative: cartoon, glamour, gore, deformed anatomy, text, watermark";
     return `${base}. ${FORENSIC}. ${NEG}`;
   }
 
@@ -492,17 +497,15 @@ function buildFluxPrompt(raw: string): string {
       ? ", architectural photography, accurate proportions, true-to-life structure, recognizable silhouette, real-world location, no fantasy elements, no surreal additions"
       : "";
     const OBJECT_LOCK = `SUBJECT LOCK (critical): the subject is a ${SUBJECT_WORD}. Render ONLY the requested ${SUBJECT_WORD} as described, with correct real-world structure, scale and materials. Do not add unrelated items, do not add fruits, food, people, faces, eyes, mouths, arms, hands, fingers, skin, nails, limbs or any human body part. Never fuse the subject with anatomy or with any other object category. Stay strictly faithful to the user's literal request.`;
-    const STYLE = `photorealistic photography, high detail, natural lighting, sharp focus, 8k${FRUIT_STYLE}${LANDMARK_STYLE}, isolated standalone subject, clear silhouette, no human presence`;
+    const STYLE = `photorealistic, high detail, natural light, sharp focus${FRUIT_STYLE}${LANDMARK_STYLE}, isolated standalone subject, clear silhouette, no human presence`;
     const extraNeg = isFruit ? "" : ", fruit, apple, banana, orange, food, produce, fruit basket, random fruit added to scene";
-    const NEG = `negative: blurry, low quality, text, watermark, logo, deformed, mutated, disfigured, melted, warped, extra parts, duplicated, asymmetrical, cartoon, illustration, painting, CGI, human hands, fingers, arms, legs, body parts, skin, fingernails, face, eyes, mouth, person holding object, anthropomorphic, object with face, object with limbs, unrelated objects, unrequested items${extraNeg}`;
+    const NEG = `negative: blurry, low quality, text, watermark, logo, deformed, cartoon, CGI, human hands, fingers, face, person, anthropomorphic, unrelated objects${extraNeg}`;
     return `${base}, ${STYLE}. ${OBJECT_LOCK} ${NEG}`;
 
   }
 
-  const HAND_DETAIL =
-    "anatomically perfect human hand with exactly five fingers per hand (one opposable thumb + four fingers), correct finger count, no extra fingers, no missing fingers, natural finger proportions, individually separated fingers, visible knuckles and natural creases, realistic fingernails, correct thumb placement and angle, natural wrist connection, realistic palm structure";
-  const BODY_DETAIL =
-    "anatomically correct full human body, realistic proportions (Vitruvian proportions: head ~1/7.5 of body height), natural shoulder width, correct spine curvature, two arms with correct elbow and wrist joints, two legs with correct knee and ankle joints, hands and feet at correct ends of limbs, no extra or missing limbs, no twisted or dislocated joints, natural standing/walking posture, realistic clothing draping with correct fabric folds";
+  const HAND_DETAIL = "natural hands only if needed, five fingers, correct thumb, no extra or fused fingers";
+  const BODY_DETAIL = "anatomically correct human body, natural proportions and posture, no extra or missing limbs";
   const isEatingCake = EATING_CAKE_RE.test(base);
   const isMultiPerson = /\b(people|persons|pessoas|crowd|multid[ãa]o|grupo|group|family|fam[íi]lia|couple|casal|tourists|turistas|friends|amigos)\b/i.test(base);
   const isFullBody = isMultiPerson || /\b(full body|corpo inteiro|de corpo inteiro|standing|walking|running|sentad[ao]|de p[ée]|andando|correndo|posando|posing|dan[çc]ando|dancing|jogando|playing|na frente|in front of|na torre|at the tower|no monumento|at the monument|na praia|at the beach|na rua|on the street|na cidade|in the city|landmark|eiffel|cristo redentor|coliseu|colosseum|big ben|taj mahal)\b/i.test(base);
@@ -515,20 +518,17 @@ function buildFluxPrompt(raw: string): string {
     ? "wide full-body composition with environment visible, subjects positioned naturally within the scene, complete bodies (head, torso, arms, legs, hands and feet all visible and anatomically correct)"
     : "chest-up composition, hands preferably out of frame";
   const STYLE =
-    `${subjectClause}, RAW photo, photorealistic, professional editorial photography, shot on Canon EOS R5 with ${isFullBody ? "35mm f/2.0" : "85mm f/1.4"} lens, ISO 200, natural light, ` +
-    "real human skin with visible pores, peach fuzz, subtle imperfections, subsurface scattering, " +
-    "correct facial anatomy, two anatomically aligned eyes of similar size with centered pupils and realistic iris catchlights, individual eyelashes, natural eyebrows, " +
-    "symmetric realistic nose, natural lips with fine lines, natural teeth with slight variation, " +
+    `${subjectClause}, RAW photorealistic DSLR photo, ${isFullBody ? "35mm" : "85mm"} lens, natural light, ` +
+    "real skin texture, correct face, aligned eyes, centered pupils, natural nose, mouth and teeth, " +
     `${compositionClause}, ` +
     (isFullBody || isEatingCake ? BODY_DETAIL + ", " : "") +
     "if hands appear they must pass strict anatomy: " +
     HAND_DETAIL + ", " +
     "cinematic natural lighting, sharp focus, 8k, unedited, no beauty filter, no AI-generated look";
   const BODY_NEG = isFullBody || isEatingCake
-    ? ", deformed body, mutated body, disfigured body, distorted body, malformed body, twisted torso, broken spine, wrong proportions, extra arms, extra legs, missing arms, missing legs, extra limbs, missing limbs, fused limbs, duplicated limbs, floating limbs, detached limbs, disjointed limbs, dislocated joints, impossible pose, broken knees, broken elbows, backwards joints, limbs growing from wrong place, conjoined people, merged people, fused faces, identical clones, bad anatomy, bad proportions, gigantic head, tiny head, long neck, short neck, no neck"
+    ? ", deformed body, bad anatomy, wrong proportions, extra limbs, missing limbs, fused limbs, impossible pose"
     : "";
-  const NEG =
-    `negative: blurry, low quality, ${FACE_NEGATIVE_PROMPT}, distorted face, deformed face, warped face, melted face, mutated face, disfigured, facial asymmetry caused by generation error, mismatched eyes, different sized eyes, asymmetric eyes (unnatural), cross-eyed, lazy eye, dead eyes, glassy eyes, empty stare, extra eyes, fused eyes, third eye, double pupils, wrong pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, body parts fused with object, object merged with body${BODY_NEG}, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
+  const NEG = `negative: blurry, low quality, deformed face, asymmetrical eyes, cross-eyed, extra eyes, double nose, double mouth, bad teeth, plastic skin, CGI, cartoon, illustration${BODY_NEG}, bad hands, extra fingers, missing fingers, fused fingers, text, watermark, logo`;
   const handsClause = isEatingCake
     ? `${handInstructionFor(base)} ${HAND_DETAIL}. Keep cake, fork, plate and fingers separated with correct contact shadows; never merge cake frosting with hands, mouth, arms, or skin.`
     : isFullBody
