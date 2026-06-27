@@ -1,5 +1,5 @@
 import { generateWithNanoBanana, stripDataUrl } from '../_shared/nano-banana.ts';
-import { generateImage, hasHumanSubject, hasHybridRequest } from '../_shared/llm.ts';
+import { generateImage, hasHumanSubject, hasHybridRequest, isScenerySubject } from '../_shared/llm.ts';
 import { chatCompletion } from '../_shared/llm.ts';
 
 const corsHeaders = {
@@ -95,6 +95,17 @@ function objectLockFor(prompt: string) {
   return `SUBJECT LOCK (CRITICAL): the subject is the ${subject} literally described by the user. Render ONLY that subject as requested, with correct real-world structure, proportions and materials. Do not add unrelated items, do not add fruit or food unless the user explicitly asked for fruit, do not add people, faces, eyes, mouths, arms, hands, fingers, skin, fingernails, limbs, body parts, portraits, or anthropomorphic traits.`;
 }
 
+function scenerySceneFor(prompt: string) {
+  return [
+    `Faithful photorealistic natural landscape photograph of: ${prompt}.`,
+    "SCENERY LOCK (CRITICAL): this is a real outdoor nature/sky scene, not a portrait, not a person, not an anthropomorphic image. For sunset/sunrise: render the real sun near the horizon, illuminated clouds, warm orange/red/gold sky, realistic atmospheric light rays, natural horizon and believable terrain/ocean/mountains only when implied by the prompt.",
+    "Do NOT add human faces, eyes, mouths, portraits, people, silhouettes, hands, fingers, skin, body parts, face-like shapes in the sun, or face-like shapes in the clouds. Do NOT turn the sun into a character.",
+    "Use natural landscape photography, realistic colors, coherent scale, true sky/cloud physics, sharp focus, high detail, no surreal additions.",
+    "Negative: human, person, face, eyes, mouth, portrait, facial features, anthropomorphic sun, face in sun, face in clouds, human silhouette, hands, fingers, body parts, cartoon, CGI, illustration, text, watermark, logo.",
+    "--style raw --photorealism high --no human --no face --no eyes --no portrait --no anthropomorphic",
+  ].join(" ");
+}
+
 function eventSceneFor(prompt: string) {
   const cakeEating = EATING_CAKE_RE.test(prompt);
   return [
@@ -130,6 +141,10 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
 
   if (isEvent && !hybrid) {
     return eventSceneFor(userTheme);
+  }
+
+  if (!hybrid && isScenerySubject(userTheme)) {
+    return scenerySceneFor(userTheme);
   }
 
 
@@ -231,6 +246,7 @@ Deno.serve(async (req) => {
     const hybridSubject = hasHybridRequest(prompt);
     const isolatedOnly = isIsolatedObjectOnly(prompt);
     const eventSubject = !isolatedOnly && EVENT_RE.test(prompt) && !hybridSubject;
+    const scenerySubject = !hybridSubject && isScenerySubject(prompt);
     const humanSubject = !isolatedOnly && (hasHumanSubject(prompt) || eventSubject) && !hybridSubject;
     const handGuard = handCompositionGuard(prompt);
     const cakeEating = EATING_CAKE_RE.test(prompt);
@@ -269,11 +285,13 @@ Deno.serve(async (req) => {
     ].join("\n") : [
       userElaborated,
       "",
-      objectLockFor(prompt),
+      scenerySubject ? "SCENERY LOCK: render only the requested natural landscape/sky phenomenon. No humans, no faces, no eyes, no mouth, no portrait, no person silhouette, no anthropomorphic sun/clouds." : objectLockFor(prompt),
       "",
-      "Photorealistic non-human subject, faithful to the user's literal request, realistic material, correct natural form, clean silhouette, no anatomy, no portrait, no skin, no hands, no fingers, no face, no person, no human body parts, no fruit or food unless the user explicitly asked for it.",
-      `Negative prompt: person, people, human, face, portrait, eyes, mouth, skin, arm, hand, finger, nails, limb, body, body parts, holding, human-object hybrid, anthropomorphic, mutated, melted, warped, deformed, duplicated parts, CGI, cartoon, illustration, text, watermark, logo, unrelated objects${FRUIT_RE.test(prompt) ? "" : ", fruit, apple, banana, orange, food, produce, fruit basket"}.`,
-      "--style raw --photorealism high --no human --no face --no hands --no fingers --no skin --no body_parts --no anthropomorphic --no object_anatomy_fusion",
+      scenerySubject
+        ? "Photorealistic natural landscape, faithful to the user's literal request, real sun/sky/clouds, warm atmospheric lighting, natural horizon, no anatomy, no portrait, no skin, no hands, no fingers, no face, no person, no human body parts."
+        : "Photorealistic non-human subject, faithful to the user's literal request, realistic material, correct natural form, clean silhouette, no anatomy, no portrait, no skin, no hands, no fingers, no face, no person, no human body parts, no fruit or food unless the user explicitly asked for it.",
+      `Negative prompt: person, people, human, face, portrait, facial features, eyes, mouth, skin, arm, hand, finger, nails, limb, body, body parts, holding, human-object hybrid, anthropomorphic, face in sun, face in clouds, mutated, melted, warped, deformed, duplicated parts, CGI, cartoon, illustration, text, watermark, logo, unrelated objects${FRUIT_RE.test(prompt) || scenerySubject ? "" : ", fruit, apple, banana, orange, food, produce, fruit basket"}.`,
+      "--style raw --photorealism high --no human --no face --no eyes --no portrait --no hands --no fingers --no skin --no body_parts --no anthropomorphic --no object_anatomy_fusion",
     ].join("\n");
 
 
