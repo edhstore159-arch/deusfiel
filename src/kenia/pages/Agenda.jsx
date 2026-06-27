@@ -309,9 +309,17 @@ export default function Agenda() {
 
         {view === "list" && (
           <div className="space-y-3">
+            <div className="inline-flex border border-nude-200 rounded-md p-0.5 bg-white">
+              <Button size="sm" variant={listFilter === "ativos" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setListFilter("ativos")} data-testid="filter-ativos">
+                Ativos
+              </Button>
+              <Button size="sm" variant={listFilter === "recusados" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setListFilter("recusados")} data-testid="filter-recusados">
+                Recusados / Excluídos ({appointments.filter(isRejected).length})
+              </Button>
+            </div>
             {upcoming.length === 0 ? (
               <Card className="p-10 border-dashed border-nude-300 text-center text-nude-400">
-                Nenhuma reunião agendada. Clique em "Nova reunião" para começar.
+                {listFilter === "recusados" ? "Nenhum agendamento recusado." : 'Nenhuma reunião agendada. Clique em "Nova reunião" para começar.'}
               </Card>
             ) : upcoming.map(it => {
               const d = new Date(it.starts_at);
