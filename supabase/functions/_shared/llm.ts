@@ -496,7 +496,7 @@ function buildFluxPrompt(raw: string): string {
     const LANDMARK_STYLE = isLandmark
       ? ", architectural photography, accurate proportions, true-to-life structure, recognizable silhouette, real-world location, no fantasy elements, no surreal additions"
       : "";
-    const OBJECT_LOCK = `SUBJECT LOCK (critical): the subject is a ${SUBJECT_WORD}. Render ONLY the requested ${SUBJECT_WORD} as described, with correct real-world structure, scale and materials. Do not add unrelated items, do not add fruits, food, people, faces, eyes, mouths, arms, hands, fingers, skin, nails, limbs or any human body part. Never fuse the subject with anatomy or with any other object category. Stay strictly faithful to the user's literal request.`;
+    const OBJECT_LOCK = `Subject lock: only the requested ${SUBJECT_WORD}, correct structure/materials; no unrelated items, fruit/food unless requested, people, faces, hands or body parts.`;
     const STYLE = `photorealistic, high detail, natural light, sharp focus${FRUIT_STYLE}${LANDMARK_STYLE}, isolated standalone subject, clear silhouette, no human presence`;
     const extraNeg = isFruit ? "" : ", fruit, apple, banana, orange, food, produce, fruit basket, random fruit added to scene";
     const NEG = `negative: blurry, low quality, text, watermark, logo, deformed, cartoon, CGI, human hands, fingers, face, person, anthropomorphic, unrelated objects${extraNeg}`;
@@ -545,12 +545,12 @@ async function imagePollinations(opts: ImageOptions) {
   try {
     const [w, h] = (opts.size || "1024x1024").split("x").map((n) => parseInt(n, 10) || 1024);
     const seed = Math.floor(Math.random() * 1_000_000);
-    const flux = buildFluxPrompt(opts.prompt);
-    const model = hasHumanSubject(opts.prompt) ? "flux-realism" : "flux";
     const humanSubject = hasHumanSubject(opts.prompt);
+    const flux = compactText(buildFluxPrompt(opts.prompt), humanSubject ? 900 : 720);
+    const model = hasHumanSubject(opts.prompt) ? "flux-realism" : "flux";
     const negative = humanSubject
-      ? `${FACE_NEGATIVE_PROMPT}, ${HAND_NEGATIVE_PROMPT}, bad anatomy, extra limbs, missing limbs, text, watermark, logo, cartoon, CGI, illustration`
-      : "human, person, face, hands, fingers, body parts, fruit or food unless requested, text, watermark, logo, cartoon, CGI, illustration";
+      ? "deformed face, bad eyes, cross-eyed, bad hands, extra fingers, missing limbs, cartoon, CGI, text, watermark, logo"
+      : "human, person, face, hands, fingers, body parts, fruit or food unless requested, cartoon, CGI, text, watermark, logo";
     const enhance = humanSubject ? "false" : "true";
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=${enhance}&model=${model}&negative=${encodeURIComponent(negative)}`;
     const resp = await fetch(url);
