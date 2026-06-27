@@ -30,8 +30,8 @@ const NEG =
   "close-up only, face only, cropped body, blurry, low quality, watermark, logo, text, typography";
 
 const FACE_LOCK =
-  "FACE LOCK (CRITICAL — must be respected above all stylistic choices): render a single anatomically correct human face with symmetric, balanced and properly aligned features. " +
-  "Exactly two eyes that are IDENTICAL in size, shape, height, width and tilt — perfectly symmetric on the horizontal axis, same eyelid opening, same iris diameter, same pupil size, both looking in exactly the same direction. Eye size must be anatomically correct relative to the face (roughly one eye-width between the two eyes, eye width approximately 1/5 of face width) — never oversized, never bulging, never one eye larger than the other, never asymmetric. Realistic pupils centered in the iris, detailed irises, natural eyelids and sharp catchlights. " +
+  "FACE LOCK (CRITICAL — must be respected above all stylistic choices): render every visible human face as an anatomically correct, natural real face with balanced and properly aligned features. " +
+  "Exactly two eyes placed on the same natural horizontal line, similar in size/shape/opening/tilt, with both pupils centered and looking in the same coherent direction. Eye size must be anatomically correct relative to the face (roughly one eye-width between the two eyes, eye width approximately 1/5 of face width) — never oversized, never bulging, never one eye larger than the other due to generation error. Realistic pupils centered in the iris, detailed irises, natural eyelids and sharp catchlights. " +
   "One nose centered between the eyes with realistic nostrils. One mouth with natural lips and natural teeth alignment when visible. Two ears in correct position when visible. " +
   "Natural jawline and chin, balanced facial proportions, correct head-to-body ratio, one head per person, no duplicated, floating or detached features. " +
   "Realistic skin texture with pores and subtle imperfections, relaxed authentic expression, no warping, no melting, no smoothing that changes identity, no beautification filter. " +
@@ -41,6 +41,9 @@ const FACE_LOCK =
   "The gaze must have clear INTENT and DIRECTION — looking at the camera, at another person, or at an object in the scene — conveying a real human emotion consistent with the scene (attention, empathy, curiosity, determination, warmth, focus). " +
   "Micro-expressions around the eyes (slight brow movement, natural eyelid creases, subtle smile lines when appropriate) must reinforce the emotion. " +
   "Forbidden: empty stare, soulless eyes, glassy eyes, white/grey pupils, misaligned gaze, cross-eyed look, unfocused eyes, eyes pointing in different directions, dilated unnatural pupils, dead expression.";
+
+const FACE_REPAIR_LOCK =
+  "FACE REPAIR LOCK: if the model is uncertain, simplify the composition before deforming the face. Prefer one to three people, keep the main face at medium portrait size, avoid tiny background faces, avoid extreme wide-angle face distortion, avoid profile faces unless requested, avoid faces partly hidden by objects, hair or hands. Run a final visual QA pass on every face: two aligned eyes, centered pupils, one nose, one mouth, normal teeth, normal jaw, no melted skin, no duplicated facial features, no facial features fused with hair/clothing/objects.";
 
 const ANATOMY_LOCK =
   "ANATOMY LOCK (CRITICAL — must be respected above stylistic choices): render an anatomically correct human body with perfectly natural proportions and joint placement. " +
@@ -177,6 +180,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             "- SCENE: describe the scene faithfully from the user theme.",
             "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise.",
             `- FACE QUALITY: ${FACE_LOCK}`,
+            `- FACE REPAIR: ${FACE_REPAIR_LOCK}`,
             `- HAND QUALITY: ${HAND_LOCK}`,
             `- HAND FRAMING: ${HAND_AVOIDANCE}`,
             `- CAKE EATING SCENES: ${CAKE_EATING_LOCK}`,
@@ -237,6 +241,8 @@ Deno.serve(async (req) => {
       "",
       FACE_LOCK,
       "",
+      FACE_REPAIR_LOCK,
+      "",
       "Negative prompt: extra limbs, extra arms, extra legs, visible hands, fingers, body, torso, deformed face, asymmetric eyes, duplicated features, melted, warped, low quality, text, watermark, logo.",
       "--style raw --photorealism high",
     ].join("\n") : humanSubject ? [
@@ -245,6 +251,8 @@ Deno.serve(async (req) => {
       `REALISM REQUIREMENTS: ${REALISM}`,
       "",
       FACE_LOCK,
+      "",
+      FACE_REPAIR_LOCK,
       "",
       ANATOMY_LOCK,
       "",
@@ -256,7 +264,7 @@ Deno.serve(async (req) => {
       "",
       HAND_AVOIDANCE,
       "",
-      `Negative prompt: ${NEG}, visible hands when not requested, visible fingers when not requested, bad hands, abnormal hands, deformed hands, distorted hands, malformed hands, mutated hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, broken fingers, bent-backwards fingers, claw hands, rubber fingers, long unnatural fingers, tiny hands, oversized hands, wrong thumb placement, detached hands, floating hands, hands growing from wrong place, baguette fingers, sausage fingers, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, cake fused with fingers, frosting fused with skin, food merged with mouth, fork fused with hand, plate fused with body, dismembered, mangled body`,
+      `Negative prompt: ${NEG}, lopsided face, face merged with hair, face merged with clothing, face merged with object, duplicated face, two faces on one head, floating facial features, low-detail background faces, visible hands when not requested, visible fingers when not requested, bad hands, abnormal hands, deformed hands, distorted hands, malformed hands, mutated hands, extra fingers, missing fingers, fused fingers, webbed fingers, duplicated fingers, duplicate fingertips, extra nails, missing nails, broken fingers, bent-backwards fingers, claw hands, rubber fingers, long unnatural fingers, tiny hands, oversized hands, wrong thumb placement, detached hands, floating hands, hands growing from wrong place, baguette fingers, sausage fingers, displaced limbs, dislocated limbs, detached arms, detached legs, floating limbs, limbs in wrong place, arms attached to wrong body part, legs attached to wrong body part, twisted limbs, broken limbs, disjointed limbs, extra joints, missing joints, impossible pose, biomechanically wrong, body parts merging, limbs growing from torso, limbs growing from head, cake fused with fingers, frosting fused with skin, food merged with mouth, fork fused with hand, plate fused with body, dismembered, mangled body`,
       "--style raw --no artificial --no smooth skin --no CGI --photorealism high --no visible_hands --no visible_fingers --no bad_hands --no deformed_hands --no extra_fingers --no missing_fingers --no fused_fingers --no displaced_limbs --no dislocated_limbs --no extra_limbs --no missing_limbs",
     ].join("\n") : [
       userElaborated,
