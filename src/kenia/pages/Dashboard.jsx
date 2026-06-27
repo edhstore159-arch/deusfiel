@@ -751,6 +751,9 @@ export default function Dashboard() {
               <div className="p-5 space-y-5">
                 <div className="text-center">
                   <Avatar className={`w-16 h-16 mx-auto ${activeContact.avatar_color}`}>
+                    {(activeContact.profile_pic_url || activeContact.picture || activeContact.avatar_url) && (
+                      <AvatarImage src={activeContact.profile_pic_url || activeContact.picture || activeContact.avatar_url} alt={activeContact.name} />
+                    )}
                     <AvatarFallback className="bg-transparent text-white text-lg font-semibold">
                       {initials(activeContact.name)}
                     </AvatarFallback>
