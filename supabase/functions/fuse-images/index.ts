@@ -53,10 +53,12 @@ async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
 }
 
 const EDIT_SINGLE_SYSTEM =
-  "You are a photorealistic image editor prompt engineer. You receive ONE reference image and a user instruction (often a color change or local edit). " +
-  "Produce ONE single-line English prompt that re-renders the SAME image with the user's edit applied — preserve identity, composition, lighting, perspective, background and all other details. " +
-  "If the user mentions a color (e.g. 'azul', 'vermelho', 'dourado'), apply that color clearly and dominantly to the requested area (clothing, hair, object, eyes, background — whichever the user named, defaulting to the main subject). " +
-  "Output ONLY the filled prompt as a single line. End with: 'Negative: " + NEGATIVE + "'.";
+  "You are a photorealistic image EDITOR (not a generator). You receive ONE reference image that is the BASE and a user instruction. " +
+  "Treat the reference image as the canvas: re-render the SAME image with ONLY the user's edit applied. " +
+  "Preserve composition, framing, perspective, pose, background, lighting and every other detail of the reference. " +
+  "Apply the user's instruction LITERALLY and dominantly (color swap, object swap, text change, accessory change) on the requested area; if the user does not name an area, apply it to the main subject. " +
+  "DO NOT generate a new scene, DO NOT change the person's identity, DO NOT recompose. " +
+  "Output ONLY the filled prompt as a single line. End with: 'Negative: new scene, different composition, different framing, different background, different pose, " + NEGATIVE + "'.";
 
 const TEMPLATE_CLONE_SYSTEM =
   "You are a graphic-design prompt engineer specialized in CLONING marketing/social-media templates. " +
@@ -72,7 +74,7 @@ async function elaborateEditPrompt(userPrompt: string): Promise<string> {
       temperature: 0.2,
       messages: [
         { role: "system", content: EDIT_SINGLE_SYSTEM },
-        { role: "user", content: `USER EDIT INSTRUCTION (apply exactly, preserve identity and composition):\n"""${userTheme}"""` },
+        { role: "user", content: `USER EDIT INSTRUCTION (apply LITERALLY on the reference image as the base, preserve composition and identity):\n"""${userTheme}"""` },
       ],
     });
     if (r.ok) {
@@ -80,7 +82,7 @@ async function elaborateEditPrompt(userPrompt: string): Promise<string> {
       if (txt && txt.length > 20) return txt;
     }
   } catch (_e) { /* fallback */ }
-  return `Edit the reference image as follows: ${userTheme}. Preserve identity, composition, perspective, lighting and background; apply the requested color/edit clearly and dominantly to the relevant area. ${FACE_LOCK} ${REALISM}. Negative: ${NEGATIVE}`;
+  return `Use the reference image as the BASE/canvas and apply this edit LITERALLY: ${userTheme}. Preserve composition, framing, perspective, pose, background and lighting exactly. Apply the requested color/object/text change clearly and dominantly to the relevant area. Do NOT generate a new scene. ${REALISM}. Negative: new scene, different composition, different framing, different background, ${NEGATIVE}`;
 }
 
 async function elaborateTemplatePrompt(userPrompt: string): Promise<string> {
