@@ -525,6 +525,9 @@ export default function Dashboard() {
                 }`}
               >
                 <Avatar className={`w-10 h-10 ${c.avatar_color || "bg-nude-500"}`}>
+                  {(c.profile_pic_url || c.picture || c.avatar_url) && (
+                    <AvatarImage src={c.profile_pic_url || c.picture || c.avatar_url} alt={c.name} />
+                  )}
                   <AvatarFallback className="bg-transparent text-white text-xs font-semibold">
                     {initials(c.name)}
                   </AvatarFallback>
