@@ -56,6 +56,8 @@ export default function FloatingVoiceOrb() {
   const restartTimerRef = useRef(null);
   const handleCommandRef = useRef(null);
   const lastFinalRef = useRef({ text: "", at: 0 });
+  const lastInterimRef = useRef("");
+  const finalProcessedRef = useRef(false);
   const speakingRef = useRef(false);
   const speechResumeTimerRef = useRef(null);
   const [alwaysOn, setAlwaysOn] = useState(() => {
