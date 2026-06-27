@@ -6,6 +6,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kenia/components/ui/select";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { Clapperboard, Copy, Download, Film, Loader2, Sparkles, Wand2 } from "lucide-react";
 
 const CATEGORIES = {
