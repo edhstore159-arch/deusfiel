@@ -1079,34 +1079,22 @@ export default function FloatingVoiceOrb() {
 
   return (
     <>
-      <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-0 p-0" data-testid="voice-orb-wrap">
+      <div className="sr-only" data-testid="voice-orb-wrap" aria-hidden="true">
         <button
           type="button"
           onClick={() => {
             unlockSpeech();
             setOpen((v) => {
               const next = !v;
-              userMinimizedRef.current = !next; // se está fechando, marca como minimizado pelo usuário
+              userMinimizedRef.current = !next;
               return next;
             });
-            // NÃO mexer em alwaysOn/recognition — escuta contínua segue ativa mesmo minimizado.
           }}
-          className="voice-orb-sun relative w-16 h-16 rounded-full ring-2 ring-gold-400 hover:scale-105 transition-transform bg-white animate-orb-glow"
           aria-label="Assistente de voz Kênia"
           data-testid="voice-orb"
         >
-          <img src={LOGO} alt="Kênia" className="relative z-10 w-full h-full object-cover rounded-full" />
-          {listening && (
-            <span className="absolute inset-0 z-20 rounded-full ring-4 ring-rose-500 animate-pulse pointer-events-none" />
-          )}
-          {alwaysOn && (
-            <span
-              className="absolute -top-1 -right-1 z-20 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse"
-              title="Escuta contínua ativa"
-            />
-          )}
+          Kênia
         </button>
-        <span className="pointer-events-none text-[10px] font-semibold tracking-wide text-gold-700 whitespace-nowrap drop-shadow-sm">Kênia Garcia · atendente virtual</span>
       </div>
 
       {open && (
