@@ -263,6 +263,221 @@ function drawCinematicObjects(ctx, width, height, t, scene) {
   });
 }
 
+// ============ CARTOON / HEYGEN-LIKE MODE ============
+const CARTOON_PALETTES = [
+  { sky1: "#ffd1a8", sky2: "#ff8fa3", ground: "#3d2a6b", accent: "#ffe066" },
+  { sky1: "#a8e0ff", sky2: "#5b8def", ground: "#1f2b6b", accent: "#ffd166" },
+  { sky1: "#ffe5b4", sky2: "#f78ca0", ground: "#2a1b4a", accent: "#9bf6ff" },
+  { sky1: "#caffbf", sky2: "#9bf6ff", ground: "#073b4c", accent: "#ffd166" },
+  { sky1: "#ffadad", sky2: "#bdb2ff", ground: "#1a1a40", accent: "#caffbf" },
+];
+
+function drawCartoonScenery(ctx, w, h, t, palette) {
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, palette.sky1);
+  sky.addColorStop(1, palette.sky2);
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+  // sun
+  ctx.fillStyle = palette.accent;
+  ctx.beginPath();
+  ctx.arc(w * 0.78, h * 0.18 + Math.sin(t * Math.PI * 2) * 8, w * 0.11, 0, Math.PI * 2);
+  ctx.fill();
+  // clouds
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  for (let i = 0; i < 4; i += 1) {
+    const cx = ((i * 220 + t * 80) % (w + 240)) - 120;
+    const cy = 140 + i * 70;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 36, 0, Math.PI * 2);
+    ctx.arc(cx + 38, cy + 6, 30, 0, Math.PI * 2);
+    ctx.arc(cx - 36, cy + 8, 28, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // ground
+  ctx.fillStyle = palette.ground;
+  ctx.beginPath();
+  ctx.moveTo(0, h * 0.72);
+  for (let x = 0; x <= w; x += 30) {
+    ctx.lineTo(x, h * 0.72 + Math.sin(x * 0.02 + t * 2) * 10);
+  }
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+  // hills
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.beginPath();
+  ctx.arc(w * 0.25, h * 0.72, 180, Math.PI, 0);
+  ctx.arc(w * 0.7, h * 0.72, 140, Math.PI, 0);
+  ctx.fill();
+}
+
+function drawCartoonCharacter(ctx, x, y, scale, t, palette, speaking = true, skin = "#ffd9b3", hair = "#2a1810", shirt = "#ef476f") {
+  ctx.save();
+  ctx.translate(x, y);
+  const bob = Math.sin(t * Math.PI * 4) * 6;
+  ctx.translate(0, bob);
+  ctx.scale(scale, scale);
+
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  ctx.ellipse(0, 210, 110, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // body
+  ctx.fillStyle = shirt;
+  roundedRect(ctx, -80, 70, 160, 170, 40);
+  ctx.fill();
+  // neck
+  ctx.fillStyle = skin;
+  ctx.fillRect(-16, 50, 32, 30);
+  // head
+  ctx.beginPath();
+  ctx.arc(0, 0, 78, 0, Math.PI * 2);
+  ctx.fill();
+  // hair
+  ctx.fillStyle = hair;
+  ctx.beginPath();
+  ctx.arc(0, -10, 78, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.fill();
+  ctx.fillRect(-78, -20, 30, 50);
+  ctx.fillRect(48, -20, 30, 50);
+  // eyes (blink)
+  const blink = Math.sin(t * Math.PI * 1.2) > 0.97 ? 0.1 : 1;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.ellipse(-26, 4, 13, 16 * blink, 0, 0, Math.PI * 2);
+  ctx.ellipse(26, 4, 13, 16 * blink, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#1a1a2e";
+  ctx.beginPath();
+  ctx.arc(-26 + Math.sin(t * 2) * 2, 6, 6 * blink, 0, Math.PI * 2);
+  ctx.arc(26 + Math.sin(t * 2) * 2, 6, 6 * blink, 0, Math.PI * 2);
+  ctx.fill();
+  // eyebrows
+  ctx.strokeStyle = hair;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-38, -18); ctx.lineTo(-14, -22);
+  ctx.moveTo(14, -22); ctx.lineTo(38, -18);
+  ctx.stroke();
+  // cheeks
+  ctx.fillStyle = "rgba(239,71,111,0.35)";
+  ctx.beginPath();
+  ctx.arc(-40, 30, 12, 0, Math.PI * 2);
+  ctx.arc(40, 30, 12, 0, Math.PI * 2);
+  ctx.fill();
+  // mouth (speaking)
+  const mouthOpen = speaking ? 6 + Math.abs(Math.sin(t * Math.PI * 14)) * 18 : 4;
+  ctx.fillStyle = "#3d1a1a";
+  ctx.beginPath();
+  ctx.ellipse(0, 42, 20, mouthOpen, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ff8fa3";
+  ctx.beginPath();
+  ctx.ellipse(0, 46, 12, mouthOpen * 0.5, 0, 0, Math.PI);
+  ctx.fill();
+  // arms wave
+  ctx.strokeStyle = shirt;
+  ctx.lineWidth = 26;
+  ctx.lineCap = "round";
+  const wave = Math.sin(t * Math.PI * 3) * 0.4;
+  ctx.beginPath();
+  ctx.moveTo(-70, 110);
+  ctx.lineTo(-110 + wave * 20, 180 - wave * 30);
+  ctx.moveTo(70, 110);
+  ctx.lineTo(110 - wave * 20, 180 + wave * 30);
+  ctx.stroke();
+  // hands
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.arc(-110 + wave * 20, 180 - wave * 30, 14, 0, Math.PI * 2);
+  ctx.arc(110 - wave * 20, 180 + wave * 30, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCartoonSpeechBubble(ctx, x, y, w, h, text) {
+  ctx.save();
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#1a1a2e";
+  ctx.lineWidth = 4;
+  roundedRect(ctx, x, y, w, h, 24);
+  ctx.fill();
+  ctx.stroke();
+  // tail
+  ctx.beginPath();
+  ctx.moveTo(x + 60, y + h);
+  ctx.lineTo(x + 40, y + h + 28);
+  ctx.lineTo(x + 90, y + h - 2);
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#1a1a2e";
+  ctx.font = "700 28px Arial, sans-serif";
+  ctx.textAlign = "left";
+  splitLines(text, 22).slice(0, 4).forEach((line, i) => {
+    ctx.fillText(line, x + 22, y + 42 + i * 36);
+  });
+  ctx.restore();
+}
+
+function drawCartoonFrame(ctx, frame, totalFrames, width, height, title, scenes, sceneIndex, sceneT) {
+  const palette = CARTOON_PALETTES[sceneIndex % CARTOON_PALETTES.length];
+  drawCartoonScenery(ctx, width, height, sceneT, palette);
+
+  const colors = [
+    { skin: "#ffd9b3", hair: "#2a1810", shirt: "#ef476f" },
+    { skin: "#e0a878", hair: "#1a1a2e", shirt: "#06d6a0" },
+    { skin: "#f5cba7", hair: "#7a3e1a", shirt: "#118ab2" },
+  ];
+  const c = colors[sceneIndex % colors.length];
+  drawCartoonCharacter(ctx, width / 2, height * 0.55, 1.6, sceneT, palette, true, c.skin, c.hair, c.shirt);
+
+  // scene title chip
+  ctx.fillStyle = "rgba(26,26,46,0.85)";
+  roundedRect(ctx, 40, 60, width - 80, 90, 20);
+  ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.font = "800 38px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText((title || "Cena").toUpperCase(), width / 2, 118);
+
+  // speech bubble with scene text
+  const sceneText = scenes[sceneIndex] || "";
+  drawCartoonSpeechBubble(ctx, 60, height * 0.78, width - 120, 200, sceneText);
+
+  // scene counter
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.font = "700 22px Arial, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(`CENA ${sceneIndex + 1}/${scenes.length}`, width - 40, 200);
+
+  // fade transition between scenes
+  if (sceneT < 0.08) {
+    ctx.fillStyle = `rgba(0,0,0,${(0.08 - sceneT) / 0.08})`;
+    ctx.fillRect(0, 0, width, height);
+  } else if (sceneT > 0.92) {
+    ctx.fillStyle = `rgba(0,0,0,${(sceneT - 0.92) / 0.08})`;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  const t = frame / Math.max(1, totalFrames);
+  ctx.fillStyle = palette.accent;
+  ctx.fillRect(0, height - 14, width * t, 14);
+}
+
+function splitScenes(text) {
+  if (!text) return ["Cena de abertura"];
+  const parts = String(text)
+    .split(/\n\s*\n|---|\|\|/g)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length ? parts : [text];
+}
+
 function drawVideoFrame(ctx, frame, totalFrames, width, height, title, category, scene) {
   const t = frame / Math.max(1, totalFrames);
   const selected = CATEGORIES[category] || CATEGORIES.dramatico;
@@ -345,6 +560,7 @@ function drawVideoFrame(ctx, frame, totalFrames, width, height, title, category,
 }
 
 export default function ViralVideoStudio() {
+  const [style, setStyle] = useState("cinematico");
   const [category, setCategory] = useState("dramatico");
   const [customScene, setCustomScene] = useState("");
   const [title, setTitle] = useState("Vídeo viral jurídico / storytelling");
@@ -395,8 +611,16 @@ export default function ViralVideoStudio() {
       recorder.ondataavailable = (event) => { if (event.data?.size) chunks.push(event.data); };
       const stopped = new Promise((resolve) => { recorder.onstop = resolve; });
       recorder.start();
+      const scenes = splitScenes(customScene || CATEGORIES[category]?.action);
+      const framesPerScene = Math.max(1, Math.floor(totalFrames / scenes.length));
       for (let frame = 0; frame <= totalFrames; frame += 1) {
-        drawVideoFrame(ctx, frame, totalFrames, width, height, title, category, customScene);
+        if (style === "cartoon") {
+          const sceneIndex = Math.min(scenes.length - 1, Math.floor(frame / framesPerScene));
+          const sceneT = (frame - sceneIndex * framesPerScene) / framesPerScene;
+          drawCartoonFrame(ctx, frame, totalFrames, width, height, title, scenes, sceneIndex, sceneT);
+        } else {
+          drawVideoFrame(ctx, frame, totalFrames, width, height, title, category, customScene);
+        }
         await new Promise((resolve) => setTimeout(resolve, 1000 / fps));
       }
       recorder.stop();
@@ -465,6 +689,26 @@ export default function ViralVideoStudio() {
                 />
               </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { key: "cinematico", label: "🎬 Cinematográfico realista" },
+                { key: "cartoon", label: "🎨 Cartoon / HeyGen (cenas)" },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setStyle(opt.key)}
+                  className={`rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${style === opt.key ? "border-gold-500 bg-gold-500/15 text-gold-100" : "border-gold-900/40 bg-nude-950/70 text-nude-300 hover:border-gold-700/70"}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {style === "cartoon" && (
+              <p className="text-xs text-nude-400 -mt-2">
+                Dica: separe cenas com linha em branco, <code>---</code> ou <code>||</code>. Cada bloco vira uma cena animada com personagem falando.
+              </p>
+            )}
 
             <div className="grid sm:grid-cols-2 gap-2">
               {Object.entries(CATEGORIES).map(([key, item]) => (
