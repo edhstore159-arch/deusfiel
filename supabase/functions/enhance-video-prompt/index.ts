@@ -36,7 +36,7 @@ Gere o prompt final em inglês agora.`;
     if (!r.ok) {
       return new Response(JSON.stringify({ error: r.error || "falha no provider", provider: r.provider || "none" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const prompt = (r.text || "").trim();
+    const prompt = String(r.data?.choices?.[0]?.message?.content || "").trim();
     return new Response(JSON.stringify({ prompt, provider: r.provider }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e?.message || e) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
