@@ -66,12 +66,11 @@ export default function VirtualSecretaryAvatar() {
   }, []);
 
   const handleClick = () => {
-    const greetings = [
-      "Oi! Como posso te ajudar?",
-      "Estou aqui! Quer abrir a agenda?",
-      "Pronto. Me diga o que precisa.",
-    ];
-    speak(greetings[Math.floor(Math.random() * greetings.length)]);
+    // Aciona a secretária virtual completa (FloatingVoiceOrb) — abre painel,
+    // libera fala e ativa o microfone com todas as funções (rotas, agenda, IA).
+    const btn = document.querySelector('[data-testid="voice-orb"]');
+    if (btn) (btn).click();
+    speak("Estou te ouvindo. Como posso ajudar?");
   };
 
   return (
