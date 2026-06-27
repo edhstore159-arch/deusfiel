@@ -23,7 +23,10 @@ const OLLAMA_MODEL = Deno.env.get("OLLAMA_MODEL") || "qwen3:8b";
 const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
 
 const FACE_SAFE_PROMPT =
-  "Hyper-realistic human face lock (priority #1): shot on full-frame DSLR (Canon EOS R5 / Sony A7R IV) with 85mm f/1.4 prime lens, ISO 200, photojournalistic portrait, RAW photo, unedited, ultra-detailed photoreal skin with visible pores, fine peach fuzz, subtle subsurface scattering, natural skin imperfections (faint freckles, small moles, fine lines, slight redness), realistic asymmetric eyes (left and right eye not identical) with detailed iris texture, limbal ring, catchlights in the pupils, individual eyelashes, natural eyebrow hairs with stray hairs, anatomically correct symmetric nose with realistic nostrils, natural lips with subtle moisture and visible lip lines, real teeth with slight variation in color and alignment (never perfectly white, never glowing), believable bone structure, natural facial asymmetry, soft Rembrandt or natural window lighting with realistic shadows on the face, sharp tack-focus on the closer eye, shallow depth of field, skin shows real human micro-detail. Final anatomy check: two eyes correctly placed, two ears, one nose, one mouth, normal number of teeth, normal jaw, normal forehead, no melted features, no double pupils, no extra facial parts. Negative face: plastic skin, waxy skin, airbrushed, doll face, porcelain skin, CGI face, 3D render, Unreal Engine, uncanny valley, fake skin, smooth blurred skin, perfectly symmetrical face, glowing teeth, too many teeth, missing teeth, cartoon, anime, illustration, painting, AI-generated look, deformed face, melted face, distorted pupils, cross-eyed, lazy eye (unintentional), extra eyes, fused eyes, third eye, asymmetric eyes (unnatural), warped features, double nose, double mouth, missing ear, deformed ear, mutated face, disfigured, low-res face, blurry face, oversharpened face, beauty filter, instagram filter.";
+  "Human face integrity lock (priority #1): render every visible face as a natural real human face, not AI-looking. Use a DSLR portrait/documentary look (Canon EOS R5 / Sony A7R IV, 85mm or 50mm prime lens, RAW photo, natural light), with the main face large enough in the frame to preserve detail. Facial geometry must be coherent: exactly two eyes placed on the same horizontal line, similar size and shape, centered pupils looking in the same direction, one centered nose, one natural mouth, one jaw, one forehead, two ears only when visible, no duplicated or floating facial parts. Skin must be photorealistic with pores, peach fuzz, subtle asymmetry, faint freckles/moles/fine lines where natural, real shadows and subsurface scattering; never waxy, plastic, smoothed or doll-like. Eyes must be alive and expressive with detailed irises, natural sclera, eyelids, eyelashes and catchlights; avoid blank/dead/glassy eyes. Teeth, if visible, must be natural and limited to a normal mouth opening — never extra rows, glowing teeth or oversized teeth. For groups, keep faces reasonably sized and apply this check to each person; if the scene does not require a crowd, prefer one to three people instead of many tiny faces. Final face QA before output: aligned eyes, centered pupils, normal nose, normal mouth, normal teeth, normal jaw, no melting, no warping, no double pupils, no extra eyes, no fused eyes, no duplicate face, no face merged with hair/clothes/objects. Negative face: deformed face, distorted face, melted face, warped face, mutated face, disfigured face, lopsided face, mismatched eyes, different sized eyes, misaligned eyes, cross-eyed, lazy eye, dead eyes, glassy eyes, blank stare, extra eyes, missing eye, fused eyes, third eye, double pupils, wrong pupils, double nose, missing nose, double mouth, extra mouth, bad teeth, too many teeth, missing teeth, duplicated face, two faces on one head, floating facial features, facial features merged with object, plastic skin, waxy skin, airbrushed, porcelain skin, beauty filter, CGI, 3D render, cartoon, anime, illustration, painting, AI-generated look, low-res face, blurry face, oversharpened face.";
+
+const FACE_NEGATIVE_PROMPT =
+  "deformed face, distorted face, melted face, warped face, mutated face, disfigured face, lopsided face, asymmetrical eyes caused by error, mismatched eyes, different sized eyes, misaligned eyes, cross-eyed, lazy eye, dead eyes, glassy eyes, blank stare, extra eyes, missing eye, fused eyes, third eye, double pupils, wrong pupils, double nose, missing nose, double mouth, extra mouth, bad teeth, too many teeth, missing teeth, duplicated face, two faces on one head, floating facial features, face merged with hair, face merged with clothes, face merged with objects, low detail face, blurry face, plastic skin, waxy skin, doll face, mannequin face, uncanny valley";
 
 
 const HAND_SAFE_PROMPT =
@@ -231,7 +234,7 @@ function withFaceSafety(prompt: string) {
   if (!hasHumanSubject(prompt)) {
     return `${prompt}. Standalone subject lock: render strictly and only what the user described, with correct real-world structure and materials. Do not add unrelated items, do not add fruits or food unless the user explicitly asked for them, do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features.`;
   }
-  return `${prompt}. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.`;
+  return `${prompt}. FACE FIRST MODE: prioritize correct facial anatomy over style, background, props and decorative details. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative face anatomy: ${FACE_NEGATIVE_PROMPT}. Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.`;
 }
 
 function handInstructionFor(prompt: string) {
@@ -514,7 +517,7 @@ function buildFluxPrompt(raw: string): string {
   const STYLE =
     `${subjectClause}, RAW photo, photorealistic, professional editorial photography, shot on Canon EOS R5 with ${isFullBody ? "35mm f/2.0" : "85mm f/1.4"} lens, ISO 200, natural light, ` +
     "real human skin with visible pores, peach fuzz, subtle imperfections, subsurface scattering, " +
-    "correct facial anatomy, two natural asymmetric eyes, realistic iris and pupils with catchlights, individual eyelashes, natural eyebrows, " +
+    "correct facial anatomy, two anatomically aligned eyes of similar size with centered pupils and realistic iris catchlights, individual eyelashes, natural eyebrows, " +
     "symmetric realistic nose, natural lips with fine lines, natural teeth with slight variation, " +
     `${compositionClause}, ` +
     (isFullBody || isEatingCake ? BODY_DETAIL + ", " : "") +
@@ -525,7 +528,7 @@ function buildFluxPrompt(raw: string): string {
     ? ", deformed body, mutated body, disfigured body, distorted body, malformed body, twisted torso, broken spine, wrong proportions, extra arms, extra legs, missing arms, missing legs, extra limbs, missing limbs, fused limbs, duplicated limbs, floating limbs, detached limbs, disjointed limbs, dislocated joints, impossible pose, broken knees, broken elbows, backwards joints, limbs growing from wrong place, conjoined people, merged people, fused faces, identical clones, bad anatomy, bad proportions, gigantic head, tiny head, long neck, short neck, no neck"
     : "";
   const NEG =
-    `negative: blurry, low quality, distorted face, deformed face, warped face, melted face, mutated face, disfigured, facial asymmetry caused by generation error, mismatched eyes, different sized eyes, asymmetric eyes (unnatural), cross-eyed, lazy eye, dead eyes, glassy eyes, empty stare, extra eyes, fused eyes, third eye, double pupils, wrong pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, body parts fused with object, object merged with body${BODY_NEG}, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
+    `negative: blurry, low quality, ${FACE_NEGATIVE_PROMPT}, distorted face, deformed face, warped face, melted face, mutated face, disfigured, facial asymmetry caused by generation error, mismatched eyes, different sized eyes, asymmetric eyes (unnatural), cross-eyed, lazy eye, dead eyes, glassy eyes, empty stare, extra eyes, fused eyes, third eye, double pupils, wrong pupils, double nose, double mouth, bad teeth, too many teeth, glowing teeth, fake skin, plastic skin, waxy skin, porcelain skin, airbrushed, doll face, mannequin, CGI, 3D render, Unreal Engine, uncanny valley, anime, cartoon, illustration, painting, AI art, beauty filter, instagram filter, oversharpened, oversaturated, body parts fused with object, object merged with body${BODY_NEG}, ${HAND_NEGATIVE_PROMPT}, mutated hand, unrealistic, text, watermark, logo`;
   const handsClause = isEatingCake
     ? `${handInstructionFor(base)} ${HAND_DETAIL}. Keep cake, fork, plate and fingers separated with correct contact shadows; never merge cake frosting with hands, mouth, arms, or skin.`
     : isFullBody
@@ -544,7 +547,12 @@ async function imagePollinations(opts: ImageOptions) {
     const seed = Math.floor(Math.random() * 1_000_000);
     const flux = buildFluxPrompt(opts.prompt);
     const model = hasHumanSubject(opts.prompt) ? "flux-realism" : "flux";
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=true&model=${model}`;
+    const humanSubject = hasHumanSubject(opts.prompt);
+    const negative = humanSubject
+      ? `${FACE_NEGATIVE_PROMPT}, ${HAND_NEGATIVE_PROMPT}, bad anatomy, extra limbs, missing limbs, text, watermark, logo, cartoon, CGI, illustration`
+      : "human, person, face, hands, fingers, body parts, fruit or food unless requested, text, watermark, logo, cartoon, CGI, illustration";
+    const enhance = humanSubject ? "false" : "true";
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(flux)}?width=${w}&height=${h}&seed=${seed}&nologo=true&enhance=${enhance}&model=${model}&negative=${encodeURIComponent(negative)}`;
     const resp = await fetch(url);
     if (!resp.ok) return { ok: false as const, error: `Pollinations ${resp.status}` };
     const buf = new Uint8Array(await resp.arrayBuffer());
