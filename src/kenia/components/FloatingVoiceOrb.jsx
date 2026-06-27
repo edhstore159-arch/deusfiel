@@ -222,8 +222,10 @@ export default function FloatingVoiceOrb() {
           }
 
           handleCommandRef.current?.(commandText);
+          finalProcessedRef.current = true;
         } else {
           handleCommandRef.current?.(finalText);
+          finalProcessedRef.current = true;
           shouldRestartRef.current = false;
           try { rec.stop(); } catch {}
         }
