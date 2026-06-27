@@ -6,7 +6,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { Button } from "@/kenia/components/ui/button";
 import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/kenia/components/ui/avatar";
 import { Separator } from "@/kenia/components/ui/separator";
 import { Progress } from "@/kenia/components/ui/progress";
 import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Flame, Tag, Calendar, AlertTriangle, ArrowLeft } from "lucide-react";
@@ -525,6 +525,9 @@ export default function Dashboard() {
                 }`}
               >
                 <Avatar className={`w-10 h-10 ${c.avatar_color || "bg-nude-500"}`}>
+                  {(c.profile_pic_url || c.picture || c.avatar_url) && (
+                    <AvatarImage src={c.profile_pic_url || c.picture || c.avatar_url} alt={c.name} />
+                  )}
                   <AvatarFallback className="bg-transparent text-white text-xs font-semibold">
                     {initials(c.name)}
                   </AvatarFallback>
@@ -564,6 +567,9 @@ export default function Dashboard() {
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
                 <Avatar className={`w-9 h-9 ${activeContact.avatar_color}`}>
+                  {(activeContact.profile_pic_url || activeContact.picture || activeContact.avatar_url) && (
+                    <AvatarImage src={activeContact.profile_pic_url || activeContact.picture || activeContact.avatar_url} alt={activeContact.name} />
+                  )}
                   <AvatarFallback className="bg-transparent text-white text-xs font-semibold">
                     {initials(activeContact.name)}
                   </AvatarFallback>
@@ -745,6 +751,9 @@ export default function Dashboard() {
               <div className="p-5 space-y-5">
                 <div className="text-center">
                   <Avatar className={`w-16 h-16 mx-auto ${activeContact.avatar_color}`}>
+                    {(activeContact.profile_pic_url || activeContact.picture || activeContact.avatar_url) && (
+                      <AvatarImage src={activeContact.profile_pic_url || activeContact.picture || activeContact.avatar_url} alt={activeContact.name} />
+                    )}
                     <AvatarFallback className="bg-transparent text-white text-lg font-semibold">
                       {initials(activeContact.name)}
                     </AvatarFallback>
