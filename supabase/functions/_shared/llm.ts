@@ -310,7 +310,7 @@ function withFaceSafety(prompt: string) {
     return `${colored}. NATURAL LANDSCAPE LOCK: render a real outdoor landscape/sky phenomenon exactly as described. For sunset/sunrise: show the real sun near the horizon, illuminated clouds, warm atmospheric light, natural sky gradients, realistic terrain/ocean/mountains if implied. Do not add people, faces, eyes, mouths, portraits, silhouettes, hands, fingers, skin, body parts, anthropomorphic shapes, or face-like patterns in the sun or clouds.`;
   }
   if (!hasHumanSubject(colored)) {
-    return `${colored}. Standalone subject lock: render strictly and only what the user described, with correct real-world structure, materials AND COLORS. Do not add unrelated items, do not add fruits or food unless the user explicitly asked for them, do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features.`;
+    return `${colored}. Standalone subject lock: render strictly and only what the user described, with correct real-world structure, materials AND COLORS. PHOTOREALISM LOCK: ultra-realistic professional product photography, RAW DSLR (Canon EOS R5 / Sony A7R IV), 85mm macro lens, f/5.6, ISO 100, studio softbox + natural light, true-to-life materials (metal reflections, wood grain, glass refractions, fabric weave, ceramic glaze, leather pores), accurate physically-based shading, soft realistic shadows and contact occlusion, sharp tack-focus on subject with subtle depth of field, 8K ultra high resolution, ultra-detailed micro-textures, no smoothing, no plastic look, no CGI, no 3D render, no cartoon, no illustration, no painting, no AI look. Do not add unrelated items, do not add fruits or food unless the user explicitly asked for them, do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features. Negative: blurry, low-res, low quality, jpeg artifacts, oversharpened, plastic, waxy, fake, cartoon, CGI, 3D render, illustration, painting, watermark, text, logo.`;
   }
   return `${colored}. FACE FIRST MODE: prioritize correct facial anatomy over style, background, props and decorative details. ${FACE_SAFE_PROMPT} ${HAND_SAFE_PROMPT} Negative face anatomy: ${FACE_NEGATIVE_PROMPT}. Negative hand anatomy: ${HAND_NEGATIVE_PROMPT}.`;
 }
@@ -486,8 +486,8 @@ async function imageLovable(opts: ImageOptions) {
     body: JSON.stringify({
       model: "openai/gpt-image-2",
       prompt: safePrompt,
-      quality: opts.quality || (hasHumanSubject(safePrompt) ? "high" : "low"),
-      size: opts.size || "1024x1024",
+      quality: opts.quality || "high",
+      size: opts.size || "1536x1536",
       stream: false,
     }),
   });
@@ -529,7 +529,8 @@ async function imageEmergent(opts: ImageOptions) {
     body: JSON.stringify({
       model: "gpt-image-1",
       prompt: safePrompt,
-      size: opts.size || "1024x1024",
+      size: opts.size || "1536x1536",
+      quality: "high",
       n: 1,
     }),
   });
@@ -625,7 +626,7 @@ function buildFluxPrompt(raw: string): string {
 // Pollinations.ai — API pública, gratuita, sem chave, sem créditos.
 async function imagePollinations(opts: ImageOptions) {
   try {
-    const [w, h] = (opts.size || "1024x1024").split("x").map((n) => parseInt(n, 10) || 1024);
+    const [w, h] = (opts.size || "1536x1536").split("x").map((n) => parseInt(n, 10) || 1536);
     const seed = Math.floor(Math.random() * 1_000_000);
     const humanSubject = hasHumanSubject(opts.prompt);
     const flux = compactText(buildFluxPrompt(opts.prompt), humanSubject ? 560 : 440);
