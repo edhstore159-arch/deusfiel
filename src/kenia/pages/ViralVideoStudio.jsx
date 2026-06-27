@@ -568,7 +568,36 @@ export default function ViralVideoStudio() {
   const [durationSeconds, setDurationSeconds] = useState(12);
   const [videoUrl, setVideoUrl] = useState("");
   const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
   const lastVideoUrl = useRef("");
+
+  const enhancePrompt = async () => {
+    if (enhancing) return;
+    setEnhancing(true);
+    try {
+      const selected = CATEGORIES[category] || CATEGORIES.dramatico;
+      const { data, error } = await supabase.functions.invoke("enhance-video-prompt", {
+        body: {
+          scene: customScene || selected.action,
+          category: selected.label,
+          mood: selected.mood,
+          durationSeconds: safeDuration,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.prompt) {
+        setCustomScene(data.prompt);
+        toast.success(`Prompt aprimorado via ${data.provider || "IA"}`);
+      } else {
+        toast.error("Não foi possível aprimorar o prompt");
+      }
+    } catch (e) {
+      toast.error(e?.message || "Falha ao aprimorar prompt");
+    } finally {
+      setEnhancing(false);
+    }
+  };
 
   const safeDuration = clampDuration(durationSeconds);
   const prompt = useMemo(() => buildPrompt(category, customScene, safeDuration), [category, customScene, safeDuration]);
