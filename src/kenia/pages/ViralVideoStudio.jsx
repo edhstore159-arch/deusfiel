@@ -560,6 +560,7 @@ function drawVideoFrame(ctx, frame, totalFrames, width, height, title, category,
 }
 
 export default function ViralVideoStudio() {
+  const [style, setStyle] = useState("cinematico");
   const [category, setCategory] = useState("dramatico");
   const [customScene, setCustomScene] = useState("");
   const [title, setTitle] = useState("Vídeo viral jurídico / storytelling");
