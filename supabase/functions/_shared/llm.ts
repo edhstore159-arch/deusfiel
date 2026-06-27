@@ -76,6 +76,24 @@ const PROMPT_TYPO_MAP: Array<[RegExp, string]> = [
   [/\blua\b/gi, "lua (moon, crescent moon)"],
   [/\bsol\b/gi, "sol (sun, bright sunshine)"],
 
+  // ===== FIGURAS RELIGIOSAS / SANTOS (iconografia católica clássica) =====
+  [/\b(santo\s+)?s[ãa]o\s+jorge\s+guerreiro\b/gi, "São Jorge Guerreiro (Saint George the Warrior: classical Catholic iconography, brave Roman soldier saint in shining silver armor and red cape, mounted on a rearing white horse, golden halo behind his head, holding a long lance piercing a green dragon at his feet, dramatic sky background, religious painting style, devotional realism, NOT a fruit, NOT a landmark)"],
+  [/\b(santo\s+)?s[ãa]o\s+jorge\b/gi, "São Jorge (Saint George: classical Catholic iconography, knight saint in shining silver armor and red cape, mounted on a white horse, golden halo, holding a lance defeating a green dragon, devotional religious painting, sacred art, NOT a fruit)"],
+  [/\bnossa\s+senhora\s+aparecida\b/gi, "Nossa Senhora Aparecida (Our Lady Aparecida: small dark-skinned Virgin Mary statue, blue and gold embroidered mantle with stars, golden crown, hands joined in prayer, golden halo, Brazilian Catholic devotional iconography)"],
+  [/\bnossa\s+senhora\b|\bvirgem\s+maria\b/gi, "Nossa Senhora / Virgem Maria (Virgin Mary: serene woman with blue mantle and white veil, golden halo, hands joined in prayer, classical Catholic religious iconography, devotional sacred art)"],
+  [/\bjesus\s+cristo\b|\bcristo\s+jesus\b/gi, "Jesus Cristo (Jesus Christ: serene bearded man, long brown hair, white robe with red mantle, golden halo, sacred heart, classical Catholic religious iconography)"],
+  [/\bsagrado\s+cora[cç][ãa]o\s+de\s+jesus\b/gi, "Sagrado Coração de Jesus (Sacred Heart of Jesus: Jesus with white robe and red mantle, exposed glowing heart crowned with thorns and flames on his chest, hand raised in blessing, golden halo, classical Catholic devotional art)"],
+  [/\bcristo\s+redentor\s+est[áa]tua\b/gi, "Cristo Redentor estátua (Christ the Redeemer statue, Rio de Janeiro landmark)"],
+  [/\bs[ãa]o\s+francisco(\s+de\s+assis)?\b/gi, "São Francisco de Assis (Saint Francis of Assisi: humble friar in brown Franciscan robe with rope belt, tonsure, golden halo, surrounded by birds and animals, devotional Catholic iconography)"],
+  [/\bsanto\s+ant[ôo]nio\b/gi, "Santo Antônio (Saint Anthony of Padua: young Franciscan friar in brown robe, holding baby Jesus and a white lily, golden halo, classical Catholic religious art)"],
+  [/\bs[ãa]o\s+pedro\b/gi, "São Pedro (Saint Peter: bearded apostle with white and gold robe, holding golden keys of heaven, golden halo, classical Catholic iconography)"],
+  [/\bs[ãa]o\s+paulo\s+ap[óo]stolo\b/gi, "São Paulo Apóstolo (Saint Paul the Apostle: bearded apostle with sword and book/scroll, red and white robe, golden halo, sacred art)"],
+  [/\bs[ãa]o\s+miguel(\s+arcanjo)?\b/gi, "São Miguel Arcanjo (Saint Michael the Archangel: warrior angel with white wings and Roman armor, golden halo, raised sword, defeating a demon at his feet, dramatic religious painting)"],
+  [/\bpadre\s+c[íi]cero\b/gi, "Padre Cícero (Father Cícero of Juazeiro: elderly Brazilian priest with black cassock, wide-brimmed black hat, white beard, holding a wooden staff or rosary, devotional Brazilian Catholic iconography)"],
+  [/\bs[ãa]o\s+benedito\b/gi, "São Benedito (Saint Benedict the Moor: dark-skinned Franciscan friar in brown robe, holding baby Jesus, golden halo, devotional art)"],
+
+
+
   // ===== FRUTAS =====
   [/\bmac[ãa]+n?s?\b/gi, "maçã (apple fruit, red apple, fresh fruit)"],
   [/\bmaca\b/gi, "maçã (apple fruit, red apple, fresh fruit)"],
