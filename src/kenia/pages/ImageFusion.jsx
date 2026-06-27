@@ -282,11 +282,16 @@ export default function ImageFusion() {
     }
   };
 
-  const fuse = async () => {
+  const fuse = async (opts = {}) => {
+    const templateMode = !!opts.templateMode;
     if (!img1 && !img2) { toast.error("Envie ao menos uma imagem"); return; }
     const singleMode = !!img1 && !img2;
-    if (singleMode && !prompt.trim()) {
+    if (singleMode && !prompt.trim() && !templateMode) {
       toast.error("Para editar uma única imagem, descreva a alteração (ex: 'mudar a roupa para azul')");
+      return;
+    }
+    if (templateMode && !prompt.trim()) {
+      toast.error("Descreva o NOVO texto/conteúdo que deve aparecer no modelo clonado.");
       return;
     }
     setLoading(true);
@@ -301,16 +306,16 @@ export default function ImageFusion() {
     try {
       const { data } = await api.post(
         "/creatives/fuse-images",
-        { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt },
+        { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt, mode: templateMode ? "template" : undefined },
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
-        await finishWithImage(data.image, singleMode ? "Imagem editada! Salvando..." : "Imagem gerada! Salvando e criando variações...");
+        await finishWithImage(data.image, templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : "Imagem gerada! Salvando e criando variações..."));
       } else if (!singleMode) {
         const fallback = await buildClientFusionFallback(img1, img2);
         await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
       } else {
-        toast.error(data.error || "Falha ao editar a imagem");
+        toast.error(data.error || "Falha ao gerar a imagem");
       }
     } catch (e) {
       if (!singleMode) {
@@ -321,12 +326,13 @@ export default function ImageFusion() {
           toast.error(e.response?.data?.detail || fallbackError?.message || "Erro ao gerar imagem");
         }
       } else {
-        toast.error(e.response?.data?.error || e.message || "Erro ao editar imagem");
+        toast.error(e.response?.data?.error || e.message || "Erro ao gerar imagem");
       }
     } finally {
       setLoading(false);
     }
   };
+
 
 
 
@@ -456,8 +462,17 @@ export default function ImageFusion() {
             placeholder="Ex: Mescle as duas imagens em estilo dourado elegante. Use o botão acima para aplicar o preset de rejuvenescimento facial."
             data-testid="fusion-prompt"
             className="bg-nude-950 border-gold-900/40 text-gold-100 placeholder:text-nude-600 mt-2" />
-          <div className="flex justify-end mt-4">
-            <Button onClick={fuse} disabled={loading || (!img1 && !img2)}
+          <div className="flex justify-end mt-4 gap-2 flex-wrap">
+            {img1 && !img2 && (
+              <Button onClick={() => fuse({ templateMode: true })} disabled={loading || !img1}
+                variant="outline"
+                className="border-gold-500/60 text-gold-200 hover:bg-gold-500/10"
+                data-testid="fusion-clone-template">
+                {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Clonando...</>) :
+                  (<><Combine className="w-4 h-4 mr-2" />🧬 Clonar este modelo (mesmo layout · novo texto/imagens)</>)}
+              </Button>
+            )}
+            <Button onClick={() => fuse()} disabled={loading || (!img1 && !img2)}
               className="bg-gradient-to-r from-gold-500 to-gold-700 hover:from-gold-400 hover:to-gold-600 text-nude-950 font-semibold"
               data-testid="fusion-generate">
               {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Gerando...</>) :
@@ -466,6 +481,7 @@ export default function ImageFusion() {
                   : (<><Wand2 className="w-4 h-4 mr-2" />Editar imagem (1 foto · use o prompt)</>))}
             </Button>
           </div>
+
 
         </Card>
 
