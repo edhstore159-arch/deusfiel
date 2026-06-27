@@ -11,6 +11,7 @@ import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
 import { ErrorDebugPopup } from "@/components/ErrorDebugPopup";
 import FloatingVoiceOrb from "@/kenia/components/FloatingVoiceOrb";
+import VirtualSecretaryAvatar from "@/kenia/components/VirtualSecretaryAvatar";
 import KeniaCallButton from "@/kenia/components/KeniaCallButton";
 import { api } from "@/kenia/lib/api";
 
