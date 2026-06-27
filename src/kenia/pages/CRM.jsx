@@ -28,6 +28,16 @@ const COLOR_MAP = {
   red: { bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500" },
 };
 
+const FALLBACK_STAGES = [
+  { id: "novos_leads", label: "Novos Leads", color: "blue" },
+  { id: "em_contato", label: "Em Contato", color: "yellow" },
+  { id: "interessado", label: "Interessado", color: "green" },
+  { id: "qualificado", label: "Qualificado", color: "emerald" },
+  { id: "em_negociacao", label: "Em Negociação", color: "orange" },
+  { id: "convertido", label: "Convertido", color: "purple" },
+  { id: "nao_interessado", label: "Não Interessado", color: "red" },
+];
+
 export default function CRM() {
   const [leads, setLeads] = useState([]);
   const [stages, setStages] = useState([]);
