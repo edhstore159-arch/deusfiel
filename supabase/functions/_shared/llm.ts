@@ -37,6 +37,11 @@ const HAND_NEGATIVE_PROMPT =
 
 const HANDS_ARE_REQUESTED = /\b(hand|hands|finger|fingers|thumb|gesture|handshake|waving|pointing|holding|grabbing|clapping|typing|writing|eating|feeding|cutting|serving|holding\s+(a\s+)?(fork|spoon|knife|plate|cake)|m[aã]o|m[aã]os|dedo|dedos|polegar|gesto|aperto de m[aã]o|acenando|apontando|segurando|digitando|escrevendo|comendo|alimentando|cortando|servindo|segurando\s+(um\s+|uma\s+)?(garfo|colher|faca|prato|bolo))\b/i;
 const EATING_CAKE_RE = /\b(eating|feeding|taking\s+a\s+bite|bite|biting|comendo|alimentando|mordendo|dar\s+uma\s+mordida|cortando|servindo)\b[\s\S]{0,80}\b(cake|birthday\s+cake|bolo|bolo\s+de\s+anivers[áa]rio|slice\s+of\s+cake|fatia\s+de\s+bolo)\b|\b(cake|birthday\s+cake|bolo|bolo\s+de\s+anivers[áa]rio|slice\s+of\s+cake|fatia\s+de\s+bolo)\b[\s\S]{0,80}\b(eating|feeding|taking\s+a\s+bite|bite|biting|comendo|alimentando|mordendo|dar\s+uma\s+mordida|cortando|servindo)\b/i;
+const SCENERY_RE = /\b(p[oô]r\s*[- ]?do\s+sol|por\s+do\s+sol|sunset|sunrise|nascer\s+do\s+sol|entardecer|crep[úu]sculo|golden\s+hour|paisagem|landscape|natureza|nature|c[ée]u|sky|nuvens?|clouds?|oceano|ocean|mar\b|sea\b|praia|beach|montanha|mountain|floresta|forest|cachoeira|waterfall|rio\b|river\b|lago\b|lake\b|deserto|desert)\b/i;
+
+export function isScenerySubject(prompt = "") {
+  return SCENERY_RE.test(prompt);
+}
 
 export function hasHybridRequest(prompt = "") {
   return /\bcom\s+(cara|rosto|face|olhos|boca|sorriso|express[ãa]o)\s+humana?s?\b/i.test(prompt)
@@ -48,6 +53,7 @@ const EVENT_RE_HUMAN = /\b(anivers[áa]rio|birthday|festa|party|casamento|weddin
 
 export function hasHumanSubject(prompt = "") {
   if (hasHybridRequest(prompt)) return true;
+  if (isScenerySubject(prompt)) return false;
   if (/\b(non-human subject lock|non-human object lock|object isolation lock|standalone non-human subject|photorealistic non-human subject)\b/i.test(prompt)) return false;
   if (/\bsubject\s+lock\b[\s\S]{0,160}\b(subject\s+is\s+(the\s+)?(object|fruit|landmark|architectural structure)|render\s+only\s+that\s+subject)\b/i.test(prompt)) return false;
   if (/--no\s+(human|face|hands|body_parts)|\bno\s+anatomy\b|\bno\s+portrait\b/i.test(prompt)) return false;
@@ -58,6 +64,11 @@ export function hasHumanSubject(prompt = "") {
 // Corrige erros comuns de digitação em PT-BR e traduz frutas/objetos para inglês
 // para melhorar a fidelidade da geração de imagens (ex.: "macan" → "maçã apple fruit").
 const PROMPT_TYPO_MAP: Array<[RegExp, string]> = [
+  // ===== PAISAGENS / FENÔMENOS NATURAIS =====
+  [/\b(p[oô]r\s*[- ]?do\s+sol|por\s+do\s+sol)\s+(inluminad[ao]s?|iluminad[ao]s?)\b/gi, "pôr do sol iluminado (real natural sunset landscape: glowing sun near the horizon, warm orange red and golden sky, illuminated clouds, atmospheric light rays, realistic landscape, NO human face, NO person, NO eyes, NO portrait)"],
+  [/\b(p[oô]r\s*[- ]?do\s+sol|por\s+do\s+sol)\b/gi, "pôr do sol (real natural sunset landscape: sun near the horizon, warm orange red and golden sky, clouds lit by sunlight, realistic landscape, NO human face, NO person, NO portrait)"],
+  [/\binluminad([ao]s?)\b/gi, "iluminad$1"],
+
   // ===== SÍMBOLOS / ÍCONES =====
   [/\bcora[cç][ãa]o\b/gi, "coração (red love heart symbol, classic stylized heart shape, romantic icon, NOT a fruit, NOT an anatomical organ unless requested)"],
   [/\bcoracoes\b|\bcora[cç][õo]es\b/gi, "corações (red love heart symbols, classic stylized heart shapes)"],
@@ -253,6 +264,9 @@ function normalizePromptTypos(raw: string): string {
 
 
 function withFaceSafety(prompt: string) {
+  if (isScenerySubject(prompt)) {
+    return `${prompt}. NATURAL LANDSCAPE LOCK: render a real outdoor landscape/sky phenomenon exactly as described. For sunset/sunrise: show the real sun near the horizon, illuminated clouds, warm atmospheric light, natural sky gradients, realistic terrain/ocean/mountains if implied. Do not add people, faces, eyes, mouths, portraits, silhouettes, hands, fingers, skin, body parts, anthropomorphic shapes, or face-like patterns in the sun or clouds.`;
+  }
   if (!hasHumanSubject(prompt)) {
     return `${prompt}. Standalone subject lock: render strictly and only what the user described, with correct real-world structure and materials. Do not add unrelated items, do not add fruits or food unless the user explicitly asked for them, do not add people, faces, skin, arms, hands, fingers, body parts, portraits, or anthropomorphic features.`;
   }
@@ -509,6 +523,9 @@ function buildFluxPrompt(raw: string): string {
 
   // Non-human subjects (fruit, objects, scenery): keep prompt faithful, no portrait lock.
   if (!hasHumanSubject(base)) {
+    if (isScenerySubject(base)) {
+      return `${base}, photorealistic natural landscape photography, real sky, real sun, warm golden atmospheric light, illuminated clouds, natural horizon, realistic colors and shadows, high detail, sharp focus. Landscape lock: no humans, no people, no face in the sun, no face in clouds, no eyes, no mouth, no portrait, no silhouettes, no hands, no fingers, no body parts, no anthropomorphic or surreal elements. negative: human, person, face, eyes, mouth, portrait, body parts, anthropomorphic sun, face-shaped clouds, cartoon, CGI, text, watermark, logo`;
+    }
     const isFruit = /\b(fruit|apple|maçã|maca|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi)\b/i.test(base);
     const isLandmark = /\b(torre\s+eiffel|eiffel\s+tower|cristo\s+redentor|estatua\s+da\s+liberdade|statue\s+of\s+liberty|big\s+ben|coliseu|colosseum|taj\s+mahal|pir[âa]mide|pyramid|monumento|monument|cathedral|catedral|igreja|church|castelo|castle|ponte|bridge|arranha-c[ée]u|skyscraper|edif[íi]cio|building|pr[ée]dio|arquitetura|architecture|landmark|skyline|cidade|city|paisagem urbana)\b/i.test(base);
     const SUBJECT_WORD = isFruit ? "fruit" : (isLandmark ? "landmark/architectural structure" : "object");
