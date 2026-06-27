@@ -19,6 +19,14 @@ const STATUS_COLORS = {
   confirmado: "bg-gold-100 text-gold-800",
   pendente: "bg-gold-100 text-gold-800",
   cancelado: "bg-rose-100 text-rose-800",
+  recusado: "bg-rose-100 text-rose-800",
+};
+
+const STATUS_MESSAGES = {
+  confirmado: "Agendamento confirmado",
+  pendente: "Agendamento marcado como pendente",
+  cancelado: "Agendamento cancelado",
+  recusado: "Agendamento recusado e movido para a lista de excluídos",
 };
 
 export default function Agenda() {
