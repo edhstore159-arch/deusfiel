@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import avatarImg from "@/assets/secretary-avatar.png";
+import KeniaCallButton from "@/kenia/components/KeniaCallButton";
 
 /**
  * VirtualSecretaryAvatar
