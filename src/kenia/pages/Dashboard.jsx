@@ -567,6 +567,9 @@ export default function Dashboard() {
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
                 <Avatar className={`w-9 h-9 ${activeContact.avatar_color}`}>
+                  {(activeContact.profile_pic_url || activeContact.picture || activeContact.avatar_url) && (
+                    <AvatarImage src={activeContact.profile_pic_url || activeContact.picture || activeContact.avatar_url} alt={activeContact.name} />
+                  )}
                   <AvatarFallback className="bg-transparent text-white text-xs font-semibold">
                     {initials(activeContact.name)}
                   </AvatarFallback>
