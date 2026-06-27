@@ -36,6 +36,7 @@ export default function Agenda() {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("list");
   const [cursor, setCursor] = useState(new Date());
+  const [listFilter, setListFilter] = useState("ativos"); // "ativos" | "recusados"
   const [form, setForm] = useState({
     title: "", client_name: "", starts_at: "", duration_min: 60,
     location: "Google Meet", notes: "", status: "confirmado",
