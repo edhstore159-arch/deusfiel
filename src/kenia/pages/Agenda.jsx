@@ -148,10 +148,13 @@ export default function Agenda() {
     itemsByDay[key].push(i);
   });
 
+  const isRejected = (i) => i.status === "recusado" || i.status === "cancelado";
   const upcoming = appointments
-    .filter(i => new Date(i.starts_at) >= new Date(today.setHours(0, 0, 0, 0)))
+    .filter(i => listFilter === "recusados"
+      ? isRejected(i)
+      : !isRejected(i) && new Date(i.starts_at) >= new Date(today.setHours(0, 0, 0, 0)))
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
-    .slice(0, 20);
+    .slice(0, 50);
 
   return (
     <div className="h-screen flex flex-col bg-nude-50 overflow-hidden">
