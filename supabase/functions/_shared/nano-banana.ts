@@ -27,16 +27,17 @@ function extractImageFromMessage(msg: any): string | null {
     const url = images[0]?.image_url?.url || images[0]?.url;
     if (url) return url;
   }
+  const RX = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/;
   if (typeof msg.content === "string") {
-    const m = msg.content.match(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/);
-    if (m) return m[0];
+    const m = msg.content.match(RX);
+    if (m) return m[0].replace(/\s+/g, "");
   }
   if (Array.isArray(msg.content)) {
     for (const part of msg.content) {
       if (part?.type === "image_url" && part?.image_url?.url) return part.image_url.url;
       if (typeof part?.text === "string") {
-        const m = part.text.match(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/);
-        if (m) return m[0];
+        const m = part.text.match(RX);
+        if (m) return m[0].replace(/\s+/g, "");
       }
     }
   }
