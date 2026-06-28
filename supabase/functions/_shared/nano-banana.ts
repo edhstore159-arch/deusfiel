@@ -171,26 +171,34 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   }
 }
 
-function dataUrlToBlob(value: string): { blob: Blob; filename: string } | null {
-  const m = String(value || "").match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+function parseDataUrl(value: string): { mime: string; base64: string; ext: string } | null {
+  const raw = String(value || "").trim();
+  // tolera quebras de linha/espacos no base64 (algumas fontes adicionam \n)
+  const m = raw.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/);
   if (!m) return null;
   const mime = m[1] || "image/png";
+  const cleaned = m[2].replace(/\s+/g, "");
+  if (!cleaned || !/^[A-Za-z0-9+/]+={0,2}$/.test(cleaned)) return null;
   const ext = mime.includes("jpeg") ? "jpg" : (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
-  const bin = atob(m[2]);
+  return { mime, base64: cleaned, ext };
+}
+
+function dataUrlToBlob(value: string): { blob: Blob; filename: string } | null {
+  const parsed = parseDataUrl(value);
+  if (!parsed) return null;
+  const bin = atob(parsed.base64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return { blob: new Blob([bytes], { type: mime }), filename: `reference.${ext}` };
+  return { blob: new Blob([bytes], { type: parsed.mime }), filename: `reference.${parsed.ext}` };
 }
 
 function dataUrlToBytes(value: string): { bytes: Uint8Array; mime: string; filename: string } | null {
-  const m = String(value || "").match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!m) return null;
-  const mime = m[1] || "image/png";
-  const ext = mime.includes("jpeg") ? "jpg" : (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
-  const bin = atob(m[2]);
+  const parsed = parseDataUrl(value);
+  if (!parsed) return null;
+  const bin = atob(parsed.base64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return { bytes, mime, filename: `reference.${ext}` };
+  return { bytes, mime: parsed.mime, filename: `reference.${parsed.ext}` };
 }
 
 function buildMultipartBody(
