@@ -159,7 +159,7 @@ const LEGAL_THEMES: LegalTheme[] = [
       "do outro lado, um advogado previdenciarista explicando o processo, gesticulando como se conectasse o segurado aos direitos previdenciários",
   },
   {
-    keys: /\b(divorcio|div[óo]rcio|guarda\s+(de\s+)?filho|pens[ãa]o\s+aliment[íi]cia|direito\s+de\s+fam[íi]lia)\b/i,
+    keys: /\b(divorcio|div[óo]rcio|guarda\s+(de\s+)?filho|pens[ãa]o\s+aliment[íi]cia|direito\s+de\s+fam[íi]lia|fam[íi]lia)\b/i,
     scene:
       "uma família brasileira em mediação — mãe e pai sentados em lados opostos de uma mesa, uma criança ao fundo desfocada; " +
       "ao centro, martelo de juiz e a balança da Justiça simbolizando o direito de família; " +
