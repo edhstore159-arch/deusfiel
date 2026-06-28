@@ -44,19 +44,8 @@ function extractImageFromMessage(msg: any): string | null {
 }
 
 function buildContent({ prompt, imageUrls }: NanoBananaOptions): Content[] {
-  const images = (imageUrls || []).filter(Boolean);
-  if (!images.length) return [{ type: "text", text: prompt }];
-
-  const parts: Content[] = [];
-  parts.push({
-    type: "text",
-    text: "The following uploaded image(s) are source material, not inspiration. For edit mode, return the same image with only the requested local edit applied.",
-  });
-  images.forEach((u, index) => {
-    parts.push({ type: "text", text: `SOURCE IMAGE ${index + 1}${index === 0 ? " / BASE CANVAS" : ""}:` });
-    parts.push({ type: "image_url", image_url: { url: u } });
-  });
-  parts.push({ type: "text", text: `FINAL IMAGE INSTRUCTION:\n${prompt}` });
+  const parts: Content[] = [{ type: "text", text: prompt }];
+  for (const u of imageUrls || []) parts.push({ type: "image_url", image_url: { url: u } });
   return parts;
 }
 
