@@ -982,7 +982,8 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
     const wantAudio = body.want_audio !== false; // default true
     const audio_base64 = wantAudio ? await synthesizeSpeech(reply) : null;
 
-    // Salva conversa e agendamento no banco (não bloqueia resposta se falhar)
+    // Salva conversa e agendamento no banco. No modo voz rápido, usa waitUntil para não segurar a resposta falada.
+    const saveConversationAndAppointment = async () => {
     try {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       const { error: convErr } = await supabase.from("conversations").insert({
@@ -1054,6 +1055,16 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
       }
     } catch (err) {
       console.error("Erro ao salvar conversa/agendamento:", err);
+    }
+    };
+
+    const savePromise = saveConversationAndAppointment();
+    if (fastMode) {
+      const edgeRuntime = (globalThis as any).EdgeRuntime;
+      if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(savePromise);
+      else savePromise.catch((err) => console.error("Erro async ao salvar conversa/agendamento:", err));
+    } else {
+      await savePromise;
     }
 
     return new Response(
