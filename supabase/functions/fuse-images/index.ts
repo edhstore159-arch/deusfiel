@@ -155,8 +155,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const isSingle = !image2_base64;
-    const isTemplate = isSingle && mode === 'template';
+    // If the user is asking for a garment color change, treat as a single-image EDIT
+    // even when a second image was provided — this preserves face/hair identity 1:1.
+    const localizedColor = buildLocalizedColorEditPrompt(prompt || '');
+    const forceEdit = !!localizedColor;
+    const isSingle = !image2_base64 || forceEdit;
+    const isTemplate = isSingle && mode === 'template' && !forceEdit;
     const fullPrompt = isTemplate
       ? await elaborateTemplatePrompt(prompt)
       : (isSingle ? await elaborateEditPrompt(prompt) : await elaborateFusionPrompt(prompt));
