@@ -306,6 +306,7 @@ function EmergentBalance() {
   const pct = (typeof remaining === "number" && max > 0)
     ? Math.max(0, Math.min(100, (remaining / max) * 100)) : null;
   const low = typeof remaining === "number" && remaining < 5;
+  const dailyBlocked = data?.dailyLimitReached || data?.errorCode === "daily_limit_reached" || /daily[_\s-]?limit|Daily spend limit/i.test(data?.error || data?.errorMessage || "");
   return (
     <div className="flex items-center justify-between flex-wrap gap-3 p-3 rounded-md bg-nude-950/60 border border-gold-900/40">
       <div className="flex items-center gap-2 text-sm text-gold-200">
@@ -313,6 +314,10 @@ function EmergentBalance() {
         <span className="font-semibold">Chave Emergent:</span>
         {loading && !data ? (
           <span className="text-nude-400">carregando...</span>
+        ) : dailyBlocked ? (
+          <span className="text-amber-300">
+            Chave válida, mas a Emergent bloqueou por limite diário. Aguarde o reset ou use outra chave com cota disponível.
+          </span>
         ) : data?.ok ? (
           <span className={low ? "text-rose-400" : "text-gold-100"}>
             Ainda tem de saldo <b>{fmt(remaining)}</b> de {fmt(max)} (gasto {fmt(spentCredits)})

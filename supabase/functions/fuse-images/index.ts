@@ -174,6 +174,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (result.provider === 'local-fallback' && isSingle) {
+      return new Response(JSON.stringify({
+        ok: false,
+        error: 'A IA de edição não está disponível agora. A chave Emergent está válida, mas o provedor está bloqueando por limite/cota diária; a imagem não foi alterada.',
+        provider: result.provider,
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({ ok: true, image: result.url, provider: result.provider, prompt_used: fullPrompt, mode: isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion') }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
