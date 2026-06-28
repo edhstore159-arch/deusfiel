@@ -204,6 +204,70 @@ function ImagePicker({ value, onChange, label, testidPrefix }) {
   );
 }
 
+const PRESETS = [
+  { label: "🌍 Trocar país (Paris)", text: "Mantenha a mesma pessoa, mesma roupa, mesma pose e identidade facial. Troque APENAS o cenário ao fundo para Paris, com a Torre Eiffel visível ao fundo, luz natural fotorrealista, sem alterar a pessoa." },
+  { label: "🗽 Trocar país (Nova York)", text: "Preserve a pessoa, roupa, pose e identidade facial. Troque APENAS o fundo para uma rua de Nova York (Times Square), iluminação realista, sem modificar a pessoa." },
+  { label: "🗾 Trocar país (Tóquio)", text: "Preserve identidade, roupa e pose. Mude APENAS o cenário ao fundo para uma rua de Tóquio com letreiros neon (Shibuya), fotorrealista." },
+  { label: "🏖️ Trocar país (Rio - praia)", text: "Preserve a pessoa e identidade facial. Troque APENAS o fundo para a praia de Copacabana com o Pão de Açúcar ao longe, luz dourada de fim de tarde." },
+  { label: "💇 Cabelo loiro", text: "Mantenha integralmente o rosto, identidade, pele, roupa e fundo. Altere APENAS a cor do cabelo para loiro natural, preservando o mesmo corte, comprimento, volume e textura. Realista, sem mudar mais nada." },
+  { label: "💇 Cabelo ruivo", text: "Mantenha rosto e identidade. Altere APENAS a cor do cabelo para ruivo natural acobreado, mesmo corte e estilo." },
+  { label: "💇 Cabelo preto", text: "Mantenha rosto e identidade. Altere APENAS a cor do cabelo para preto natural, preservando o corte." },
+  { label: "👁️ Olhos azuis", text: "Mantenha 100% da identidade facial, formato dos olhos, expressão e maquiagem. Altere APENAS a cor da íris para azul natural realista." },
+  { label: "👁️ Olhos verdes", text: "Mantenha rosto e identidade. Altere APENAS a cor da íris para verde natural realista." },
+  { label: "👁️ Olhos castanhos", text: "Mantenha rosto e identidade. Altere APENAS a cor da íris para castanho natural realista." },
+];
+
+function EmergentBalance() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("emergent-balance", { body: {} });
+      if (error) throw error;
+      setData(data);
+    } catch (e) {
+      setData({ ok: false, error: String(e?.message || e) });
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(); }, []);
+  const fmt = (v) => (typeof v === "number" ? `$${v.toFixed(2)}` : "—");
+  const remaining = data?.remaining;
+  const max = data?.maxBudget;
+  const pct = (typeof remaining === "number" && typeof max === "number" && max > 0)
+    ? Math.max(0, Math.min(100, (remaining / max) * 100)) : null;
+  const low = typeof remaining === "number" && remaining < 0.5;
+  return (
+    <div className="flex items-center justify-between flex-wrap gap-3 p-3 rounded-md bg-nude-950/60 border border-gold-900/40">
+      <div className="flex items-center gap-2 text-sm text-gold-200">
+        <CreditCard className="w-4 h-4 text-gold-400" />
+        <span className="font-semibold">Chave Emergent:</span>
+        {loading && !data ? (
+          <span className="text-nude-400">carregando...</span>
+        ) : data?.ok ? (
+          <span className={low ? "text-rose-400" : "text-gold-100"}>
+            Restam <b>{fmt(remaining)}</b> de {fmt(max)} (gasto {fmt(data.spend)})
+          </span>
+        ) : (
+          <span className="text-rose-400">{data?.error || "indisponível"}</span>
+        )}
+        {pct !== null && (
+          <span className="ml-2 inline-block w-32 h-1.5 rounded bg-nude-800 overflow-hidden align-middle">
+            <span className={`block h-full ${low ? "bg-rose-500" : "bg-gold-500"}`} style={{ width: `${pct}%` }} />
+          </span>
+        )}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={load} disabled={loading}
+        className="border-gold-700/50 text-gold-200 hover:bg-gold-500/10 hover:text-gold-100">
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Atualizar"}
+      </Button>
+    </div>
+  );
+}
+
+
 export default function ImageFusion() {
   const [img1, setImg1] = useState(null);
   const [img2, setImg2] = useState(null);
