@@ -238,6 +238,59 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   const key = Deno.env.get("EMERGENT_API_KEY");
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
   const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt) };
+  const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
+  try {
+    if (imageUrls.length > 0) {
+      const form = new FormData();
+      form.append("model", "gpt-image-1");
+      form.append("prompt", safeOpts.prompt);
+      form.append("size", "1024x1024");
+      for (const u of imageUrls.slice(0, 4)) {
+        const converted = dataUrlToBlob(u);
+        if (converted) form.append("image", converted.blob, converted.filename);
+      }
+      if (form.has("image")) {
+        const resp = await fetch("https://integrations.emergentagent.com/llm/images/edits", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}` },
+          body: form,
+        });
+        const text = await resp.text();
+        if (resp.ok) {
+          const data = JSON.parse(text);
+          const b64 = data?.data?.[0]?.b64_json;
+          const url = data?.data?.[0]?.url;
+          if (b64) return { url: `data:image/png;base64,${b64}` };
+          if (url) return { url };
+        } else if (/budget[_\s]exceeded|Budget has been exceeded/i.test(text)) {
+          return { url: null, error: `Emergent: orçamento da chave esgotado. Detalhe: ${text.slice(0, 240)}` };
+        } else {
+          console.warn("⚠️ Emergent images/edits falhou:", resp.status, text.slice(0, 240));
+        }
+      }
+    } else {
+      const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024", n: 1 }),
+      });
+      const text = await resp.text();
+      if (resp.ok) {
+        const data = JSON.parse(text);
+        const b64 = data?.data?.[0]?.b64_json;
+        const url = data?.data?.[0]?.url;
+        if (b64) return { url: `data:image/png;base64,${b64}` };
+        if (url) return { url };
+      } else if (/budget[_\s]exceeded|Budget has been exceeded/i.test(text)) {
+        return { url: null, error: `Emergent: orçamento da chave esgotado. Detalhe: ${text.slice(0, 240)}` };
+      } else {
+        console.warn("⚠️ Emergent images/generations falhou:", resp.status, text.slice(0, 240));
+      }
+    }
+  } catch (e) {
+    console.warn("⚠️ Emergent images API erro:", (e as Error)?.message || e);
+  }
+
   const models = [
     "gemini-2.5-flash-image",
     "google/gemini-2.5-flash-image",
