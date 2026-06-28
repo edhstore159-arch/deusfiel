@@ -492,6 +492,14 @@ export async function chatCompletion(opts: ChatOptions) {
       if (r.ok) return r;
       console.warn("⚠️ Gemini rápido falhou, tentando Ollama/Emergent:", r.status, r.error?.slice?.(0, 200));
     }
+    if (OLLAMA_URL) {
+      const r = await chatOllama(opts);
+      if (r.ok) return r;
+      console.warn("⚠️ Ollama rápido falhou, tentando Emergent:", r.status, r.error?.slice?.(0, 200));
+    }
+    const r3 = await chatEmergent(opts);
+    if (r3.ok) return r3;
+    return { ok: false as const, status: r3.status || 502, error: r3.error || "Nenhum provider rápido disponível", provider: "none" };
   }
   // Order: Ollama → Lovable → Gemini (direct) → Emergent
   if (OLLAMA_URL) {
