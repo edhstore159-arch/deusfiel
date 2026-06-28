@@ -624,13 +624,39 @@ export default function ViralVideoStudio() {
       const url = data.url || (data.b64 ? `data:video/mp4;base64,${data.b64}` : "");
       if (!url) throw new Error("Resposta sem URL de vídeo");
       setVideoUrl(url);
-      toast.success(`Vídeo Emergent gerado (${seconds}s)`);
+      const via = data.provider === "replicate" ? "Replicate (Kling v2.1) — fallback" : "Emergent (Veo)";
+      toast.success(`Vídeo gerado via ${via} (${seconds}s)`);
     } catch (e) {
-      toast.error(e?.message || "Falha ao gerar vídeo via Emergent");
+      toast.error(e?.message || "Falha ao gerar vídeo");
     } finally {
       setGeneratingEmergent(false);
     }
   };
+
+  const [generatingReplicate, setGeneratingReplicate] = useState(false);
+  const generateWithReplicate = async () => {
+    if (generatingReplicate) return;
+    setGeneratingReplicate(true);
+    try {
+      const seconds = Math.min(10, Math.max(4, clampDuration(durationSeconds)));
+      const veoPrompt = buildVeoPrompt(prompt, category, customScene, seconds);
+      toast.info("Gerando com Kling v2.1 (pode levar 3-8 min)...");
+      const { data, error } = await supabase.functions.invoke("emergent-video", {
+        body: { prompt: veoPrompt, durationSeconds: seconds, aspectRatio: "9:16", provider: "replicate" },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Falha Replicate");
+      const url = data.url || (data.b64 ? `data:video/mp4;base64,${data.b64}` : "");
+      if (!url) throw new Error("Sem URL de vídeo");
+      setVideoUrl(url);
+      toast.success(`Vídeo Kling v2.1 gerado (${seconds}s)`);
+    } catch (e) {
+      toast.error(e?.message || "Falha Replicate");
+    } finally {
+      setGeneratingReplicate(false);
+    }
+  };
+
 
   const enhancePrompt = async () => {
     if (enhancing) return;
