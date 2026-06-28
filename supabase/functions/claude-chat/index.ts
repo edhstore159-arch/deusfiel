@@ -21,6 +21,41 @@ Deno.serve(async (req) => {
         .map((m: any) => ({ role: m.role, content: m.content })),
     ];
 
+    // 1) Tentar Anthropic oficial se ANTHROPIC_API_KEY existir
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (anthropicKey) {
+      try {
+        const sys = messages[0].content;
+        const userMsgs = messages.slice(1).map((m: any) => ({ role: m.role, content: m.content }));
+        const aRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 2048,
+            system: sys,
+            messages: userMsgs,
+          }),
+        });
+        if (aRes.ok) {
+          const j = await aRes.json();
+          const content = String(j?.content?.[0]?.text || "").trim();
+          return new Response(
+            JSON.stringify({ content, provider: "anthropic" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        console.warn("Anthropic falhou, caindo no fallback:", aRes.status, await aRes.text().catch(() => ""));
+      } catch (e) {
+        console.warn("Anthropic erro, fallback:", e);
+      }
+    }
+
+    // 2) Fallback: gateway de IA gratuita do projeto
     const r = await chatCompletion({ messages, temperature: 0.7 });
     if (!r.ok) {
       return new Response(
