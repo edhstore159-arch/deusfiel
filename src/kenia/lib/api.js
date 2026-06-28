@@ -379,6 +379,29 @@ const write = (key, value) => {
 const response = (data, status = 200, headers = {}) => Promise.resolve({ data: clone(data), status, statusText: "OK", headers, config: {} });
 const nextId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+const dataUrlToBlob = async (input, fallbackType = "image/png") => {
+  const value = String(input || "").trim();
+  const dataUrl = value.startsWith("data:") ? value : `data:${fallbackType};base64,${value}`;
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    if (blob?.size) return blob;
+  } catch {}
+
+  const match = dataUrl.match(/^data:([^;,]+)?(?:;[^,]*)?,([\s\S]*)$/i);
+  const mimeType = match?.[1] || fallbackType;
+  const pureB64 = (match?.[2] || dataUrl).replace(/\s/g, "");
+  const binary = atob(pureB64);
+  const chunkSize = 8192;
+  const chunks = [];
+  for (let i = 0; i < binary.length; i += chunkSize) {
+    const slice = binary.slice(i, i + chunkSize);
+    const bytes = new Uint8Array(slice.length);
+    for (let j = 0; j < slice.length; j += 1) bytes[j] = slice.charCodeAt(j);
+    chunks.push(bytes);
+  }
+  return new Blob(chunks, { type: mimeType });
+};
+
 const safeCaseId = (sessionId) => {
   const raw = String(sessionId || nextId("session"));
   const safe = raw.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 90);
@@ -683,9 +706,10 @@ const staticGet = async (url, config = {}) => {
             created_at: r.created_at,
           };
         });
-        // Acrescenta locais sem storage_path (ainda não persistidos)
-        const orphan = local.filter((l) => !l.storage_path);
-        return response([...cloudItems, ...orphan]);
+        // Acrescenta locais que ainda não estão na nuvem ou cujo registro não foi criado.
+        const cloudPaths = new Set(rows.map((r) => r.storage_path).filter(Boolean));
+        const localExtras = local.filter((l) => !l.storage_path || !cloudPaths.has(l.storage_path));
+        return response([...cloudItems, ...localExtras]);
       } catch {
         return response(local);
       }
@@ -928,23 +952,12 @@ const staticPost = (url, body = {}) => {
         const uid = auth?.user?.id;
         if (!uid) {
           console.warn("[creatives] usuário não autenticado — imagem só será salva localmente.");
-        } else if (b64) {
-          const dataUrl = b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
-          // Converte sem depender de fetch (mais robusto para data URLs grandes)
-          let blob;
-          try {
-            blob = await (await fetch(dataUrl)).blob();
-          } catch {
-            const pureB64 = dataUrl.split(",")[1] || "";
-            const bin = atob(pureB64);
-            const bytes = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            blob = new Blob([bytes], { type: "image/png" });
-          }
+        } else if (storedImage) {
+          const blob = await dataUrlToBlob(storedImage, "image/png");
           storagePath = `${uid}/creative-${Date.now()}.png`;
           const { error: upErr } = await supabase.storage
             .from("creative-assets")
-            .upload(storagePath, blob, { contentType: "image/png", upsert: true });
+            .upload(storagePath, blob, { contentType: blob.type || "image/png", upsert: true });
           if (!upErr) {
             const { error: insErr } = await supabase.from("generated_images").insert({
               user_id: uid, storage_path: storagePath, prompt: topic, kind: "creative", paid: false,
