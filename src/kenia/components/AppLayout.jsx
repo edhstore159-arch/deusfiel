@@ -114,9 +114,9 @@ export default function AppLayout() {
       {/* Sidebar — nude/gold executive (drawer no mobile, fixo no desktop) */}
       <aside
         className={`bg-card border-r border-nude-200 flex flex-col w-64 z-50
-                    fixed inset-y-0 left-0 h-[100dvh] max-h-[100dvh] transform transition-transform duration-300 ease-in-out
+                    fixed inset-y-0 left-0 h-[100dvh] max-h-[100dvh] overflow-y-auto overscroll-contain [touch-action:pan-y] transform transition-transform duration-300 ease-in-out
                     ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-                    lg:static lg:translate-x-0 lg:z-auto lg:h-auto lg:max-h-none`}
+                    lg:static lg:translate-x-0 lg:z-auto lg:h-auto lg:max-h-none lg:overflow-visible`}
         data-testid="app-sidebar"
       >
         <div className="px-6 py-6 border-b border-nude-200 flex items-center justify-between">
@@ -143,7 +143,7 @@ export default function AppLayout() {
           </button>
         </div>
 
-        <nav className="flex-1 min-h-0 px-3 py-5 space-y-0.5 overflow-y-auto overscroll-contain">
+        <nav className="shrink-0 px-3 py-5 space-y-0.5 overflow-visible lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -174,7 +174,7 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-nude-200">
+        <div className="shrink-0 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] border-t border-nude-200 lg:pb-3">
           <div className="flex items-center gap-3 px-2 py-2">
             <Avatar className="w-9 h-9 ring-1 ring-gold-300/60">
               <AvatarFallback className="bg-gold-100 text-gold-700 text-xs font-semibold font-sans">
