@@ -48,6 +48,7 @@ const Settings = lazyWithReload(() => import("@/kenia/pages/Settings"));
 const DebugTool = lazyWithReload(() => import("@/kenia/pages/DebugTool"));
 const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
 const ClaudeChat = lazyWithReload(() => import("@/kenia/pages/ClaudeChat"));
+const CloudHub = lazyWithReload(() => import("@/kenia/pages/CloudHub"));
 const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
 
@@ -97,6 +98,7 @@ function App() {
                 <Route path="/app" element={<Dashboard />} />
                 <Route path="/app/chat-ia" element={<ChatIA />} />
                 <Route path="/app/claude" element={<ClaudeChat />} />
+                <Route path="/app/cloud" element={<CloudHub />} />
                 <Route path="/app/admin" element={<AdminCases />} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
                 

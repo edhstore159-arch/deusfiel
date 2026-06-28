@@ -5,7 +5,7 @@ import {
   LayoutDashboard, KanbanSquare, Scale, Wallet, Sparkles,
   BarChart3, LogOut, MessageSquare, Wrench, Radio,
   CalendarDays, Settings as SettingsIcon, Combine,
-  ShieldCheck, Bot, Menu, X, Clapperboard,
+  ShieldCheck, Bot, Menu, X, Clapperboard, Cloud,
 } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
@@ -21,6 +21,7 @@ const NAV = [
   { to: "/app", label: "Atendimento", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
   { to: "/app/chat-ia", label: "Chat IA · Análise", icon: Bot, testid: "nav-chat-ia" },
   { to: "/app/claude", label: "Claude · IA Grátis", icon: Sparkles, testid: "nav-claude" },
+  { to: "/app/cloud", label: "Cloud", icon: Cloud, testid: "nav-cloud" },
   { to: "/app/admin", label: "Painel Admin · Casos", icon: ShieldCheck, testid: "nav-admin" },
   { to: "/app/secretary-tasks", label: "Tarefas Secretária", icon: MessageSquare, testid: "nav-secretary-tasks" },
   
@@ -43,6 +44,7 @@ const PREFETCH = {
   "/app": () => import("@/kenia/pages/Dashboard"),
   "/app/chat-ia": () => import("@/kenia/pages/ChatIA"),
   "/app/claude": () => import("@/kenia/pages/ClaudeChat"),
+  "/app/cloud": () => import("@/kenia/pages/CloudHub"),
   "/app/admin": () => import("@/kenia/pages/AdminCases"),
   "/app/secretary-tasks": () => import("@/kenia/pages/SecretaryTasks"),
   
