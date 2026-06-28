@@ -49,6 +49,7 @@ const DebugTool = lazyWithReload(() => import("@/kenia/pages/DebugTool"));
 const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
 const ClaudeChat = lazyWithReload(() => import("@/kenia/pages/ClaudeChat"));
 const CloudHub = lazyWithReload(() => import("@/kenia/pages/CloudHub"));
+const CloudSiteView = lazyWithReload(() => import("@/kenia/pages/CloudSiteView"));
 const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
 
