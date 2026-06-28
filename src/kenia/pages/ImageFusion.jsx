@@ -257,7 +257,7 @@ function EmergentBalance() {
           <span className="text-nude-400">carregando...</span>
         ) : data?.ok ? (
           <span className={low ? "text-rose-400" : "text-gold-100"}>
-            Restam <b>{fmt(remaining)}</b> de {fmt(max)} (gasto {fmt(data.spend)})
+            Restam <b>{fmt(remaining)}</b> de {fmt(max)} (gasto {fmt(spentCredits)})
           </span>
         ) : (
           <span className="text-rose-400">{data?.error || "indisponível"}</span>
