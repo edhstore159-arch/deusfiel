@@ -569,7 +569,45 @@ export default function ViralVideoStudio() {
   const [videoUrl, setVideoUrl] = useState("");
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
+  const [generatingEmergent, setGeneratingEmergent] = useState(false);
+  const [emergentKey, setEmergentKey] = useState(() => {
+    try { return localStorage.getItem("kenia.emergent.video.key") || ""; } catch { return ""; }
+  });
   const lastVideoUrl = useRef("");
+
+  const saveEmergentKey = (value) => {
+    setEmergentKey(value);
+    try {
+      if (value) localStorage.setItem("kenia.emergent.video.key", value);
+      else localStorage.removeItem("kenia.emergent.video.key");
+    } catch { /* noop */ }
+  };
+
+  const generateWithEmergent = async () => {
+    if (generatingEmergent) return;
+    setGeneratingEmergent(true);
+    try {
+      const seconds = Math.min(8, Math.max(4, clampDuration(durationSeconds)));
+      const { data, error } = await supabase.functions.invoke("emergent-video", {
+        body: {
+          prompt,
+          durationSeconds: seconds,
+          aspectRatio: "9:16",
+          overrideKey: emergentKey || undefined,
+        },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Falha na geração via Emergent");
+      const url = data.url || (data.b64 ? `data:video/mp4;base64,${data.b64}` : "");
+      if (!url) throw new Error("Resposta sem URL de vídeo");
+      setVideoUrl(url);
+      toast.success(`Vídeo Emergent gerado (${seconds}s)`);
+    } catch (e) {
+      toast.error(e?.message || "Falha ao gerar vídeo via Emergent");
+    } finally {
+      setGeneratingEmergent(false);
+    }
+  };
 
   const enhancePrompt = async () => {
     if (enhancing) return;
@@ -776,6 +814,17 @@ export default function ViralVideoStudio() {
               ))}
             </div>
 
+            <div className="space-y-2 rounded-md border border-gold-900/40 bg-nude-950/70 p-3">
+              <Label className="text-gold-200 text-xs uppercase tracking-wide">Chave Emergent (opcional)</Label>
+              <Input
+                value={emergentKey}
+                onChange={(e) => saveEmergentKey(e.target.value)}
+                placeholder="sk-emergent-... (deixe em branco para usar a chave do sistema)"
+                className="bg-nude-950 border-gold-900/40 text-gold-100 placeholder:text-nude-600"
+              />
+              <p className="text-[11px] text-nude-400">Salva localmente no navegador. Usada apenas na geração via Emergent (Veo).</p>
+            </div>
+
             <div className="flex flex-wrap justify-end gap-2">
               <Button
                 onClick={enhancePrompt}
@@ -794,12 +843,21 @@ export default function ViralVideoStudio() {
                 <Copy className="w-4 h-4 mr-2" /> Copiar prompt final
               </Button>
               <Button
+                onClick={generateWithEmergent}
+                disabled={generatingEmergent}
+                variant="outline"
+                className="border-gold-500/70 bg-gold-500/10 text-gold-100 hover:bg-gold-500/20"
+              >
+                {generatingEmergent ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                {generatingEmergent ? "Gerando (Emergent)..." : "Gerar com Emergent (Veo)"}
+              </Button>
+              <Button
                 onClick={generateVideo}
                 disabled={generatingVideo}
                 className="bg-gradient-to-r from-gold-500 to-gold-700 hover:from-gold-400 hover:to-gold-600 text-nude-950 font-semibold"
               >
                 {generatingVideo ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
-                {generatingVideo ? "Gerando vídeo..." : "Gerar vídeo"}
+                {generatingVideo ? "Gerando vídeo..." : "Gerar vídeo local"}
               </Button>
             </div>
           </Card>
