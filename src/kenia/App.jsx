@@ -47,9 +47,6 @@ const Consulta = lazyWithReload(() => import("@/kenia/pages/Consulta"));
 const Settings = lazyWithReload(() => import("@/kenia/pages/Settings"));
 const DebugTool = lazyWithReload(() => import("@/kenia/pages/DebugTool"));
 const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
-const ClaudeChat = lazyWithReload(() => import("@/kenia/pages/ClaudeChat"));
-const CloudHub = lazyWithReload(() => import("@/kenia/pages/CloudHub"));
-const CloudSiteView = lazyWithReload(() => import("@/kenia/pages/CloudSiteView"));
 const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
 
@@ -89,7 +86,6 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/trust" element={<Trust />} />
               <Route path="/admin/debug" element={<Protected><DebugTool /></Protected>} />
-              <Route path="/s/:slug" element={<CloudSiteView />} />
               <Route
                 element={
                   <Protected>
@@ -99,8 +95,6 @@ function App() {
               >
                 <Route path="/app" element={<Dashboard />} />
                 <Route path="/app/chat-ia" element={<ChatIA />} />
-                <Route path="/app/claude" element={<ClaudeChat />} />
-                <Route path="/app/cloud" element={<CloudHub />} />
                 <Route path="/app/admin" element={<AdminCases />} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
                 

@@ -3,9 +3,13 @@ import { useEffect, useState } from "react";
 /**
  * DebugErrorThrower
  *
- * Escuta "lovable-debug-error" sem derrubar a prévia.
- * A instrução chega pelo chat/erro reportado ao agente; manter o app rodando
- * evita tela branca enquanto a correção é aplicada.
+ * Escuta "lovable-debug-error" e converte a instrução em um erro fatal de
+ * runtime durante o render. Esse erro é INTENCIONAL: ele escapa para o
+ * overlay global da Lovable para acionar o botão "Try to Fix".
+ *
+ * NÃO envolver em ErrorBoundary/Suspense.
+ * NÃO remover o throw.
+ * NÃO trocar por console.error / toast / log silencioso.
  */
 export const DebugErrorThrower = () => {
   const [message, setMessage] = useState<string | null>(null);
@@ -21,12 +25,10 @@ export const DebugErrorThrower = () => {
     return () => window.removeEventListener("lovable-debug-error", handler as EventListener);
   }, []);
 
-  useEffect(() => {
-    if (!message) return;
-    console.info("lovable-debug-instruction", message);
-    const timeout = window.setTimeout(() => setMessage(null), 250);
-    return () => window.clearTimeout(timeout);
-  }, [message]);
+  if (message) {
+    // Intencional: cai no overlay global da Lovable para usar "Try to Fix".
+    throw new Error(message);
+  }
 
   return null;
 };

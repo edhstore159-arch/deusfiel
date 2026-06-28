@@ -58,7 +58,6 @@ export function hasHumanSubject(prompt = "") {
   if (/\bsubject\s+lock\b[\s\S]{0,160}\b(subject\s+is\s+(the\s+)?(object|fruit|landmark|architectural structure)|render\s+only\s+that\s+subject)\b/i.test(prompt)) return false;
   if (/--no\s+(human|face|hands|body_parts)|\bno\s+anatomy\b|\bno\s+portrait\b/i.test(prompt)) return false;
   if (EVENT_RE_HUMAN.test(prompt)) return true;
-  if (/\b(s[ãa]o\s+jorge|nossa\s+senhora|virgem\s+maria|jesus\s+cristo|cristo\s+jesus|sagrado\s+cora[cç][ãa]o\s+de\s+jesus|s[ãa]o\s+francisco|santo\s+ant[ôo]nio|s[ãa]o\s+pedro|s[ãa]o\s+paulo\s+ap[óo]stolo|s[ãa]o\s+miguel|padre\s+c[íi]cero|s[ãa]o\s+benedito|santo\s+s[ãa]o\s+\w+|saint\s+\w+|nossa\s+senhora\s+aparecida)\b/i.test(prompt)) return true;
   return /\b(person|people|human|man|woman|child|face|portrait|lawyer|client|brazilian|homem|mulher|pessoa|pessoas|rosto|retrato|advogado|advogada|cliente|crian[cç]a|idos[ao]|jovem|senhor|senhora|m[ãa]e|pai|filh[ao]|viol[êe]ncia|agress[ãa]o|hematoma|ematoma|les[ãa]o|les[õo]es|ferid[ao]|machucad[ao]|corpo|bra[cç]o|perna|pele humana|bruise|injury|wound|assault)\b/i.test(prompt);
 }
 
@@ -76,24 +75,6 @@ const PROMPT_TYPO_MAP: Array<[RegExp, string]> = [
   [/\bestrela?s?\b/gi, "estrela (five-pointed star symbol)"],
   [/\blua\b/gi, "lua (moon, crescent moon)"],
   [/\bsol\b/gi, "sol (sun, bright sunshine)"],
-
-  // ===== FIGURAS RELIGIOSAS / SANTOS (iconografia católica clássica) =====
-  [/\b(santo\s+)?s[ãa]o\s+jorge\s+guerreiro\b/gi, "São Jorge Guerreiro (Saint George the Warrior: classical Catholic iconography, brave Roman soldier saint in shining silver armor and red cape, mounted on a rearing white horse, golden halo behind his head, holding a long lance piercing a green dragon at his feet, dramatic sky background, religious painting style, devotional realism, NOT a fruit, NOT a landmark)"],
-  [/\b(santo\s+)?s[ãa]o\s+jorge\b/gi, "São Jorge (Saint George: classical Catholic iconography, knight saint in shining silver armor and red cape, mounted on a white horse, golden halo, holding a lance defeating a green dragon, devotional religious painting, sacred art, NOT a fruit)"],
-  [/\bnossa\s+senhora\s+aparecida\b/gi, "Nossa Senhora Aparecida (Our Lady Aparecida: small dark-skinned Virgin Mary statue, blue and gold embroidered mantle with stars, golden crown, hands joined in prayer, golden halo, Brazilian Catholic devotional iconography)"],
-  [/\bnossa\s+senhora\b|\bvirgem\s+maria\b/gi, "Nossa Senhora / Virgem Maria (Virgin Mary: serene woman with blue mantle and white veil, golden halo, hands joined in prayer, classical Catholic religious iconography, devotional sacred art)"],
-  [/\bjesus\s+cristo\b|\bcristo\s+jesus\b/gi, "Jesus Cristo (Jesus Christ: serene bearded man, long brown hair, white robe with red mantle, golden halo, sacred heart, classical Catholic religious iconography)"],
-  [/\bsagrado\s+cora[cç][ãa]o\s+de\s+jesus\b/gi, "Sagrado Coração de Jesus (Sacred Heart of Jesus: Jesus with white robe and red mantle, exposed glowing heart crowned with thorns and flames on his chest, hand raised in blessing, golden halo, classical Catholic devotional art)"],
-  [/\bcristo\s+redentor\s+est[áa]tua\b/gi, "Cristo Redentor estátua (Christ the Redeemer statue, Rio de Janeiro landmark)"],
-  [/\bs[ãa]o\s+francisco(\s+de\s+assis)?\b/gi, "São Francisco de Assis (Saint Francis of Assisi: humble friar in brown Franciscan robe with rope belt, tonsure, golden halo, surrounded by birds and animals, devotional Catholic iconography)"],
-  [/\bsanto\s+ant[ôo]nio\b/gi, "Santo Antônio (Saint Anthony of Padua: young Franciscan friar in brown robe, holding baby Jesus and a white lily, golden halo, classical Catholic religious art)"],
-  [/\bs[ãa]o\s+pedro\b/gi, "São Pedro (Saint Peter: bearded apostle with white and gold robe, holding golden keys of heaven, golden halo, classical Catholic iconography)"],
-  [/\bs[ãa]o\s+paulo\s+ap[óo]stolo\b/gi, "São Paulo Apóstolo (Saint Paul the Apostle: bearded apostle with sword and book/scroll, red and white robe, golden halo, sacred art)"],
-  [/\bs[ãa]o\s+miguel(\s+arcanjo)?\b/gi, "São Miguel Arcanjo (Saint Michael the Archangel: warrior angel with white wings and Roman armor, golden halo, raised sword, defeating a demon at his feet, dramatic religious painting)"],
-  [/\bpadre\s+c[íi]cero\b/gi, "Padre Cícero (Father Cícero of Juazeiro: elderly Brazilian priest with black cassock, wide-brimmed black hat, white beard, holding a wooden staff or rosary, devotional Brazilian Catholic iconography)"],
-  [/\bs[ãa]o\s+benedito\b/gi, "São Benedito (Saint Benedict the Moor: dark-skinned Franciscan friar in brown robe, holding baby Jesus, golden halo, devotional art)"],
-
-
 
   // ===== FRUTAS =====
   [/\bmac[ãa]+n?s?\b/gi, "maçã (apple fruit, red apple, fresh fruit)"],
@@ -666,42 +647,9 @@ async function imagePollinations(opts: ImageOptions) {
   }
 }
 
-async function enhancePromptWithOllama(userPrompt: string): Promise<string> {
-  if (!OLLAMA_URL || isUnsupportedOllamaHost(OLLAMA_URL)) return userPrompt;
-  try {
-    const system = `Você é um diretor de arte que converte pedidos em PT-BR em PROMPTS de geração de imagem em INGLÊS, fotorrealistas, fiéis ao pedido.
-REGRAS:
-- Mantenha o ASSUNTO EXATO pedido pelo usuário (santos católicos, objetos, paisagens, pessoas). NUNCA troque por fruta/comida se não foi pedido.
-- Para santos/figuras religiosas: descreva iconografia católica clássica correta (vestes, halo, atributos: ex. São Jorge = cavaleiro, armadura prateada, cavalo branco, lança, dragão).
-- Para paisagens: sem rostos, sem pessoas, sem antropomorfismo.
-- Para pessoas: anatomia correta, mãos com 5 dedos, rosto natural.
-- Inclua: composição, iluminação, lente, materiais, atmosfera.
-- Inclua "negative:" com o que NÃO deve aparecer.
-- Devolva APENAS o prompt final em inglês, sem explicação, sem markdown, máximo 180 palavras.`;
-    const r = await chatOllama({
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: `Pedido do usuário: "${userPrompt}"\n\nGere o prompt final em inglês:` },
-      ],
-      temperature: 0.4,
-    });
-    if (!r.ok) return userPrompt;
-    const out = String(r.data?.choices?.[0]?.message?.content || "").trim()
-      .replace(/^```[a-z]*\s*/i, "").replace(/\s*```$/i, "")
-      .replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-    if (!out || out.length < 20) return userPrompt;
-    // Mantém o pedido original como âncora + prompt enriquecido do Ollama
-    return `${userPrompt}. ${out}`;
-  } catch {
-    return userPrompt;
-  }
-}
-
 export async function generateImage(opts: ImageOptions) {
-  const enriched = await enhancePromptWithOllama(opts.prompt);
-  const humanSubject = hasHumanSubject(enriched);
-  const faceSafeOpts = { ...opts, prompt: withFaceSafety(enriched), quality: opts.quality || (humanSubject ? "high" : undefined) };
-
+  const humanSubject = hasHumanSubject(opts.prompt);
+  const faceSafeOpts = { ...opts, prompt: withFaceSafety(opts.prompt), quality: opts.quality || (humanSubject ? "high" : undefined) };
   // Para imagens com pessoas, prioriza modelos com melhor anatomia facial; Pollinations fica só como fallback.
   if (LOVABLE_KEY) {
     const r = await imageLovable(faceSafeOpts);

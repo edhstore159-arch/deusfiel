@@ -56,8 +56,6 @@ export default function FloatingVoiceOrb() {
   const restartTimerRef = useRef(null);
   const handleCommandRef = useRef(null);
   const lastFinalRef = useRef({ text: "", at: 0 });
-  const lastInterimRef = useRef("");
-  const finalProcessedRef = useRef(false);
   const speakingRef = useRef(false);
   const speechResumeTimerRef = useRef(null);
   const [alwaysOn, setAlwaysOn] = useState(() => {
@@ -181,7 +179,6 @@ export default function FloatingVoiceOrb() {
     rec.onresult = (e) => {
       const txt = Array.from(e.results).map((r) => r[0].transcript).join(" ");
       setTranscript(txt);
-      lastInterimRef.current = txt;
       // Interrupção imediata: se a palavra "secretária" aparecer mesmo nos
       // resultados parciais (interim) enquanto a assistente está falando,
       // cancela a fala na hora — não espera o resultado final.
@@ -222,10 +219,8 @@ export default function FloatingVoiceOrb() {
           }
 
           handleCommandRef.current?.(commandText);
-          finalProcessedRef.current = true;
         } else {
           handleCommandRef.current?.(finalText);
-          finalProcessedRef.current = true;
           shouldRestartRef.current = false;
           try { rec.stop(); } catch {}
         }
@@ -246,27 +241,6 @@ export default function FloatingVoiceOrb() {
     rec.onend = () => {
       recognitionActiveRef.current = false;
       setListening(false);
-      // Chrome fallback: às vezes encerra sem disparar isFinal=true.
-      // Se nada foi processado, usa o último interim como comando.
-      if (!finalProcessedRef.current) {
-        const pending = (lastInterimRef.current || "").trim();
-        if (pending) {
-          finalProcessedRef.current = true;
-          lastInterimRef.current = "";
-          if (alwaysOnRef.current) {
-            const woke = hasWakeWord(pending);
-            const cmd = woke ? stripWake(pending) : pending;
-            if (woke) activateCommandSession();
-            if ((woke && (!cmd || isWakeOnlyPrompt(cmd))) ) {
-              answerWakePrompt();
-            } else if (woke || commandSessionActiveRef.current) {
-              handleCommandRef.current?.(cmd);
-            }
-          } else {
-            handleCommandRef.current?.(pending);
-          }
-        }
-      }
       if (!shouldRestartRef.current || !alwaysOnRef.current) return;
       restartContinuousRecognition(speakingRef.current ? 700 : 300);
     };
@@ -301,8 +275,6 @@ export default function FloatingVoiceOrb() {
       commandSessionActiveRef.current = false;
       awakeUntilRef.current = 0;
       setTranscript("");
-      lastInterimRef.current = "";
-      finalProcessedRef.current = false;
       try {
         rec.continuous = true;
         rec.interimResults = true;
@@ -1083,8 +1055,6 @@ export default function FloatingVoiceOrb() {
       commandSessionActiveRef.current = false;
       setAlwaysOn(false);
       setTranscript("");
-      lastInterimRef.current = "";
-      finalProcessedRef.current = false;
       try {
         rec.continuous = false;
         rec.interimResults = true;
