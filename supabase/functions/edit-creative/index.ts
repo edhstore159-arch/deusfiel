@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const image: string = String(body.image_base64 || body.image || "").trim();
     const prompt: string = String(body.prompt || body.instruction || "").trim();
+    const emergentApiKey: string = String(body.emergentApiKey || body.overrideKey || "").trim();
     if (!image) {
       return new Response(JSON.stringify({ ok: false, error: "image_base64 obrigatório" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -39,9 +40,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const imageUrl = image.startsWith("data:") ? image : `data:image/png;base64,${image}`;
+    const imageUrl = image.startsWith("data:") || /^https?:\/\//i.test(image) ? image : `data:image/png;base64,${image}`;
     const fullPrompt = buildEditPrompt(prompt);
-    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls: [imageUrl] });
+    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls: [imageUrl], mode: "edit", emergentApiKey: emergentApiKey || undefined });
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || "Sem imagem gerada" }), {
@@ -55,8 +56,8 @@ Deno.serve(async (req) => {
         JSON.stringify({
           ok: false,
           error:
-            "A IA de edição está indisponível no momento (Lovable AI, Gemini e Emergent falharam). " +
-            "A imagem não foi alterada. Tente novamente em instantes.",
+            "A IA de edição está indisponível no momento. A Emergent foi tentada primeiro, mas falhou ou está bloqueada por limite/cota diária; " +
+            "a imagem não foi alterada. Se tiver outra chave Emergent com cota, informe no campo de chave alternativa.",
           provider: result.provider,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
