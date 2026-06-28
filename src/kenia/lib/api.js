@@ -706,9 +706,10 @@ const staticGet = async (url, config = {}) => {
             created_at: r.created_at,
           };
         });
-        // Acrescenta locais sem storage_path (ainda não persistidos)
-        const orphan = local.filter((l) => !l.storage_path);
-        return response([...cloudItems, ...orphan]);
+        // Acrescenta locais que ainda não estão na nuvem ou cujo registro não foi criado.
+        const cloudPaths = new Set(rows.map((r) => r.storage_path).filter(Boolean));
+        const localExtras = local.filter((l) => !l.storage_path || !cloudPaths.has(l.storage_path));
+        return response([...cloudItems, ...localExtras]);
       } catch {
         return response(local);
       }
