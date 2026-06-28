@@ -445,21 +445,27 @@ export default function ImageFusion() {
         </div>
 
         <Card className="max-w-5xl mx-auto p-5 bg-nude-900/60 border-gold-900/40 mt-5">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          <EmergentBalance />
+          <div className="flex items-center justify-between flex-wrap gap-2 mt-3">
             <Label className="text-gold-200">Instrução adicional (opcional)</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Button type="button" variant="outline" size="sm"
               onClick={() => setPrompt((p) => (p ? p + "\n\n" : "") + REJUVENATE_PROMPT)}
               className="border-gold-700/50 text-gold-200 hover:bg-gold-500/10 hover:text-gold-100"
-              data-testid="fusion-rejuvenate-preset"
-            >
-              <Wand2 className="w-3.5 h-3.5 mr-1.5" /> Preset: rejuvenescer rosto (preservar identidade)
+              data-testid="fusion-rejuvenate-preset">
+              <Wand2 className="w-3.5 h-3.5 mr-1.5" /> Rejuvenescer rosto
             </Button>
+            {PRESETS.map((p) => (
+              <Button key={p.label} type="button" variant="outline" size="sm"
+                onClick={() => setPrompt((cur) => (cur ? cur + "\n\n" : "") + p.text)}
+                className="border-gold-700/50 text-gold-200 hover:bg-gold-500/10 hover:text-gold-100">
+                {p.label}
+              </Button>
+            ))}
           </div>
           <Textarea rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Ex: Mescle as duas imagens em estilo dourado elegante. Use o botão acima para aplicar o preset de rejuvenescimento facial."
+            placeholder="Ex: trocar o cenário para Paris ao fundo, mudar cor do cabelo para loiro, mudar olhos para azul."
             data-testid="fusion-prompt"
             className="bg-nude-950 border-gold-900/40 text-gold-100 placeholder:text-nude-600 mt-2" />
           <div className="flex justify-end mt-4 gap-2 flex-wrap">
@@ -481,8 +487,6 @@ export default function ImageFusion() {
                   : (<><Wand2 className="w-4 h-4 mr-2" />Editar imagem (1 foto · use o prompt)</>))}
             </Button>
           </div>
-
-
         </Card>
 
         {(generatingVariants || variants.length > 0) && (
