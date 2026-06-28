@@ -570,7 +570,9 @@ export default function FloatingVoiceOrb() {
     return ctx;
   };
 
-  const needsDashboardContext = (text) => /\b(agenda|agendamento|agendamentos|cliente|clientes|contato|contatos|telefone|whats|whatsapp|zap|lead|leads|crm|pipeline|processo|processos|prazo|prazos|mensagem|mensagens|dashboard|dados|n[úu]mero|quantos?|listar?|mostrar?|consultar?|alterar|mudar|reagendar|marcar|cancelar|confirmar)\b/i.test(norm(text));
+  // Sempre carrega o contexto do dashboard — a secretária precisa ter visão completa de
+  // agendamentos (hoje, amanhã, qualquer data) para responder sem depender de palavra-chave.
+  const needsDashboardContext = (_text) => true;
 
   const findClient = (name, ctx) => {
     const n = norm(name);
