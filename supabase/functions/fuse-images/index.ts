@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { image1_base64, image2_base64, prompt, mode } = await req.json();
+    const { image1_base64, image2_base64, prompt, mode, emergentApiKey, overrideKey } = await req.json();
     if (!image1_base64) {
       return new Response(JSON.stringify({ ok: false, error: 'Envie ao menos uma imagem.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -121,7 +121,12 @@ Deno.serve(async (req) => {
       : (isSingle ? await elaborateEditPrompt(prompt) : await elaborateFusionPrompt(prompt));
     const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64];
 
-    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion') });
+    const result = await generateWithNanoBanana({
+      prompt: fullPrompt,
+      imageUrls,
+      mode: isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion'),
+      emergentApiKey: String(emergentApiKey || overrideKey || '').trim() || undefined,
+    });
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {
@@ -132,7 +137,7 @@ Deno.serve(async (req) => {
     if (result.provider === 'local-fallback' && isSingle) {
       return new Response(JSON.stringify({
         ok: false,
-        error: 'A IA de edição não está disponível agora. A chave Emergent está válida, mas o provedor está bloqueando por limite/cota diária; a imagem não foi alterada.',
+        error: 'A IA de edição não está disponível agora. A Emergent foi tentada primeiro, mas falhou ou está bloqueada por limite/cota diária; a imagem não foi alterada. Se tiver outra chave Emergent com cota, informe no campo de chave alternativa.',
         provider: result.provider,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
