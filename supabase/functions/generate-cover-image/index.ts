@@ -166,7 +166,7 @@ const LEGAL_THEMES: LegalTheme[] = [
       "uma advogada empática, do lado, gesticulando como se interligasse os pontos: pais, criança e proteção jurídica",
   },
   {
-    keys: /\b(direito\s+do\s+consumidor|cdc|procon|cobran[çc]a\s+indevida|negativa[çc][ãa]o\s+indevida)\b/i,
+    keys: /\b(direito\s+do\s+consumidor|consumidor|cdc|procon|cobran[çc]a\s+indevida|negativa[çc][ãa]o\s+indevida)\b/i,
     scene:
       "um consumidor brasileiro frustrado segurando uma fatura abusiva ou cartão bloqueado; " +
       "ao centro, código de defesa do consumidor aberto sobre a mesa, balança e martelo da Justiça; " +
