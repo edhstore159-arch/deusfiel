@@ -96,6 +96,7 @@ function App() {
               >
                 <Route path="/app" element={<Dashboard />} />
                 <Route path="/app/chat-ia" element={<ChatIA />} />
+                <Route path="/app/claude" element={<ClaudeChat />} />
                 <Route path="/app/admin" element={<AdminCases />} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
                 
