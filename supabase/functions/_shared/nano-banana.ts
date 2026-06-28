@@ -20,6 +20,39 @@ function withFacePreservation(prompt: string) {
   return `${prompt}\n\n${FACE_PRESERVATION_LOCK}\nNegative: distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, plastic skin, over-smoothed skin, changed identity, different person.`;
 }
 
+function extractImageFromAny(value: any, depth = 0): string | null {
+  if (!value || depth > 8) return null;
+  const RX = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/;
+  if (typeof value === "string") {
+    const dataUrl = value.match(RX)?.[0];
+    if (dataUrl) return dataUrl.replace(/\s+/g, "");
+    const imageUrl = value.match(/https?:\/\/[^\s"'<>]+\.(?:png|jpe?g|webp)(?:\?[^\s"'<>]*)?/i)?.[0];
+    if (imageUrl) return imageUrl;
+    return null;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = extractImageFromAny(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof value === "object") {
+    const direct = value.url || value.image_url?.url || value.inlineData?.data || value.inline_data?.data || value.b64_json;
+    if (typeof direct === "string") {
+      if (direct.startsWith("data:image/") || direct.startsWith("http")) return extractImageFromAny(direct, depth + 1) || direct;
+      const compact = direct.replace(/\s+/g, "");
+      const mime = value.inlineData?.mimeType || value.inline_data?.mime_type || "image/png";
+      if (compact.length > 80 && /^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return `data:${mime};base64,${compact}`;
+    }
+    for (const key of ["images", "content", "message", "data", "choices", "parts", "output"]) {
+      const found = extractImageFromAny(value[key], depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function extractImageFromMessage(msg: any): string | null {
   if (!msg) return null;
   const images = msg.images;
@@ -41,7 +74,7 @@ function extractImageFromMessage(msg: any): string | null {
       }
     }
   }
-  return null;
+  return extractImageFromAny(msg);
 }
 
 function buildContent({ prompt, imageUrls }: NanoBananaOptions): Content[] {
