@@ -233,12 +233,21 @@ function EmergentBalance() {
     }
   };
   useEffect(() => { load(); }, []);
-  const fmt = (v) => (typeof v === "number" ? `$${v.toFixed(2)}` : "—");
-  const remaining = data?.remaining;
-  const max = data?.maxBudget;
-  const pct = (typeof remaining === "number" && typeof max === "number" && max > 0)
+  // Exibimos saldo em "Créditos" (1 USD ≈ 10 Créditos). Base de saldo total: 44.44 Créditos.
+  const CREDIT_RATE = 10;
+  const TOTAL_CREDITS = 44.44;
+  const spendUsd = typeof data?.spend === "number" ? data.spend : null;
+  const remainingCredits = spendUsd !== null
+    ? Math.max(0, TOTAL_CREDITS - spendUsd * CREDIT_RATE)
+    : (typeof data?.remaining === "number" ? data.remaining * CREDIT_RATE : null);
+  const maxCredits = TOTAL_CREDITS;
+  const spentCredits = spendUsd !== null ? spendUsd * CREDIT_RATE : null;
+  const fmt = (v) => (typeof v === "number" ? `${v.toFixed(2)} Créditos` : "—");
+  const remaining = remainingCredits;
+  const max = maxCredits;
+  const pct = (typeof remaining === "number" && max > 0)
     ? Math.max(0, Math.min(100, (remaining / max) * 100)) : null;
-  const low = typeof remaining === "number" && remaining < 0.5;
+  const low = typeof remaining === "number" && remaining < 5;
   return (
     <div className="flex items-center justify-between flex-wrap gap-3 p-3 rounded-md bg-nude-950/60 border border-gold-900/40">
       <div className="flex items-center gap-2 text-sm text-gold-200">
@@ -248,7 +257,7 @@ function EmergentBalance() {
           <span className="text-nude-400">carregando...</span>
         ) : data?.ok ? (
           <span className={low ? "text-rose-400" : "text-gold-100"}>
-            Restam <b>{fmt(remaining)}</b> de {fmt(max)} (gasto {fmt(data.spend)})
+            Restam <b>{fmt(remaining)}</b> de {fmt(max)} (gasto {fmt(spentCredits)})
           </span>
         ) : (
           <span className="text-rose-400">{data?.error || "indisponível"}</span>
