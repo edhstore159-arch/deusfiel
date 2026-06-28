@@ -77,9 +77,20 @@ export default function Creatives() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setLogoImage(String(reader.result));
+    reader.onload = () => {
+      const url = String(reader.result);
+      setLogoImage(url);
+      try { localStorage.setItem("kenia.creative.logo", url); } catch {}
+      toast.success("Logo salvo — será aplicado em todos os criativos");
+    };
     reader.readAsDataURL(file);
   };
+
+  const clearLogo = () => {
+    setLogoImage(null);
+    try { localStorage.removeItem("kenia.creative.logo"); } catch {}
+  };
+
 
 
   useEffect(() => { load(); loadScheduled(); }, []);
