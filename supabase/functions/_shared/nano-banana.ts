@@ -546,8 +546,16 @@ export async function generateWithNanoBanana(
   opts: NanoBananaOptions,
 ): Promise<{ url: string | null; provider: string; error?: string }> {
   const errs: string[] = [];
+  const hadInputRefs = Boolean(opts.imageUrls?.filter(Boolean).length);
   const normalizedOpts = { ...opts, imageUrls: await normalizeReferenceImages(opts.imageUrls) };
   const hasRefs = Boolean(normalizedOpts.imageUrls?.length);
+  if (hadInputRefs && !hasRefs) {
+    return {
+      url: null,
+      provider: "none",
+      error: "Imagem de referência inválida ou vazia; não foi possível enviar para a Emergent sem perder a identidade.",
+    };
+  }
 
   // ===== Novo fluxo solicitado: Pollinations PRIMEIRO (rascunho gratuito),
   // depois Emergent para refinar/corrigir imperfeições usando o rascunho como referência.
