@@ -89,6 +89,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/trust" element={<Trust />} />
               <Route path="/admin/debug" element={<Protected><DebugTool /></Protected>} />
+              <Route path="/s/:slug" element={<CloudSiteView />} />
               <Route
                 element={
                   <Protected>
