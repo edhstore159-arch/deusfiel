@@ -818,8 +818,26 @@ export default function FloatingVoiceOrb() {
       if (!c) { const m = `Não encontrei ${name} na central de mensagens.`; setReply(m); speak(m); return; }
       const contactId = c.id || c._id || c.contact_id;
       const phone = c.phone || c.client_phone || "";
-      await api.post("/whatsapp/send", { contact_id: contactId, phone, text: message, from_me: true });
-      const m = `Mensagem enviada para ${c.name || c.client_name}.`;
+      const contactName = c.name || c.client_name || name;
+      await api.post("/whatsapp/send", { contact_id: contactId, contact_phone: phone, phone, text: message, from_me: true });
+      // Persiste no dashboard (central de mensagens)
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData?.user?.id;
+        if (uid && contactId) {
+          await supabase.from("whatsapp_messages").upsert({
+            user_id: uid,
+            contact_id: String(contactId),
+            contact_name: contactName,
+            contact_phone: phone || null,
+            text: message,
+            from_me: true,
+            provider_message_id: `voice-${Date.now()}`,
+            created_at: new Date().toISOString(),
+          }, { onConflict: "user_id,contact_id,provider_message_id" });
+        }
+      } catch (err) { console.warn("Não foi possível espelhar mensagem no dashboard:", err); }
+      const m = `Mensagem enviada para ${contactName} pela central de mensagens.`;
       setReply(m); speak(m); toast.success(m);
     } catch (e) {
       toast.error("Falha ao enviar WhatsApp: " + (e?.message || e));
