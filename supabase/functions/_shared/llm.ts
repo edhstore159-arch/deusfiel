@@ -582,22 +582,31 @@ async function imageGemini(opts: ImageOptions) {
 async function imageEmergent(opts: ImageOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, error: "EMERGENT_API_KEY ausente" };
   const safePrompt = opts.prompt;
-  const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
-    body: JSON.stringify({
-      model: "gpt-image-1",
-      prompt: safePrompt,
-      size: opts.size || "1536x1536",
-      quality: "high",
-      n: 1,
-    }),
-  });
-  if (!resp.ok) return { ok: false as const, error: `Emergent ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
-  const data = await resp.json();
-  const b64 = data?.data?.[0]?.b64_json;
-  if (!b64) return { ok: false as const, error: "Emergent não retornou imagem" };
-  return { ok: true as const, b64, provider: "emergent" };
+  const models = ["vertex_ai/gemini-2.5-flash-image", "vertex_ai/gemini-3.1-flash-image-preview"];
+  let lastError = "";
+  for (const model of models) {
+    const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
+      body: JSON.stringify({
+        model,
+        modalities: ["image", "text"],
+        messages: [{ role: "user", content: safePrompt }],
+      }),
+    }, 45000);
+    if (!resp.ok) {
+      lastError = `Emergent ${model} ${resp.status}: ${(await resp.text()).slice(0, 240)}`;
+      continue;
+    }
+    const data = await resp.json();
+    const msg = data?.choices?.[0]?.message;
+    const url = msg?.images?.[0]?.image_url?.url || msg?.images?.[0]?.url || "";
+    const b64 = String(url).match(/^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/)?.[1]
+      || String(msg?.content || "").match(/data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]+)/)?.[1];
+    if (b64) return { ok: true as const, b64, provider: "emergent" };
+    lastError = `Emergent ${model} não retornou imagem`;
+  }
+  return { ok: false as const, error: lastError || "Emergent não retornou imagem" };
 }
 
 const compactText = (value: string, max = 420) => (value || "")
