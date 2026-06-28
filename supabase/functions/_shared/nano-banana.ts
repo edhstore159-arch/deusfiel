@@ -272,6 +272,46 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 2500
   }
 }
 
+function looksLikeBareBase64Image(value: string) {
+  const compact = value.replace(/\s+/g, "");
+  return compact.length > 80 && /^[A-Za-z0-9+/]+={0,2}$/.test(compact);
+}
+
+async function remoteImageToDataUrl(url: string): Promise<string> {
+  const resp = await fetchWithTimeout(url, { method: "GET" }, 20000);
+  if (!resp.ok) throw new Error(`Falha ao baixar imagem de referência: ${resp.status}`);
+  const contentType = (resp.headers.get("content-type") || "image/png").split(";")[0];
+  if (!contentType.startsWith("image/")) throw new Error(`URL de referência não é imagem: ${contentType}`);
+  const bytes = new Uint8Array(await resp.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.slice(i, i + 0x8000));
+  return `data:${contentType};base64,${btoa(bin)}`;
+}
+
+async function normalizeReferenceImages(imageUrls?: string[]) {
+  const out: string[] = [];
+  for (const raw of imageUrls || []) {
+    const value = String(raw || "").trim();
+    if (!value) continue;
+    if (/^data:image\//i.test(value)) {
+      const parsed = parseDataUrl(value);
+      out.push(parsed ? `data:${parsed.mime};base64,${parsed.base64}` : value);
+    } else if (/^https?:\/\//i.test(value)) {
+      try {
+        out.push(await remoteImageToDataUrl(value));
+      } catch (e) {
+        console.warn("⚠️ Não foi possível normalizar URL de imagem:", (e as Error)?.message || e);
+        out.push(value);
+      }
+    } else if (looksLikeBareBase64Image(value)) {
+      out.push(`data:image/png;base64,${value.replace(/\s+/g, "")}`);
+    } else {
+      out.push(value);
+    }
+  }
+  return out;
+}
+
 async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) return { url: null, error: "OPENAI_API_KEY ausente" };
