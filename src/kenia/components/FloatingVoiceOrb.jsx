@@ -602,8 +602,8 @@ export default function FloatingVoiceOrb() {
         status: a.status,
         origem: a.source,
       });
-      const apptsTomorrow = (ctx.appointments || []).filter((a) => apptISO(a) === _tomorrowISO).map(mapAppt);
-      const apptsToday = (ctx.appointments || []).filter((a) => apptISO(a) === _todayISO).map(mapAppt);
+      const apptsTomorrow = (ctx?.appointments || []).filter((a) => apptISO(a) === _tomorrowISO).map(mapAppt);
+      const apptsToday = (ctx?.appointments || []).filter((a) => apptISO(a) === _todayISO).map(mapAppt);
 
       const ctxSummary = ctx ? [
         `RESUMO: ${ctx.contacts.length} contatos, ${ctx.leads.length} leads, ${ctx.processes.length} processos, ${ctx.appointments.length} agendamentos (HOJE ${_todayISO}: ${apptsToday.length} | AMANHÃ ${_tomorrowISO}: ${apptsTomorrow.length}), ${ctx.logs.length} mensagens, ${ctx.deadlines.length} prazos.`,
@@ -630,8 +630,10 @@ export default function FloatingVoiceOrb() {
       const enrichedSystem = renderKeniaPrompt(loadKeniaPrompt(), { dateContext, ctxSummary, jusContext });
 
 
-      const { data: authData } = await supabase.auth.getUser();
-      const authUserId = authData?.user?.id || null;
+      const authUserId = await Promise.race([
+        supabase.auth.getUser().then(({ data }) => data?.user?.id || null).catch(() => null),
+        new Promise((resolve) => window.setTimeout(() => resolve(null), 800)),
+      ]);
       const { data, error } = await supabase.functions.invoke("chat-ai", {
         body: {
           message: text,
