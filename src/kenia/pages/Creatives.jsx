@@ -443,8 +443,8 @@ export default function Creatives() {
               </div>
 
             </div>
-            <DialogFooter>
-              <Button onClick={generate} disabled={generating} className="bg-nude-900 hover:bg-nude-800" data-testid="creative-generate">
+            <DialogFooter className="px-6 py-4 border-t border-nude-200 bg-white shrink-0 sticky bottom-0">
+              <Button onClick={generate} disabled={generating} className="bg-nude-900 hover:bg-nude-800 w-full sm:w-auto" data-testid="creative-generate">
                 {generating ? <><span className="animate-pulse-soft">Gerando arte e legenda...</span></> : <><Sparkles className="w-4 h-4 mr-2" /> Gerar com IA</>}
               </Button>
             </DialogFooter>
