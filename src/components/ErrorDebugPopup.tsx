@@ -13,7 +13,7 @@ import { buildDebugInstructionMessage, deliverLovableDebugInstruction } from "@/
  * No editor da Lovable usa CustomEvent para acionar o "Try to Fix" nativo.
  * Fora do editor salva a instrução no backend para não quebrar a tela.
  */
-const BUCKET = "debug-uploads";
+const BUCKET = "debug-attachments";
 
 type Uploaded = { name: string; url: string; type: string; size: number };
 
