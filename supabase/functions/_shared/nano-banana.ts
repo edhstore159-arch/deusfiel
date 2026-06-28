@@ -50,7 +50,8 @@ function extractImageFromAny(value: any, depth = 0): string | null {
   if (typeof value === "object") {
     const direct = value.url || value.image_url?.url || value.inlineData?.data || value.inline_data?.data || value.b64_json;
     if (typeof direct === "string") {
-      if (direct.startsWith("data:image/") || direct.startsWith("http")) return extractImageFromAny(direct, depth + 1) || direct;
+      if (direct.startsWith("data:image/")) return extractImageFromAny(direct, depth + 1) || direct;
+      if (/^https?:\/\//i.test(direct)) return extractImageFromAny(direct, depth + 1) || (isLikelyImageUrl(direct) ? direct : null);
       const compact = direct.replace(/\s+/g, "");
       const mime = value.inlineData?.mimeType || value.inline_data?.mime_type || "image/png";
       if (compact.length > 80 && /^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return `data:${mime};base64,${compact}`;
