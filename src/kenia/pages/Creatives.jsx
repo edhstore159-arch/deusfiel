@@ -273,15 +273,22 @@ export default function Creatives() {
     toast.success("Legenda copiada");
   };
 
+  const imageSrc = (value) => {
+    const v = String(value || "");
+    if (!v) return "";
+    if (v.startsWith("data:") || v.startsWith("http://") || v.startsWith("https://") || v.startsWith("blob:")) return v;
+    return `data:image/png;base64,${v}`;
+  };
+
   const download = (item) => {
     if (!item.image_b64) return;
     const a = document.createElement("a");
-    a.href = String(item.image_b64).startsWith("data:") ? item.image_b64 : `data:image/png;base64,${item.image_b64}`;
+    a.href = imageSrc(item.image_b64);
     a.download = `legalflow-${item.id}.png`;
+    a.target = "_blank";
+    a.rel = "noopener";
     a.click();
   };
-
-  const imageSrc = (value) => String(value || "").startsWith("data:") ? value : `data:image/png;base64,${value}`;
 
   const NetIcon = ({ network, className }) => {
     if (network === "instagram") return <Instagram className={className} />;
