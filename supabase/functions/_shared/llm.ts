@@ -336,7 +336,13 @@ async function chatLovable(opts: ChatOptions) {
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
-    body: JSON.stringify({ model: opts.model || "google/gemini-3-flash-preview", ...opts }),
+    body: JSON.stringify({
+      model: opts.model || "google/gemini-3-flash-preview",
+      messages: opts.messages,
+      ...(opts.response_format ? { response_format: opts.response_format } : {}),
+      ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+      ...(typeof opts.maxTokens === "number" ? { max_tokens: opts.maxTokens } : {}),
+    }),
   });
   if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
   return { ok: true as const, data: await resp.json(), provider: "lovable" };
