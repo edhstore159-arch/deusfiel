@@ -926,24 +926,37 @@ const staticPost = (url, body = {}) => {
       try {
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth?.user?.id;
-        if (uid && b64) {
+        if (!uid) {
+          console.warn("[creatives] usuário não autenticado — imagem só será salva localmente.");
+        } else if (b64) {
           const dataUrl = b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
-          const blob = await (await fetch(dataUrl)).blob();
+          // Converte sem depender de fetch (mais robusto para data URLs grandes)
+          let blob;
+          try {
+            blob = await (await fetch(dataUrl)).blob();
+          } catch {
+            const pureB64 = dataUrl.split(",")[1] || "";
+            const bin = atob(pureB64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            blob = new Blob([bytes], { type: "image/png" });
+          }
           storagePath = `${uid}/creative-${Date.now()}.png`;
           const { error: upErr } = await supabase.storage
             .from("creative-assets")
             .upload(storagePath, blob, { contentType: "image/png", upsert: true });
           if (!upErr) {
-            await supabase.from("generated_images").insert({
+            const { error: insErr } = await supabase.from("generated_images").insert({
               user_id: uid, storage_path: storagePath, prompt: topic, kind: "creative", paid: false,
             });
+            if (insErr) console.warn("[creatives] insert generated_images falhou:", insErr.message);
           } else {
-            console.warn("creative-assets upload falhou:", upErr.message);
+            console.warn("[creatives] upload bucket falhou:", upErr.message);
             storagePath = null;
           }
         }
       } catch (e) {
-        console.warn("Persistência de imagem gerada falhou:", e?.message || e);
+        console.warn("[creatives] persistência falhou:", e?.message || e);
       }
       const item = {
         id: nextId("creative"),
