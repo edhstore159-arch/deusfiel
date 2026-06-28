@@ -49,6 +49,7 @@ const DebugTool = lazyWithReload(() => import("@/kenia/pages/DebugTool"));
 const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
 const ClaudeChat = lazyWithReload(() => import("@/kenia/pages/ClaudeChat"));
 const CloudHub = lazyWithReload(() => import("@/kenia/pages/CloudHub"));
+const CloudSiteView = lazyWithReload(() => import("@/kenia/pages/CloudSiteView"));
 const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
 
@@ -88,6 +89,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/trust" element={<Trust />} />
               <Route path="/admin/debug" element={<Protected><DebugTool /></Protected>} />
+              <Route path="/s/:slug" element={<CloudSiteView />} />
               <Route
                 element={
                   <Protected>
