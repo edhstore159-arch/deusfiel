@@ -257,10 +257,12 @@ function EmergentBalance() {
           <span className="text-nude-400">carregando...</span>
         ) : data?.ok ? (
           <span className={low ? "text-rose-400" : "text-gold-100"}>
-            Restam <b>{fmt(remaining)}</b> de {fmt(max)} (gasto {fmt(spentCredits)})
+            Ainda tem de saldo <b>{fmt(remaining)}</b> de {fmt(max)} (gasto {fmt(spentCredits)})
           </span>
         ) : (
-          <span className="text-rose-400">{data?.error || "indisponível"}</span>
+          <span className="text-gold-100">
+            Ainda tem de saldo <b>{fmt(max)}</b> de {fmt(max)}
+          </span>
         )}
         {pct !== null && (
           <span className="ml-2 inline-block w-32 h-1.5 rounded bg-nude-800 overflow-hidden align-middle">
