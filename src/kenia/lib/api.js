@@ -649,7 +649,48 @@ const staticGet = async (url, config = {}) => {
       }
     })();
   }
-  if (path === "/creatives") return response(read("creatives", seedCreatives));
+  if (path === "/creatives") {
+    return (async () => {
+      const local = read("creatives", seedCreatives);
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const uid = auth?.user?.id;
+        if (!uid) return response(local);
+        const { data: rows, error } = await supabase
+          .from("generated_images")
+          .select("id, storage_path, prompt, created_at")
+          .eq("user_id", uid)
+          .eq("kind", "creative")
+          .order("created_at", { ascending: false })
+          .limit(120);
+        if (error || !rows?.length) return response(local);
+        const paths = rows.map((r) => r.storage_path).filter(Boolean);
+        const { data: signed } = await supabase.storage.from("creative-assets").createSignedUrls(paths, 60 * 60);
+        const urlByPath = {};
+        (signed || []).forEach((s, i) => { if (s?.signedUrl) urlByPath[paths[i]] = s.signedUrl; });
+        const cloudItems = rows.map((r) => {
+          const localMatch = local.find((l) => l.storage_path === r.storage_path);
+          return {
+            id: localMatch?.id || `creative-${r.id}`,
+            title: localMatch?.title || r.prompt || "Criativo",
+            topic: localMatch?.topic || r.prompt || "",
+            network: localMatch?.network || "instagram",
+            format: localMatch?.format || "post",
+            caption: localMatch?.caption || "",
+            ...localMatch,
+            storage_path: r.storage_path,
+            image_b64: urlByPath[r.storage_path] || localMatch?.image_b64 || "",
+            created_at: r.created_at,
+          };
+        });
+        // Acrescenta locais sem storage_path (ainda não persistidos)
+        const orphan = local.filter((l) => !l.storage_path);
+        return response([...cloudItems, ...orphan]);
+      } catch {
+        return response(local);
+      }
+    })();
+  }
   if (path === "/settings") return response({ using_default_text: true, using_default_image: true, llm_text_key_masked: "Emergent padrão", llm_image_key_masked: "Emergent padrão" });
   if (path === "/whatsapp/diagnostics") return response({ ok: true, static_mode: true, checks: [
     { id: "static-site", ok: true, label: "Modo demonstração ativo", msg: "Painel rodando sem backend externo — as funções de WhatsApp em tempo real ficam desativadas até você publicar um backend (Render/VPS) e definir VITE_BACKEND_URL.", hint: "Você pode continuar usando CRM, Agenda, ChatIA e Finance normalmente. Quando publicar o backend Baileys, esta tela passa a exibir o QR Code real." },
