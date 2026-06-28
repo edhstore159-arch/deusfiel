@@ -405,20 +405,26 @@ export default function Creatives() {
               </div>
 
               <div>
-                <Label>Logo do escritório (opcional)</Label>
-                <p className="text-xs text-nude-500 mb-1.5">A IA aplicará seu logo discretamente no criativo gerado.</p>
+                <Label>Logo do escritório {logoImage && <span className="ml-1 text-[10px] uppercase tracking-wider text-emerald-600 font-semibold">salvo · será aplicado sempre</span>}</Label>
+                <p className="text-xs text-nude-500 mb-1.5">A IA aplicará seu logo discretamente em todos os criativos gerados (fica salvo no navegador).</p>
                 {logoImage ? (
-                  <div className="relative inline-block">
-                    <img src={logoImage} alt="logo" className="h-20 w-20 object-contain rounded-md border border-nude-200 bg-white p-1" />
-                    <button
-                      type="button"
-                      onClick={() => setLogoImage(null)}
-                      className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 shadow"
-                      data-testid="creative-remove-logo"
-                      aria-label="Remover logo"
-                    >
-                      <XIcon className="w-3 h-3" />
-                    </button>
+                  <div className="flex items-center gap-3">
+                    <div className="relative inline-block">
+                      <img src={logoImage} alt="logo" className="h-20 w-20 object-contain rounded-md border border-nude-200 bg-white p-1" />
+                      <button
+                        type="button"
+                        onClick={clearLogo}
+                        className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 shadow"
+                        data-testid="creative-remove-logo"
+                        aria-label="Remover logo"
+                      >
+                        <XIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <label className="text-xs underline text-nude-600 cursor-pointer">
+                      Trocar logo
+                      <input type="file" accept="image/*" className="hidden" onChange={onPickLogo} />
+                    </label>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 h-20 border-2 border-dashed border-nude-300 rounded-md cursor-pointer hover:bg-nude-50 text-sm text-nude-600" data-testid="creative-upload-logo">
@@ -428,6 +434,7 @@ export default function Creatives() {
                   </label>
                 )}
               </div>
+
             </div>
             <DialogFooter>
               <Button onClick={generate} disabled={generating} className="bg-nude-900 hover:bg-nude-800" data-testid="creative-generate">
