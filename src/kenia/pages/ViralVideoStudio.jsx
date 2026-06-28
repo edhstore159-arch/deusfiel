@@ -651,10 +651,16 @@ export default function ViralVideoStudio() {
       setVideoUrl(url);
       toast.success(`Vídeo Kling v2.1 gerado (${seconds}s)`);
     } catch (e) {
-      toast.error(e?.message || "Falha Replicate");
+      const msg = String(e?.message || e || "Falha Replicate");
+      if (/insufficient credit/i.test(msg)) {
+        toast.error("Replicate sem créditos. Adicione saldo em replicate.com/account/billing e tente novamente.", { duration: 8000 });
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setGeneratingReplicate(false);
     }
+
   };
 
 
