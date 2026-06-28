@@ -518,11 +518,15 @@ export default function FloatingVoiceOrb() {
   };
 
   const loadClientContext = async () => {
-    if (contextRef.current && Date.now() - contextAtRef.current < 60_000) return contextRef.current;
-    const safe = async (p) => { try { const { data } = await api.get(p); return data; } catch { return null; } };
+    if (contextRef.current && Date.now() - contextAtRef.current < 180_000) return contextRef.current;
+    const withTimeout = (promise, fallback, ms = 2500) => Promise.race([
+      promise,
+      new Promise((resolve) => window.setTimeout(() => resolve(fallback), ms)),
+    ]);
+    const safe = async (p) => withTimeout(api.get(p).then(({ data }) => data).catch(() => null), null);
     const safeSb = async (table) => {
       try {
-        const { data } = await supabase.from(table).select("*").limit(500);
+        const { data } = await withTimeout(supabase.from(table).select("*").limit(120), { data: [] });
         return Array.isArray(data) ? data : [];
       } catch { return []; }
     };
@@ -561,6 +565,8 @@ export default function FloatingVoiceOrb() {
     return ctx;
   };
 
+  const needsDashboardContext = (text) => /\b(agenda|agendamento|agendamentos|cliente|clientes|contato|contatos|telefone|whats|whatsapp|zap|lead|leads|crm|pipeline|processo|processos|prazo|prazos|mensagem|mensagens|dashboard|dados|n[úu]mero|quantos?|listar?|mostrar?|consultar?|alterar|mudar|reagendar|marcar|cancelar|confirmar)\b/i.test(norm(text));
+
   const findClient = (name, ctx) => {
     const n = norm(name);
     if (!n) return null;
@@ -572,7 +578,7 @@ export default function FloatingVoiceOrb() {
     setThinking(true);
     setReply("");
     try {
-      const ctx = await loadClientContext().catch(() => null);
+      const ctx = needsDashboardContext(text) ? await loadClientContext().catch(() => null) : null;
       // Computa "hoje" e "amanhã" no fuso de São Paulo para destacar agendamentos relevantes.
       const isoSP = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
       const _now = new Date();
@@ -603,22 +609,15 @@ export default function FloatingVoiceOrb() {
         `RESUMO: ${ctx.contacts.length} contatos, ${ctx.leads.length} leads, ${ctx.processes.length} processos, ${ctx.appointments.length} agendamentos (HOJE ${_todayISO}: ${apptsToday.length} | AMANHÃ ${_tomorrowISO}: ${apptsTomorrow.length}), ${ctx.logs.length} mensagens, ${ctx.deadlines.length} prazos.`,
         `AGENDAMENTOS HOJE (${_todayISO}): ${JSON.stringify(apptsToday)}`,
         `AGENDAMENTOS AMANHÃ (${_tomorrowISO}): ${JSON.stringify(apptsTomorrow)}`,
-        `Leads (top 20): ${JSON.stringify((ctx.leads||[]).slice(0, 20).map((l) => ({ nome: l.name, tel: l.phone, area: l.case_type, etapa: l.stage })))}`,
-        `Contatos (top 20): ${JSON.stringify((ctx.contacts||[]).slice(0, 20).map((c) => ({ nome: c.name, tel: c.phone, nao_lidas: c.unread })))}`,
-        `Processos (top 20): ${JSON.stringify((ctx.processes||[]).slice(0, 20).map((p) => ({ cliente: p.client_name, numero: p.process_number, area: p.case_type, status: p.status, proxima_audiencia: p.next_hearing })))}`,
-        `Prazos próximos (top 15): ${JSON.stringify((ctx.deadlines||[]).slice(0, 15).map((d) => ({ cliente: d.client_name, titulo: d.title, vencimento: d.due_at, urgencia: d.urgency })))}`,
+        `Leads (top 10): ${JSON.stringify((ctx.leads||[]).slice(0, 10).map((l) => ({ nome: l.name, tel: l.phone, area: l.case_type, etapa: l.stage })))}`,
+        `Contatos (top 10): ${JSON.stringify((ctx.contacts||[]).slice(0, 10).map((c) => ({ nome: c.name, tel: c.phone, nao_lidas: c.unread })))}`,
+        `Processos (top 10): ${JSON.stringify((ctx.processes||[]).slice(0, 10).map((p) => ({ cliente: p.client_name, numero: p.process_number, area: p.case_type, status: p.status, proxima_audiencia: p.next_hearing })))}`,
+        `Prazos próximos (top 8): ${JSON.stringify((ctx.deadlines||[]).slice(0, 8).map((d) => ({ cliente: d.client_name, titulo: d.title, vencimento: d.due_at, urgencia: d.urgency })))}`,
       ].join("\n") : "";
 
 
-      // Busca no Jusbrasil quando a pergunta é jurídica
-      const legalRe = /\b(lei|leis|art(?:igo)?\.?\s*\d|c[oó]digo|cpc|cpp|clt|cf|stf|stj|tjsp|tjmg|jurisprud[eê]ncia|s[uú]mula|processo\b(?!s? do))|\b(direito|trabalhista|c[ií]vel|criminal|penal|tribut[aá]rio|previdenci[aá]rio|consumidor|fam[ií]lia|imobili[aá]rio|herdeiro|inventario|invent[aá]rio|div[oó]rcio|guarda|pens[aã]o|alimentos|usucapi[aã]o|despejo|reintegra[cç][aã]o|habeas corpus|recurso)\b/i;
+      // Busca jurídica fica concentrada no backend para evitar chamada duplicada e reduzir latência da voz.
       let jusContext = "";
-      if (legalRe.test(text)) {
-        try {
-          const { data: js } = await supabase.functions.invoke("jusbrasil-search", { body: { query: text } });
-          if (js?.summary) jusContext = `\n\nRESULTADOS DA BUSCA NO JUSBRASIL (use estas referências reais, cite títulos e URLs quando útil):\n${js.summary}\nFonte da busca: ${js.source_url}`;
-        } catch {}
-      }
 
       const nowBR = new Date();
       const fmtFull = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(nowBR);
@@ -640,7 +639,8 @@ export default function FloatingVoiceOrb() {
           session_id: "kenia-voice-orb",
           system_prompt: enrichedSystem,
           context: ctxSummary,
-          want_audio: true,
+          want_audio: false,
+          fast_mode: true,
           user_id: authUserId,
         },
       });
