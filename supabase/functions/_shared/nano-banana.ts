@@ -490,17 +490,18 @@ export async function generateWithNanoBanana(
   opts: NanoBananaOptions,
 ): Promise<{ url: string | null; provider: string; error?: string }> {
   const errs: string[] = [];
-  const hasRefs = Boolean(opts.imageUrls?.length);
+  const normalizedOpts = { ...opts, imageUrls: await normalizeReferenceImages(opts.imageUrls) };
+  const hasRefs = Boolean(normalizedOpts.imageUrls?.length);
 
   // ===== Novo fluxo solicitado: Pollinations PRIMEIRO (rascunho gratuito),
   // depois Emergent para refinar/corrigir imperfeições usando o rascunho como referência.
   // Só aplica quando não há imagens de referência do usuário (geração pura).
   if (!hasRefs) {
-    const draft = await callPollinations(opts);
+    const draft = await callPollinations(normalizedOpts);
     if (draft.url) {
       if (Deno.env.get("EMERGENT_API_KEY")) {
         const refined = await callEmergent({
-          ...opts,
+          ...normalizedOpts,
           imageUrls: [draft.url],
           prompt: `PHOTOREALISTIC FACE & ANATOMY RESTORATION PASS. Use the provided draft strictly as a layout/composition reference and repaint it as a high-fidelity photograph. STRICT REQUIREMENTS: (1) Faces must be perfectly symmetric, anatomically correct, with two natural eyes (matching color, correct pupils, no extra iris), one nose, one mouth with natural lips and teeth, natural skin texture with pores; NO melted, warped, doubled, asymmetric, cross-eyed, missing or extra facial features. (2) Hands must have exactly 5 fingers each, correct proportions, no fused/extra/missing digits. (3) Bodies must have correct proportions and limb count. (4) Preserve original composition, framing, clothing, lighting direction, ethnicity and number of people from the draft. (5) Sharp focus on faces, natural depth of field, professional photography, 50mm lens look, no plastic/CGI/3D-render appearance. NEGATIVE: deformed face, distorted face, mutated face, extra fingers, fused fingers, missing fingers, extra limbs, asymmetric eyes, lazy eye, cross-eyed, malformed mouth, bad teeth, uncanny valley, doll-like, plastic skin, cartoon, illustration, anime, painting, blurry, low-res. Scene context: ${opts.prompt}`,
         });
@@ -517,39 +518,52 @@ export async function generateWithNanoBanana(
 
 
 
+  // Edição/fusão com imagem do usuário: tentar Emergent primeiro. Essa é a
+  // chave configurada para edição real; evita gastar tempo em provedores sem
+  // crédito e garante que a imagem enviada seja usada como referência.
+  if (hasRefs && Deno.env.get("EMERGENT_API_KEY")) {
+    const r = await callEmergent(normalizedOpts);
+    if (r.url) return { url: r.url, provider: "emergent" };
+    errs.push(r.error || "Emergent falhou");
+    console.warn("⚠️ Emergent falhou:", r.error);
+  }
+
+
   if (Deno.env.get("LOVABLE_API_KEY")) {
-    const r = await callLovableGateway(opts);
+    const r = await callLovableGateway(normalizedOpts);
     if (r.url) return { url: r.url, provider: "lovable" };
     errs.push(r.error || "Lovable falhou");
     console.warn("⚠️ Lovable falhou:", r.error);
   }
 
   if (Deno.env.get("GEMINI_API_KEY")) {
-    const r = await callGeminiDirect(opts);
+    const r = await callGeminiDirect(normalizedOpts);
     if (r.url) return { url: r.url, provider: "gemini" };
     errs.push(r.error || "Gemini direto falhou");
     console.warn("⚠️ Gemini direto falhou:", r.error);
   }
 
   if (Deno.env.get("OPENAI_API_KEY")) {
-    const r = await callOpenAIImages(opts);
+    const r = await callOpenAIImages(normalizedOpts);
     if (r.url) return { url: r.url, provider: "openai" };
     errs.push(r.error || "OpenAI falhou");
     console.warn("⚠️ OpenAI falhou:", r.error);
   }
 
-  const r3 = await callEmergent(opts);
-  if (r3.url) return { url: r3.url, provider: "emergent" };
-  errs.push(r3.error || "Emergent falhou");
+  if (!hasRefs) {
+    const r3 = await callEmergent(normalizedOpts);
+    if (r3.url) return { url: r3.url, provider: "emergent" };
+    errs.push(r3.error || "Emergent falhou");
+  }
 
-  const hasReferenceImages = Boolean(opts.imageUrls?.length);
+  const hasReferenceImages = Boolean(normalizedOpts.imageUrls?.length);
 
   // Pollinations is text-only and cannot see uploaded reference images. For
   // edit/template flows, never use it unless the caller explicitly allows a
   // new image, otherwise it creates an unrelated image and breaks the user's
   // expectation that the uploaded file is the base canvas.
   if (!hasReferenceImages || opts.allowTextOnlyFallback) {
-    const rPoll = await callPollinations(opts);
+    const rPoll = await callPollinations(normalizedOpts);
     if (rPoll.url) {
       console.warn("ℹ️ Usando Pollinations (gratuito) como fallback:", errs.join(" | "));
       return { url: rPoll.url, provider: "pollinations-free" };
@@ -559,7 +573,7 @@ export async function generateWithNanoBanana(
     errs.push("Fallback Pollinations ignorado porque não preserva imagem de referência");
   }
 
-  const localFallback = buildLocalFusionFallback(opts);
+  const localFallback = buildLocalFusionFallback(normalizedOpts);
   if (localFallback) {
     console.warn("⚠️ Todos os provedores falharam; usando composição local:", errs.join(" | "));
     return { url: localFallback, provider: "local-fallback" };
