@@ -907,7 +907,7 @@ const staticPost = (url, body = {}) => {
       const item = {
         id: nextId("creative"),
         ...body,
-        caption: `Post sugerido: ${topic}.\n\nExplique o direito com clareza, convide o cliente a separar documentos e finalize com chamada para atendimento.`,
+        caption: (body.caption && String(body.caption).trim()) || `Post sugerido: ${topic}.\n\nExplique o direito com clareza, convide o cliente a separar documentos e finalize com chamada para atendimento.`,
         image_b64: storedImage,
         storage_path: storagePath,
         ...(genError ? { error: genError } : {}),
