@@ -287,6 +287,45 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
   const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt) };
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
+
+  // A chave Emergent expõe os modelos de imagem Gemini via Vertex AI no endpoint
+  // OpenAI-compatible de chat. O endpoint /llm/images/edits tem apresentado
+  // erro interno/timeout; por isso usamos chat multimodal primeiro, que edita e
+  // gera imagens corretamente com a chave sk-emergent atual.
+  const models = [
+    "vertex_ai/gemini-2.5-flash-image",
+    "vertex_ai/gemini-3.1-flash-image-preview",
+  ];
+  let lastError = "";
+
+  for (const model of models) {
+    try {
+      const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          modalities: ["image", "text"],
+          messages: [{ role: "user", content: buildContent(safeOpts) }],
+        }),
+      }, 45000);
+      if (!resp.ok) {
+        const txt = (await resp.text()).slice(0, 300);
+        lastError = `Emergent[${model}] ${resp.status}: ${txt}`;
+        if (/budget[_\s]exceeded|Budget has been exceeded/i.test(txt)) {
+          return { url: null, error: `Emergent: orçamento da chave esgotado. Detalhe: ${txt}` };
+        }
+        continue;
+      }
+      const data = await resp.json();
+      const url = extractImageFromMessage(data?.choices?.[0]?.message);
+      if (url) return { url };
+      lastError = `Emergent[${model}] sem imagem`;
+    } catch (e) {
+      lastError = `Emergent[${model}] erro: ${(e as Error)?.message || e}`;
+    }
+  }
+
   try {
     if (imageUrls.length > 0) {
       const files = imageUrls.slice(0, 4).map((u) => dataUrlToBytes(u)).filter(Boolean) as Array<{ bytes: Uint8Array; mime: string; filename: string }>;
@@ -299,7 +338,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": multipart.contentType, "Content-Length": multipart.contentLength },
           body: multipart.body,
-        }, 45000);
+        }, 12000);
         const text = await resp.text();
         if (resp.ok) {
           const data = JSON.parse(text);
@@ -318,7 +357,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024", n: 1 }),
-      }, 45000);
+      }, 12000);
       const text = await resp.text();
       if (resp.ok) {
         const data = JSON.parse(text);
@@ -334,42 +373,6 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
     }
   } catch (e) {
     console.warn("⚠️ Emergent images API erro:", (e as Error)?.message || e);
-  }
-
-  const models = [
-    "vertex_ai/gemini-2.5-flash-image",
-    "vertex_ai/gemini-3.1-flash-image-preview",
-    "gemini/gemini-2.5-flash-image",
-    "gemini/gemini-3.1-flash-image-preview",
-  ];
-  let lastError = "";
-  for (const model of models) {
-    try {
-      const resp = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          modalities: ["image", "text"],
-          messages: [{ role: "user", content: buildContent(safeOpts) }],
-        }),
-      });
-      if (!resp.ok) {
-        const txt = (await resp.text()).slice(0, 240);
-        lastError = `Emergent[${model}] ${resp.status}: ${txt}`;
-        // Budget exceeded is a hard stop — no point trying other models with the same key.
-        if (/budget[_\s]exceeded|Budget has been exceeded/i.test(txt)) {
-          return { url: null, error: `Emergent: orçamento da chave esgotado (recarregue créditos em emergentagent.com). Detalhe: ${txt}` };
-        }
-        continue;
-      }
-      const data = await resp.json();
-      const url = extractImageFromMessage(data?.choices?.[0]?.message);
-      if (url) return { url };
-      lastError = `Emergent[${model}] sem imagem`;
-    } catch (e) {
-      lastError = `Emergent[${model}] erro: ${(e as Error)?.message || e}`;
-    }
   }
   return { url: null, error: lastError || "Emergent falhou" };
 }
