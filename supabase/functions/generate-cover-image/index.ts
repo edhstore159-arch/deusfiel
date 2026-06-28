@@ -186,11 +186,14 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
   let userTheme = (userPrompt || "").trim();
   const legalScene = legalThemeExpansion(userTheme);
   if (legalScene) {
-    userTheme = `${userTheme}. Cena narrativa jurídica detalhada: ${legalScene}. ` +
-      "Composição editorial em três planos (vítima/situação à esquerda, símbolos da Justiça ao centro, advogado interligando à direita), " +
-      "estilo fotojornalismo documental brasileiro, luz natural cinematográfica, sem violência explícita, sem sangue, sem cenas gráficas, " +
-      "tom respeitoso e protetivo, focado em conscientização e defesa de direitos.";
+    userTheme =
+      `Fotografia documental hiper-realista (não ilustração, não 3D, não arte digital) de uma cena jurídica brasileira real sobre: ${userTheme}. ` +
+      `Cena com PESSOAS REAIS brasileiras (atores adultos reais, rostos autênticos, peles com poros e imperfeições naturais, roupas reais e amassadas, expressões verdadeiras, ambiente real com objetos do dia a dia), capturada como reportagem fotojornalística — estilo Magnum / National Geographic / Folha de S.Paulo. ` +
+      `Composição editorial em três planos: ${legalScene}. ` +
+      `Iluminação natural cinematográfica (janela, luz ambiente real), 50mm ou 85mm f/1.8, profundidade de campo rasa, grão natural de ISO, sem violência explícita, sem sangue, sem cenas gráficas, tom respeitoso e protetivo, focado em conscientização e defesa de direitos. ` +
+      `PROIBIDO: ilustração, cartoon, 3D render, CGI, anime, pintura, aspecto de stock photo, pele de plástico, rostos perfeitos, look de IA, boneco, cera.`;
   }
+
 
   const hybrid = hasHybridRequest(userTheme);
   const isolatedOnly = isIsolatedObjectOnly(userTheme);
