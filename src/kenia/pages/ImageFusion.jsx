@@ -320,14 +320,13 @@ function EmergentBalance() {
           </span>
         ) : data?.ok ? (
           <span className={low ? "text-rose-400" : "text-gold-100"}>
-            Saldo: <b>{fmt(remaining)}</b> de {fmt(max)}
+            Ainda tem de saldo <b>{fmt(remaining)}</b> de {fmt(max)} (gasto {fmt(spentCredits)})
           </span>
         ) : (
           <span className="text-gold-100">
-            Saldo: <b>{fmt(max)}</b> de {fmt(max)}
+            Ainda tem de saldo <b>{fmt(max)}</b> de {fmt(max)}
           </span>
         )}
-
         {pct !== null && (
           <span className="ml-2 inline-block w-32 h-1.5 rounded bg-nude-800 overflow-hidden align-middle">
             <span className={`block h-full ${low ? "bg-rose-500" : "bg-gold-500"}`} style={{ width: `${pct}%` }} />
