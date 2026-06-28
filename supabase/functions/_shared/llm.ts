@@ -343,19 +343,23 @@ function handInstructionFor(prompt: string) {
 
 async function chatLovable(opts: ChatOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, status: 0, error: "LOVABLE_API_KEY ausente" };
-  const resp = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
-    body: JSON.stringify({
-      model: opts.model || "google/gemini-3-flash-preview",
-      messages: opts.messages,
-      ...(opts.response_format ? { response_format: opts.response_format } : {}),
-      ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
-      ...(typeof opts.maxTokens === "number" ? { max_tokens: opts.maxTokens } : {}),
-    }),
-  }, opts.timeoutMs || 20000);
-  if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-  return { ok: true as const, data: await resp.json(), provider: "lovable" };
+  try {
+    const resp = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
+      body: JSON.stringify({
+        model: opts.model || "google/gemini-3-flash-preview",
+        messages: opts.messages,
+        ...(opts.response_format ? { response_format: opts.response_format } : {}),
+        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+        ...(typeof opts.maxTokens === "number" ? { max_tokens: opts.maxTokens } : {}),
+      }),
+    }, opts.timeoutMs || 20000);
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    return { ok: true as const, data: await resp.json(), provider: "lovable" };
+  } catch (error) {
+    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
+  }
 }
 
 function messagesToGeminiContents(messages: ChatMessage[]) {
@@ -392,38 +396,46 @@ async function chatGemini(opts: ChatOptions) {
   if (typeof opts.maxTokens === "number") {
     body.generationConfig = { ...(body.generationConfig || {}), maxOutputTokens: opts.maxTokens };
   }
-  const resp = await fetchWithTimeout(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }, opts.timeoutMs || 20000);
-  if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-  const data = await resp.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || "").join("") || "";
-  // Wrap into OpenAI-compatible shape so callers can read choices[0].message.content
-  return {
-    ok: true as const,
-    provider: "gemini",
-    data: { choices: [{ message: { role: "assistant", content: text } }] },
-  };
+  try {
+    const resp = await fetchWithTimeout(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }, opts.timeoutMs || 20000);
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    const data = await resp.json();
+    const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || "").join("") || "";
+    // Wrap into OpenAI-compatible shape so callers can read choices[0].message.content
+    return {
+      ok: true as const,
+      provider: "gemini",
+      data: { choices: [{ message: { role: "assistant", content: text } }] },
+    };
+  } catch (error) {
+    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
+  }
 }
 
 async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
-  const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
-    body: JSON.stringify({
-      model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/")
-        ? opts.model
-        : "gpt-4o-mini",
-      messages: opts.messages,
-      ...(opts.response_format ? { response_format: opts.response_format } : {}),
-      ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
-    }),
-  }, opts.timeoutMs || 20000);
-  if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-  return { ok: true as const, data: await resp.json(), provider: "emergent" };
+  try {
+    const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
+      body: JSON.stringify({
+        model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/")
+          ? opts.model
+          : "gpt-4o-mini",
+        messages: opts.messages,
+        ...(opts.response_format ? { response_format: opts.response_format } : {}),
+        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+      }),
+    }, opts.timeoutMs || 20000);
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    return { ok: true as const, data: await resp.json(), provider: "emergent" };
+  } catch (error) {
+    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
+  }
 }
 
 function isUnsupportedOllamaHost(rawUrl: string) {
