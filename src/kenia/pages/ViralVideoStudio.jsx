@@ -588,9 +588,10 @@ export default function ViralVideoStudio() {
     setGeneratingEmergent(true);
     try {
       const seconds = Math.min(8, Math.max(4, clampDuration(durationSeconds)));
+      const veoPrompt = buildVeoPrompt(prompt, category, customScene, seconds);
       const { data, error } = await supabase.functions.invoke("emergent-video", {
         body: {
-          prompt,
+          prompt: veoPrompt,
           durationSeconds: seconds,
           aspectRatio: "9:16",
           overrideKey: emergentKey || undefined,
