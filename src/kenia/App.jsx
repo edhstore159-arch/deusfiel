@@ -71,9 +71,11 @@ function PageFallback() {
 function App() {
   return (
     <div className="App">
+      <DebugErrorThrower />
       <AuthProvider>
         <BrowserRouter>
           <ScrollToTop />
+
 
           <Suspense fallback={<PageFallback />}>
             <Routes>
