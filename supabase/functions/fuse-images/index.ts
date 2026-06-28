@@ -69,6 +69,8 @@ const TEMPLATE_CLONE_SYSTEM =
 
 async function elaborateEditPrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || "").trim() || "Re-render the same image preserving identity.";
+  const localizedColor = buildLocalizedColorEditPrompt(userTheme);
+  if (localizedColor) return localizedColor;
   try {
     const r = await chatCompletion({
       temperature: 0.2,
@@ -83,6 +85,43 @@ async function elaborateEditPrompt(userPrompt: string): Promise<string> {
     }
   } catch (_e) { /* fallback */ }
   return `Use the reference image as the BASE/canvas and apply this edit LITERALLY: ${userTheme}. Preserve composition, framing, perspective, pose, background and lighting exactly. Apply the requested color/object/text change clearly and dominantly to the relevant area. Do NOT generate a new scene. ${REALISM}. Negative: new scene, different composition, different framing, different background, ${NEGATIVE}`;
+}
+
+function normalizeText(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+const COLOR_ALIASES: Array<{ re: RegExp; en: string; strong: string }> = [
+  { re: /\b(azul|blue)\b/i, en: 'blue', strong: 'clear saturated royal blue (#005DFF)' },
+  { re: /\b(vermelh[ao]|red)\b/i, en: 'red', strong: 'clear red' },
+  { re: /\b(preto|preta|black)\b/i, en: 'black', strong: 'deep black' },
+  { re: /\b(branco|branca|white)\b/i, en: 'white', strong: 'clean white' },
+  { re: /\b(verde|green)\b/i, en: 'green', strong: 'clear green' },
+  { re: /\b(amarel[ao]|yellow)\b/i, en: 'yellow', strong: 'clear yellow' },
+  { re: /\b(rosa|pink)\b/i, en: 'pink', strong: 'clear pink' },
+  { re: /\b(roxo|roxa|purple)\b/i, en: 'purple', strong: 'clear purple' },
+  { re: /\b(laranja|orange)\b/i, en: 'orange', strong: 'clear orange' },
+  { re: /\b(cinza|gray|grey)\b/i, en: 'gray', strong: 'neutral gray' },
+];
+
+function findColor(text: string, preferAfterPara = false) {
+  const haystack = preferAfterPara ? (text.match(/(?:para|por|to|into)\s+(.+)$/i)?.[1] || text) : text;
+  return COLOR_ALIASES.find((c) => c.re.test(haystack));
+}
+
+function buildLocalizedColorEditPrompt(userTheme: string): string | null {
+  const normalized = normalizeText(userTheme);
+  const isGarment = /\b(camiseta|camisa|blusa|roupa|uniforme|terno|paleto|vestido|calca|short|jaqueta|shirt|t-?shirt|top|clothing|garment)\b/i.test(normalized);
+  const asksColorChange = /\b(troc|muda|alter|change|recolor|cor|color)\b/i.test(normalized);
+  if (!isGarment || !asksColorChange) return null;
+
+  const target = findColor(normalized, true) || findColor(normalized, false);
+  if (!target) return null;
+  const beforeTarget = normalized.split(/\b(?:para|por|to|into)\b/i)[0] || normalized;
+  const source = COLOR_ALIASES.find((c) => c.en !== target.en && c.re.test(beforeTarget));
+  const sourceText = source ? ` currently ${source.en}` : '';
+
+  return `IMAGE EDIT MODE — use the attached image as the exact base canvas. Localized garment color replacement: identify the shirt/t-shirt/top/clothing${sourceText} and recolor ONLY that garment to ${target.strong}. The final visible garment color MUST be ${target.en}. Preserve the original garment fabric texture, seams, folds, wrinkles, shadows, highlights, print/logos, shape and fit. Preserve the same person, face, skin, hair, hands, pose, body, background, lighting, camera angle, crop, perspective and all other objects exactly. Do not create a new person, do not create a new scene, do not change the composition. Photorealistic edit, natural fabric color, clean edges. User instruction: ${userTheme}. Negative: unchanged garment color, red shirt if target is blue, new shirt shape, different clothing style, different person, different background, new scene, ${NEGATIVE}`;
 }
 
 async function elaborateTemplatePrompt(userPrompt: string): Promise<string> {
@@ -122,7 +161,7 @@ Deno.serve(async (req) => {
       : (isSingle ? await elaborateEditPrompt(prompt) : await elaborateFusionPrompt(prompt));
     const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64];
 
-    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls });
+    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion') });
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {

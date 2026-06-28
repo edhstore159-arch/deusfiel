@@ -9,6 +9,7 @@ type Content =
 export interface NanoBananaOptions {
   prompt: string;
   imageUrls?: string[]; // data URLs or http(s) URLs
+  mode?: "edit" | "fusion" | "template" | "generate";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
 }
 
@@ -244,8 +245,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
       for (const u of imageUrls.slice(0, 4)) {
         const converted = dataUrlToBlob(u);
         if (!converted) continue;
-        // OpenAI accepts one or more image parts under the image field for edits.
-        form.append("image", converted.blob, converted.filename);
+        form.append(imageUrls.length > 1 ? "image[]" : "image", converted.blob, converted.filename);
       }
       if (!form.has("image")) return { url: null, error: "OpenAI: imagem de referência inválida" };
 
@@ -285,7 +285,10 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
 async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("EMERGENT_API_KEY");
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
-  const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt) };
+  const editPrefix = opts.mode === "edit"
+    ? "STRICT IMAGE EDIT MODE: the uploaded image is the exact base canvas. Do not generate a new photo. Preserve all pixels/details except the specifically requested edit. The requested edit must be visibly applied.\n\n"
+    : "";
+  const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt) };
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
 
   // A chave Emergent expõe os modelos de imagem Gemini via Vertex AI no endpoint
@@ -332,7 +335,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
       if (files.length) {
         const multipart = buildMultipartBody(
           { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024" },
-          files.map((file) => ({ name: "image", ...file })),
+          files.map((file) => ({ name: files.length > 1 ? "image[]" : "image", ...file })),
         );
         const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
           method: "POST",

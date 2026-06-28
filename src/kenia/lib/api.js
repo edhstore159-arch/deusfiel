@@ -909,6 +909,7 @@ const staticPost = (url, body = {}) => {
             image1_base64: body.image1_base64,
             image2_base64: body.image2_base64,
             prompt: body.prompt || "",
+            mode: body.mode,
           },
         });
         if (error) throw error;
