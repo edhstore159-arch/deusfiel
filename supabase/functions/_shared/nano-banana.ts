@@ -416,6 +416,32 @@ export async function generateWithNanoBanana(
   opts: NanoBananaOptions,
 ): Promise<{ url: string | null; provider: string; error?: string }> {
   const errs: string[] = [];
+  const hasRefs = Boolean(opts.imageUrls?.length);
+
+  // ===== Novo fluxo solicitado: Pollinations PRIMEIRO (rascunho gratuito),
+  // depois Emergent para refinar/corrigir imperfeições usando o rascunho como referência.
+  // Só aplica quando não há imagens de referência do usuário (geração pura).
+  if (!hasRefs) {
+    const draft = await callPollinations(opts);
+    if (draft.url) {
+      if (Deno.env.get("EMERGENT_API_KEY")) {
+        const refined = await callEmergent({
+          ...opts,
+          imageUrls: [draft.url],
+          prompt: `Refine and fix imperfections (anatomy, hands, eyes, symmetry, lighting, sharpness, artifacts) of this draft image while preserving its composition and subject. ${opts.prompt}`,
+        });
+        if (refined.url) {
+          console.info("✨ Pollinations → Emergent refine OK");
+          return { url: refined.url, provider: "pollinations+emergent-refine" };
+        }
+        console.warn("⚠️ Emergent refine falhou, retornando rascunho Pollinations:", refined.error);
+      }
+      return { url: draft.url, provider: "pollinations-draft" };
+    }
+    errs.push(draft.error || "Pollinations falhou");
+  }
+
+
 
   if (Deno.env.get("LOVABLE_API_KEY")) {
     const r = await callLovableGateway(opts);
