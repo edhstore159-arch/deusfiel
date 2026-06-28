@@ -569,7 +569,45 @@ export default function ViralVideoStudio() {
   const [videoUrl, setVideoUrl] = useState("");
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
+  const [generatingEmergent, setGeneratingEmergent] = useState(false);
+  const [emergentKey, setEmergentKey] = useState(() => {
+    try { return localStorage.getItem("kenia.emergent.video.key") || ""; } catch { return ""; }
+  });
   const lastVideoUrl = useRef("");
+
+  const saveEmergentKey = (value) => {
+    setEmergentKey(value);
+    try {
+      if (value) localStorage.setItem("kenia.emergent.video.key", value);
+      else localStorage.removeItem("kenia.emergent.video.key");
+    } catch { /* noop */ }
+  };
+
+  const generateWithEmergent = async () => {
+    if (generatingEmergent) return;
+    setGeneratingEmergent(true);
+    try {
+      const seconds = Math.min(8, Math.max(4, clampDuration(durationSeconds)));
+      const { data, error } = await supabase.functions.invoke("emergent-video", {
+        body: {
+          prompt,
+          durationSeconds: seconds,
+          aspectRatio: "9:16",
+          overrideKey: emergentKey || undefined,
+        },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Falha na geração via Emergent");
+      const url = data.url || (data.b64 ? `data:video/mp4;base64,${data.b64}` : "");
+      if (!url) throw new Error("Resposta sem URL de vídeo");
+      setVideoUrl(url);
+      toast.success(`Vídeo Emergent gerado (${seconds}s)`);
+    } catch (e) {
+      toast.error(e?.message || "Falha ao gerar vídeo via Emergent");
+    } finally {
+      setGeneratingEmergent(false);
+    }
+  };
 
   const enhancePrompt = async () => {
     if (enhancing) return;
