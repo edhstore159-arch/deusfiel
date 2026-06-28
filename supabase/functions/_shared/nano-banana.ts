@@ -181,6 +181,16 @@ function dataUrlToBlob(value: string): { blob: Blob; filename: string } | null {
   return { blob: new Blob([bytes], { type: mime }), filename: `reference.${ext}` };
 }
 
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 25000) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) return { url: null, error: "OPENAI_API_KEY ausente" };
@@ -201,11 +211,11 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
       }
       if (!form.has("image")) return { url: null, error: "OpenAI: imagem de referência inválida" };
 
-      const resp = await fetch("https://api.openai.com/v1/images/edits", {
+      const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}` },
         body: form,
-      });
+      }, 25000);
       const text = await resp.text();
       if (!resp.ok) return { url: null, error: `OpenAI edição ${resp.status}: ${text.slice(0, 240)}` };
       const data = JSON.parse(text);
@@ -216,11 +226,11 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
       return { url: null, error: "OpenAI edição não retornou imagem" };
     }
 
-    const resp = await fetch("https://api.openai.com/v1/images/generations", {
+    const resp = await fetchWithTimeout("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", n: 1 }),
-    });
+    }, 25000);
     const text = await resp.text();
     if (!resp.ok) return { url: null, error: `OpenAI imagem ${resp.status}: ${text.slice(0, 240)}` };
     const data = JSON.parse(text);
@@ -250,11 +260,11 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         if (converted) form.append("image", converted.blob, converted.filename);
       }
       if (form.has("image")) {
-        const resp = await fetch("https://integrations.emergentagent.com/llm/images/edits", {
+        const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
           method: "POST",
           headers: { Authorization: `Bearer ${key}` },
           body: form,
-        });
+        }, 45000);
         const text = await resp.text();
         if (resp.ok) {
           const data = JSON.parse(text);
@@ -269,11 +279,11 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         }
       }
     } else {
-      const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
+      const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/generations", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024", n: 1 }),
-      });
+      }, 45000);
       const text = await resp.text();
       if (resp.ok) {
         const data = JSON.parse(text);
