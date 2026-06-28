@@ -304,7 +304,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userElaborated = await elaboratePrompt(prompt, style);
+    // Inclui case_type/title no prompt para que o detector de tema jurídico
+    // (LEGAL_THEMES) dispare mesmo quando o usuário escolhe a área no select
+    // e digita pouco no tema. Ex.: case_type="Trabalhista" → cena trabalhista.
+    const caseTypeHint = case_type ? `Área jurídica: ${case_type}. ` : "";
+    const titleHint = title ? `Título do post: ${title}. ` : "";
+    const themedPrompt = `${caseTypeHint}${titleHint}${prompt}`.trim();
+    const userElaborated = await elaboratePrompt(themedPrompt, style);
     const hybridSubject = hasHybridRequest(prompt);
     const isolatedOnly = isIsolatedObjectOnly(prompt);
     const eventSubject = !isolatedOnly && EVENT_RE.test(prompt) && !hybridSubject;
