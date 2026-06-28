@@ -558,6 +558,7 @@ export async function generateWithNanoBanana(
   const hadInputRefs = Boolean(opts.imageUrls?.filter(Boolean).length);
   const normalizedOpts = { ...opts, imageUrls: await normalizeReferenceImages(opts.imageUrls) };
   const hasRefs = Boolean(normalizedOpts.imageUrls?.length);
+  const hasEmergentKey = Boolean(String(normalizedOpts.emergentApiKey || "").trim() || Deno.env.get("EMERGENT_API_KEY"));
   if (hadInputRefs && !hasRefs) {
     return {
       url: null,
@@ -572,7 +573,7 @@ export async function generateWithNanoBanana(
   if (!hasRefs) {
     const draft = await callPollinations(normalizedOpts);
     if (draft.url) {
-      if (Deno.env.get("EMERGENT_API_KEY")) {
+      if (hasEmergentKey) {
         const refined = await callEmergent({
           ...normalizedOpts,
           imageUrls: [draft.url],
@@ -594,7 +595,7 @@ export async function generateWithNanoBanana(
   // Edição/fusão com imagem do usuário: tentar Emergent primeiro. Essa é a
   // chave configurada para edição real; evita gastar tempo em provedores sem
   // crédito e garante que a imagem enviada seja usada como referência.
-  if (hasRefs && Deno.env.get("EMERGENT_API_KEY")) {
+  if (hasRefs && hasEmergentKey) {
     const r = await callEmergent(normalizedOpts);
     if (r.url) return { url: r.url, provider: "emergent" };
     errs.push(r.error || "Emergent falhou");
@@ -623,7 +624,7 @@ export async function generateWithNanoBanana(
     console.warn("⚠️ OpenAI falhou:", r.error);
   }
 
-  if (!hasRefs) {
+  if (!hasRefs && hasEmergentKey) {
     const r3 = await callEmergent(normalizedOpts);
     if (r3.url) return { url: r3.url, provider: "emergent" };
     errs.push(r3.error || "Emergent falhou");
