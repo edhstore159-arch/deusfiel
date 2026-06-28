@@ -157,8 +157,56 @@ function fileToBase64(file) {
   });
 }
 
+function WebcamCaptureDialog({ open, onClose, onCapture }) {
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        if (cancelled) { s.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = s;
+        if (videoRef.current) { videoRef.current.srcObject = s; await videoRef.current.play().catch(() => {}); }
+      } catch (e) {
+        setErr(e?.name === "NotAllowedError" ? "Permissão negada. Libere a câmera nas configurações do navegador." : (e?.message || "Não foi possível acessar a webcam."));
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    };
+  }, [open]);
+
+  if (!open) return null;
+  const snap = () => {
+    const v = videoRef.current; if (!v) return;
+    const c = document.createElement("canvas");
+    c.width = v.videoWidth || 720; c.height = v.videoHeight || 720;
+    c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+    onCapture(c.toDataURL("image/png"));
+    onClose();
+  };
+  return (
+    <div className="fixed inset-0 z-[1000] bg-black/80 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-nude-950 border border-gold-700/40 rounded-lg p-4 max-w-lg w-full space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between"><h3 className="text-gold-100 font-semibold">Tirar foto pela webcam</h3><button onClick={onClose} className="text-nude-400 hover:text-white"><X className="w-4 h-4" /></button></div>
+        {err ? <div className="text-rose-400 text-sm">{err}</div> : <video ref={videoRef} autoPlay playsInline muted className="w-full rounded bg-black" />}
+        <div className="flex gap-2 justify-end">
+          <Button type="button" variant="outline" onClick={onClose} className="border-gold-700/50 text-gold-200">Cancelar</Button>
+          <Button type="button" onClick={snap} disabled={!!err} className="bg-gold-600 hover:bg-gold-500 text-white"><Camera className="w-4 h-4 mr-2" />Capturar</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ImagePicker({ value, onChange, label, testidPrefix }) {
   const inputRef = useRef(null);
+  const [camOpen, setCamOpen] = useState(false);
   return (
     <div className="space-y-2">
       <Label className="text-gold-200">{label}</Label>
@@ -200,6 +248,16 @@ function ImagePicker({ value, onChange, label, testidPrefix }) {
           }}
         />
       </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={(e) => { e.stopPropagation(); setCamOpen(true); }}
+        className="w-full border-gold-700/50 text-gold-200 hover:bg-gold-500/10 hover:text-gold-100"
+      >
+        <Camera className="w-4 h-4 mr-2" /> Tirar foto pela webcam
+      </Button>
+      <WebcamCaptureDialog open={camOpen} onClose={() => setCamOpen(false)} onCapture={(b64) => onChange(b64)} />
     </div>
   );
 }
