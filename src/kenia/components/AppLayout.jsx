@@ -42,6 +42,7 @@ const NAV = [
 const PREFETCH = {
   "/app": () => import("@/kenia/pages/Dashboard"),
   "/app/chat-ia": () => import("@/kenia/pages/ChatIA"),
+  "/app/claude": () => import("@/kenia/pages/ClaudeChat"),
   "/app/admin": () => import("@/kenia/pages/AdminCases"),
   "/app/secretary-tasks": () => import("@/kenia/pages/SecretaryTasks"),
   
