@@ -570,7 +570,9 @@ export default function FloatingVoiceOrb() {
     return ctx;
   };
 
-  const needsDashboardContext = (text) => /\b(agenda|agendamento|agendamentos|cliente|clientes|contato|contatos|telefone|whats|whatsapp|zap|lead|leads|crm|pipeline|processo|processos|prazo|prazos|mensagem|mensagens|dashboard|dados|n[úu]mero|quantos?|listar?|mostrar?|consultar?|alterar|mudar|reagendar|marcar|cancelar|confirmar)\b/i.test(norm(text));
+  // Sempre carrega o contexto do dashboard — a secretária precisa ter visão completa de
+  // agendamentos (hoje, amanhã, qualquer data) para responder sem depender de palavra-chave.
+  const needsDashboardContext = (_text) => true;
 
   const findClient = (name, ctx) => {
     const n = norm(name);
@@ -610,10 +612,25 @@ export default function FloatingVoiceOrb() {
       const apptsTomorrow = (ctx?.appointments || []).filter((a) => apptISO(a) === _tomorrowISO).map(mapAppt);
       const apptsToday = (ctx?.appointments || []).filter((a) => apptISO(a) === _todayISO).map(mapAppt);
 
+      // Agrupa TODOS os agendamentos por data (ISO) para que a secretária responda
+      // sobre qualquer dia solicitado, não apenas hoje/amanhã.
+      const apptsByDate = {};
+      (ctx?.appointments || []).forEach((a) => {
+        const k = apptISO(a) || "sem-data";
+        (apptsByDate[k] ||= []).push(mapAppt(a));
+      });
+      const upcoming = (ctx?.appointments || [])
+        .filter((a) => { const k = apptISO(a); return k && k >= _todayISO; })
+        .sort((a, b) => (apptISO(a) + (a.appointment_time || "")).localeCompare(apptISO(b) + (b.appointment_time || "")))
+        .slice(0, 30)
+        .map((a) => ({ data: apptISO(a), ...mapAppt(a) }));
+
       const ctxSummary = ctx ? [
         `RESUMO: ${ctx.contacts.length} contatos, ${ctx.leads.length} leads, ${ctx.processes.length} processos, ${ctx.appointments.length} agendamentos (HOJE ${_todayISO}: ${apptsToday.length} | AMANHÃ ${_tomorrowISO}: ${apptsTomorrow.length}), ${ctx.logs.length} mensagens, ${ctx.deadlines.length} prazos.`,
         `AGENDAMENTOS HOJE (${_todayISO}): ${JSON.stringify(apptsToday)}`,
         `AGENDAMENTOS AMANHÃ (${_tomorrowISO}): ${JSON.stringify(apptsTomorrow)}`,
+        `PRÓXIMOS AGENDAMENTOS (até 30, ordenados por data): ${JSON.stringify(upcoming)}`,
+        `AGENDAMENTOS POR DATA (ISO → lista): ${JSON.stringify(apptsByDate)}`,
         `Leads (top 10): ${JSON.stringify((ctx.leads||[]).slice(0, 10).map((l) => ({ nome: l.name, tel: l.phone, area: l.case_type, etapa: l.stage })))}`,
         `Contatos (top 10): ${JSON.stringify((ctx.contacts||[]).slice(0, 10).map((c) => ({ nome: c.name, tel: c.phone, nao_lidas: c.unread })))}`,
         `Processos (top 10): ${JSON.stringify((ctx.processes||[]).slice(0, 10).map((p) => ({ cliente: p.client_name, numero: p.process_number, area: p.case_type, status: p.status, proxima_audiencia: p.next_hearing })))}`,
