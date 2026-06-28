@@ -4,7 +4,7 @@ import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Badge } from "@/kenia/components/ui/badge";
-import { Cloud, Upload, Globe, Trash2, Loader2, Copy, ExternalLink } from "lucide-react";
+import { Cloud, Upload, Globe, Trash2, Loader2, Copy, ExternalLink, Eye, Image as ImageIcon, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/kenia/contexts/AuthContext";
 import { toast } from "sonner";
@@ -16,6 +16,10 @@ export default function CloudHub() {
   const [objects, setObjects] = useState([]);
   const [sites, setSites] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [imagePrompt, setImagePrompt] = useState("imagem profissional para site jurídico, elegante, fundo claro, detalhes em dourado");
+  const [imageResult, setImageResult] = useState(null);
+  const [generatingImage, setGeneratingImage] = useState(false);
 
   // form state
   const [slug, setSlug] = useState("");
@@ -28,7 +32,12 @@ export default function CloudHub() {
       supabase.from("cloud_objects").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
       supabase.from("cloud_sites").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
     ]);
-    setObjects(objs || []);
+    const objectsWithFreshUrls = await Promise.all((objs || []).map(async (item) => {
+      if (!item.path) return item;
+      const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(item.path, 60 * 60 * 24 * 365);
+      return { ...item, url: signed?.signedUrl || item.url };
+    }));
+    setObjects(objectsWithFreshUrls);
     setSites(sts || []);
   };
 
@@ -105,7 +114,77 @@ export default function CloudHub() {
     }
   };
 
+  const previewDraft = () => {
+    setPreview({ type: "site", title: title.trim() || "Pré-visualização", html });
+  };
+
+  const previewSite = (site) => {
+    setPreview({ type: "site", title: site.title, html: site.html, url: siteUrl(site) });
+  };
+
+  const previewObject = (object) => {
+    setPreview({ type: "object", title: object.name, object });
+  };
+
+  const dataUrlToBlob = async (dataUrl) => {
+    const response = await fetch(dataUrl);
+    return response.blob();
+  };
+
+  const generateCloudImage = async () => {
+    if (!user?.id) return;
+    const cleanPrompt = imagePrompt.trim();
+    if (!cleanPrompt) return toast.error("Descreva a imagem para gerar");
+    setGeneratingImage(true);
+    setImageResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-cover-image", {
+        body: {
+          prompt: cleanPrompt,
+          title: cleanPrompt,
+          network: "cloud",
+          format: "1024x1024",
+          tone: "profissional elegante",
+          case_type: "cloud-site",
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const imageDataUrl = data?.image_data_url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : "");
+      if (!imageDataUrl) throw new Error("A geração não retornou imagem");
+
+      setImageResult(imageDataUrl);
+      const blob = await dataUrlToBlob(imageDataUrl);
+      const mime = blob.type || (imageDataUrl.startsWith("data:image/svg") ? "image/svg+xml" : "image/png");
+      const ext = mime.includes("svg") ? "svg" : "png";
+      const safeName = cleanPrompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 44) || "imagem-cloud";
+      const path = `${user.id}/generated-${Date.now()}-${safeName}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: mime, upsert: false });
+      if (upErr) throw upErr;
+      const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 365);
+      const storedObject = {
+        user_id: user.id,
+        name: `${safeName}.${ext}`,
+        path,
+        url: signed?.signedUrl || "",
+        size: blob.size,
+        mime,
+      };
+      const { data: inserted, error: insErr } = await supabase.from("cloud_objects").insert(storedObject).select("*").single();
+      if (insErr) throw insErr;
+      const objectForPreview = { ...inserted, url: signed?.signedUrl || imageDataUrl };
+      toast.success(`Imagem gerada e salva na Cloud${data?.provider ? ` · ${data.provider}` : ""}`);
+      setPreview({ type: "object", title: objectForPreview.name, object: objectForPreview });
+      await refresh();
+    } catch (e) {
+      toast.error("Falha ao gerar imagem: " + (e?.message || e));
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
   const siteUrl = (s) => `${window.location.origin}/s/${s.slug}`;
+  const previewTitle = preview?.title || "Pré-visualização";
 
   if (authLoading) {
     return <div className="p-6 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>;
@@ -138,20 +217,29 @@ export default function CloudHub() {
           <Input placeholder="Título do site" value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
         <Textarea rows={6} value={html} onChange={(e) => setHtml(e.target.value)} placeholder="HTML do site" className="font-mono text-xs" />
-        <Button onClick={createSite} disabled={busy}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Globe className="h-4 w-4 mr-2" />}
-          Publicar site
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={createSite} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Globe className="h-4 w-4 mr-2" />}
+            Publicar site
+          </Button>
+          <Button type="button" variant="outline" onClick={previewDraft}>
+            <Eye className="h-4 w-4 mr-2" />
+            Pré-visualizar
+          </Button>
+        </div>
 
         <div className="space-y-2">
           {sites.length === 0 && <p className="text-sm text-muted-foreground">Nenhum site ainda.</p>}
           {sites.map((s) => (
-            <div key={s.id} className="flex items-center justify-between border rounded-lg p-2 text-sm">
+            <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-2 text-sm">
               <div className="min-w-0">
                 <div className="font-medium truncate">{s.title}</div>
                 <div className="text-xs text-muted-foreground truncate">{siteUrl(s)}</div>
               </div>
               <div className="flex gap-1 shrink-0">
+                <Button size="icon" variant="ghost" onClick={() => previewSite(s)} title="Pré-visualizar">
+                  <Eye className="h-4 w-4" />
+                </Button>
                 <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(siteUrl(s)); toast.success("URL copiada"); }}>
                   <Copy className="h-4 w-4" />
                 </Button>
@@ -163,6 +251,78 @@ export default function CloudHub() {
             </div>
           ))}
         </div>
+      </Card>
+
+      {/* Image generation */}
+      <Card className="p-5 space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <ImageIcon className="h-5 w-5 text-amber-600" />
+          <h2 className="font-semibold">Gerador de imagens da Cloud</h2>
+          <Badge variant="outline" className="ml-auto">Salva em Objetos</Badge>
+        </div>
+        <Textarea
+          rows={3}
+          value={imagePrompt}
+          onChange={(e) => setImagePrompt(e.target.value)}
+          placeholder="Descreva a imagem que deseja criar"
+        />
+        <Button onClick={generateCloudImage} disabled={generatingImage || busy}>
+          {generatingImage ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+          Gerar imagem
+        </Button>
+        {imageResult && (
+          <div className="overflow-hidden rounded-lg border bg-muted/30">
+            <img src={imageResult} alt="Imagem gerada pela Cloud" className="max-h-80 w-full object-contain" />
+          </div>
+        )}
+      </Card>
+
+      {/* Preview */}
+      <Card className="p-5 space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Eye className="h-5 w-5 text-amber-600" />
+          <h2 className="font-semibold">Pré-visualização</h2>
+          {preview?.url && (
+            <Button size="sm" variant="outline" asChild className="ml-auto">
+              <a href={preview.url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /> Abrir</a>
+            </Button>
+          )}
+        </div>
+        {!preview && <p className="text-sm text-muted-foreground">Clique no ícone de olho em um site/arquivo ou use o botão de pré-visualizar do editor.</p>}
+        {preview?.type === "site" && (
+          <div className="overflow-hidden rounded-lg border bg-background">
+            <div className="flex items-center justify-between border-b px-3 py-2 text-xs text-muted-foreground">
+              <span className="truncate font-medium">{previewTitle}</span>
+              <RefreshCw className="h-3.5 w-3.5" />
+            </div>
+            <iframe
+              title={previewTitle}
+              srcDoc={`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${previewTitle}</title></head><body>${preview.html || ""}</body></html>`}
+              className="h-[520px] w-full border-0 bg-background"
+              sandbox="allow-scripts allow-forms allow-popups"
+            />
+          </div>
+        )}
+        {preview?.type === "object" && (() => {
+          const object = preview.object;
+          const isImage = object?.mime?.startsWith("image/");
+          const isHtml = object?.mime === "text/html" || object?.name?.toLowerCase().endsWith(".html");
+          return (
+            <div className="overflow-hidden rounded-lg border bg-muted/30">
+              <div className="flex items-center justify-between border-b bg-background px-3 py-2 text-xs text-muted-foreground">
+                <span className="truncate font-medium">{object?.name}</span>
+                <span>{object?.mime || "arquivo"}</span>
+              </div>
+              {isImage ? (
+                <img src={object.url} alt={object.name} className="max-h-[520px] w-full object-contain" />
+              ) : isHtml ? (
+                <iframe title={object.name} src={object.url} className="h-[520px] w-full border-0 bg-background" sandbox="allow-scripts allow-forms allow-popups" />
+              ) : (
+                <div className="p-6 text-sm text-muted-foreground">Prévia direta indisponível para este tipo de arquivo. Use Abrir para visualizar/download.</div>
+              )}
+            </div>
+          );
+        })()}
       </Card>
 
       {/* Objects */}
@@ -181,12 +341,15 @@ export default function CloudHub() {
         <div className="space-y-2">
           {objects.length === 0 && <p className="text-sm text-muted-foreground">Nenhum arquivo ainda.</p>}
           {objects.map((o) => (
-            <div key={o.id} className="flex items-center justify-between border rounded-lg p-2 text-sm">
+            <div key={o.id} className="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-2 text-sm">
               <div className="min-w-0">
                 <div className="font-medium truncate">{o.name}</div>
                 <div className="text-xs text-muted-foreground">{(o.size / 1024).toFixed(1)} KB · {o.mime || "arquivo"}</div>
               </div>
               <div className="flex gap-1 shrink-0">
+                <Button size="icon" variant="ghost" onClick={() => previewObject(o)} title="Pré-visualizar">
+                  <Eye className="h-4 w-4" />
+                </Button>
                 <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(o.url); toast.success("URL copiada"); }}>
                   <Copy className="h-4 w-4" />
                 </Button>
