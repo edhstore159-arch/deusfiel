@@ -306,7 +306,7 @@ export default function ImageFusion() {
     try {
       const { data } = await api.post(
         "/creatives/fuse-images",
-        { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt, mode: templateMode ? "template" : undefined },
+        { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt, mode: templateMode ? "template" : (singleMode ? "edit" : "fusion") },
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
