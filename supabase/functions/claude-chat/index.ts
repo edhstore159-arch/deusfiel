@@ -8,6 +8,15 @@ const SYSTEM_PROMPT = `Você é Claude — um assistente de IA gratuito embutido
 - Se não souber algo, diga que não sabe em vez de inventar.
 - Para perguntas jurídicas, dê orientações gerais e recomende consultar a advogada.`;
 
+const providerLabel = (provider: string) => {
+  if (provider === "ollama") return "Cloud Ollama";
+  if (provider === "lovable") return "Lovable Cloud";
+  if (provider === "gemini") return "Gemini";
+  if (provider === "emergent") return "Emergent";
+  if (provider === "anthropic") return "Anthropic Claude";
+  return provider || "IA";
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -45,7 +54,7 @@ Deno.serve(async (req) => {
           const j = await aRes.json();
           const content = String(j?.content?.[0]?.text || "").trim();
           return new Response(
-            JSON.stringify({ content, provider: "anthropic" }),
+            JSON.stringify({ content, provider: "anthropic", provider_label: providerLabel("anthropic") }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
@@ -59,13 +68,14 @@ Deno.serve(async (req) => {
     const r = await chatCompletion({ messages, temperature: 0.7 });
     if (!r.ok) {
       return new Response(
-        JSON.stringify({ error: r.error || "Falha no provedor de IA", provider: r.provider || "none" }),
+        JSON.stringify({ error: r.error || "Falha no provedor de IA", provider: r.provider || "none", provider_label: providerLabel(r.provider || "none") }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
     const content = String(r.data?.choices?.[0]?.message?.content || "").trim();
+    const provider = (r as any).provider || "lovable";
     return new Response(
-      JSON.stringify({ content, provider: (r as any).provider || "lovable" }),
+      JSON.stringify({ content, provider, provider_label: providerLabel(provider) }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
