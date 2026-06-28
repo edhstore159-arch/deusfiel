@@ -193,7 +193,12 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         }),
       });
       if (!resp.ok) {
-        lastError = `Emergent[${model}] ${resp.status}: ${(await resp.text()).slice(0, 160)}`;
+        const txt = (await resp.text()).slice(0, 240);
+        lastError = `Emergent[${model}] ${resp.status}: ${txt}`;
+        // Budget exceeded is a hard stop — no point trying other models with the same key.
+        if (/budget[_\s]exceeded|Budget has been exceeded/i.test(txt)) {
+          return { url: null, error: `Emergent: orçamento da chave esgotado (recarregue créditos em emergentagent.com). Detalhe: ${txt}` };
+        }
         continue;
       }
       const data = await resp.json();
