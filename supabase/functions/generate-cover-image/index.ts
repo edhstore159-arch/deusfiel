@@ -296,7 +296,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { prompt, reference_image_base64, logo_base64, style, title, network, format, tone, case_type } = body || {};
+    const { prompt, reference_image_base64, logo_base64, style, title, subtitle, network, format, tone, case_type } = body || {};
     if (!prompt || typeof prompt !== "string") {
       return new Response(JSON.stringify({ error: "Prompt obrigatório" }), {
         status: 400,
