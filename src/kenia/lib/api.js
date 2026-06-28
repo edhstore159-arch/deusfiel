@@ -878,17 +878,43 @@ const staticPost = (url, body = {}) => {
       }
       if (!b64) b64 = buildLocalCreativeImage(body.title || topic, topic);
       const storedImage = await compactImageForStorage(b64);
+      // Persiste a imagem gerada no bucket creative-assets + tabela generated_images
+      let storagePath = null;
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const uid = auth?.user?.id;
+        if (uid && b64) {
+          const dataUrl = b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
+          const blob = await (await fetch(dataUrl)).blob();
+          storagePath = `${uid}/creative-${Date.now()}.png`;
+          const { error: upErr } = await supabase.storage
+            .from("creative-assets")
+            .upload(storagePath, blob, { contentType: "image/png", upsert: true });
+          if (!upErr) {
+            await supabase.from("generated_images").insert({
+              user_id: uid, storage_path: storagePath, prompt: topic, kind: "creative", paid: false,
+            });
+          } else {
+            console.warn("creative-assets upload falhou:", upErr.message);
+            storagePath = null;
+          }
+        }
+      } catch (e) {
+        console.warn("Persistência de imagem gerada falhou:", e?.message || e);
+      }
       const item = {
         id: nextId("creative"),
         ...body,
         caption: `Post sugerido: ${topic}.\n\nExplique o direito com clareza, convide o cliente a separar documentos e finalize com chamada para atendimento.`,
         image_b64: storedImage,
+        storage_path: storagePath,
         ...(genError ? { error: genError } : {}),
       };
       const items = read("creatives", seedCreatives);
       items.unshift(item);
       write("creatives", items);
       return response(item, 201);
+
     })();
   }
   if (path === "/debug/instruction") {
