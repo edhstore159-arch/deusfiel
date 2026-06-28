@@ -170,6 +170,70 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   }
 }
 
+function dataUrlToBlob(value: string): { blob: Blob; filename: string } | null {
+  const m = String(value || "").match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!m) return null;
+  const mime = m[1] || "image/png";
+  const ext = mime.includes("jpeg") ? "jpg" : (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
+  const bin = atob(m[2]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { blob: new Blob([bytes], { type: mime }), filename: `reference.${ext}` };
+}
+
+async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) return { url: null, error: "OPENAI_API_KEY ausente" };
+
+  const prompt = withFacePreservation(opts.prompt);
+  const imageUrls = (opts.imageUrls || []).filter(Boolean);
+  try {
+    if (imageUrls.length > 0) {
+      const form = new FormData();
+      form.append("model", "gpt-image-1");
+      form.append("prompt", prompt);
+      form.append("size", "1024x1024");
+      for (const u of imageUrls.slice(0, 4)) {
+        const converted = dataUrlToBlob(u);
+        if (!converted) continue;
+        // OpenAI accepts one or more image parts under the image field for edits.
+        form.append("image", converted.blob, converted.filename);
+      }
+      if (!form.has("image")) return { url: null, error: "OpenAI: imagem de referência inválida" };
+
+      const resp = await fetch("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+      });
+      const text = await resp.text();
+      if (!resp.ok) return { url: null, error: `OpenAI edição ${resp.status}: ${text.slice(0, 240)}` };
+      const data = JSON.parse(text);
+      const b64 = data?.data?.[0]?.b64_json;
+      const url = data?.data?.[0]?.url;
+      if (b64) return { url: `data:image/png;base64,${b64}` };
+      if (url) return { url };
+      return { url: null, error: "OpenAI edição não retornou imagem" };
+    }
+
+    const resp = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", n: 1 }),
+    });
+    const text = await resp.text();
+    if (!resp.ok) return { url: null, error: `OpenAI imagem ${resp.status}: ${text.slice(0, 240)}` };
+    const data = JSON.parse(text);
+    const b64 = data?.data?.[0]?.b64_json;
+    const url = data?.data?.[0]?.url;
+    if (b64) return { url: `data:image/png;base64,${b64}` };
+    if (url) return { url };
+    return { url: null, error: "OpenAI imagem não retornou imagem" };
+  } catch (e) {
+    return { url: null, error: `OpenAI erro: ${(e as Error)?.message || e}` };
+  }
+}
+
 async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("EMERGENT_API_KEY");
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
@@ -249,6 +313,13 @@ export async function generateWithNanoBanana(
     if (r.url) return { url: r.url, provider: "gemini" };
     errs.push(r.error || "Gemini direto falhou");
     console.warn("⚠️ Gemini direto falhou:", r.error);
+  }
+
+  if (Deno.env.get("OPENAI_API_KEY")) {
+    const r = await callOpenAIImages(opts);
+    if (r.url) return { url: r.url, provider: "openai" };
+    errs.push(r.error || "OpenAI falhou");
+    console.warn("⚠️ OpenAI falhou:", r.error);
   }
 
   const r3 = await callEmergent(opts);
