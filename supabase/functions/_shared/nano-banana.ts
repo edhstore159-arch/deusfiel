@@ -11,6 +11,7 @@ export interface NanoBananaOptions {
   imageUrls?: string[]; // data URLs or http(s) URLs
   mode?: "edit" | "fusion" | "template" | "generate";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
+  emergentApiKey?: string; // optional per-request override, never logged
 }
 
 const FACE_PRESERVATION_LOCK =
@@ -295,7 +296,29 @@ async function normalizeReferenceImages(imageUrls?: string[]) {
     if (!value) continue;
     if (/^data:image\//i.test(value)) {
       const parsed = parseDataUrl(value);
-      out.push(parsed ? `data:${parsed.mime};base64,${parsed.base64}` : value);
+      if (parsed) {
+        out.push(`data:${parsed.mime};base64,${parsed.base64}`);
+        continue;
+      }
+
+      // Some callers accidentally wrapped an http(s) URL as
+      // data:image/png;base64,https://...; sending that to Gemini/Emergent
+      // causes "Provided image is not valid". Unwrap and normalize it here.
+      const payload = value.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/i, "").trim();
+      if (/^https?:\/\//i.test(payload)) {
+        try {
+          out.push(await remoteImageToDataUrl(payload));
+        } catch (e) {
+          console.warn("⚠️ Não foi possível baixar URL embutida em data URL inválido:", (e as Error)?.message || e);
+          out.push(payload);
+        }
+        continue;
+      }
+      if (looksLikeBareBase64Image(payload)) {
+        out.push(`data:image/png;base64,${payload.replace(/\s+/g, "")}`);
+        continue;
+      }
+      console.warn("⚠️ Imagem de referência inválida ignorada antes de chamar o provedor");
     } else if (/^https?:\/\//i.test(value)) {
       try {
         out.push(await remoteImageToDataUrl(value));
@@ -365,7 +388,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
 }
 
 async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
-  const key = Deno.env.get("EMERGENT_API_KEY");
+  const key = String(opts.emergentApiKey || "").trim() || Deno.env.get("EMERGENT_API_KEY");
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
   const editPrefix = opts.mode === "edit"
     ? "STRICT IMAGE EDIT MODE: the uploaded image is the exact base canvas. Do not generate a new photo. Preserve all pixels/details except the specifically requested edit. The requested edit must be visibly applied.\n\n"
@@ -496,7 +519,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   } catch (e) {
     console.warn("⚠️ Emergent images API erro:", (e as Error)?.message || e);
   }
-  return { url: null, error: lastError || quotaError || "Emergent falhou" };
+  return { url: null, error: quotaError || lastError || "Emergent falhou" };
 }
 
 async function callPollinations(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
