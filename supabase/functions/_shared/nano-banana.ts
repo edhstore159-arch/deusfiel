@@ -406,9 +406,10 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         continue;
       }
       const data = await resp.json();
-      const url = extractImageFromMessage(data?.choices?.[0]?.message);
+      const url = extractImageFromMessage(data?.choices?.[0]?.message) || extractImageFromAny(data);
       if (url) return { url };
       lastError = `Emergent[${model}] sem imagem`;
+      console.warn("⚠️ Emergent chat não retornou imagem:", JSON.stringify(data).slice(0, 300));
     } catch (e) {
       lastError = `Emergent[${model}] erro: ${(e as Error)?.message || e}`;
     }
