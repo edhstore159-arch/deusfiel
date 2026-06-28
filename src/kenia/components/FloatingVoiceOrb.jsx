@@ -207,6 +207,11 @@ export default function FloatingVoiceOrb() {
         if (alwaysOnRef.current) {
           const woke = hasWakeWord(finalText);
           const commandText = woke ? stripWake(finalText) : finalText;
+          // Enquanto a assistente estiver tocando algo (hino, áudio, fala),
+          // só interrompe / aceita comandos se a palavra "secretária" for dita.
+          if (speakingRef.current && !woke) {
+            continue;
+          }
           if (woke) {
             window.speechSynthesis?.cancel?.();
             activateCommandSession();
