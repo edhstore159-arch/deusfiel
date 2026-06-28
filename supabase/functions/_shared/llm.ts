@@ -7,6 +7,9 @@ export interface ChatOptions {
   messages: ChatMessage[];
   response_format?: any;
   temperature?: number;
+  timeoutMs?: number;
+  maxTokens?: number;
+  preferFastProvider?: boolean;
 }
 
 export interface ImageOptions {
@@ -370,6 +373,9 @@ async function chatGemini(opts: ChatOptions) {
   if (typeof opts.temperature === "number") {
     body.generationConfig = { ...(body.generationConfig || {}), temperature: opts.temperature };
   }
+  if (typeof opts.maxTokens === "number") {
+    body.generationConfig = { ...(body.generationConfig || {}), maxOutputTokens: opts.maxTokens };
+  }
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -419,7 +425,8 @@ async function chatOllama(opts: ChatOptions) {
     return { ok: false as const, status: 0, error: "OLLAMA_URL precisa ser uma URL pública acessível pelo backend" };
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeoutMs = Math.max(4000, Math.min(30000, opts.timeoutMs || Number(Deno.env.get("OLLAMA_CHAT_TIMEOUT_MS") || 30000)));
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const resp = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: "POST",
@@ -434,7 +441,10 @@ async function chatOllama(opts: ChatOptions) {
         messages: opts.messages.map((message) => ({ role: message.role, content: String(message.content || "") })),
         stream: false,
         ...(opts.response_format?.type === "json_object" ? { format: "json" } : {}),
-        options: { temperature: typeof opts.temperature === "number" ? opts.temperature : 0.7 },
+        options: {
+          temperature: typeof opts.temperature === "number" ? opts.temperature : 0.7,
+          ...(typeof opts.maxTokens === "number" ? { num_predict: opts.maxTokens } : {}),
+        },
       }),
     });
     const text = await resp.text();
@@ -454,6 +464,19 @@ async function chatOllama(opts: ChatOptions) {
 }
 
 export async function chatCompletion(opts: ChatOptions) {
+  // Para voz/atendimento ao vivo, prioriza provedores cloud rápidos antes do Ollama local/ngrok.
+  if (opts.preferFastProvider) {
+    if (LOVABLE_KEY) {
+      const r = await chatLovable(opts);
+      if (r.ok) return r;
+      console.warn("⚠️ Lovable chat rápido falhou, tentando Gemini/Ollama:", r.status, r.error?.slice?.(0, 200));
+    }
+    if (GEMINI_KEY) {
+      const r = await chatGemini(opts);
+      if (r.ok) return r;
+      console.warn("⚠️ Gemini rápido falhou, tentando Ollama/Emergent:", r.status, r.error?.slice?.(0, 200));
+    }
+  }
   // Order: Ollama → Lovable → Gemini (direct) → Emergent
   if (OLLAMA_URL) {
     const r = await chatOllama(opts);
