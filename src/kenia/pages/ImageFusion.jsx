@@ -7,7 +7,7 @@ import { Button } from "@/kenia/components/ui/button";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
-import { Combine, Upload, Loader2, Download, X, Sparkles, ImageIcon, Package, Info, Wand2, Trash2, CreditCard, Lock } from "lucide-react";
+import { Combine, Upload, Loader2, Download, X, Sparkles, ImageIcon, Package, Info, Wand2, Trash2, CreditCard, Lock, Camera } from "lucide-react";
 import SocialConnections from "@/kenia/components/SocialConnections";
 
 // Preset de rejuvenescimento facial preservando identidade
