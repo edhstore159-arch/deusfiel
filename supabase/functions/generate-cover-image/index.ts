@@ -130,9 +130,68 @@ function handCompositionGuard(userPrompt = "") {
 }
 
 
+// Mapeia temas jurídicos comuns para uma cena narrativa rica e simbólica,
+// para que o gerador não devolva uma cena genérica e sim algo claramente
+// relacionado ao direito invocado pelo usuário.
+type LegalTheme = { keys: RegExp; scene: string };
+const LEGAL_THEMES: LegalTheme[] = [
+  {
+    keys: /\b(viol[êe]ncia\s+(contra\s+)?(a\s+)?mulher|viol[êe]ncia\s+dom[ée]stica|maria\s+da\s+penha|feminic[íi]dio|agress[ãa]o\s+(contra\s+)?(a\s+)?mulher|abuso\s+(contra\s+)?(a\s+)?mulher)\b/i,
+    scene:
+      "uma mulher brasileira de meia-idade com expressão de medo e dor no canto esquerdo da cena, " +
+      "marcas sutis de agressão no rosto e braços, abraçando a si mesma de forma protetiva, em ambiente doméstico com pouca luz; " +
+      "ao fundo do mesmo lado, a silhueta ameaçadora e fora de foco de um homem (marido agressor), apenas insinuada, sem violência explícita visível; " +
+      "no centro da composição, um martelo de juiz (gavel) sobre uma mesa de madeira escura representando a Justiça e a Lei Maria da Penha; " +
+      "do lado direito, um advogado brasileiro de terno escuro, postura firme e olhar empático, gesticulando como se interligasse os elementos da cena — vítima, justiça e proteção legal — em uma metáfora visual de defesa de direitos",
+  },
+  {
+    keys: /\b(direitos?\s+trabalhista|justi[çc]a\s+do\s+trabalho|clt|demiss[ãa]o|rescis[ãa]o|fgts|horas?\s+extras?|ass[ée]dio\s+moral|trabalhador\s+demitido|verbas?\s+rescis[óo]rias?)\b/i,
+    scene:
+      "um trabalhador brasileiro de uniforme ou camisa social simples, expressão preocupada e cansada, segurando uma carta de demissão ou caixa de pertences pessoais, saindo de um portão de fábrica/escritório; " +
+      "ao centro da composição, símbolos da Justiça do Trabalho — martelo de juiz, balança e um exemplar da CLT sobre uma mesa; " +
+      "do lado oposto, um advogado trabalhista de terno, gesticulando como se interligasse a injustiça sofrida pelo trabalhador aos instrumentos legais que o protegem, transmitindo amparo, esperança e ação jurídica",
+  },
+  {
+    keys: /\b(aposentadoria|inss|previd[êe]nci|benef[íi]cio\s+previdenci[áa]rio|bpc\s+loas|auxilio[\s-]?doen[çc]a|pens[ãa]o\s+por\s+morte)\b/i,
+    scene:
+      "um casal idoso brasileiro sentado em frente a uma mesa com documentos do INSS, expressão de cansaço e esperança; " +
+      "ao centro, balança da Justiça e martelo de juiz sobre uma mesa de madeira; " +
+      "do outro lado, um advogado previdenciarista explicando o processo, gesticulando como se conectasse o segurado aos direitos previdenciários",
+  },
+  {
+    keys: /\b(divorcio|div[óo]rcio|guarda\s+(de\s+)?filho|pens[ãa]o\s+aliment[íi]cia|direito\s+de\s+fam[íi]lia)\b/i,
+    scene:
+      "uma família brasileira em mediação — mãe e pai sentados em lados opostos de uma mesa, uma criança ao fundo desfocada; " +
+      "ao centro, martelo de juiz e a balança da Justiça simbolizando o direito de família; " +
+      "uma advogada empática, do lado, gesticulando como se interligasse os pontos: pais, criança e proteção jurídica",
+  },
+  {
+    keys: /\b(direito\s+do\s+consumidor|cdc|procon|cobran[çc]a\s+indevida|negativa[çc][ãa]o\s+indevida)\b/i,
+    scene:
+      "um consumidor brasileiro frustrado segurando uma fatura abusiva ou cartão bloqueado; " +
+      "ao centro, código de defesa do consumidor aberto sobre a mesa, balança e martelo da Justiça; " +
+      "advogado de terno do lado, gesticulando como se conectasse o consumidor lesado às proteções legais do CDC",
+  },
+];
+
+function legalThemeExpansion(prompt: string): string | null {
+  for (const theme of LEGAL_THEMES) {
+    if (theme.keys.test(prompt)) return theme.scene;
+  }
+  return null;
+}
+
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
-  const userTheme = (userPrompt || "").trim();
+  let userTheme = (userPrompt || "").trim();
+  const legalScene = legalThemeExpansion(userTheme);
+  if (legalScene) {
+    userTheme = `${userTheme}. Cena narrativa jurídica detalhada: ${legalScene}. ` +
+      "Composição editorial em três planos (vítima/situação à esquerda, símbolos da Justiça ao centro, advogado interligando à direita), " +
+      "estilo fotojornalismo documental brasileiro, luz natural cinematográfica, sem violência explícita, sem sangue, sem cenas gráficas, " +
+      "tom respeitoso e protetivo, focado em conscientização e defesa de direitos.";
+  }
+
   const hybrid = hasHybridRequest(userTheme);
   const isolatedOnly = isIsolatedObjectOnly(userTheme);
   const humanSubject = !isolatedOnly && hasHumanSubject(userTheme);
