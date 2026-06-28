@@ -567,54 +567,6 @@ const compactImageForStorage = (src, maxSide = 768, quality = 0.82) => new Promi
   img.src = value;
 });
 
-const uploadCreativeAsset = async (imageSrc, { prompt = "", kind = "creative", userId = null } = {}) => {
-  const value = String(imageSrc || "");
-  if (!value) return null;
-  try {
-    let blob;
-    let ext = "png";
-    if (/^data:image\//i.test(value)) {
-      const [header, b64] = value.split(",");
-      if (!b64) return null;
-      const mime = header.match(/data:(image\/[a-zA-Z0-9.+-]+);base64/i)?.[1] || "image/png";
-      ext = mime.includes("jpeg") ? "jpg" : (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
-      const bin = atob(b64.replace(/\s+/g, ""));
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      blob = new Blob([bytes], { type: mime });
-    } else if (/^https?:\/\//i.test(value)) {
-      const res = await fetch(value);
-      if (!res.ok) return null;
-      blob = await res.blob();
-      const mime = blob.type || "image/png";
-      ext = mime.includes("jpeg") ? "jpg" : (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
-    } else {
-      return null;
-    }
-
-    const { data: auth } = await supabase.auth.getUser();
-    const uid = userId || auth?.user?.id;
-    if (!uid || !blob) return null;
-    const storagePath = `${uid}/${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error: upErr } = await supabase.storage.from("creative-assets").upload(storagePath, blob, {
-      contentType: blob.type || `image/${ext}`,
-      upsert: true,
-    });
-    if (upErr) throw upErr;
-    await supabase.from("generated_images").insert({
-      user_id: uid,
-      storage_path: storagePath,
-      prompt,
-      kind,
-      paid: false,
-    });
-    return storagePath;
-  } catch (e) {
-    console.warn("Persistência do criativo falhou:", e?.message || e);
-    return null;
-  }
-};
-
 const buildLocalCreativeImage = (title = "Criativo jurídico", topic = "") => {
   const safeTitle = String(title || "Criativo jurídico").replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
   const safeTopic = String(topic || "Conteúdo profissional").slice(0, 90).replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
@@ -697,50 +649,7 @@ const staticGet = async (url, config = {}) => {
       }
     })();
   }
-  if (path === "/creatives") {
-    return (async () => {
-      const localItems = read("creatives", seedCreatives);
-      try {
-        const { data: auth } = await supabase.auth.getUser();
-        const uid = auth?.user?.id;
-        if (!uid) return response(localItems);
-        const { data: rows } = await supabase
-          .from("generated_images")
-          .select("id, storage_path, prompt, created_at")
-          .eq("user_id", uid)
-          .eq("kind", "creative")
-          .order("created_at", { ascending: false })
-          .limit(100);
-        const cloudItems = [];
-        for (const row of rows || []) {
-          if (!row.storage_path) continue;
-          const { data: signed } = await supabase.storage
-            .from("creative-assets")
-            .createSignedUrl(row.storage_path, 60 * 60 * 24 * 7); // 7 dias
-          const url = signed?.signedUrl;
-          if (!url) continue;
-          // tenta achar entrada local correspondente para preservar título/legenda
-          const localMatch = localItems.find((it) => it.storage_path === row.storage_path);
-          cloudItems.push({
-            id: localMatch?.id || row.id,
-            title: localMatch?.title || row.prompt || "Criativo",
-            network: localMatch?.network || "instagram",
-            format: localMatch?.format || "post",
-            caption: localMatch?.caption || "",
-            image_b64: url,
-            storage_path: row.storage_path,
-            created_at: row.created_at,
-          });
-        }
-        // merge: cloud em primeiro, depois itens locais sem storage_path correspondente
-        const seen = new Set(cloudItems.map((i) => i.storage_path));
-        const localOnly = localItems.filter((i) => !i.storage_path || !seen.has(i.storage_path));
-        return response([...cloudItems, ...localOnly]);
-      } catch {
-        return response(localItems);
-      }
-    })();
-  }
+  if (path === "/creatives") return response(read("creatives", seedCreatives));
   if (path === "/settings") return response({ using_default_text: true, using_default_image: true, llm_text_key_masked: "Emergent padrão", llm_image_key_masked: "Emergent padrão" });
   if (path === "/whatsapp/diagnostics") return response({ ok: true, static_mode: true, checks: [
     { id: "static-site", ok: true, label: "Modo demonstração ativo", msg: "Painel rodando sem backend externo — as funções de WhatsApp em tempo real ficam desativadas até você publicar um backend (Render/VPS) e definir VITE_BACKEND_URL.", hint: "Você pode continuar usando CRM, Agenda, ChatIA e Finance normalmente. Quando publicar o backend Baileys, esta tela passa a exibir o QR Code real." },
@@ -1029,7 +938,6 @@ const staticPost = (url, body = {}) => {
             image2_base64: body.image2_base64,
             prompt: body.prompt || "",
             mode: body.mode,
-            emergentApiKey: body.emergentApiKey || body.overrideKey || undefined,
           },
         });
         if (error) throw error;
@@ -1045,30 +953,20 @@ const staticPost = (url, body = {}) => {
         const sourceImage = body.image_base64 || body.image_b64 || body.image || "";
         if (!sourceImage) return response({ ok: false, error: "Imagem original ausente" });
         const { data, error } = await supabase.functions.invoke("edit-creative", {
-          body: {
-            image_base64: sourceImage,
-            prompt: body.prompt || body.instruction || "",
-            emergentApiKey: body.emergentApiKey || body.overrideKey || undefined,
-          },
+          body: { image_base64: sourceImage, prompt: body.prompt || body.instruction || "" },
         });
         if (error) throw error;
         if (!data?.ok || !(data?.image || data?.image_b64)) {
           return response({ ok: false, error: data?.error || "Edição não retornou imagem" });
         }
         const newImage = await compactImageForStorage(data.image || data.image_b64);
-        const newStoragePath = await uploadCreativeAsset(newImage, {
-          prompt: body.prompt || body.instruction || "Edição de criativo",
-          kind: "creative",
-        });
         if (body.id) {
           const items = read("creatives", seedCreatives).map((item) =>
-            item.id === body.id
-              ? { ...item, image_b64: newImage, storage_path: newStoragePath || item.storage_path, last_edit_prompt: body.prompt || null }
-              : item,
+            item.id === body.id ? { ...item, image_b64: newImage, last_edit_prompt: body.prompt || null } : item,
           );
           write("creatives", items);
         }
-        return response({ ok: true, image_b64: newImage, image: newImage, storage_path: newStoragePath || null });
+        return response({ ok: true, image_b64: newImage, image: newImage });
       } catch (e) {
         return response({ ok: false, error: e?.message || String(e) });
       }

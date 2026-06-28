@@ -56,17 +56,6 @@ export default function Creatives() {
   const [editing, setEditing] = useState(false);
   const [editPreview, setEditPreview] = useState(null);
   const [editUpload, setEditUpload] = useState(null); // data URL for replacement source image
-  const [emergentEditKey, setEmergentEditKey] = useState(() => {
-    try { return localStorage.getItem("kenia.emergent.image.key") || ""; } catch { return ""; }
-  });
-
-  const saveEmergentEditKey = (value) => {
-    setEmergentEditKey(value);
-    try {
-      if (value) localStorage.setItem("kenia.emergent.image.key", value);
-      else localStorage.removeItem("kenia.emergent.image.key");
-    } catch { /* noop */ }
-  };
 
   const onPickImage = (e) => {
     const file = e.target.files?.[0];
@@ -256,7 +245,6 @@ export default function Creatives() {
         id: editTarget.id,
         image_base64: sourceImage,
         prompt: editPrompt.trim(),
-        emergentApiKey: emergentEditKey.trim() || undefined,
       });
       if (data?.ok && (data.image_b64 || data.image)) {
         const next = data.image_b64 || data.image;
@@ -285,22 +273,15 @@ export default function Creatives() {
     toast.success("Legenda copiada");
   };
 
-  const imageSrc = (value) => {
-    const v = String(value || "");
-    if (!v) return "";
-    if (v.startsWith("data:") || v.startsWith("http://") || v.startsWith("https://") || v.startsWith("blob:")) return v;
-    return `data:image/png;base64,${v}`;
-  };
-
   const download = (item) => {
     if (!item.image_b64) return;
     const a = document.createElement("a");
-    a.href = imageSrc(item.image_b64);
+    a.href = String(item.image_b64).startsWith("data:") ? item.image_b64 : `data:image/png;base64,${item.image_b64}`;
     a.download = `legalflow-${item.id}.png`;
-    a.target = "_blank";
-    a.rel = "noopener";
     a.click();
   };
+
+  const imageSrc = (value) => String(value || "").startsWith("data:") ? value : `data:image/png;base64,${value}`;
 
   const NetIcon = ({ network, className }) => {
     if (network === "instagram") return <Instagram className={className} />;
@@ -329,11 +310,11 @@ export default function Creatives() {
               <Wand2 className="w-4 h-4 mr-2" /> Criar com IA
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0">
-            <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
               <DialogTitle>Gerar Criativo com IA</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 overflow-y-auto px-6 flex-1 min-h-0">
+            <div className="space-y-3">
               <div><Label>Título do Post</Label><Input placeholder="Ex: 5 direitos do trabalhador demitido" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} data-testid="creative-title" /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -455,8 +436,8 @@ export default function Creatives() {
               </div>
 
             </div>
-            <DialogFooter className="px-6 py-4 border-t border-nude-200 bg-white shrink-0 sticky bottom-0">
-              <Button onClick={generate} disabled={generating} className="bg-nude-900 hover:bg-nude-800 w-full sm:w-auto" data-testid="creative-generate">
+            <DialogFooter>
+              <Button onClick={generate} disabled={generating} className="bg-nude-900 hover:bg-nude-800" data-testid="creative-generate">
                 {generating ? <><span className="animate-pulse-soft">Gerando arte e legenda...</span></> : <><Sparkles className="w-4 h-4 mr-2" /> Gerar com IA</>}
               </Button>
             </DialogFooter>
@@ -683,17 +664,6 @@ export default function Creatives() {
                   value={editPrompt}
                   onChange={(e) => setEditPrompt(e.target.value)}
                 />
-                <div className="mt-3">
-                  <Label className="text-xs uppercase tracking-wide text-nude-600">Chave Emergent alternativa (opcional)</Label>
-                  <Input
-                    type="password"
-                    value={emergentEditKey}
-                    onChange={(e) => saveEmergentEditKey(e.target.value)}
-                    placeholder="sk-emergent-... (use outra chave se a principal atingiu limite diário)"
-                    className="mt-1"
-                  />
-                  <p className="text-[11px] text-nude-500 mt-1">Salva localmente e usada apenas nesta edição.</p>
-                </div>
                 <div className="flex gap-2 mt-3">
                   <Button
                     onClick={runEdit}

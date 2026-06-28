@@ -145,7 +145,7 @@ const LEGAL_THEMES: LegalTheme[] = [
       "do lado direito, um advogado brasileiro de terno escuro, postura firme e olhar empático, gesticulando como se interligasse os elementos da cena — vítima, justiça e proteção legal — em uma metáfora visual de defesa de direitos",
   },
   {
-    keys: /\b(trabalhista|direitos?\s+trabalhista|justi[çc]a\s+do\s+trabalho|clt|demiss[ãa]o|rescis[ãa]o|fgts|horas?\s+extras?|ass[ée]dio\s+moral|trabalhador\s+demitido|verbas?\s+rescis[óo]rias?)\b/i,
+    keys: /\b(direitos?\s+trabalhista|justi[çc]a\s+do\s+trabalho|clt|demiss[ãa]o|rescis[ãa]o|fgts|horas?\s+extras?|ass[ée]dio\s+moral|trabalhador\s+demitido|verbas?\s+rescis[óo]rias?)\b/i,
     scene:
       "um trabalhador brasileiro de uniforme ou camisa social simples, expressão preocupada e cansada, segurando uma carta de demissão ou caixa de pertences pessoais, saindo de um portão de fábrica/escritório; " +
       "ao centro da composição, símbolos da Justiça do Trabalho — martelo de juiz, balança e um exemplar da CLT sobre uma mesa; " +
@@ -159,14 +159,14 @@ const LEGAL_THEMES: LegalTheme[] = [
       "do outro lado, um advogado previdenciarista explicando o processo, gesticulando como se conectasse o segurado aos direitos previdenciários",
   },
   {
-    keys: /\b(divorcio|div[óo]rcio|guarda\s+(de\s+)?filho|pens[ãa]o\s+aliment[íi]cia|direito\s+de\s+fam[íi]lia|fam[íi]lia)\b/i,
+    keys: /\b(divorcio|div[óo]rcio|guarda\s+(de\s+)?filho|pens[ãa]o\s+aliment[íi]cia|direito\s+de\s+fam[íi]lia)\b/i,
     scene:
       "uma família brasileira em mediação — mãe e pai sentados em lados opostos de uma mesa, uma criança ao fundo desfocada; " +
       "ao centro, martelo de juiz e a balança da Justiça simbolizando o direito de família; " +
       "uma advogada empática, do lado, gesticulando como se interligasse os pontos: pais, criança e proteção jurídica",
   },
   {
-    keys: /\b(direito\s+do\s+consumidor|consumidor|cdc|procon|cobran[çc]a\s+indevida|negativa[çc][ãa]o\s+indevida)\b/i,
+    keys: /\b(direito\s+do\s+consumidor|cdc|procon|cobran[çc]a\s+indevida|negativa[çc][ãa]o\s+indevida)\b/i,
     scene:
       "um consumidor brasileiro frustrado segurando uma fatura abusiva ou cartão bloqueado; " +
       "ao centro, código de defesa do consumidor aberto sobre a mesa, balança e martelo da Justiça; " +
@@ -186,17 +186,12 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
   let userTheme = (userPrompt || "").trim();
   const legalScene = legalThemeExpansion(userTheme);
   if (legalScene) {
-    // Retorna imediatamente para garantir que EVENT_RE / scenerySceneFor / hybrid
-    // não sobrescrevam a cena jurídica narrativa (ex.: "trabalhador demitido"
-    // estava caindo no fluxo de evento genérico e perdendo o tema trabalhista).
-    return (
-      `Hyper-realistic documentary photograph (not illustration, not 3D, not digital art) of a real Brazilian legal scene about: ${userTheme}. ` +
-      `Scene featuring REAL Brazilian people (real adult actors, authentic faces, skin with natural pores and imperfections, real wrinkled clothing, true expressions, real environment with everyday objects), captured as photojournalistic reportage — Magnum / National Geographic / Folha de S.Paulo style. ` +
-      `Editorial composition in three planes: ${legalScene}. ` +
-      `Cinematic natural lighting (window, real ambient light), 50mm or 85mm f/1.8, shallow depth of field, natural ISO grain, no explicit violence, no blood, no graphic scenes, respectful and protective tone, focused on awareness and defense of rights. ` +
-      `FORBIDDEN: illustration, cartoon, 3D render, CGI, anime, painting, stock photo look, plastic skin, perfect faces, AI look, doll, wax. ` +
-      `Style: ${style || "documentary photojournalism, editorial"}.`
-    );
+    userTheme =
+      `Fotografia documental hiper-realista (não ilustração, não 3D, não arte digital) de uma cena jurídica brasileira real sobre: ${userTheme}. ` +
+      `Cena com PESSOAS REAIS brasileiras (atores adultos reais, rostos autênticos, peles com poros e imperfeições naturais, roupas reais e amassadas, expressões verdadeiras, ambiente real com objetos do dia a dia), capturada como reportagem fotojornalística — estilo Magnum / National Geographic / Folha de S.Paulo. ` +
+      `Composição editorial em três planos: ${legalScene}. ` +
+      `Iluminação natural cinematográfica (janela, luz ambiente real), 50mm ou 85mm f/1.8, profundidade de campo rasa, grão natural de ISO, sem violência explícita, sem sangue, sem cenas gráficas, tom respeitoso e protetivo, focado em conscientização e defesa de direitos. ` +
+      `PROIBIDO: ilustração, cartoon, 3D render, CGI, anime, pintura, aspecto de stock photo, pele de plástico, rostos perfeitos, look de IA, boneco, cera.`;
   }
 
 
@@ -309,13 +304,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Inclui case_type/title no prompt para que o detector de tema jurídico
-    // (LEGAL_THEMES) dispare mesmo quando o usuário escolhe a área no select
-    // e digita pouco no tema. Ex.: case_type="Trabalhista" → cena trabalhista.
-    const caseTypeHint = case_type ? `Área jurídica: ${case_type}. ` : "";
-    const titleHint = title ? `Título do post: ${title}. ` : "";
-    const themedPrompt = `${caseTypeHint}${titleHint}${prompt}`.trim();
-    const userElaborated = await elaboratePrompt(themedPrompt, style);
+    const userElaborated = await elaboratePrompt(prompt, style);
     const hybridSubject = hasHybridRequest(prompt);
     const isolatedOnly = isIsolatedObjectOnly(prompt);
     const eventSubject = !isolatedOnly && EVENT_RE.test(prompt) && !hybridSubject;
@@ -397,9 +386,7 @@ Deno.serve(async (req) => {
       }
       if (logo_base64) {
         imageUrls.push(toDataUrl(logo_base64));
-        promptParts.push(
-          "LOGO OVERLAY REQUIREMENT (MANDATORY, NÃO IGNORAR): A ÚLTIMA imagem enviada é o LOGO oficial do escritório de advocacia. Você DEVE renderizar este logo VISÍVEL e NÍTIDO no canto inferior direito da arte final, ocupando aproximadamente 12-15% da largura da imagem, com um leve padding de 24px das bordas. Preserve EXATAMENTE as cores, formas, tipografia e proporções originais do logo — NÃO redesenhe, NÃO traduza, NÃO simplifique, NÃO mude as cores. Se houver fundo escuro atrás, adicione uma leve sombra suave para garantir legibilidade. O logo deve aparecer SEM FALTA na imagem final — sua ausência é considerada falha grave.",
-        );
+        promptParts.push("Incorpore o logo enviado (última imagem) de forma discreta e elegante em um dos cantos da arte, preservando suas cores e proporções originais, sem distorcer.");
       }
 
       const result = await generateWithNanoBanana({
@@ -413,49 +400,28 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      // Segundo passe de garantia: se temos logo, força um overlay final via Emergent
-      // usando a arte gerada + o logo como references. Isso evita que o logo seja
-      // ignorado/redesenhado pelo modelo no primeiro passe.
-      let finalUrl = result.url;
-      let finalProvider = result.provider;
-      if (logo_base64 && Deno.env.get("EMERGENT_API_KEY")) {
-        try {
-          const overlay = await generateWithNanoBanana({
-            prompt:
-              "LOGO STAMP PASS. A PRIMEIRA imagem é a arte final pronta. A SEGUNDA imagem é o LOGO oficial. Sua única tarefa: estampar o LOGO no canto inferior direito da arte, ocupando ~13% da largura, com padding de 24px das bordas, preservando 100% das cores/formas/tipografia originais do logo (NÃO redesenhe). Mantenha TODO o resto da arte idêntico — não altere composição, pessoas, cores, textos ou iluminação. Saída: a mesma arte, agora com o logo visível e nítido no canto inferior direito.",
-            imageUrls: [finalUrl, toDataUrl(logo_base64)],
-          });
-          if (overlay.url) {
-            finalUrl = overlay.url;
-            finalProvider = `${result.provider}+logo-overlay`;
-          }
-        } catch (_) { /* mantém finalUrl original */ }
-      }
-
-      return new Response(JSON.stringify({ b64_json: stripDataUrl(finalUrl), image_data_url: finalUrl, provider: finalProvider }), {
+      return new Response(JSON.stringify({ b64_json: stripDataUrl(result.url), image_data_url: result.url, provider: result.provider }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
 
-    // Text-to-image: usa o pipeline com refinamento (Pollinations rascunho → Emergent corrige
-    // anatomia/mãos/olhos/deformações). Se Pollinations falhar/gerar lixo, cai para Lovable
-    // Gateway → Gemini → OpenAI → Emergent puro.
-    const nb = await generateWithNanoBanana({ prompt: fullPrompt, mode: "generate", allowTextOnlyFallback: true });
-    if (!nb.url) {
+    // Text-to-image: try Lovable Gateway gpt-image-2, fallback to Emergent (gpt-image-1).
+    const img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "high" });
+    if (!img.ok) {
+      // Local SVG fallback so the client never sees a 502 / blank screen.
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#g)"/><circle cx="512" cy="420" r="160" fill="rgba(255,255,255,0.08)"/><rect x="312" y="640" width="400" height="14" rx="7" fill="rgba(255,255,255,0.35)"/><rect x="372" y="680" width="280" height="10" rx="5" fill="rgba(255,255,255,0.22)"/></svg>`;
       const b64 = btoa(unescape(encodeURIComponent(svg)));
       return new Response(JSON.stringify({
         image_data_url: `data:image/svg+xml;base64,${b64}`,
         provider: "local-fallback",
-        warning: nb.error,
+        warning: img.error,
       }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    return new Response(JSON.stringify({ b64_json: stripDataUrl(nb.url), image_data_url: nb.url, provider: nb.provider }), {
+    return new Response(JSON.stringify({ b64_json: img.b64, image_data_url: `data:image/png;base64,${img.b64}`, provider: img.provider }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

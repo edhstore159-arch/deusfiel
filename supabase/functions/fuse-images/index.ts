@@ -1,5 +1,6 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { generateWithNanoBanana } from '../_shared/nano-banana.ts';
+import { chatCompletion } from '../_shared/llm.ts';
 
 const REALISM =
   "ultra realistic photography, 50mm lens, shallow depth of field, natural skin texture, " +
@@ -30,6 +31,24 @@ const TEMPLATE_SYSTEM =
 
 async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || "").trim();
+  try {
+    const r = await chatCompletion({
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: TEMPLATE_SYSTEM },
+        {
+          role: "user",
+          content:
+            `USER DIRECTION (respect exactly, never override identity preservation):\n"""${userTheme || "Place the person from image 1 naturally inside the environment from image 2."}"""`,
+        },
+      ],
+    });
+    if (r.ok) {
+      const txt = r.data?.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 20) return txt;
+    }
+  } catch (_e) { /* fallback below */ }
+
   return `Place the person from IMAGE 1 (preserve exact identity, face, skin, hair, clothing, accessories) inside the environment from IMAGE 2 (preserve its lighting, palette, time of day, mood). ${FACE_LOCK} Single seamless photorealistic composition, match perspective and shadows, no collage, no split-screen. ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
 }
 
@@ -52,6 +71,19 @@ async function elaborateEditPrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || "").trim() || "Re-render the same image preserving identity.";
   const localizedColor = buildLocalizedColorEditPrompt(userTheme);
   if (localizedColor) return localizedColor;
+  try {
+    const r = await chatCompletion({
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: EDIT_SINGLE_SYSTEM },
+        { role: "user", content: `USER EDIT INSTRUCTION (apply LITERALLY on the reference image as the base, preserve composition and identity):\n"""${userTheme}"""` },
+      ],
+    });
+    if (r.ok) {
+      const txt = r.data?.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 20) return txt;
+    }
+  } catch (_e) { /* fallback */ }
   return `Use the reference image as the BASE/canvas and apply this edit LITERALLY: ${userTheme}. Preserve composition, framing, perspective, pose, background and lighting exactly. Apply the requested color/object/text change clearly and dominantly to the relevant area. Do NOT generate a new scene. ${REALISM}. Negative: new scene, different composition, different framing, different background, ${NEGATIVE}`;
 }
 
@@ -95,6 +127,19 @@ function buildLocalizedColorEditPrompt(userTheme: string): string | null {
 
 async function elaborateTemplatePrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || "").trim() || "Replace text and photo with the new content provided by the user.";
+  try {
+    const r = await chatCompletion({
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: TEMPLATE_CLONE_SYSTEM },
+        { role: "user", content: `NEW CONTENT FOR THE CLONED TEMPLATE (replace text and photographic subject, KEEP layout/typography/palette identical to the reference):\n"""${userTheme}"""` },
+      ],
+    });
+    if (r.ok) {
+      const txt = r.data?.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 20) return txt;
+    }
+  } catch (_e) { /* fallback */ }
   return `Recreate the EXACT same template/layout/typography/color palette/decorative elements as the reference image, but replace the text blocks with: ${userTheme}. Replace any subject photo with the new subject described. Keep alignment, hierarchy, fonts, badges and brand area identical. Render new text crisp and legible. Negative: blurry text, garbled letters, different layout, different palette, ${NEGATIVE}`;
 }
 
@@ -103,7 +148,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { image1_base64, image2_base64, prompt, mode, emergentApiKey, overrideKey } = await req.json();
+    const { image1_base64, image2_base64, prompt, mode } = await req.json();
     if (!image1_base64) {
       return new Response(JSON.stringify({ ok: false, error: 'Envie ao menos uma imagem.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -121,12 +166,7 @@ Deno.serve(async (req) => {
       : (isSingle ? await elaborateEditPrompt(prompt) : await elaborateFusionPrompt(prompt));
     const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64];
 
-    const result = await generateWithNanoBanana({
-      prompt: fullPrompt,
-      imageUrls,
-      mode: isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion'),
-      emergentApiKey: String(emergentApiKey || overrideKey || '').trim() || undefined,
-    });
+    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion') });
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {
@@ -137,7 +177,7 @@ Deno.serve(async (req) => {
     if (result.provider === 'local-fallback' && isSingle) {
       return new Response(JSON.stringify({
         ok: false,
-        error: 'A IA de edição não está disponível agora. A Emergent foi tentada primeiro, mas falhou ou está bloqueada por limite/cota diária; a imagem não foi alterada. Se tiver outra chave Emergent com cota, informe no campo de chave alternativa.',
+        error: 'A IA de edição não está disponível agora. A chave Emergent está válida, mas o provedor está bloqueando por limite/cota diária; a imagem não foi alterada.',
         provider: result.provider,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

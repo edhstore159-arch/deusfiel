@@ -11,7 +11,6 @@ export interface NanoBananaOptions {
   imageUrls?: string[]; // data URLs or http(s) URLs
   mode?: "edit" | "fusion" | "template" | "generate";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
-  emergentApiKey?: string; // optional per-request override, never logged
 }
 
 const FACE_PRESERVATION_LOCK =
@@ -19,49 +18,6 @@ const FACE_PRESERVATION_LOCK =
 
 function withFacePreservation(prompt: string) {
   return `${prompt}\n\n${FACE_PRESERVATION_LOCK}\nNegative: distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, plastic skin, over-smoothed skin, changed identity, different person.`;
-}
-
-function isLikelyImageUrl(url: string) {
-  return /^https?:\/\//i.test(url) && (
-    /\.(?:png|jpe?g|webp|gif)(?:\?|$)/i.test(url) ||
-    /\/storage\/v1\/object\//i.test(url) ||
-    /\/render\/image\//i.test(url) ||
-    /image/i.test(url)
-  );
-}
-
-function extractImageFromAny(value: any, depth = 0): string | null {
-  if (!value || depth > 8) return null;
-  const RX = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/;
-  if (typeof value === "string") {
-    const dataUrl = value.match(RX)?.[0];
-    if (dataUrl) return dataUrl.replace(/\s+/g, "");
-    const imageUrl = value.match(/https?:\/\/[^\s"'<>]+/i)?.[0];
-    if (imageUrl && isLikelyImageUrl(imageUrl)) return imageUrl;
-    return null;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = extractImageFromAny(item, depth + 1);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (typeof value === "object") {
-    const direct = value.url || value.image_url?.url || value.inlineData?.data || value.inline_data?.data || value.b64_json;
-    if (typeof direct === "string") {
-      if (direct.startsWith("data:image/")) return extractImageFromAny(direct, depth + 1) || direct;
-      if (/^https?:\/\//i.test(direct)) return extractImageFromAny(direct, depth + 1) || (isLikelyImageUrl(direct) ? direct : null);
-      const compact = direct.replace(/\s+/g, "");
-      const mime = value.inlineData?.mimeType || value.inline_data?.mime_type || "image/png";
-      if (compact.length > 80 && /^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return `data:${mime};base64,${compact}`;
-    }
-    for (const key of ["images", "content", "message", "data", "choices", "parts", "output"]) {
-      const found = extractImageFromAny(value[key], depth + 1);
-      if (found) return found;
-    }
-  }
-  return null;
 }
 
 function extractImageFromMessage(msg: any): string | null {
@@ -85,7 +41,7 @@ function extractImageFromMessage(msg: any): string | null {
       }
     }
   }
-  return extractImageFromAny(msg);
+  return null;
 }
 
 function buildContent({ prompt, imageUrls }: NanoBananaOptions): Content[] {
@@ -283,68 +239,6 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 2500
   }
 }
 
-function looksLikeBareBase64Image(value: string) {
-  const compact = value.replace(/\s+/g, "");
-  return compact.length > 80 && /^[A-Za-z0-9+/]+={0,2}$/.test(compact);
-}
-
-async function remoteImageToDataUrl(url: string): Promise<string> {
-  const resp = await fetchWithTimeout(url, { method: "GET" }, 20000);
-  if (!resp.ok) throw new Error(`Falha ao baixar imagem de referência: ${resp.status}`);
-  const contentType = (resp.headers.get("content-type") || "image/png").split(";")[0];
-  if (!contentType.startsWith("image/")) throw new Error(`URL de referência não é imagem: ${contentType}`);
-  const bytes = new Uint8Array(await resp.arrayBuffer());
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.slice(i, i + 0x8000));
-  return `data:${contentType};base64,${btoa(bin)}`;
-}
-
-async function normalizeReferenceImages(imageUrls?: string[]) {
-  const out: string[] = [];
-  for (const raw of imageUrls || []) {
-    const value = String(raw || "").trim();
-    if (!value) continue;
-    if (/^data:image\//i.test(value)) {
-      const parsed = parseDataUrl(value);
-      if (parsed) {
-        out.push(`data:${parsed.mime};base64,${parsed.base64}`);
-        continue;
-      }
-
-      // Some callers accidentally wrapped an http(s) URL as
-      // data:image/png;base64,https://...; sending that to Gemini/Emergent
-      // causes "Provided image is not valid". Unwrap and normalize it here.
-      const payload = value.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/i, "").trim();
-      if (/^https?:\/\//i.test(payload)) {
-        try {
-          out.push(await remoteImageToDataUrl(payload));
-        } catch (e) {
-          console.warn("⚠️ Não foi possível baixar URL embutida em data URL inválido:", (e as Error)?.message || e);
-          out.push(payload);
-        }
-        continue;
-      }
-      if (looksLikeBareBase64Image(payload)) {
-        out.push(`data:image/png;base64,${payload.replace(/\s+/g, "")}`);
-        continue;
-      }
-      console.warn("⚠️ Imagem de referência inválida ignorada antes de chamar o provedor");
-    } else if (/^https?:\/\//i.test(value)) {
-      try {
-        out.push(await remoteImageToDataUrl(value));
-      } catch (e) {
-        console.warn("⚠️ Não foi possível normalizar URL de imagem:", (e as Error)?.message || e);
-        out.push(value);
-      }
-    } else if (looksLikeBareBase64Image(value)) {
-      out.push(`data:image/png;base64,${value.replace(/\s+/g, "")}`);
-    } else {
-      out.push(value);
-    }
-  }
-  return out;
-}
-
 async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) return { url: null, error: "OPENAI_API_KEY ausente" };
@@ -398,7 +292,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
 }
 
 async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
-  const key = String(opts.emergentApiKey || "").trim() || Deno.env.get("EMERGENT_API_KEY");
+  const key = Deno.env.get("EMERGENT_API_KEY");
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
   const editPrefix = opts.mode === "edit"
     ? "STRICT IMAGE EDIT MODE: the uploaded image is the exact base canvas. Do not generate a new photo. Preserve all pixels/details except the specifically requested edit. The requested edit must be visibly applied.\n\n"
@@ -415,7 +309,6 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
     "vertex_ai/gemini-3.1-flash-image-preview",
   ];
   let lastError = "";
-  let quotaError = "";
   const isQuotaError = (value: string) => /budget|exceed|quota|daily[_\s-]?(limit|spend)|daily_limit_reached|limit[_\s-]?reached/i.test(value);
   const quotaMessage = (detail: string) =>
     `Emergent: chave válida, mas bloqueada por limite/cota diária no provedor. Detalhe: ${detail}`;
@@ -435,15 +328,14 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         const txt = (await resp.text()).slice(0, 300);
         lastError = `Emergent[${model}] ${resp.status}: ${txt}`;
         if (isQuotaError(txt)) {
-          quotaError = quotaMessage(txt);
+          return { url: null, error: quotaMessage(txt) };
         }
         continue;
       }
       const data = await resp.json();
-      const url = extractImageFromMessage(data?.choices?.[0]?.message) || extractImageFromAny(data);
+      const url = extractImageFromMessage(data?.choices?.[0]?.message);
       if (url) return { url };
       lastError = `Emergent[${model}] sem imagem`;
-      console.warn("⚠️ Emergent chat não retornou imagem:", JSON.stringify(data).slice(0, 300));
     } catch (e) {
       lastError = `Emergent[${model}] erro: ${(e as Error)?.message || e}`;
     }
@@ -451,36 +343,6 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
 
   try {
     if (imageUrls.length > 0) {
-      const form = new FormData();
-      form.append("model", "gpt-image-1");
-      form.append("prompt", safeOpts.prompt);
-      form.append("size", "1024x1024");
-      for (const u of imageUrls.slice(0, 4)) {
-        const converted = dataUrlToBlob(u);
-        if (!converted) continue;
-        form.append(imageUrls.length > 1 ? "image[]" : "image", converted.blob, converted.filename);
-      }
-      if (form.has("image") || form.has("image[]")) {
-        const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${key}` },
-          body: form,
-        }, 30000);
-        const text = await resp.text();
-        if (resp.ok) {
-          const data = JSON.parse(text);
-          const b64 = data?.data?.[0]?.b64_json;
-          const url = data?.data?.[0]?.url || extractImageFromAny(data);
-          if (b64) return { url: `data:image/png;base64,${b64}` };
-          if (url) return { url };
-        } else if (isQuotaError(text)) {
-          quotaError = quotaMessage(text.slice(0, 240));
-        } else {
-          lastError = `Emergent images/edits ${resp.status}: ${text.slice(0, 240)}`;
-          console.warn("⚠️ Emergent images/edits falhou:", resp.status, text.slice(0, 240));
-        }
-      }
-
       const files = imageUrls.slice(0, 4).map((u) => dataUrlToBytes(u)).filter(Boolean) as Array<{ bytes: Uint8Array; mime: string; filename: string }>;
       if (files.length) {
         const multipart = buildMultipartBody(
@@ -500,9 +362,8 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           if (b64) return { url: `data:image/png;base64,${b64}` };
           if (url) return { url };
         } else if (isQuotaError(text)) {
-          quotaError = quotaMessage(text.slice(0, 240));
+          return { url: null, error: quotaMessage(text.slice(0, 240)) };
         } else {
-          lastError = `Emergent images/edits ${resp.status}: ${text.slice(0, 240)}`;
           console.warn("⚠️ Emergent images/edits falhou:", resp.status, text.slice(0, 240));
         }
       }
@@ -520,16 +381,15 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         if (b64) return { url: `data:image/png;base64,${b64}` };
         if (url) return { url };
       } else if (isQuotaError(text)) {
-        quotaError = quotaMessage(text.slice(0, 240));
+        return { url: null, error: quotaMessage(text.slice(0, 240)) };
       } else {
-        lastError = `Emergent images/generations ${resp.status}: ${text.slice(0, 240)}`;
         console.warn("⚠️ Emergent images/generations falhou:", resp.status, text.slice(0, 240));
       }
     }
   } catch (e) {
     console.warn("⚠️ Emergent images API erro:", (e as Error)?.message || e);
   }
-  return { url: null, error: quotaError || lastError || "Emergent falhou" };
+  return { url: null, error: lastError || "Emergent falhou" };
 }
 
 async function callPollinations(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
@@ -556,29 +416,19 @@ export async function generateWithNanoBanana(
   opts: NanoBananaOptions,
 ): Promise<{ url: string | null; provider: string; error?: string }> {
   const errs: string[] = [];
-  const hadInputRefs = Boolean(opts.imageUrls?.filter(Boolean).length);
-  const normalizedOpts = { ...opts, imageUrls: await normalizeReferenceImages(opts.imageUrls) };
-  const hasRefs = Boolean(normalizedOpts.imageUrls?.length);
-  const hasEmergentKey = Boolean(String(normalizedOpts.emergentApiKey || "").trim() || Deno.env.get("EMERGENT_API_KEY"));
-  if (hadInputRefs && !hasRefs) {
-    return {
-      url: null,
-      provider: "none",
-      error: "Imagem de referência inválida ou vazia; não foi possível enviar para a Emergent sem perder a identidade.",
-    };
-  }
+  const hasRefs = Boolean(opts.imageUrls?.length);
 
   // ===== Novo fluxo solicitado: Pollinations PRIMEIRO (rascunho gratuito),
   // depois Emergent para refinar/corrigir imperfeições usando o rascunho como referência.
   // Só aplica quando não há imagens de referência do usuário (geração pura).
   if (!hasRefs) {
-    const draft = await callPollinations(normalizedOpts);
+    const draft = await callPollinations(opts);
     if (draft.url) {
-      if (hasEmergentKey) {
+      if (Deno.env.get("EMERGENT_API_KEY")) {
         const refined = await callEmergent({
-          ...normalizedOpts,
+          ...opts,
           imageUrls: [draft.url],
-          prompt: `PHOTOREALISTIC FACE & ANATOMY RESTORATION PASS. Use the provided draft strictly as a layout/composition reference and repaint it as a high-fidelity photograph. STRICT REQUIREMENTS: (1) Faces must be perfectly symmetric, anatomically correct, with two natural eyes (matching color, correct pupils, no extra iris), one nose, one mouth with natural lips and teeth, natural skin texture with pores; NO melted, warped, doubled, asymmetric, cross-eyed, missing or extra facial features. (2) Hands must have exactly 5 fingers each, correct proportions, no fused/extra/missing digits. (3) Bodies must have correct proportions and limb count. (4) Preserve original composition, framing, clothing, lighting direction, ethnicity and number of people from the draft. (5) Sharp focus on faces, natural depth of field, professional photography, 50mm lens look, no plastic/CGI/3D-render appearance. NEGATIVE: deformed face, distorted face, mutated face, extra fingers, fused fingers, missing fingers, extra limbs, asymmetric eyes, lazy eye, cross-eyed, malformed mouth, bad teeth, uncanny valley, doll-like, plastic skin, cartoon, illustration, anime, painting, blurry, low-res. Scene context: ${opts.prompt}`,
+          prompt: `Refine and fix imperfections (anatomy, hands, eyes, symmetry, lighting, sharpness, artifacts) of this draft image while preserving its composition and subject. ${opts.prompt}`,
         });
         if (refined.url) {
           console.info("✨ Pollinations → Emergent refine OK");
@@ -593,52 +443,39 @@ export async function generateWithNanoBanana(
 
 
 
-  // Edição/fusão com imagem do usuário: tentar Emergent primeiro. Essa é a
-  // chave configurada para edição real; evita gastar tempo em provedores sem
-  // crédito e garante que a imagem enviada seja usada como referência.
-  if (hasRefs && hasEmergentKey) {
-    const r = await callEmergent(normalizedOpts);
-    if (r.url) return { url: r.url, provider: "emergent" };
-    errs.push(r.error || "Emergent falhou");
-    console.warn("⚠️ Emergent falhou:", r.error);
-  }
-
-
   if (Deno.env.get("LOVABLE_API_KEY")) {
-    const r = await callLovableGateway(normalizedOpts);
+    const r = await callLovableGateway(opts);
     if (r.url) return { url: r.url, provider: "lovable" };
     errs.push(r.error || "Lovable falhou");
     console.warn("⚠️ Lovable falhou:", r.error);
   }
 
   if (Deno.env.get("GEMINI_API_KEY")) {
-    const r = await callGeminiDirect(normalizedOpts);
+    const r = await callGeminiDirect(opts);
     if (r.url) return { url: r.url, provider: "gemini" };
     errs.push(r.error || "Gemini direto falhou");
     console.warn("⚠️ Gemini direto falhou:", r.error);
   }
 
   if (Deno.env.get("OPENAI_API_KEY")) {
-    const r = await callOpenAIImages(normalizedOpts);
+    const r = await callOpenAIImages(opts);
     if (r.url) return { url: r.url, provider: "openai" };
     errs.push(r.error || "OpenAI falhou");
     console.warn("⚠️ OpenAI falhou:", r.error);
   }
 
-  if (!hasRefs && hasEmergentKey) {
-    const r3 = await callEmergent(normalizedOpts);
-    if (r3.url) return { url: r3.url, provider: "emergent" };
-    errs.push(r3.error || "Emergent falhou");
-  }
+  const r3 = await callEmergent(opts);
+  if (r3.url) return { url: r3.url, provider: "emergent" };
+  errs.push(r3.error || "Emergent falhou");
 
-  const hasReferenceImages = Boolean(normalizedOpts.imageUrls?.length);
+  const hasReferenceImages = Boolean(opts.imageUrls?.length);
 
   // Pollinations is text-only and cannot see uploaded reference images. For
   // edit/template flows, never use it unless the caller explicitly allows a
   // new image, otherwise it creates an unrelated image and breaks the user's
   // expectation that the uploaded file is the base canvas.
   if (!hasReferenceImages || opts.allowTextOnlyFallback) {
-    const rPoll = await callPollinations(normalizedOpts);
+    const rPoll = await callPollinations(opts);
     if (rPoll.url) {
       console.warn("ℹ️ Usando Pollinations (gratuito) como fallback:", errs.join(" | "));
       return { url: rPoll.url, provider: "pollinations-free" };
@@ -648,7 +485,7 @@ export async function generateWithNanoBanana(
     errs.push("Fallback Pollinations ignorado porque não preserva imagem de referência");
   }
 
-  const localFallback = buildLocalFusionFallback(normalizedOpts);
+  const localFallback = buildLocalFusionFallback(opts);
   if (localFallback) {
     console.warn("⚠️ Todos os provedores falharam; usando composição local:", errs.join(" | "));
     return { url: localFallback, provider: "local-fallback" };

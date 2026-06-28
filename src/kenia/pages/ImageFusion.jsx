@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Textarea } from "@/kenia/components/ui/textarea";
-import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
 import { Combine, Upload, Loader2, Download, X, Sparkles, ImageIcon, Package, Info, Wand2, Trash2, CreditCard, Lock, Camera } from "lucide-react";
@@ -353,17 +352,6 @@ export default function ImageFusion() {
   const [generatingVariants, setGeneratingVariants] = useState(false);
   const [saved, setSaved] = useState([]); // {id, url, prompt, paid, storage_path}
   const [paying, setPaying] = useState(null);
-  const [emergentKey, setEmergentKey] = useState(() => {
-    try { return localStorage.getItem("kenia.emergent.image.key") || ""; } catch { return ""; }
-  });
-
-  const saveEmergentKey = (value) => {
-    setEmergentKey(value);
-    try {
-      if (value) localStorage.setItem("kenia.emergent.image.key", value);
-      else localStorage.removeItem("kenia.emergent.image.key");
-    } catch { /* noop */ }
-  };
 
   useEffect(() => { loadSaved(); }, []);
 
@@ -456,13 +444,7 @@ export default function ImageFusion() {
     try {
       const { data } = await api.post(
         "/creatives/fuse-images",
-        {
-          image1_base64: img1 || img2,
-          image2_base64: singleMode ? null : img2,
-          prompt,
-          mode: templateMode ? "template" : (singleMode ? "edit" : "fusion"),
-          emergentApiKey: emergentKey.trim() || undefined,
-        },
+        { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt, mode: templateMode ? "template" : (singleMode ? "edit" : "fusion") },
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
@@ -602,17 +584,6 @@ export default function ImageFusion() {
 
         <Card className="max-w-5xl mx-auto p-5 bg-nude-900/60 border-gold-900/40 mt-5">
           <EmergentBalance />
-          <div className="mt-3 p-3 rounded-md bg-nude-950/50 border border-gold-900/40">
-            <Label className="text-gold-200 text-xs uppercase tracking-wide">Chave Emergent alternativa (opcional)</Label>
-            <Input
-              type="password"
-              value={emergentKey}
-              onChange={(e) => saveEmergentKey(e.target.value)}
-              placeholder="sk-emergent-... (use outra chave se a principal atingiu limite diário)"
-              className="mt-1 bg-nude-950 border-gold-900/40 text-gold-100 placeholder:text-nude-600"
-            />
-            <p className="text-[11px] text-nude-400 mt-1">Salva localmente no navegador e enviada só para esta edição/fusão.</p>
-          </div>
           <div className="flex items-center justify-between flex-wrap gap-2 mt-3">
             <Label className="text-gold-200">Instrução adicional (opcional)</Label>
           </div>
