@@ -33,11 +33,15 @@ export default function Creatives() {
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState(null);
   const [refImage, setRefImage] = useState(null); // data URL
-  const [logoImage, setLogoImage] = useState(null); // data URL (logo do escritório)
+  const [logoImage, setLogoImage] = useState(() => {
+    try { return localStorage.getItem("kenia.creative.logo") || null; } catch { return null; }
+  }); // data URL (logo do escritório) — persistido entre sessões
   const [form, setForm] = useState({
     title: "", network: "instagram", format: "post",
     topic: "", tone: "profissional", case_type: "",
+    caption: "", subtitle: "",
   });
+
   const [scheduled, setScheduled] = useState([]);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleTarget, setScheduleTarget] = useState(null); // creative item
@@ -73,9 +77,20 @@ export default function Creatives() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setLogoImage(String(reader.result));
+    reader.onload = () => {
+      const url = String(reader.result);
+      setLogoImage(url);
+      try { localStorage.setItem("kenia.creative.logo", url); } catch {}
+      toast.success("Logo salvo — será aplicado em todos os criativos");
+    };
     reader.readAsDataURL(file);
   };
+
+  const clearLogo = () => {
+    setLogoImage(null);
+    try { localStorage.removeItem("kenia.creative.logo"); } catch {}
+  };
+
 
 
   useEffect(() => { load(); loadScheduled(); }, []);
@@ -187,9 +202,10 @@ export default function Creatives() {
       }
       setPreview(data);
       setOpen(false);
-      setForm({ title: "", network: "instagram", format: "post", topic: "", tone: "profissional", case_type: "" });
+      setForm({ title: "", network: "instagram", format: "post", topic: "", tone: "profissional", case_type: "", caption: "", subtitle: "" });
       setRefImage(null);
-      setLogoImage(null);
+      // logoImage permanece salvo (persistente) para próximos criativos
+
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Erro ao gerar");
@@ -351,6 +367,18 @@ export default function Creatives() {
               </div>
               <div><Label>Tema / Mensagem Principal</Label><Textarea rows={3} placeholder="Sobre o que é o post? Qual a mensagem chave?" value={form.topic} onChange={e => setForm({ ...form, topic: e.target.value })} data-testid="creative-topic" /></div>
 
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <Label>Subtítulo no post (opcional)</Label>
+                  <Input placeholder="Ex: Saiba seus direitos" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Legenda personalizada (opcional)</Label>
+                  <Textarea rows={2} placeholder="Se preenchida, será usada como legenda do post em vez da gerada pela IA." value={form.caption} onChange={e => setForm({ ...form, caption: e.target.value })} />
+                </div>
+              </div>
+
+
               <div>
                 <Label>Imagem de referência (opcional)</Label>
                 <p className="text-xs text-nude-500 mb-1.5">Envie um pôster/modelo para a IA manter layout, cores e estilo, trocando só o conteúdo pedido.</p>
@@ -377,20 +405,26 @@ export default function Creatives() {
               </div>
 
               <div>
-                <Label>Logo do escritório (opcional)</Label>
-                <p className="text-xs text-nude-500 mb-1.5">A IA aplicará seu logo discretamente no criativo gerado.</p>
+                <Label>Logo do escritório {logoImage && <span className="ml-1 text-[10px] uppercase tracking-wider text-emerald-600 font-semibold">salvo · será aplicado sempre</span>}</Label>
+                <p className="text-xs text-nude-500 mb-1.5">A IA aplicará seu logo discretamente em todos os criativos gerados (fica salvo no navegador).</p>
                 {logoImage ? (
-                  <div className="relative inline-block">
-                    <img src={logoImage} alt="logo" className="h-20 w-20 object-contain rounded-md border border-nude-200 bg-white p-1" />
-                    <button
-                      type="button"
-                      onClick={() => setLogoImage(null)}
-                      className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 shadow"
-                      data-testid="creative-remove-logo"
-                      aria-label="Remover logo"
-                    >
-                      <XIcon className="w-3 h-3" />
-                    </button>
+                  <div className="flex items-center gap-3">
+                    <div className="relative inline-block">
+                      <img src={logoImage} alt="logo" className="h-20 w-20 object-contain rounded-md border border-nude-200 bg-white p-1" />
+                      <button
+                        type="button"
+                        onClick={clearLogo}
+                        className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 shadow"
+                        data-testid="creative-remove-logo"
+                        aria-label="Remover logo"
+                      >
+                        <XIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <label className="text-xs underline text-nude-600 cursor-pointer">
+                      Trocar logo
+                      <input type="file" accept="image/*" className="hidden" onChange={onPickLogo} />
+                    </label>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 h-20 border-2 border-dashed border-nude-300 rounded-md cursor-pointer hover:bg-nude-50 text-sm text-nude-600" data-testid="creative-upload-logo">
@@ -400,6 +434,7 @@ export default function Creatives() {
                   </label>
                 )}
               </div>
+
             </div>
             <DialogFooter>
               <Button onClick={generate} disabled={generating} className="bg-nude-900 hover:bg-nude-800" data-testid="creative-generate">

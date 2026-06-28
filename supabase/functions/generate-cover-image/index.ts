@@ -296,7 +296,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { prompt, reference_image_base64, logo_base64, style, title, network, format, tone, case_type } = body || {};
+    const { prompt, reference_image_base64, logo_base64, style, title, subtitle, network, format, tone, case_type } = body || {};
     if (!prompt || typeof prompt !== "string") {
       return new Response(JSON.stringify({ error: "Prompt obrigatório" }), {
         status: 400,
@@ -371,7 +371,10 @@ Deno.serve(async (req) => {
         promptParts.push(
           `POSTER TEMPLATE EDIT MODE — the first uploaded image is the MASTER REFERENCE POSTER, not just inspiration.`,
           `User request/new content to apply to that same poster: "${prompt}".`,
-          `Creative context: title="${title || ""}", network="${network || ""}", format="${format || ""}", tone="${tone || ""}", case_type="${case_type || ""}".`,
+          `Creative context: title="${title || ""}", subtitle="${subtitle || ""}", network="${network || ""}", format="${format || ""}", tone="${tone || ""}", case_type="${case_type || ""}".`,
+          title ? `Render the TITLE text exactly as: "${title}" in the same headline slot of the reference poster.` : "",
+          subtitle ? `Render the SUBTITLE text exactly as: "${subtitle}" in the secondary text slot of the reference poster.` : "",
+
           `Recreate the SAME poster/template structure from the reference: same layout grid, margins, spacing, typography style, text hierarchy, color palette, decorative elements, badges, photo placement, background, lighting and overall visual identity.`,
           `Replace ONLY the text/content requested by the user and only swap/add visual elements explicitly requested. Keep all other visual decisions from the reference poster.`,
           `If the reference contains a person, preserve the same identity, face, hair, skin tone, clothing and proportions unless the user explicitly asks to change them.`,
