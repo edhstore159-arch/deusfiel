@@ -392,7 +392,9 @@ Deno.serve(async (req) => {
       }
       if (logo_base64) {
         imageUrls.push(toDataUrl(logo_base64));
-        promptParts.push("Incorpore o logo enviado (última imagem) de forma discreta e elegante em um dos cantos da arte, preservando suas cores e proporções originais, sem distorcer.");
+        promptParts.push(
+          "LOGO OVERLAY REQUIREMENT (MANDATORY, NÃO IGNORAR): A ÚLTIMA imagem enviada é o LOGO oficial do escritório de advocacia. Você DEVE renderizar este logo VISÍVEL e NÍTIDO no canto inferior direito da arte final, ocupando aproximadamente 12-15% da largura da imagem, com um leve padding de 24px das bordas. Preserve EXATAMENTE as cores, formas, tipografia e proporções originais do logo — NÃO redesenhe, NÃO traduza, NÃO simplifique, NÃO mude as cores. Se houver fundo escuro atrás, adicione uma leve sombra suave para garantir legibilidade. O logo deve aparecer SEM FALTA na imagem final — sua ausência é considerada falha grave.",
+        );
       }
 
       const result = await generateWithNanoBanana({
