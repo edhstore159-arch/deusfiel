@@ -145,7 +145,7 @@ const LEGAL_THEMES: LegalTheme[] = [
       "do lado direito, um advogado brasileiro de terno escuro, postura firme e olhar empático, gesticulando como se interligasse os elementos da cena — vítima, justiça e proteção legal — em uma metáfora visual de defesa de direitos",
   },
   {
-    keys: /\b(direitos?\s+trabalhista|justi[çc]a\s+do\s+trabalho|clt|demiss[ãa]o|rescis[ãa]o|fgts|horas?\s+extras?|ass[ée]dio\s+moral|trabalhador\s+demitido|verbas?\s+rescis[óo]rias?)\b/i,
+    keys: /\b(trabalhista|direitos?\s+trabalhista|justi[çc]a\s+do\s+trabalho|clt|demiss[ãa]o|rescis[ãa]o|fgts|horas?\s+extras?|ass[ée]dio\s+moral|trabalhador\s+demitido|verbas?\s+rescis[óo]rias?)\b/i,
     scene:
       "um trabalhador brasileiro de uniforme ou camisa social simples, expressão preocupada e cansada, segurando uma carta de demissão ou caixa de pertences pessoais, saindo de um portão de fábrica/escritório; " +
       "ao centro da composição, símbolos da Justiça do Trabalho — martelo de juiz, balança e um exemplar da CLT sobre uma mesa; " +
@@ -159,14 +159,14 @@ const LEGAL_THEMES: LegalTheme[] = [
       "do outro lado, um advogado previdenciarista explicando o processo, gesticulando como se conectasse o segurado aos direitos previdenciários",
   },
   {
-    keys: /\b(divorcio|div[óo]rcio|guarda\s+(de\s+)?filho|pens[ãa]o\s+aliment[íi]cia|direito\s+de\s+fam[íi]lia)\b/i,
+    keys: /\b(divorcio|div[óo]rcio|guarda\s+(de\s+)?filho|pens[ãa]o\s+aliment[íi]cia|direito\s+de\s+fam[íi]lia|fam[íi]lia)\b/i,
     scene:
       "uma família brasileira em mediação — mãe e pai sentados em lados opostos de uma mesa, uma criança ao fundo desfocada; " +
       "ao centro, martelo de juiz e a balança da Justiça simbolizando o direito de família; " +
       "uma advogada empática, do lado, gesticulando como se interligasse os pontos: pais, criança e proteção jurídica",
   },
   {
-    keys: /\b(direito\s+do\s+consumidor|cdc|procon|cobran[çc]a\s+indevida|negativa[çc][ãa]o\s+indevida)\b/i,
+    keys: /\b(direito\s+do\s+consumidor|consumidor|cdc|procon|cobran[çc]a\s+indevida|negativa[çc][ãa]o\s+indevida)\b/i,
     scene:
       "um consumidor brasileiro frustrado segurando uma fatura abusiva ou cartão bloqueado; " +
       "ao centro, código de defesa do consumidor aberto sobre a mesa, balança e martelo da Justiça; " +
@@ -304,7 +304,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userElaborated = await elaboratePrompt(prompt, style);
+    // Inclui case_type/title no prompt para que o detector de tema jurídico
+    // (LEGAL_THEMES) dispare mesmo quando o usuário escolhe a área no select
+    // e digita pouco no tema. Ex.: case_type="Trabalhista" → cena trabalhista.
+    const caseTypeHint = case_type ? `Área jurídica: ${case_type}. ` : "";
+    const titleHint = title ? `Título do post: ${title}. ` : "";
+    const themedPrompt = `${caseTypeHint}${titleHint}${prompt}`.trim();
+    const userElaborated = await elaboratePrompt(themedPrompt, style);
     const hybridSubject = hasHybridRequest(prompt);
     const isolatedOnly = isIsolatedObjectOnly(prompt);
     const eventSubject = !isolatedOnly && EVENT_RE.test(prompt) && !hybridSubject;
@@ -406,22 +412,23 @@ Deno.serve(async (req) => {
     }
 
 
-    // Text-to-image: try Lovable Gateway gpt-image-2, fallback to Emergent (gpt-image-1).
-    const img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "high" });
-    if (!img.ok) {
-      // Local SVG fallback so the client never sees a 502 / blank screen.
+    // Text-to-image: usa o pipeline com refinamento (Pollinations rascunho → Emergent corrige
+    // anatomia/mãos/olhos/deformações). Se Pollinations falhar/gerar lixo, cai para Lovable
+    // Gateway → Gemini → OpenAI → Emergent puro.
+    const nb = await generateWithNanoBanana({ prompt: fullPrompt, mode: "generate", allowTextOnlyFallback: true });
+    if (!nb.url) {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#g)"/><circle cx="512" cy="420" r="160" fill="rgba(255,255,255,0.08)"/><rect x="312" y="640" width="400" height="14" rx="7" fill="rgba(255,255,255,0.35)"/><rect x="372" y="680" width="280" height="10" rx="5" fill="rgba(255,255,255,0.22)"/></svg>`;
       const b64 = btoa(unescape(encodeURIComponent(svg)));
       return new Response(JSON.stringify({
         image_data_url: `data:image/svg+xml;base64,${b64}`,
         provider: "local-fallback",
-        warning: img.error,
+        warning: nb.error,
       }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    return new Response(JSON.stringify({ b64_json: img.b64, image_data_url: `data:image/png;base64,${img.b64}`, provider: img.provider }), {
+    return new Response(JSON.stringify({ b64_json: stripDataUrl(nb.url), image_data_url: nb.url, provider: nb.provider }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
