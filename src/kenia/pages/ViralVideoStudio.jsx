@@ -901,6 +901,15 @@ export default function ViralVideoStudio() {
                 {generatingEmergent ? "Gerando (Emergent)..." : "Gerar com Emergent (Veo)"}
               </Button>
               <Button
+                onClick={generateWithReplicate}
+                disabled={generatingReplicate}
+                variant="outline"
+                className="border-emerald-500/70 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
+              >
+                {generatingReplicate ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                {generatingReplicate ? "Gerando (Kling)..." : "Gerar com Replicate (Kling v2.1 — realista)"}
+              </Button>
+              <Button
                 onClick={generateVideo}
                 disabled={generatingVideo}
                 className="bg-gradient-to-r from-gold-500 to-gold-700 hover:from-gold-400 hover:to-gold-600 text-nude-950 font-semibold"
