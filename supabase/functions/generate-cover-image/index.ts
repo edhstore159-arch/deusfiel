@@ -186,12 +186,17 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
   let userTheme = (userPrompt || "").trim();
   const legalScene = legalThemeExpansion(userTheme);
   if (legalScene) {
-    userTheme =
-      `Fotografia documental hiper-realista (não ilustração, não 3D, não arte digital) de uma cena jurídica brasileira real sobre: ${userTheme}. ` +
-      `Cena com PESSOAS REAIS brasileiras (atores adultos reais, rostos autênticos, peles com poros e imperfeições naturais, roupas reais e amassadas, expressões verdadeiras, ambiente real com objetos do dia a dia), capturada como reportagem fotojornalística — estilo Magnum / National Geographic / Folha de S.Paulo. ` +
-      `Composição editorial em três planos: ${legalScene}. ` +
-      `Iluminação natural cinematográfica (janela, luz ambiente real), 50mm ou 85mm f/1.8, profundidade de campo rasa, grão natural de ISO, sem violência explícita, sem sangue, sem cenas gráficas, tom respeitoso e protetivo, focado em conscientização e defesa de direitos. ` +
-      `PROIBIDO: ilustração, cartoon, 3D render, CGI, anime, pintura, aspecto de stock photo, pele de plástico, rostos perfeitos, look de IA, boneco, cera.`;
+    // Retorna imediatamente para garantir que EVENT_RE / scenerySceneFor / hybrid
+    // não sobrescrevam a cena jurídica narrativa (ex.: "trabalhador demitido"
+    // estava caindo no fluxo de evento genérico e perdendo o tema trabalhista).
+    return (
+      `Hyper-realistic documentary photograph (not illustration, not 3D, not digital art) of a real Brazilian legal scene about: ${userTheme}. ` +
+      `Scene featuring REAL Brazilian people (real adult actors, authentic faces, skin with natural pores and imperfections, real wrinkled clothing, true expressions, real environment with everyday objects), captured as photojournalistic reportage — Magnum / National Geographic / Folha de S.Paulo style. ` +
+      `Editorial composition in three planes: ${legalScene}. ` +
+      `Cinematic natural lighting (window, real ambient light), 50mm or 85mm f/1.8, shallow depth of field, natural ISO grain, no explicit violence, no blood, no graphic scenes, respectful and protective tone, focused on awareness and defense of rights. ` +
+      `FORBIDDEN: illustration, cartoon, 3D render, CGI, anime, painting, stock photo look, plastic skin, perfect faces, AI look, doll, wax. ` +
+      `Style: ${style || "documentary photojournalism, editorial"}.`
+    );
   }
 
 
