@@ -48,7 +48,75 @@ async function checkEmergentImage() {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), 25000);
   try {
-    const r = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
+    const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: "vertex_ai/gemini-2.5-flash-image",
+        modalities: ["image", "text"],
+        messages: [{ role: "user", content: "Generate a red apple image, photorealistic." }],
+      }),
+    });
+    const text = await r.text();
+    if (!r.ok) return { configured: true, ok: false, status: r.status, error: text.slice(0, 300) };
+    let hasImage = false;
+    try {
+      const msg = JSON.parse(text)?.choices?.[0]?.message;
+      hasImage = !!msg?.images?.[0]?.image_url?.url || /data:image\//.test(String(msg?.content || ""));
+    } catch { /* noop */ }
+    return { configured: true, ok: hasImage, status: r.status, hasImage };
+  } catch (e) {
+    return { configured: true, ok: false, error: String((e as Error)?.message || e) };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function checkEmergentEdit() {
+  const key = Deno.env.get("EMERGENT_API_KEY");
+  if (!key) return { configured: false, ok: false, error: "EMERGENT_API_KEY ausente" };
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 35000);
+  try {
+    const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: "vertex_ai/gemini-2.5-flash-image",
+        modalities: ["image", "text"],
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "Turn the reference image blue, keep the same simple shape. Return one image only." },
+            { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAIAAABMXPacAAABLElEQVR4nO3RQREAIAzAMIZ/zyAjjzUKetd5J9LVAds1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgDcAagDUAawDWAKwBWAOwBmANwBqANQBrANYArAFYA7AGYA3AGoA1AGsA1gCsAVgDsAZgH8/hAf+bYtS1AAAAAElFTkSuQmCC" } },
+          ],
+        }],
+      }),
+    });
+    const text = await r.text();
+    if (!r.ok) return { configured: true, ok: false, status: r.status, error: text.slice(0, 300) };
+    let hasImage = false;
+    try {
+      const msg = JSON.parse(text)?.choices?.[0]?.message;
+      hasImage = !!msg?.images?.[0]?.image_url?.url || /data:image\//.test(String(msg?.content || ""));
+    } catch { /* noop */ }
+    return { configured: true, ok: hasImage, status: r.status, hasImage };
+  } catch (e) {
+    return { configured: true, ok: false, error: String((e as Error)?.message || e) };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function checkOpenAIImage() {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) return { configured: false, ok: false, error: "OPENAI_API_KEY ausente" };
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 25000);
+  try {
+    const r = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       signal: controller.signal,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -57,7 +125,7 @@ async function checkEmergentImage() {
     const text = await r.text();
     if (!r.ok) return { configured: true, ok: false, status: r.status, error: text.slice(0, 300) };
     let hasImage = false;
-    try { hasImage = !!JSON.parse(text)?.data?.[0]?.b64_json; } catch { /* noop */ }
+    try { hasImage = !!JSON.parse(text)?.data?.[0]?.b64_json || !!JSON.parse(text)?.data?.[0]?.url; } catch { /* noop */ }
     return { configured: true, ok: hasImage, status: r.status, hasImage };
   } catch (e) {
     return { configured: true, ok: false, error: String((e as Error)?.message || e) };
@@ -72,13 +140,17 @@ Deno.serve(async (req) => {
   const deep = url.searchParams.get("deep") === "1";
   const ollama = await checkOllama();
   const emergentImage = deep ? await checkEmergentImage() : { configured: !!Deno.env.get("EMERGENT_API_KEY"), note: "passe ?deep=1 para testar geração real" };
+  const emergentEdit = deep ? await checkEmergentEdit() : { configured: !!Deno.env.get("EMERGENT_API_KEY"), note: "passe ?deep=1 para testar edição real" };
+  const openaiImage = deep ? await checkOpenAIImage() : { configured: !!Deno.env.get("OPENAI_API_KEY"), note: "passe ?deep=1 para testar geração real" };
   const providers = {
     ollama,
     lovable: { configured: !!Deno.env.get("LOVABLE_API_KEY") },
     gemini: { configured: !!Deno.env.get("GEMINI_API_KEY") },
     emergent: { configured: !!Deno.env.get("EMERGENT_API_KEY") },
     emergentImage,
+    emergentEdit,
     openai: { configured: !!Deno.env.get("OPENAI_API_KEY") },
+    openaiImage,
   };
   return new Response(JSON.stringify({ ok: true, providers }, null, 2), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -170,20 +170,137 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   }
 }
 
+function dataUrlToBlob(value: string): { blob: Blob; filename: string } | null {
+  const m = String(value || "").match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!m) return null;
+  const mime = m[1] || "image/png";
+  const ext = mime.includes("jpeg") ? "jpg" : (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
+  const bin = atob(m[2]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { blob: new Blob([bytes], { type: mime }), filename: `reference.${ext}` };
+}
+
+function dataUrlToBytes(value: string): { bytes: Uint8Array; mime: string; filename: string } | null {
+  const m = String(value || "").match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!m) return null;
+  const mime = m[1] || "image/png";
+  const ext = mime.includes("jpeg") ? "jpg" : (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
+  const bin = atob(m[2]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { bytes, mime, filename: `reference.${ext}` };
+}
+
+function buildMultipartBody(
+  fields: Record<string, string>,
+  files: Array<{ name: string; filename: string; mime: string; bytes: Uint8Array }>,
+) {
+  const boundary = `----kenia-${crypto.randomUUID()}`;
+  const encoder = new TextEncoder();
+  const chunks: Uint8Array[] = [];
+  const pushText = (value: string) => chunks.push(encoder.encode(value));
+  for (const [name, value] of Object.entries(fields)) {
+    pushText(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`);
+  }
+  for (const file of files) {
+    pushText(`--${boundary}\r\nContent-Disposition: form-data; name="${file.name}"; filename="${file.filename}"\r\nContent-Type: ${file.mime}\r\n\r\n`);
+    chunks.push(file.bytes);
+    pushText("\r\n");
+  }
+  pushText(`--${boundary}--\r\n`);
+  const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const body = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return { body, contentType: `multipart/form-data; boundary=${boundary}`, contentLength: String(length) };
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 25000) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) return { url: null, error: "OPENAI_API_KEY ausente" };
+
+  const prompt = withFacePreservation(opts.prompt);
+  const imageUrls = (opts.imageUrls || []).filter(Boolean);
+  try {
+    if (imageUrls.length > 0) {
+      const form = new FormData();
+      form.append("model", "gpt-image-1");
+      form.append("prompt", prompt);
+      form.append("size", "1024x1024");
+      for (const u of imageUrls.slice(0, 4)) {
+        const converted = dataUrlToBlob(u);
+        if (!converted) continue;
+        // OpenAI accepts one or more image parts under the image field for edits.
+        form.append("image", converted.blob, converted.filename);
+      }
+      if (!form.has("image")) return { url: null, error: "OpenAI: imagem de referência inválida" };
+
+      const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+      }, 25000);
+      const text = await resp.text();
+      if (!resp.ok) return { url: null, error: `OpenAI edição ${resp.status}: ${text.slice(0, 240)}` };
+      const data = JSON.parse(text);
+      const b64 = data?.data?.[0]?.b64_json;
+      const url = data?.data?.[0]?.url;
+      if (b64) return { url: `data:image/png;base64,${b64}` };
+      if (url) return { url };
+      return { url: null, error: "OpenAI edição não retornou imagem" };
+    }
+
+    const resp = await fetchWithTimeout("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", n: 1 }),
+    }, 25000);
+    const text = await resp.text();
+    if (!resp.ok) return { url: null, error: `OpenAI imagem ${resp.status}: ${text.slice(0, 240)}` };
+    const data = JSON.parse(text);
+    const b64 = data?.data?.[0]?.b64_json;
+    const url = data?.data?.[0]?.url;
+    if (b64) return { url: `data:image/png;base64,${b64}` };
+    if (url) return { url };
+    return { url: null, error: "OpenAI imagem não retornou imagem" };
+  } catch (e) {
+    return { url: null, error: `OpenAI erro: ${(e as Error)?.message || e}` };
+  }
+}
+
 async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("EMERGENT_API_KEY");
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
   const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt) };
+  const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
+
+  // A chave Emergent expõe os modelos de imagem Gemini via Vertex AI no endpoint
+  // OpenAI-compatible de chat. O endpoint /llm/images/edits tem apresentado
+  // erro interno/timeout; por isso usamos chat multimodal primeiro, que edita e
+  // gera imagens corretamente com a chave sk-emergent atual.
   const models = [
-    "gemini-2.5-flash-image",
-    "google/gemini-2.5-flash-image",
-    "gemini-3.1-flash-image-preview",
-    "google/gemini-3.1-flash-image-preview",
+    "vertex_ai/gemini-2.5-flash-image",
+    "vertex_ai/gemini-3.1-flash-image-preview",
   ];
   let lastError = "";
+
   for (const model of models) {
     try {
-      const resp = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+      const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -191,13 +308,12 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           modalities: ["image", "text"],
           messages: [{ role: "user", content: buildContent(safeOpts) }],
         }),
-      });
+      }, 45000);
       if (!resp.ok) {
-        const txt = (await resp.text()).slice(0, 240);
+        const txt = (await resp.text()).slice(0, 300);
         lastError = `Emergent[${model}] ${resp.status}: ${txt}`;
-        // Budget exceeded is a hard stop — no point trying other models with the same key.
         if (/budget[_\s]exceeded|Budget has been exceeded/i.test(txt)) {
-          return { url: null, error: `Emergent: orçamento da chave esgotado (recarregue créditos em emergentagent.com). Detalhe: ${txt}` };
+          return { url: null, error: `Emergent: orçamento da chave esgotado. Detalhe: ${txt}` };
         }
         continue;
       }
@@ -208,6 +324,55 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
     } catch (e) {
       lastError = `Emergent[${model}] erro: ${(e as Error)?.message || e}`;
     }
+  }
+
+  try {
+    if (imageUrls.length > 0) {
+      const files = imageUrls.slice(0, 4).map((u) => dataUrlToBytes(u)).filter(Boolean) as Array<{ bytes: Uint8Array; mime: string; filename: string }>;
+      if (files.length) {
+        const multipart = buildMultipartBody(
+          { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024" },
+          files.map((file) => ({ name: "image", ...file })),
+        );
+        const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": multipart.contentType, "Content-Length": multipart.contentLength },
+          body: multipart.body,
+        }, 12000);
+        const text = await resp.text();
+        if (resp.ok) {
+          const data = JSON.parse(text);
+          const b64 = data?.data?.[0]?.b64_json;
+          const url = data?.data?.[0]?.url;
+          if (b64) return { url: `data:image/png;base64,${b64}` };
+          if (url) return { url };
+        } else if (/budget[_\s]exceeded|Budget has been exceeded/i.test(text)) {
+          return { url: null, error: `Emergent: orçamento da chave esgotado. Detalhe: ${text.slice(0, 240)}` };
+        } else {
+          console.warn("⚠️ Emergent images/edits falhou:", resp.status, text.slice(0, 240));
+        }
+      }
+    } else {
+      const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/generations", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024", n: 1 }),
+      }, 12000);
+      const text = await resp.text();
+      if (resp.ok) {
+        const data = JSON.parse(text);
+        const b64 = data?.data?.[0]?.b64_json;
+        const url = data?.data?.[0]?.url;
+        if (b64) return { url: `data:image/png;base64,${b64}` };
+        if (url) return { url };
+      } else if (/budget[_\s]exceeded|Budget has been exceeded/i.test(text)) {
+        return { url: null, error: `Emergent: orçamento da chave esgotado. Detalhe: ${text.slice(0, 240)}` };
+      } else {
+        console.warn("⚠️ Emergent images/generations falhou:", resp.status, text.slice(0, 240));
+      }
+    }
+  } catch (e) {
+    console.warn("⚠️ Emergent images API erro:", (e as Error)?.message || e);
   }
   return { url: null, error: lastError || "Emergent falhou" };
 }
@@ -249,6 +414,13 @@ export async function generateWithNanoBanana(
     if (r.url) return { url: r.url, provider: "gemini" };
     errs.push(r.error || "Gemini direto falhou");
     console.warn("⚠️ Gemini direto falhou:", r.error);
+  }
+
+  if (Deno.env.get("OPENAI_API_KEY")) {
+    const r = await callOpenAIImages(opts);
+    if (r.url) return { url: r.url, provider: "openai" };
+    errs.push(r.error || "OpenAI falhou");
+    console.warn("⚠️ OpenAI falhou:", r.error);
   }
 
   const r3 = await callEmergent(opts);
