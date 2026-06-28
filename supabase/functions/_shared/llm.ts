@@ -7,6 +7,9 @@ export interface ChatOptions {
   messages: ChatMessage[];
   response_format?: any;
   temperature?: number;
+  timeoutMs?: number;
+  maxTokens?: number;
+  preferFastProvider?: boolean;
 }
 
 export interface ImageOptions {
@@ -21,6 +24,16 @@ const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
 const OLLAMA_URL = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "").replace(/\/api\/(generate|chat|tags)$/, "");
 const OLLAMA_MODEL = Deno.env.get("OLLAMA_MODEL") || "qwen3:8b";
 const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(3000, timeoutMs));
+  try {
+    return await fetch(url, { ...init, signal: init.signal || controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 const FACE_SAFE_PROMPT =
   "Human face integrity lock (priority #1): render every visible face as a natural real human face, not AI-looking. Use a DSLR portrait/documentary look (Canon EOS R5 / Sony A7R IV, 85mm or 50mm prime lens, RAW photo, natural light), with the main face large enough in the frame to preserve detail. Facial geometry must be coherent: exactly two eyes placed on the same horizontal line, similar size and shape, centered pupils looking in the same direction, one centered nose, one natural mouth, one jaw, one forehead, two ears only when visible, no duplicated or floating facial parts. Skin must be photorealistic with pores, peach fuzz, subtle asymmetry, faint freckles/moles/fine lines where natural, real shadows and subsurface scattering; never waxy, plastic, smoothed or doll-like. Eyes must be alive and expressive with detailed irises, natural sclera, eyelids, eyelashes and catchlights; avoid blank/dead/glassy eyes. Teeth, if visible, must be natural and limited to a normal mouth opening — never extra rows, glowing teeth or oversized teeth. For groups, keep faces reasonably sized and apply this check to each person; if the scene does not require a crowd, prefer one to three people instead of many tiny faces. Final face QA before output: aligned eyes, centered pupils, normal nose, normal mouth, normal teeth, normal jaw, no melting, no warping, no double pupils, no extra eyes, no fused eyes, no duplicate face, no face merged with hair/clothes/objects. Negative face: deformed face, distorted face, melted face, warped face, mutated face, disfigured face, lopsided face, mismatched eyes, different sized eyes, misaligned eyes, cross-eyed, lazy eye, dead eyes, glassy eyes, blank stare, extra eyes, missing eye, fused eyes, third eye, double pupils, wrong pupils, double nose, missing nose, double mouth, extra mouth, bad teeth, too many teeth, missing teeth, duplicated face, two faces on one head, floating facial features, facial features merged with object, plastic skin, waxy skin, airbrushed, porcelain skin, beauty filter, CGI, 3D render, cartoon, anime, illustration, painting, AI-generated look, low-res face, blurry face, oversharpened face.";
@@ -330,13 +343,23 @@ function handInstructionFor(prompt: string) {
 
 async function chatLovable(opts: ChatOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, status: 0, error: "LOVABLE_API_KEY ausente" };
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
-    body: JSON.stringify({ model: opts.model || "google/gemini-3-flash-preview", ...opts }),
-  });
-  if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-  return { ok: true as const, data: await resp.json(), provider: "lovable" };
+  try {
+    const resp = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
+      body: JSON.stringify({
+        model: opts.model || "google/gemini-3-flash-preview",
+        messages: opts.messages,
+        ...(opts.response_format ? { response_format: opts.response_format } : {}),
+        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+        ...(typeof opts.maxTokens === "number" ? { max_tokens: opts.maxTokens } : {}),
+      }),
+    }, opts.timeoutMs || 20000);
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    return { ok: true as const, data: await resp.json(), provider: "lovable" };
+  } catch (error) {
+    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
+  }
 }
 
 function messagesToGeminiContents(messages: ChatMessage[]) {
@@ -370,38 +393,49 @@ async function chatGemini(opts: ChatOptions) {
   if (typeof opts.temperature === "number") {
     body.generationConfig = { ...(body.generationConfig || {}), temperature: opts.temperature };
   }
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-  const data = await resp.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || "").join("") || "";
-  // Wrap into OpenAI-compatible shape so callers can read choices[0].message.content
-  return {
-    ok: true as const,
-    provider: "gemini",
-    data: { choices: [{ message: { role: "assistant", content: text } }] },
-  };
+  if (typeof opts.maxTokens === "number") {
+    body.generationConfig = { ...(body.generationConfig || {}), maxOutputTokens: opts.maxTokens };
+  }
+  try {
+    const resp = await fetchWithTimeout(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }, opts.timeoutMs || 20000);
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    const data = await resp.json();
+    const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || "").join("") || "";
+    // Wrap into OpenAI-compatible shape so callers can read choices[0].message.content
+    return {
+      ok: true as const,
+      provider: "gemini",
+      data: { choices: [{ message: { role: "assistant", content: text } }] },
+    };
+  } catch (error) {
+    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
+  }
 }
 
 async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
-  const resp = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
-    body: JSON.stringify({
-      model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/")
-        ? opts.model
-        : "gpt-4o-mini",
-      messages: opts.messages,
-      ...(opts.response_format ? { response_format: opts.response_format } : {}),
-      ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
-    }),
-  });
-  if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-  return { ok: true as const, data: await resp.json(), provider: "emergent" };
+  try {
+    const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
+      body: JSON.stringify({
+        model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/")
+          ? opts.model
+          : "gpt-4o-mini",
+        messages: opts.messages,
+        ...(opts.response_format ? { response_format: opts.response_format } : {}),
+        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+      }),
+    }, opts.timeoutMs || 20000);
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    return { ok: true as const, data: await resp.json(), provider: "emergent" };
+  } catch (error) {
+    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
+  }
 }
 
 function isUnsupportedOllamaHost(rawUrl: string) {
@@ -419,7 +453,8 @@ async function chatOllama(opts: ChatOptions) {
     return { ok: false as const, status: 0, error: "OLLAMA_URL precisa ser uma URL pública acessível pelo backend" };
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeoutMs = Math.max(4000, Math.min(30000, opts.timeoutMs || Number(Deno.env.get("OLLAMA_CHAT_TIMEOUT_MS") || 30000)));
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const resp = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: "POST",
@@ -434,7 +469,10 @@ async function chatOllama(opts: ChatOptions) {
         messages: opts.messages.map((message) => ({ role: message.role, content: String(message.content || "") })),
         stream: false,
         ...(opts.response_format?.type === "json_object" ? { format: "json" } : {}),
-        options: { temperature: typeof opts.temperature === "number" ? opts.temperature : 0.7 },
+        options: {
+          temperature: typeof opts.temperature === "number" ? opts.temperature : 0.7,
+          ...(typeof opts.maxTokens === "number" ? { num_predict: opts.maxTokens } : {}),
+        },
       }),
     });
     const text = await resp.text();
@@ -454,6 +492,27 @@ async function chatOllama(opts: ChatOptions) {
 }
 
 export async function chatCompletion(opts: ChatOptions) {
+  // Para voz/atendimento ao vivo, prioriza provedores cloud rápidos antes do Ollama local/ngrok.
+  if (opts.preferFastProvider) {
+    if (LOVABLE_KEY) {
+      const r = await chatLovable(opts);
+      if (r.ok) return r;
+      console.warn("⚠️ Lovable chat rápido falhou, tentando Gemini/Ollama:", r.status, r.error?.slice?.(0, 200));
+    }
+    if (GEMINI_KEY) {
+      const r = await chatGemini(opts);
+      if (r.ok) return r;
+      console.warn("⚠️ Gemini rápido falhou, tentando Ollama/Emergent:", r.status, r.error?.slice?.(0, 200));
+    }
+    if (OLLAMA_URL) {
+      const r = await chatOllama(opts);
+      if (r.ok) return r;
+      console.warn("⚠️ Ollama rápido falhou, tentando Emergent:", r.status, r.error?.slice?.(0, 200));
+    }
+    const r3 = await chatEmergent(opts);
+    if (r3.ok) return r3;
+    return { ok: false as const, status: r3.status || 502, error: r3.error || "Nenhum provider rápido disponível", provider: "none" };
+  }
   // Order: Ollama → Lovable → Gemini (direct) → Emergent
   if (OLLAMA_URL) {
     const r = await chatOllama(opts);

@@ -612,6 +612,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
     const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
+    const fastMode = body.fast_mode === true;
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
     const sessionId: string = body.session_id ? String(body.session_id) : `chat-${crypto.randomUUID()}`;
@@ -702,7 +703,7 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
 
     let jusbrasilContext = "";
     const legalIntentRe = /\b(aposentad|inss|auxili|bpc|loas|pens[aã]o|benef[ií]cio|previd|div[oó]rcio|guarda|pens[aã]o\s+alimen|invent[aá]rio|partilha|heran[cç]a|uni[aã]o\s+est[aá]vel|trabalh|rescis[aã]o|fgts|horas?\s+extras?|ass[eé]dio|consumidor|cdc|garantia|reembolso|cobran[cç]a|negativa[cç][aã]o|serasa|spc|banc[aá]rio|empr[eé]stimo|consignado|contrato|processo|audi[eê]ncia|intima[cç][aã]o|crime|criminal|tribut[aá]rio|imposto|im[oó]vel|usucapi[aã]o|loca[cç][aã]o|despejo|advogad|direito|lei|jur[ií]dic|requisito|elegib|me\s+aposent|tenho\s+direito)\b/i;
-    const shouldFetchJus = isWhatsApp || legalIntentRe.test(userMessage);
+    const shouldFetchJus = !fastMode && (isWhatsApp || legalIntentRe.test(userMessage));
     if (shouldFetchJus) {
       try {
         const jr = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/jusbrasil-search`, {
@@ -856,13 +857,16 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       model: "google/gemini-3-flash-preview",
       messages,
       temperature: 0.72,
+      preferFastProvider: fastMode,
+      timeoutMs: fastMode ? 9000 : undefined,
+      maxTokens: fastMode ? 260 : undefined,
     });
 
     let data: any = aiResult.ok ? aiResult.data : null;
     let rawReply: string = aiResult.ok
       ? data?.choices?.[0]?.message?.content ?? ""
       : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
-    if (aiResult.ok && isNearDuplicateReply(rawReply, history)) {
+    if (aiResult.ok && !fastMode && isNearDuplicateReply(rawReply, history)) {
       const retryResult = await chatCompletion({
         model: "google/gemini-3-flash-preview",
         messages: [
@@ -911,7 +915,7 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
     // Análise técnica do caso: começa com heurística local e refina com IA quando disponível.
     const localAnalysis = buildLocalCaseAnalysis(history, userMessage);
     let analysis: any = localAnalysis;
-    try {
+    if (!fastMode) try {
       const convoText = [...history, { role: "user", content: userMessage }, { role: "assistant", content: reply }]
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n");
@@ -949,6 +953,7 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
           { role: "user", content: `Conversa:\n${convoText}\n\nGere o JSON de análise.` },
         ],
         response_format: { type: "json_object" },
+        timeoutMs: 12000,
       });
       if (aResp.ok) {
         const parsed = JSON.parse(aResp.data?.choices?.[0]?.message?.content || "{}");
@@ -977,7 +982,8 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
     const wantAudio = body.want_audio !== false; // default true
     const audio_base64 = wantAudio ? await synthesizeSpeech(reply) : null;
 
-    // Salva conversa e agendamento no banco (não bloqueia resposta se falhar)
+    // Salva conversa e agendamento no banco. No modo voz rápido, usa waitUntil para não segurar a resposta falada.
+    const saveConversationAndAppointment = async () => {
     try {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       const { error: convErr } = await supabase.from("conversations").insert({
@@ -1049,6 +1055,16 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
       }
     } catch (err) {
       console.error("Erro ao salvar conversa/agendamento:", err);
+    }
+    };
+
+    const savePromise = saveConversationAndAppointment();
+    if (fastMode) {
+      const edgeRuntime = (globalThis as any).EdgeRuntime;
+      if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(savePromise);
+      else savePromise.catch((err) => console.error("Erro async ao salvar conversa/agendamento:", err));
+    } else {
+      await savePromise;
     }
 
     return new Response(
