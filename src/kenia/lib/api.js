@@ -862,6 +862,7 @@ const staticPost = (url, body = {}) => {
           body: {
             prompt: topic,
             title: body.title || "",
+            subtitle: body.subtitle || "",
             network: body.network || "",
             format: body.format || "",
             tone: body.tone || "",
@@ -870,6 +871,7 @@ const staticPost = (url, body = {}) => {
             logo_base64: body.logo_base64 || null,
           },
         });
+
         if (error) throw error;
         b64 = data?.image_data_url || data?.b64_json || "";
         if (!b64 && data?.error) genError = data.error;
