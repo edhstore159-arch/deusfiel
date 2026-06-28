@@ -5,14 +5,14 @@ export const shouldSuppressLovableDebugInstruction = (_message: string) => false
 export const isLovableNativeDebugRuntime = () => false;
 
 /**
- * Não dispara mais erro fatal de runtime. O Debug Tool deve salvar/registrar
- * instruções sem derrubar o dashboard com tela branca.
+ * Dispara o CustomEvent que o DebugErrorThrower converte em erro fatal
+ * de runtime — necessário para acionar o overlay global da Lovable e o
+ * botão "Try to Fix". NÃO substituir por chat/API/toast.
  */
 export const dispatchLovableDebugError = (message: string) => {
-  if (typeof window !== "undefined" && message) {
-    console.warn("[DebugInstruction]", message);
-  }
-  return false;
+  if (typeof window === "undefined" || !message) return false;
+  window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
+  return true;
 };
 
 export const deliverLovableDebugInstruction = (message: string) => {
