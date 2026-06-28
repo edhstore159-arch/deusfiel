@@ -626,9 +626,10 @@ export default function FloatingVoiceOrb() {
         .map((a) => ({ data: apptISO(a), ...mapAppt(a) }));
 
       const ctxSummary = ctx ? [
+        `REGRA DE AGENDAMENTOS — RESPOSTA OBRIGATÓRIA: se o cliente perguntar sobre agendamentos de HOJE, AMANHÃ ou qualquer data específica, consulte EXCLUSIVAMENTE as listas abaixo e responda de forma direta. Se a lista do dia perguntado estiver vazia ([]), diga claramente "Não há agendamentos para [dia]". Se houver itens, diga a quantidade e enumere nome do cliente + horário. NUNCA invente, NUNCA diga que não tem acesso aos dados.`,
         `RESUMO: ${ctx.contacts.length} contatos, ${ctx.leads.length} leads, ${ctx.processes.length} processos, ${ctx.appointments.length} agendamentos (HOJE ${_todayISO}: ${apptsToday.length} | AMANHÃ ${_tomorrowISO}: ${apptsTomorrow.length}), ${ctx.logs.length} mensagens, ${ctx.deadlines.length} prazos.`,
-        `AGENDAMENTOS HOJE (${_todayISO}): ${JSON.stringify(apptsToday)}`,
-        `AGENDAMENTOS AMANHÃ (${_tomorrowISO}): ${JSON.stringify(apptsTomorrow)}`,
+        `AGENDAMENTOS HOJE (${_todayISO}) — total ${apptsToday.length}: ${JSON.stringify(apptsToday)}`,
+        `AGENDAMENTOS AMANHÃ (${_tomorrowISO}) — total ${apptsTomorrow.length}: ${JSON.stringify(apptsTomorrow)}`,
         `PRÓXIMOS AGENDAMENTOS (até 30, ordenados por data): ${JSON.stringify(upcoming)}`,
         `AGENDAMENTOS POR DATA (ISO → lista): ${JSON.stringify(apptsByDate)}`,
         `Leads (top 10): ${JSON.stringify((ctx.leads||[]).slice(0, 10).map((l) => ({ nome: l.name, tel: l.phone, area: l.case_type, etapa: l.stage })))}`,
