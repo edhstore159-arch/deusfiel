@@ -72,22 +72,28 @@ export default function Onboarding() {
 
   useEffect(() => {
     if (step !== 3 || connected) return;
+    let stopped = false;
     const refreshQr = async () => {
       try {
         const { data: status } = await api.get("/whatsapp/baileys/status");
         if (status?.connected) {
           setConnected(true);
           setQrImg(null);
+          try { localStorage.setItem("wa_connected", "1"); } catch {}
           return;
         }
-        const { data: qrData } = await api.get("/whatsapp/qr");
-        applyQrResponse(qrData);
+        // Só pede novo QR se ainda não temos um — evita invalidar a sessão atual
+        if (!qrImg && !stopped) {
+          const { data: qrData } = await api.get("/whatsapp/qr");
+          applyQrResponse(qrData);
+        }
       } catch {}
     };
     refreshQr();
-    const timer = window.setInterval(refreshQr, 10000);
-    return () => window.clearInterval(timer);
-  }, [step, connected]);
+    // Polling longo (60s) para não derrubar QR/sessão ativa
+    const timer = window.setInterval(refreshQr, 60000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [step, connected, qrImg]);
 
   const saveStep1 = async () => {
     if (!data.office_name) { toast.error("Informe o nome do escritório"); return; }
