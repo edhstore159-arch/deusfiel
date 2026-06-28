@@ -981,6 +981,7 @@ const staticPost = (url, body = {}) => {
             image2_base64: body.image2_base64,
             prompt: body.prompt || "",
             mode: body.mode,
+            emergentApiKey: body.emergentApiKey || body.overrideKey || undefined,
           },
         });
         if (error) throw error;
@@ -996,7 +997,11 @@ const staticPost = (url, body = {}) => {
         const sourceImage = body.image_base64 || body.image_b64 || body.image || "";
         if (!sourceImage) return response({ ok: false, error: "Imagem original ausente" });
         const { data, error } = await supabase.functions.invoke("edit-creative", {
-          body: { image_base64: sourceImage, prompt: body.prompt || body.instruction || "" },
+          body: {
+            image_base64: sourceImage,
+            prompt: body.prompt || body.instruction || "",
+            emergentApiKey: body.emergentApiKey || body.overrideKey || undefined,
+          },
         });
         if (error) throw error;
         if (!data?.ok || !(data?.image || data?.image_b64)) {
