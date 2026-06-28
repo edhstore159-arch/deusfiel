@@ -114,9 +114,9 @@ export default function AppLayout() {
       {/* Sidebar — nude/gold executive (drawer no mobile, fixo no desktop) */}
       <aside
         className={`bg-card border-r border-nude-200 flex flex-col w-64 z-50
-                    fixed inset-y-0 left-0 transform transition-transform duration-300 ease-in-out
+                    fixed inset-y-0 left-0 h-[100dvh] max-h-[100dvh] transform transition-transform duration-300 ease-in-out
                     ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-                    lg:static lg:translate-x-0 lg:z-auto`}
+                    lg:static lg:translate-x-0 lg:z-auto lg:h-auto lg:max-h-none`}
         data-testid="app-sidebar"
       >
         <div className="px-6 py-6 border-b border-nude-200 flex items-center justify-between">
