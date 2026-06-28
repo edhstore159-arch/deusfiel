@@ -181,6 +181,44 @@ function dataUrlToBlob(value: string): { blob: Blob; filename: string } | null {
   return { blob: new Blob([bytes], { type: mime }), filename: `reference.${ext}` };
 }
 
+function dataUrlToBytes(value: string): { bytes: Uint8Array; mime: string; filename: string } | null {
+  const m = String(value || "").match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!m) return null;
+  const mime = m[1] || "image/png";
+  const ext = mime.includes("jpeg") ? "jpg" : (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
+  const bin = atob(m[2]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { bytes, mime, filename: `reference.${ext}` };
+}
+
+function buildMultipartBody(
+  fields: Record<string, string>,
+  files: Array<{ name: string; filename: string; mime: string; bytes: Uint8Array }>,
+) {
+  const boundary = `----kenia-${crypto.randomUUID()}`;
+  const encoder = new TextEncoder();
+  const chunks: Uint8Array[] = [];
+  const pushText = (value: string) => chunks.push(encoder.encode(value));
+  for (const [name, value] of Object.entries(fields)) {
+    pushText(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`);
+  }
+  for (const file of files) {
+    pushText(`--${boundary}\r\nContent-Disposition: form-data; name="${file.name}"; filename="${file.filename}"\r\nContent-Type: ${file.mime}\r\n\r\n`);
+    chunks.push(file.bytes);
+    pushText("\r\n");
+  }
+  pushText(`--${boundary}--\r\n`);
+  const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const body = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return { body, contentType: `multipart/form-data; boundary=${boundary}`, contentLength: String(length) };
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 25000) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -251,19 +289,16 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
   try {
     if (imageUrls.length > 0) {
-      const form = new FormData();
-      form.append("model", "gpt-image-1");
-      form.append("prompt", safeOpts.prompt);
-      form.append("size", "1024x1024");
-      for (const u of imageUrls.slice(0, 4)) {
-        const converted = dataUrlToBlob(u);
-        if (converted) form.append("image", converted.blob, converted.filename);
-      }
-      if (form.has("image")) {
+      const files = imageUrls.slice(0, 4).map((u) => dataUrlToBytes(u)).filter(Boolean) as Array<{ bytes: Uint8Array; mime: string; filename: string }>;
+      if (files.length) {
+        const multipart = buildMultipartBody(
+          { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024" },
+          files.map((file) => ({ name: "image", ...file })),
+        );
         const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
           method: "POST",
-          headers: { Authorization: `Bearer ${key}` },
-          body: form,
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": multipart.contentType, "Content-Length": multipart.contentLength },
+          body: multipart.body,
         }, 45000);
         const text = await resp.text();
         if (resp.ok) {
