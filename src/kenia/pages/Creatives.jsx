@@ -202,9 +202,10 @@ export default function Creatives() {
       }
       setPreview(data);
       setOpen(false);
-      setForm({ title: "", network: "instagram", format: "post", topic: "", tone: "profissional", case_type: "" });
+      setForm({ title: "", network: "instagram", format: "post", topic: "", tone: "profissional", case_type: "", caption: "", subtitle: "" });
       setRefImage(null);
-      setLogoImage(null);
+      // logoImage permanece salvo (persistente) para próximos criativos
+
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Erro ao gerar");
