@@ -1056,13 +1056,19 @@ const staticPost = (url, body = {}) => {
           return response({ ok: false, error: data?.error || "Edição não retornou imagem" });
         }
         const newImage = await compactImageForStorage(data.image || data.image_b64);
+        const newStoragePath = await uploadCreativeAsset(newImage, {
+          prompt: body.prompt || body.instruction || "Edição de criativo",
+          kind: "creative",
+        });
         if (body.id) {
           const items = read("creatives", seedCreatives).map((item) =>
-            item.id === body.id ? { ...item, image_b64: newImage, last_edit_prompt: body.prompt || null } : item,
+            item.id === body.id
+              ? { ...item, image_b64: newImage, storage_path: newStoragePath || item.storage_path, last_edit_prompt: body.prompt || null }
+              : item,
           );
           write("creatives", items);
         }
-        return response({ ok: true, image_b64: newImage, image: newImage });
+        return response({ ok: true, image_b64: newImage, image: newImage, storage_path: newStoragePath || null });
       } catch (e) {
         return response({ ok: false, error: e?.message || String(e) });
       }
