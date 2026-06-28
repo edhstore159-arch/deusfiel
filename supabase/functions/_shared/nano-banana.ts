@@ -21,14 +21,23 @@ function withFacePreservation(prompt: string) {
   return `${prompt}\n\n${FACE_PRESERVATION_LOCK}\nNegative: distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, plastic skin, over-smoothed skin, changed identity, different person.`;
 }
 
+function isLikelyImageUrl(url: string) {
+  return /^https?:\/\//i.test(url) && (
+    /\.(?:png|jpe?g|webp|gif)(?:\?|$)/i.test(url) ||
+    /\/storage\/v1\/object\//i.test(url) ||
+    /\/render\/image\//i.test(url) ||
+    /image/i.test(url)
+  );
+}
+
 function extractImageFromAny(value: any, depth = 0): string | null {
   if (!value || depth > 8) return null;
   const RX = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/;
   if (typeof value === "string") {
     const dataUrl = value.match(RX)?.[0];
     if (dataUrl) return dataUrl.replace(/\s+/g, "");
-    const imageUrl = value.match(/https?:\/\/[^\s"'<>]+\.(?:png|jpe?g|webp)(?:\?[^\s"'<>]*)?/i)?.[0];
-    if (imageUrl) return imageUrl;
+    const imageUrl = value.match(/https?:\/\/[^\s"'<>]+/i)?.[0];
+    if (imageUrl && isLikelyImageUrl(imageUrl)) return imageUrl;
     return null;
   }
   if (Array.isArray(value)) {
