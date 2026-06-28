@@ -14,8 +14,20 @@ const INITIAL = [
     role: "assistant",
     content:
       "Olá! Sou **Claude**, seu assistente de IA gratuito integrado ao dashboard. Como posso ajudar hoje?",
+    provider: "sistema",
   },
 ];
+
+const providerLabel = (provider) => {
+  const normalized = String(provider || "").toLowerCase();
+  if (normalized === "ollama") return "Cloud Ollama";
+  if (normalized === "lovable") return "Lovable Cloud";
+  if (normalized === "gemini") return "Gemini";
+  if (normalized === "emergent") return "Emergent";
+  if (normalized === "anthropic") return "Anthropic Claude";
+  if (normalized === "sistema") return "Sistema";
+  return provider || "IA";
+};
 
 export default function ClaudeChat() {
   const [messages, setMessages] = useState(() => {
@@ -57,7 +69,7 @@ export default function ClaudeChat() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const content = data?.content || "Sem resposta.";
-      setMessages((m) => [...m, { role: "assistant", content }]);
+      setMessages((m) => [...m, { role: "assistant", content, provider: data?.provider || "IA" }]);
     } catch (e) {
       toast.error("Erro ao falar com Claude: " + (e?.message || e));
       setMessages((m) => [...m, { role: "assistant", content: "_Erro temporário. Tente novamente em instantes._" }]);
@@ -105,6 +117,11 @@ export default function ClaudeChat() {
                     : "bg-muted text-foreground"
                 }`}
               >
+                {m.role === "assistant" && m.provider && (
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Respondido por: {providerLabel(m.provider)}
+                  </div>
+                )}
                 {m.role === "assistant" ? (
                   <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-pre:my-2">
                     <ReactMarkdown>{m.content}</ReactMarkdown>
