@@ -382,6 +382,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
     "vertex_ai/gemini-3.1-flash-image-preview",
   ];
   let lastError = "";
+  let quotaError = "";
   const isQuotaError = (value: string) => /budget|exceed|quota|daily[_\s-]?(limit|spend)|daily_limit_reached|limit[_\s-]?reached/i.test(value);
   const quotaMessage = (detail: string) =>
     `Emergent: chave válida, mas bloqueada por limite/cota diária no provedor. Detalhe: ${detail}`;
@@ -401,7 +402,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         const txt = (await resp.text()).slice(0, 300);
         lastError = `Emergent[${model}] ${resp.status}: ${txt}`;
         if (isQuotaError(txt)) {
-          return { url: null, error: quotaMessage(txt) };
+          quotaError = quotaMessage(txt);
         }
         continue;
       }
@@ -417,6 +418,36 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
 
   try {
     if (imageUrls.length > 0) {
+      const form = new FormData();
+      form.append("model", "gpt-image-1");
+      form.append("prompt", safeOpts.prompt);
+      form.append("size", "1024x1024");
+      for (const u of imageUrls.slice(0, 4)) {
+        const converted = dataUrlToBlob(u);
+        if (!converted) continue;
+        form.append(imageUrls.length > 1 ? "image[]" : "image", converted.blob, converted.filename);
+      }
+      if (form.has("image") || form.has("image[]")) {
+        const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}` },
+          body: form,
+        }, 30000);
+        const text = await resp.text();
+        if (resp.ok) {
+          const data = JSON.parse(text);
+          const b64 = data?.data?.[0]?.b64_json;
+          const url = data?.data?.[0]?.url || extractImageFromAny(data);
+          if (b64) return { url: `data:image/png;base64,${b64}` };
+          if (url) return { url };
+        } else if (isQuotaError(text)) {
+          quotaError = quotaMessage(text.slice(0, 240));
+        } else {
+          lastError = `Emergent images/edits ${resp.status}: ${text.slice(0, 240)}`;
+          console.warn("⚠️ Emergent images/edits falhou:", resp.status, text.slice(0, 240));
+        }
+      }
+
       const files = imageUrls.slice(0, 4).map((u) => dataUrlToBytes(u)).filter(Boolean) as Array<{ bytes: Uint8Array; mime: string; filename: string }>;
       if (files.length) {
         const multipart = buildMultipartBody(
@@ -436,8 +467,9 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           if (b64) return { url: `data:image/png;base64,${b64}` };
           if (url) return { url };
         } else if (isQuotaError(text)) {
-          return { url: null, error: quotaMessage(text.slice(0, 240)) };
+          quotaError = quotaMessage(text.slice(0, 240));
         } else {
+          lastError = `Emergent images/edits ${resp.status}: ${text.slice(0, 240)}`;
           console.warn("⚠️ Emergent images/edits falhou:", resp.status, text.slice(0, 240));
         }
       }
@@ -455,15 +487,16 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         if (b64) return { url: `data:image/png;base64,${b64}` };
         if (url) return { url };
       } else if (isQuotaError(text)) {
-        return { url: null, error: quotaMessage(text.slice(0, 240)) };
+        quotaError = quotaMessage(text.slice(0, 240));
       } else {
+        lastError = `Emergent images/generations ${resp.status}: ${text.slice(0, 240)}`;
         console.warn("⚠️ Emergent images/generations falhou:", resp.status, text.slice(0, 240));
       }
     }
   } catch (e) {
     console.warn("⚠️ Emergent images API erro:", (e as Error)?.message || e);
   }
-  return { url: null, error: lastError || "Emergent falhou" };
+  return { url: null, error: lastError || quotaError || "Emergent falhou" };
 }
 
 async function callPollinations(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
