@@ -27,7 +27,10 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
-    throw new Error(message);
+    const toThrow = message;
+    // Clear on next tick so React's error recovery rerender doesn't re-throw forever.
+    queueMicrotask(() => setMessage(null));
+    throw new Error(toThrow);
   }
 
   return null;
