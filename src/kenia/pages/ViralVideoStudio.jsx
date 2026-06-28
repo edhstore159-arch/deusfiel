@@ -57,6 +57,28 @@ function buildPrompt(category, customScene, durationSeconds) {
   return `${BASE_STYLE} Duration: ${durationSeconds} seconds. Scene: ${action}. Mood: ${selected.mood}. Camera: vertical smartphone cinematic framing, continuous handheld movement, slow motion accents, shallow depth of field, realistic environment. If the scene contains fruit/object/product, keep it standalone and never merge it with human anatomy unless the user explicitly asks for a human face on the object. ${NEGATIVE}`;
 }
 
+// Veo (Emergent) prefers a single continuous-shot description in English with
+// concrete camera, subject, action, environment, lighting and lens details.
+// We wrap the user scene with strong cinematographic guidance so the model
+// reliably generates a 9:16 vertical clip instead of failing or rendering text cards.
+function buildVeoPrompt(basePrompt, category, customScene, seconds) {
+  const selected = CATEGORIES[category] || CATEGORIES.dramatico;
+  const action = (customScene || "").trim() || selected.action;
+  const mood = selected.mood;
+  const lines = [
+    `Cinematic vertical 9:16 video, single continuous take (no cuts, no transitions, no split-screen, no on-screen text), approximately ${seconds} seconds long.`,
+    `Subject and action: ${action}.`,
+    `Mood: ${mood}.`,
+    `Camera: handheld smartphone-style cinematography, slow gradual push-in, shallow depth of field, 35mm lens look, eye-level framing for people / tabletop angle for objects.`,
+    `Lighting: dramatic high-contrast natural light with warm highlights and soft shadows, subtle film grain, realistic color grading.`,
+    `Realism: hyper-realistic 4K, anatomically correct human faces with alive expressive eyes, natural lip movement when speaking, real physical motion of objects with clean edges (no morphing between people and objects unless explicitly described).`,
+    `Audio context (visual only — model does not need to synthesize sound): natural ambient environment.`,
+    `Avoid: fast cuts, captions, watermarks, logos, deformed hands, extra fingers, melted faces, dead eyes, cartoon style (unless category is cartoon), text overlays.`,
+    `Reference style brief: ${basePrompt}`,
+  ];
+  return lines.join(" ");
+}
+
 const splitLines = (text, max = 30) => {
   const words = String(text || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   const lines = [];
