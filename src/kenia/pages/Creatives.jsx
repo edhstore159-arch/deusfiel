@@ -367,6 +367,18 @@ export default function Creatives() {
               </div>
               <div><Label>Tema / Mensagem Principal</Label><Textarea rows={3} placeholder="Sobre o que é o post? Qual a mensagem chave?" value={form.topic} onChange={e => setForm({ ...form, topic: e.target.value })} data-testid="creative-topic" /></div>
 
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <Label>Subtítulo no post (opcional)</Label>
+                  <Input placeholder="Ex: Saiba seus direitos" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Legenda personalizada (opcional)</Label>
+                  <Textarea rows={2} placeholder="Se preenchida, será usada como legenda do post em vez da gerada pela IA." value={form.caption} onChange={e => setForm({ ...form, caption: e.target.value })} />
+                </div>
+              </div>
+
+
               <div>
                 <Label>Imagem de referência (opcional)</Label>
                 <p className="text-xs text-nude-500 mb-1.5">Envie um pôster/modelo para a IA manter layout, cores e estilo, trocando só o conteúdo pedido.</p>
