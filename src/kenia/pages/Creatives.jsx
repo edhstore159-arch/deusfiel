@@ -33,11 +33,15 @@ export default function Creatives() {
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState(null);
   const [refImage, setRefImage] = useState(null); // data URL
-  const [logoImage, setLogoImage] = useState(null); // data URL (logo do escritório)
+  const [logoImage, setLogoImage] = useState(() => {
+    try { return localStorage.getItem("kenia.creative.logo") || null; } catch { return null; }
+  }); // data URL (logo do escritório) — persistido entre sessões
   const [form, setForm] = useState({
     title: "", network: "instagram", format: "post",
     topic: "", tone: "profissional", case_type: "",
+    caption: "", subtitle: "",
   });
+
   const [scheduled, setScheduled] = useState([]);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleTarget, setScheduleTarget] = useState(null); // creative item
