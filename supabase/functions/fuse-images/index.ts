@@ -91,17 +91,17 @@ function normalizeText(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-const COLOR_ALIASES: Array<{ re: RegExp; en: string; strong: string }> = [
-  { re: /\b(azul|blue)\b/i, en: 'blue', strong: 'clear saturated royal blue (#005DFF)' },
-  { re: /\b(vermelh[ao]|red)\b/i, en: 'red', strong: 'clear red' },
-  { re: /\b(preto|preta|black)\b/i, en: 'black', strong: 'deep black' },
-  { re: /\b(branco|branca|white)\b/i, en: 'white', strong: 'clean white' },
-  { re: /\b(verde|green)\b/i, en: 'green', strong: 'clear green' },
-  { re: /\b(amarel[ao]|yellow)\b/i, en: 'yellow', strong: 'clear yellow' },
-  { re: /\b(rosa|pink)\b/i, en: 'pink', strong: 'clear pink' },
-  { re: /\b(roxo|roxa|purple)\b/i, en: 'purple', strong: 'clear purple' },
-  { re: /\b(laranja|orange)\b/i, en: 'orange', strong: 'clear orange' },
-  { re: /\b(cinza|gray|grey)\b/i, en: 'gray', strong: 'neutral gray' },
+const COLOR_ALIASES: Array<{ re: RegExp; en: string; strong: string; avoid: string }> = [
+  { re: /\b(azul|blue)\b/i, en: 'blue', strong: 'vivid bright pure blue (hex #1E73FF), clearly recognizable as blue', avoid: 'navy, dark blue, midnight blue, black, gray, teal, purple' },
+  { re: /\b(vermelh[ao]|red)\b/i, en: 'red', strong: 'vivid pure red (hex #E53935)', avoid: 'orange, pink, brown, dark maroon, black' },
+  { re: /\b(preto|preta|black)\b/i, en: 'black', strong: 'deep pure black (hex #0A0A0A)', avoid: 'dark gray, navy, brown' },
+  { re: /\b(branco|branca|white)\b/i, en: 'white', strong: 'clean pure white (hex #FFFFFF)', avoid: 'cream, beige, gray' },
+  { re: /\b(verde|green)\b/i, en: 'green', strong: 'vivid grass green (hex #2E9E44)', avoid: 'teal, olive, dark green, black' },
+  { re: /\b(amarel[ao]|yellow)\b/i, en: 'yellow', strong: 'vivid bright yellow (hex #FFD500)', avoid: 'orange, mustard, gold, brown' },
+  { re: /\b(rosa|pink)\b/i, en: 'pink', strong: 'vivid bright pink (hex #FF4FA3)', avoid: 'red, purple, magenta' },
+  { re: /\b(roxo|roxa|purple)\b/i, en: 'purple', strong: 'vivid purple (hex #8E44AD)', avoid: 'pink, blue, black' },
+  { re: /\b(laranja|orange)\b/i, en: 'orange', strong: 'vivid orange (hex #FF7A1A)', avoid: 'red, yellow, brown' },
+  { re: /\b(cinza|gray|grey)\b/i, en: 'gray', strong: 'neutral medium gray (hex #808080)', avoid: 'black, white, blue' },
 ];
 
 function findColor(text: string, preferAfterPara = false) {
@@ -121,8 +121,9 @@ function buildLocalizedColorEditPrompt(userTheme: string): string | null {
   const source = COLOR_ALIASES.find((c) => c.en !== target.en && c.re.test(beforeTarget));
   const sourceText = source ? ` currently ${source.en}` : '';
 
-  return `IMAGE EDIT MODE — use the attached image as the exact base canvas. Localized garment color replacement: identify the shirt/t-shirt/top/clothing${sourceText} and recolor ONLY that garment to ${target.strong}. The final visible garment color MUST be ${target.en}. Preserve the original garment fabric texture, seams, folds, wrinkles, shadows, highlights, print/logos, shape and fit. Preserve the same person, face, skin, hair, hands, pose, body, background, lighting, camera angle, crop, perspective and all other objects exactly. Do not create a new person, do not create a new scene, do not change the composition. Photorealistic edit, natural fabric color, clean edges. User instruction: ${userTheme}. Negative: unchanged garment color, red shirt if target is blue, new shirt shape, different clothing style, different person, different background, new scene, ${NEGATIVE}`;
+  return `IMAGE EDIT MODE — use the attached image as the exact base canvas. Localized garment color replacement: identify the shirt/t-shirt/top/clothing${sourceText} and recolor ONLY that garment to ${target.strong}. The final visible garment color MUST be unmistakably ${target.en.toUpperCase()} — a viewer must instantly say "${target.en}". Do NOT use ${target.avoid}. Use a saturated, bright, daylight version of ${target.en}; avoid muddy, washed-out, or overly dark tones. Preserve the original garment fabric texture, seams, folds, wrinkles, shadows, highlights, prints/logos, shape and fit. Preserve the same person, face, skin, hair, hands, pose, body, background, lighting, camera angle, crop and perspective exactly. Do not create a new person or new scene. Photorealistic edit, natural fabric color, clean edges. User instruction: ${userTheme}. Negative: ${target.avoid}, unchanged garment color, washed-out color, desaturated color, near-black garment, near-white garment, different clothing style, different person, different background, new scene, ${NEGATIVE}`;
 }
+
 
 async function elaborateTemplatePrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || "").trim() || "Replace text and photo with the new content provided by the user.";
