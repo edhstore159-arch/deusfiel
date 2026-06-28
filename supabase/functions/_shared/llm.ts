@@ -666,9 +666,42 @@ async function imagePollinations(opts: ImageOptions) {
   }
 }
 
+async function enhancePromptWithOllama(userPrompt: string): Promise<string> {
+  if (!OLLAMA_URL || isUnsupportedOllamaHost(OLLAMA_URL)) return userPrompt;
+  try {
+    const system = `Você é um diretor de arte que converte pedidos em PT-BR em PROMPTS de geração de imagem em INGLÊS, fotorrealistas, fiéis ao pedido.
+REGRAS:
+- Mantenha o ASSUNTO EXATO pedido pelo usuário (santos católicos, objetos, paisagens, pessoas). NUNCA troque por fruta/comida se não foi pedido.
+- Para santos/figuras religiosas: descreva iconografia católica clássica correta (vestes, halo, atributos: ex. São Jorge = cavaleiro, armadura prateada, cavalo branco, lança, dragão).
+- Para paisagens: sem rostos, sem pessoas, sem antropomorfismo.
+- Para pessoas: anatomia correta, mãos com 5 dedos, rosto natural.
+- Inclua: composição, iluminação, lente, materiais, atmosfera.
+- Inclua "negative:" com o que NÃO deve aparecer.
+- Devolva APENAS o prompt final em inglês, sem explicação, sem markdown, máximo 180 palavras.`;
+    const r = await chatOllama({
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: `Pedido do usuário: "${userPrompt}"\n\nGere o prompt final em inglês:` },
+      ],
+      temperature: 0.4,
+    });
+    if (!r.ok) return userPrompt;
+    const out = String(r.data?.choices?.[0]?.message?.content || "").trim()
+      .replace(/^```[a-z]*\s*/i, "").replace(/\s*```$/i, "")
+      .replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    if (!out || out.length < 20) return userPrompt;
+    // Mantém o pedido original como âncora + prompt enriquecido do Ollama
+    return `${userPrompt}. ${out}`;
+  } catch {
+    return userPrompt;
+  }
+}
+
 export async function generateImage(opts: ImageOptions) {
-  const humanSubject = hasHumanSubject(opts.prompt);
-  const faceSafeOpts = { ...opts, prompt: withFaceSafety(opts.prompt), quality: opts.quality || (humanSubject ? "high" : undefined) };
+  const enriched = await enhancePromptWithOllama(opts.prompt);
+  const humanSubject = hasHumanSubject(enriched);
+  const faceSafeOpts = { ...opts, prompt: withFaceSafety(enriched), quality: opts.quality || (humanSubject ? "high" : undefined) };
+
   // Para imagens com pessoas, prioriza modelos com melhor anatomia facial; Pollinations fica só como fallback.
   if (LOVABLE_KEY) {
     const r = await imageLovable(faceSafeOpts);
