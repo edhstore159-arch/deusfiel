@@ -88,7 +88,56 @@ function isIsolatedObjectOnly(prompt: string) {
 }
 const FRUIT_OR_OBJECT = /\b(fruit|apple|maçã|maca|macan|banana|laranja|orange|uva|grape|morango|strawberry|abacaxi|pineapple|melancia|watermelon|mam[ãa]o|papaya|pera|pear|manga|mango|lim[ãa]o|lemon|p[êe]ssego|peach|cereja|cherry|kiwi|fruta|objeto|produto|product|object|food|comida|bolo|p[ãa]o|baguete|book|livro|carro|casa|flor|torre|tower|monumento|monument|building|edif[íi]cio|pr[ée]dio|landmark|cidade|city)\b/i;
 
+// Lista ampla de pássaros/animais (PT-BR + EN) com identificação ESPECÍFICA da espécie.
+// O nome da espécie é injetado literalmente no prompt para evitar que o modelo gere
+// um pássaro genérico ("bird") quando o usuário pediu, por exemplo, um "tucano".
+const BIRD_SPECIES: Array<{ re: RegExp; en: string; pt: string; traits: string }> = [
+  { re: /\b(sabi[áa]|rufous-bellied\s+thrush)\b/i, en: "rufous-bellied thrush (Turdus rufiventris, 'sabiá-laranjeira')", pt: "sabiá-laranjeira", traits: "small songbird, brown back, orange belly, dark head, short yellow beak" },
+  { re: /\b(beija[- ]?flor|hummingbird|colibri)\b/i, en: "hummingbird (Trochilidae)", pt: "beija-flor", traits: "tiny iridescent bird, long thin beak, hovering wings in motion blur, often near flower" },
+  { re: /\b(arara[- ]?azul|hyacinth\s+macaw)\b/i, en: "hyacinth macaw (Anodorhynchus hyacinthinus)", pt: "arara-azul", traits: "large cobalt-blue parrot, yellow eye ring and yellow patch at beak base, massive black hooked beak" },
+  { re: /\b(arara[- ]?vermelha|scarlet\s+macaw)\b/i, en: "scarlet macaw (Ara macao)", pt: "arara-vermelha", traits: "large parrot with vivid scarlet red body, blue and yellow wing feathers, white face, hooked beak" },
+  { re: /\b(arara|macaw)\b/i, en: "macaw (Ara)", pt: "arara", traits: "large colorful long-tailed parrot, strong hooked beak, vivid plumage" },
+  { re: /\b(papagaio|parrot)\b/i, en: "Amazon parrot (Amazona aestiva, 'papagaio-verdadeiro')", pt: "papagaio", traits: "medium green parrot, yellow forehead, blue around eyes, red wing patches, curved beak" },
+  { re: /\b(tucano|toucan)\b/i, en: "toco toucan (Ramphastos toco)", pt: "tucano-toco", traits: "black body, white throat, huge bright orange beak with black tip, blue skin around the eye" },
+  { re: /\b(can[áa]rio|canary)\b/i, en: "Atlantic canary (Serinus canaria)", pt: "canário", traits: "small bright yellow songbird, short conical beak" },
+  { re: /\b(coruja|owl)\b/i, en: "owl (Strigiformes)", pt: "coruja", traits: "round head, large forward-facing eyes, feather tufts, camouflaged plumage, silent posture" },
+  { re: /\b([áa]guia|eagle)\b/i, en: "eagle (Accipitridae)", pt: "águia", traits: "large raptor, hooked yellow beak, sharp talons, broad wings, piercing eyes" },
+  { re: /\b(gavi[ãa]o|hawk)\b/i, en: "hawk (Accipitridae)", pt: "gavião", traits: "medium raptor, sharp hooked beak, strong talons, brown/streaked plumage" },
+  { re: /\b(urubu|black\s+vulture|vulture)\b/i, en: "black vulture (Coragyps atratus)", pt: "urubu", traits: "all-black plumage, bare grey/black head, hooked beak, broad wings" },
+  { re: /\b(bem[- ]?te[- ]?vi|great\s+kiskadee)\b/i, en: "great kiskadee (Pitangus sulphuratus)", pt: "bem-te-vi", traits: "yellow belly, white throat, black-and-white striped head, brown back, stout black beak" },
+  { re: /\b(jo[ãa]o[- ]?de[- ]?barro|rufous\s+hornero)\b/i, en: "rufous hornero (Furnarius rufus)", pt: "joão-de-barro", traits: "small reddish-brown bird, often near its iconic round clay oven nest" },
+  { re: /\b(andorinha|swallow)\b/i, en: "swallow (Hirundinidae)", pt: "andorinha", traits: "slender bird, long pointed wings, forked tail, dark blue back, light belly, in flight" },
+  { re: /\b(pomba|pombo|dove|pigeon)\b/i, en: "rock dove / pigeon (Columba livia)", pt: "pomba", traits: "grey body, iridescent green-purple neck, short beak, red feet" },
+  { re: /\b(pardal|sparrow)\b/i, en: "house sparrow (Passer domesticus)", pt: "pardal", traits: "small brown-and-grey bird with streaked back, short conical beak" },
+  { re: /\b(periquito|parakeet|budgerigar|budgie)\b/i, en: "parakeet (Melopsittacus undulatus)", pt: "periquito", traits: "small green/yellow parrot, long tail, short hooked beak" },
+  { re: /\b(calopsita|cockatiel)\b/i, en: "cockatiel (Nymphicus hollandicus)", pt: "calopsita", traits: "small grey parrot with yellow crest and round orange cheek patches" },
+  { re: /\b(pav[ãa]o|peacock|peafowl)\b/i, en: "Indian peafowl (Pavo cristatus)", pt: "pavão", traits: "iridescent blue body, fan of long iridescent green tail feathers with eye-spots, crest on head" },
+  { re: /\b(flamingo)\b/i, en: "flamingo (Phoenicopterus)", pt: "flamingo", traits: "tall pink wading bird, long curved neck, long thin legs, downward-bent beak" },
+  { re: /\b(cisne|swan)\b/i, en: "swan (Cygnus)", pt: "cisne", traits: "large white waterbird, long curved neck, orange or black beak" },
+  { re: /\b(pato|duck)\b/i, en: "duck (Anatidae)", pt: "pato", traits: "waterbird, flat beak, webbed feet, rounded body" },
+  { re: /\b(ganso|goose)\b/i, en: "goose (Anser)", pt: "ganso", traits: "large waterbird, long neck, orange beak and feet" },
+  { re: /\b(pinguim|penguin)\b/i, en: "penguin (Spheniscidae)", pt: "pinguim", traits: "flightless seabird, black back, white belly, flipper wings, waddling posture" },
+  { re: /\b(avestruz|ostrich)\b/i, en: "ostrich (Struthio camelus)", pt: "avestruz", traits: "very large flightless bird, long bare neck and legs, fluffy black/white plumage" },
+  { re: /\b(galo|rooster)\b/i, en: "rooster (Gallus gallus domesticus)", pt: "galo", traits: "male chicken with bright red comb and wattles, long curved tail feathers, colorful plumage" },
+  { re: /\b(galinha|hen|chicken)\b/i, en: "hen (Gallus gallus domesticus)", pt: "galinha", traits: "female chicken, small red comb, rounded body, brown/white feathers" },
+  { re: /\b(p[áa]ssaro|passarinho|ave|bird)\b/i, en: "bird", pt: "pássaro", traits: "small wild bird with anatomically correct beak, eyes, feathers, wings and feet" },
+];
+
+function detectBird(prompt: string) {
+  for (const b of BIRD_SPECIES) if (b.re.test(prompt)) return b;
+  return null;
+}
+
+const ANIMAL_RE = /\b(p[áa]ssaro|passarinho|ave|bird|sabi[áa]|beija[- ]?flor|hummingbird|arara|macaw|papagaio|parrot|tucano|toucan|can[áa]rio|canary|coruja|owl|[áa]guia|eagle|gavi[ãa]o|hawk|urubu|vulture|bem[- ]?te[- ]?vi|kiskadee|jo[ãa]o[- ]?de[- ]?barro|hornero|andorinha|swallow|pomba|pombo|dove|pigeon|pardal|sparrow|periquito|parakeet|budgie|calopsita|cockatiel|pav[ãa]o|peacock|flamingo|cisne|swan|pato|duck|ganso|goose|pinguim|penguin|avestruz|ostrich|galo|rooster|galinha|hen|chicken|c[ãa]o|cachorro|dog|gato|cat|cavalo|horse|le[ãa]o|lion|tigre|tiger|on[çc]a|jaguar|elefante|elephant|girafa|giraffe|macaco|monkey|lobo|wolf|raposa|fox|urso|bear|coelho|rabbit|veado|deer|peixe|fish|tubar[ãa]o|shark|baleia|whale|golfinho|dolphin|tartaruga|turtle|cobra|snake|lagarto|lizard|sapo|frog|borboleta|butterfly|abelha|bee)\b/i;
+
 function objectLockFor(prompt: string) {
+  const bird = detectBird(prompt);
+  if (bird) {
+    return `SUBJECT LOCK (CRITICAL): the subject is a ${bird.en} — in Portuguese "${bird.pt}". Render EXACTLY this species, faithful to its real-world appearance: ${bird.traits}. Do NOT render a generic bird, do NOT substitute for a different species, do NOT mix traits of other birds. Photorealistic wildlife photography, anatomically correct beak, eyes, feathers, wings and feet. Do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
+  }
+  if (ANIMAL_RE.test(prompt)) {
+    return `SUBJECT LOCK (CRITICAL): the subject is the specific animal literally named by the user. Render ONLY that exact species with correct real-world anatomy, proportions, coloration and natural habitat. Do not substitute species, do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
+  }
   const isFruit = FRUIT_RE.test(prompt);
   const isLandmark = LANDMARK_RE.test(prompt);
   const subject = isFruit ? "fruit" : (isLandmark ? "landmark / architectural structure" : "object");
