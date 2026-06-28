@@ -48,16 +48,23 @@ async function checkEmergentImage() {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), 25000);
   try {
-    const r = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
+    const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
       method: "POST",
       signal: controller.signal,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: "gpt-image-1", prompt: "a red apple, photorealistic", size: "1024x1024", n: 1 }),
+      body: JSON.stringify({
+        model: "vertex_ai/gemini-2.5-flash-image",
+        modalities: ["image", "text"],
+        messages: [{ role: "user", content: "Generate a red apple image, photorealistic." }],
+      }),
     });
     const text = await r.text();
     if (!r.ok) return { configured: true, ok: false, status: r.status, error: text.slice(0, 300) };
     let hasImage = false;
-    try { hasImage = !!JSON.parse(text)?.data?.[0]?.b64_json; } catch { /* noop */ }
+    try {
+      const msg = JSON.parse(text)?.choices?.[0]?.message;
+      hasImage = !!msg?.images?.[0]?.image_url?.url || /data:image\//.test(String(msg?.content || ""));
+    } catch { /* noop */ }
     return { configured: true, ok: hasImage, status: r.status, hasImage };
   } catch (e) {
     return { configured: true, ok: false, error: String((e as Error)?.message || e) };
@@ -72,25 +79,29 @@ async function checkEmergentEdit() {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), 35000);
   try {
-    const form = new FormData();
-    form.append("model", "gpt-image-1");
-    form.append("prompt", "turn the reference image blue, keep the same simple shape");
-    form.append("size", "1024x1024");
-    const b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p94AAAAASUVORK5CYII=";
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    form.append("image", new Blob([bytes], { type: "image/png" }), "reference.png");
-    const r = await fetch("https://integrations.emergentagent.com/llm/images/edits", {
+    const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
       method: "POST",
       signal: controller.signal,
-      headers: { Authorization: `Bearer ${key}` },
-      body: form,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: "vertex_ai/gemini-2.5-flash-image",
+        modalities: ["image", "text"],
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "Turn the reference image blue, keep the same simple shape. Return one image only." },
+            { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAIAAADDPmHLAAAAnElEQVR4nO3QQQ0AIBDAMMC/5+ONAvZoFSzZnpsEAF6tnwEA3wYCYgImYCJgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAiZgAvYhAqCBQD9QAAAAAElFTkSuQmCC" } },
+          ],
+        }],
+      }),
     });
     const text = await r.text();
     if (!r.ok) return { configured: true, ok: false, status: r.status, error: text.slice(0, 300) };
     let hasImage = false;
-    try { hasImage = !!JSON.parse(text)?.data?.[0]?.b64_json || !!JSON.parse(text)?.data?.[0]?.url; } catch { /* noop */ }
+    try {
+      const msg = JSON.parse(text)?.choices?.[0]?.message;
+      hasImage = !!msg?.images?.[0]?.image_url?.url || /data:image\//.test(String(msg?.content || ""));
+    } catch { /* noop */ }
     return { configured: true, ok: hasImage, status: r.status, hasImage };
   } catch (e) {
     return { configured: true, ok: false, error: String((e as Error)?.message || e) };
