@@ -428,7 +428,7 @@ export async function generateWithNanoBanana(
         const refined = await callEmergent({
           ...opts,
           imageUrls: [draft.url],
-          prompt: `Refine and fix imperfections (anatomy, hands, eyes, symmetry, lighting, sharpness, artifacts) of this draft image while preserving its composition and subject. ${opts.prompt}`,
+          prompt: `PHOTOREALISTIC FACE & ANATOMY RESTORATION PASS. Use the provided draft strictly as a layout/composition reference and repaint it as a high-fidelity photograph. STRICT REQUIREMENTS: (1) Faces must be perfectly symmetric, anatomically correct, with two natural eyes (matching color, correct pupils, no extra iris), one nose, one mouth with natural lips and teeth, natural skin texture with pores; NO melted, warped, doubled, asymmetric, cross-eyed, missing or extra facial features. (2) Hands must have exactly 5 fingers each, correct proportions, no fused/extra/missing digits. (3) Bodies must have correct proportions and limb count. (4) Preserve original composition, framing, clothing, lighting direction, ethnicity and number of people from the draft. (5) Sharp focus on faces, natural depth of field, professional photography, 50mm lens look, no plastic/CGI/3D-render appearance. NEGATIVE: deformed face, distorted face, mutated face, extra fingers, fused fingers, missing fingers, extra limbs, asymmetric eyes, lazy eye, cross-eyed, malformed mouth, bad teeth, uncanny valley, doll-like, plastic skin, cartoon, illustration, anime, painting, blurry, low-res. Scene context: ${opts.prompt}`,
         });
         if (refined.url) {
           console.info("✨ Pollinations → Emergent refine OK");
