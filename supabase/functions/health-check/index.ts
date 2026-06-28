@@ -66,6 +66,39 @@ async function checkEmergentImage() {
   }
 }
 
+async function checkEmergentEdit() {
+  const key = Deno.env.get("EMERGENT_API_KEY");
+  if (!key) return { configured: false, ok: false, error: "EMERGENT_API_KEY ausente" };
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 35000);
+  try {
+    const form = new FormData();
+    form.append("model", "gpt-image-1");
+    form.append("prompt", "turn the reference image blue, keep the same simple shape");
+    form.append("size", "1024x1024");
+    const b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p94AAAAASUVORK5CYII=";
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    form.append("image", new Blob([bytes], { type: "image/png" }), "reference.png");
+    const r = await fetch("https://integrations.emergentagent.com/llm/images/edits", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+    });
+    const text = await r.text();
+    if (!r.ok) return { configured: true, ok: false, status: r.status, error: text.slice(0, 300) };
+    let hasImage = false;
+    try { hasImage = !!JSON.parse(text)?.data?.[0]?.b64_json || !!JSON.parse(text)?.data?.[0]?.url; } catch { /* noop */ }
+    return { configured: true, ok: hasImage, status: r.status, hasImage };
+  } catch (e) {
+    return { configured: true, ok: false, error: String((e as Error)?.message || e) };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function checkOpenAIImage() {
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) return { configured: false, ok: false, error: "OPENAI_API_KEY ausente" };
@@ -96,6 +129,7 @@ Deno.serve(async (req) => {
   const deep = url.searchParams.get("deep") === "1";
   const ollama = await checkOllama();
   const emergentImage = deep ? await checkEmergentImage() : { configured: !!Deno.env.get("EMERGENT_API_KEY"), note: "passe ?deep=1 para testar geração real" };
+  const emergentEdit = deep ? await checkEmergentEdit() : { configured: !!Deno.env.get("EMERGENT_API_KEY"), note: "passe ?deep=1 para testar edição real" };
   const openaiImage = deep ? await checkOpenAIImage() : { configured: !!Deno.env.get("OPENAI_API_KEY"), note: "passe ?deep=1 para testar geração real" };
   const providers = {
     ollama,
@@ -103,6 +137,7 @@ Deno.serve(async (req) => {
     gemini: { configured: !!Deno.env.get("GEMINI_API_KEY") },
     emergent: { configured: !!Deno.env.get("EMERGENT_API_KEY") },
     emergentImage,
+    emergentEdit,
     openai: { configured: !!Deno.env.get("OPENAI_API_KEY") },
     openaiImage,
   };
