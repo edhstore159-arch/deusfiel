@@ -205,6 +205,72 @@ export type Database = {
           },
         ]
       }
+      cloud_objects: {
+        Row: {
+          created_at: string
+          id: string
+          mime: string | null
+          name: string
+          path: string
+          size: number
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mime?: string | null
+          name: string
+          path: string
+          size?: number
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mime?: string | null
+          name?: string
+          path?: string
+          size?: number
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cloud_sites: {
+        Row: {
+          created_at: string
+          html: string
+          id: string
+          is_public: boolean
+          slug: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          html?: string
+          id?: string
+          is_public?: boolean
+          slug: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          html?: string
+          id?: string
+          is_public?: boolean
+          slug?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           created_at: string
