@@ -309,6 +309,9 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
     "vertex_ai/gemini-3.1-flash-image-preview",
   ];
   let lastError = "";
+  const isQuotaError = (value: string) => /budget|exceed|quota|daily[_\s-]?(limit|spend)|daily_limit_reached|limit[_\s-]?reached/i.test(value);
+  const quotaMessage = (detail: string) =>
+    `Emergent: chave válida, mas bloqueada por limite/cota diária no provedor. Detalhe: ${detail}`;
 
   for (const model of models) {
     try {
@@ -324,8 +327,8 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
       if (!resp.ok) {
         const txt = (await resp.text()).slice(0, 300);
         lastError = `Emergent[${model}] ${resp.status}: ${txt}`;
-        if (/budget[_\s]exceeded|Budget has been exceeded/i.test(txt)) {
-          return { url: null, error: `Emergent: orçamento da chave esgotado. Detalhe: ${txt}` };
+        if (isQuotaError(txt)) {
+          return { url: null, error: quotaMessage(txt) };
         }
         continue;
       }
@@ -358,8 +361,8 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           const url = data?.data?.[0]?.url;
           if (b64) return { url: `data:image/png;base64,${b64}` };
           if (url) return { url };
-        } else if (/budget[_\s]exceeded|Budget has been exceeded/i.test(text)) {
-          return { url: null, error: `Emergent: orçamento da chave esgotado. Detalhe: ${text.slice(0, 240)}` };
+        } else if (isQuotaError(text)) {
+          return { url: null, error: quotaMessage(text.slice(0, 240)) };
         } else {
           console.warn("⚠️ Emergent images/edits falhou:", resp.status, text.slice(0, 240));
         }
@@ -377,8 +380,8 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         const url = data?.data?.[0]?.url;
         if (b64) return { url: `data:image/png;base64,${b64}` };
         if (url) return { url };
-      } else if (/budget[_\s]exceeded|Budget has been exceeded/i.test(text)) {
-        return { url: null, error: `Emergent: orçamento da chave esgotado. Detalhe: ${text.slice(0, 240)}` };
+      } else if (isQuotaError(text)) {
+        return { url: null, error: quotaMessage(text.slice(0, 240)) };
       } else {
         console.warn("⚠️ Emergent images/generations falhou:", resp.status, text.slice(0, 240));
       }

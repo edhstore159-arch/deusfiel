@@ -31,10 +31,21 @@ Deno.serve(async (req) => {
     const spend = parseFloat(h["x-litellm-key-spend"] || "");
     const maxBudget = parseFloat(h["x-litellm-key-max-budget"] || "");
     let budgetExceeded = false;
+    let dailyLimitReached = false;
     let parsedError: string | null = null;
+    let parsedCode: string | null = null;
+    let parsedMessage: string | null = null;
     if (!r.ok) {
       parsedError = text.slice(0, 400);
-      if (/budget|exceeded/i.test(text)) budgetExceeded = true;
+      try {
+        const parsed = JSON.parse(text);
+        parsedCode = parsed?.error?.code || parsed?.error?.type || null;
+        parsedMessage = parsed?.error?.message || null;
+      } catch (_e) {
+        // keep raw text fallback
+      }
+      budgetExceeded = /budget|exceed|quota|daily[_\s-]?(limit|spend)|limit[_\s-]?reached/i.test(text);
+      dailyLimitReached = /daily[_\s-]?(limit|spend)|daily_limit_reached/i.test(text);
     }
     const remaining = !isNaN(spend) && !isNaN(maxBudget) ? Math.max(0, maxBudget - spend) : null;
     return new Response(JSON.stringify({
@@ -43,7 +54,11 @@ Deno.serve(async (req) => {
       spend: isNaN(spend) ? null : spend,
       maxBudget: isNaN(maxBudget) ? null : maxBudget,
       remaining,
+      available: r.ok,
       budgetExceeded,
+      dailyLimitReached,
+      errorCode: parsedCode,
+      errorMessage: parsedMessage,
       headers: h,
       error: parsedError,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
