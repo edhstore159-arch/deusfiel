@@ -56,6 +56,17 @@ export default function Creatives() {
   const [editing, setEditing] = useState(false);
   const [editPreview, setEditPreview] = useState(null);
   const [editUpload, setEditUpload] = useState(null); // data URL for replacement source image
+  const [emergentEditKey, setEmergentEditKey] = useState(() => {
+    try { return localStorage.getItem("kenia.emergent.image.key") || ""; } catch { return ""; }
+  });
+
+  const saveEmergentEditKey = (value) => {
+    setEmergentEditKey(value);
+    try {
+      if (value) localStorage.setItem("kenia.emergent.image.key", value);
+      else localStorage.removeItem("kenia.emergent.image.key");
+    } catch { /* noop */ }
+  };
 
   const onPickImage = (e) => {
     const file = e.target.files?.[0];
@@ -245,6 +256,7 @@ export default function Creatives() {
         id: editTarget.id,
         image_base64: sourceImage,
         prompt: editPrompt.trim(),
+        emergentApiKey: emergentEditKey.trim() || undefined,
       });
       if (data?.ok && (data.image_b64 || data.image)) {
         const next = data.image_b64 || data.image;
@@ -671,6 +683,17 @@ export default function Creatives() {
                   value={editPrompt}
                   onChange={(e) => setEditPrompt(e.target.value)}
                 />
+                <div className="mt-3">
+                  <Label className="text-xs uppercase tracking-wide text-nude-600">Chave Emergent alternativa (opcional)</Label>
+                  <Input
+                    type="password"
+                    value={emergentEditKey}
+                    onChange={(e) => saveEmergentEditKey(e.target.value)}
+                    placeholder="sk-emergent-... (use outra chave se a principal atingiu limite diário)"
+                    className="mt-1"
+                  />
+                  <p className="text-[11px] text-nude-500 mt-1">Salva localmente e usada apenas nesta edição.</p>
+                </div>
                 <div className="flex gap-2 mt-3">
                   <Button
                     onClick={runEdit}
