@@ -377,16 +377,71 @@ export default function Dashboard() {
     }
   };
 
+  const sendCopilotWhatsApp = async (contact, text) => {
+    if (!contact || !text) return false;
+    const localMsg = { id: `local-${Date.now()}`, text, from_me: true, created_at: new Date().toISOString(), pending_local: true };
+    try {
+      const { data } = await api.post("/whatsapp/send", {
+        contact_id: contact.id, contact_phone: contact.phone, phone: contact.phone, text,
+      });
+      const msg = data?.message || localMsg;
+      const finalMsg = { ...localMsg, ...msg, text: msg.text ?? msg.message ?? text, from_me: true, pending_local: false };
+      try { await savePersistedWhatsAppMessage(contact, finalMsg); } catch {}
+      if (activeContact && activeContact.id === contact.id) {
+        setMessages((prev) => dedupeMessages([...prev, finalMsg]));
+      }
+      loadContacts();
+      return true;
+    } catch (e) {
+      toast.error(e?.response?.data?.error || "Falha ao enviar pelo WhatsApp");
+      return false;
+    }
+  };
+
+  const findContactByName = (name) => {
+    const n = (name || "").trim().toLowerCase();
+    if (!n) return null;
+    return contacts.find((c) => (c.name || "").toLowerCase().includes(n)) || null;
+  };
+
   const askAI = async () => {
     if (!aiPrompt.trim()) return;
     const userMsg = { role: "user", content: aiPrompt };
     setAiMessages((m) => [...m, userMsg]);
-    setAiThinking(true);
     const prompt = aiPrompt;
     setAiPrompt("");
+
+    // Detecta comando de envio direto pelo copiloto
+    const sendCmd = prompt.match(/\b(?:envie|enviar|mande|mandar|manda|envia)\s+(?:uma\s+)?(?:mensagem|whats?app|zap)\s+(?:para|pro|pra|ao|a)\s+(.+?)\s+(?:dizendo|falando|com\s+a\s+mensagem|que|:)\s+(.+)/i);
+    if (sendCmd) {
+      const target = findContactByName(sendCmd[1]) || activeContact;
+      const text = sendCmd[2].trim().replace(/^["'`]|["'`]$/g, "");
+      if (!target) {
+        setAiMessages((m) => [...m, { role: "assistant", content: `Não encontrei o contato "${sendCmd[1]}" na Central de Mensagens. Abra a conversa primeiro ou diga o nome exato.` }]);
+        return;
+      }
+      const ok = await sendCopilotWhatsApp(target, text);
+      setAiMessages((m) => [...m, { role: "assistant", content: ok ? `✅ Mensagem enviada para ${target.name} via Central de Mensagens: "${text}"` : `❌ Não consegui enviar para ${target.name}.` }]);
+      return;
+    }
+
+    // Envio rápido para o contato ativo: "envie agora", "envie essa", "manda essa"
+    const sendActive = prompt.match(/\b(?:envie|enviar|mande|mandar|manda|envia)\s+(?:agora|essa|isso|esta\s+mensagem|para\s+(?:o|a)\s+cliente)\s*:?\s*(.*)/i);
+    if (sendActive && activeContact) {
+      const text = (sendActive[1] || "").trim().replace(/^["'`]|["'`]$/g, "");
+      const lastAi = [...aiMessages].reverse().find((m) => m.role === "assistant" && m.content);
+      const toSend = text || lastAi?.content || "";
+      if (toSend) {
+        const ok = await sendCopilotWhatsApp(activeContact, toSend);
+        setAiMessages((m) => [...m, { role: "assistant", content: ok ? `✅ Enviado para ${activeContact.name}.` : `❌ Falha ao enviar.` }]);
+        return;
+      }
+    }
+
+    setAiThinking(true);
     try {
       const contextual = activeContact
-        ? `Cliente: ${activeContact.name}. Última mensagem: "${activeContact.last_message}". Pergunta do advogado: ${prompt}`
+        ? `Cliente: ${activeContact.name}. Última mensagem: "${activeContact.last_message}". Pergunta do advogado: ${prompt}\n\nIMPORTANTE: Se o advogado pedir para enviar mensagem, ele pode usar comandos como "envie mensagem para [nome] dizendo [texto]" ou "envie agora" para enviar pelo WhatsApp.`
         : prompt;
       const { data } = await api.post("/chat/message", {
         message: contextual,
