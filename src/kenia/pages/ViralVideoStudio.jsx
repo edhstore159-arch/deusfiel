@@ -904,7 +904,7 @@ export default function ViralVideoStudio() {
                 className="border-gold-500/70 bg-gold-500/10 text-gold-100 hover:bg-gold-500/20"
               >
                 {generatingEmergent ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                {generatingEmergent ? "Gerando (Emergent)..." : "Gerar com Emergent (Veo)"}
+                {generatingEmergent ? "Gerando (Modelo de Crédito)..." : "Gerar com Modelo de Crédito (Veo)"}
               </Button>
               <Button
                 onClick={generateWithReplicate}
