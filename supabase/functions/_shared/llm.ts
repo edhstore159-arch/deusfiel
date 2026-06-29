@@ -719,8 +719,26 @@ async function imagePollinations(opts: ImageOptions) {
 export async function generateImage(opts: ImageOptions) {
   const humanSubject = hasHumanSubject(opts.prompt);
   const faceSafeOpts = { ...opts, prompt: withFaceSafety(opts.prompt), quality: opts.quality || (humanSubject ? "high" : undefined) };
-  // Pollinations é GRATUITO e sem chave — usa como provider primário para garantir
-  // que o usuário sempre receba a imagem sem depender de créditos pagos (Lovable/Gemini/Emergent).
+  const pref = opts.preferProvider || "auto";
+
+  // Provider explícito: respeita escolha do usuário sem fallback automático para pagos.
+  if (pref === "pollinations") {
+    const r = await imagePollinations(faceSafeOpts);
+    if (r.ok) return r;
+    return { ok: false as const, error: r.error || "Pollinations falhou", provider: "pollinations" };
+  }
+  if (pref === "emergent") {
+    if (!EMERGENT_KEY) return { ok: false as const, error: "EMERGENT_API_KEY ausente", provider: "emergent" };
+    const r = await imageEmergent(faceSafeOpts);
+    if (r.ok) return r;
+    // Se Emergent falhar (sem crédito etc.), cai para Pollinations gratuito.
+    console.warn("⚠️ Emergent falhou, caindo para Pollinations gratuito:", r.error);
+    const rp = await imagePollinations(faceSafeOpts);
+    if (rp.ok) return rp;
+    return { ok: false as const, error: r.error || "Emergent falhou", provider: "emergent" };
+  }
+
+  // auto: Pollinations é GRATUITO e sem chave — primário; demais como fallback.
   const r0 = await imagePollinations(faceSafeOpts);
   if (r0.ok) return r0;
   console.warn("⚠️ Pollinations falhou:", r0.error);
