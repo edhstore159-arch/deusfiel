@@ -291,22 +291,22 @@ export default function Creatives() {
 
   return (
     <div className="h-screen flex flex-col bg-nude-50 overflow-hidden">
-      <div className="px-6 py-4 bg-white border-b border-nude-200 flex items-center justify-between">
-        <div>
+      <div className="px-4 sm:px-6 py-4 bg-white border-b border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="min-w-0">
           <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold flex items-center gap-1.5">
             <Sparkles className="w-3 h-3" /> Powered by IA
           </div>
-          <h1 className="font-display font-bold text-2xl">Criativos para Redes Sociais</h1>
+          <h1 className="font-display font-bold text-xl sm:text-2xl truncate">Criativos para Redes Sociais</h1>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button asChild variant="outline" className="border-gold-300 bg-white text-nude-900 hover:bg-gold-50">
+        <div className="flex flex-wrap items-center sm:justify-end gap-2 w-full sm:w-auto">
+          <Button asChild variant="outline" size="sm" className="border-gold-300 bg-white text-nude-900 hover:bg-gold-50 flex-1 sm:flex-none sm:size-default">
             <Link to="/app/viral-video">
               <Film className="w-4 h-4 mr-2" /> Gerar vídeo
             </Link>
           </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-nude-900 hover:bg-nude-800" data-testid="ai-generate-post-btn">
+            <Button size="sm" className="bg-nude-900 hover:bg-nude-800 flex-1 sm:flex-none sm:size-default" data-testid="ai-generate-post-btn">
               <Wand2 className="w-4 h-4 mr-2" /> Criar com IA
             </Button>
           </DialogTrigger>
