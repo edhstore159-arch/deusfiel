@@ -152,6 +152,7 @@ function objectLockFor(prompt: string) {
   const mammal = detectMammal(prompt);
   if (mammal) {
     return `SUBJECT LOCK (CRITICAL): the subject is a ${mammal.en} — in Portuguese "${mammal.pt}". Render EXACTLY this species, faithful to its real-world appearance: ${mammal.traits}. Do NOT substitute for a different species, do NOT mix traits with other big cats/canids/mammals. Photorealistic wildlife photography, anatomically correct head, eyes, fur/coat pattern, paws and tail. Do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
+  }
   if (ANIMAL_RE.test(prompt)) {
     return `SUBJECT LOCK (CRITICAL): the subject is the specific animal literally named by the user. Render ONLY that exact species with correct real-world anatomy, proportions, coloration and natural habitat. Do not substitute species, do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
   }
@@ -247,9 +248,36 @@ function legalThemeExpansion(prompt: string): string | null {
   return null;
 }
 
+type ShortScene = { keys: RegExp; scene: string };
+const SHORT_SCENES: ShortScene[] = [
+  {
+    keys: /\b(jesus|jesuis|jesuz|cristo)\b[\s\S]{0,80}\b(cruz|crucificado|crucifica[cç][aã]o)\b|\b(cruz|crucificado|crucifica[cç][aã]o)\b[\s\S]{0,80}\b(jesus|jesuis|jesuz|cristo)\b/i,
+    scene:
+      "respectful hyper-realistic historical biblical photograph representing Jesus Christ on the cross at Golgotha, an adult Middle Eastern man with long dark hair and beard, crown of thorns, simple linen cloth, wooden cross, dramatic cloudy sky, Roman-era background, emotional reverent atmosphere, no gore, no excessive blood, no text",
+  },
+  {
+    keys: /\b(brasil|brasileir[oa]s?|sele[cç][aã]o)\b[\s\S]{0,100}\b(futebol|fultebol|football|soccer|copa|world\s*cup)\b|\b(futebol|fultebol|football|soccer|copa|world\s*cup)\b[\s\S]{0,100}\b(brasil|brasileir[oa]s?|sele[cç][aã]o)\b|\b(jogadores?|players?)\b[\s\S]{0,80}\b(ganh\w*|venc\w*|winning|lifting)\b[\s\S]{0,80}\b(copa|world\s*cup|trof[ée]u|trophy)\b/i,
+    scene:
+      "hyper-realistic documentary sports photograph of Brazilian football players celebrating after winning the world championship, athletes in green and yellow Brazil-inspired uniforms with no official logos, lifting a generic golden world cup trophy, packed stadium, confetti, flags in Brazilian colors, emotional victory celebration, real sweat, realistic faces, stadium floodlights, no text, no watermark",
+  },
+];
+
+function shortSceneExpansion(prompt: string): string | null {
+  const compact = String(prompt || "").trim();
+  if (!compact) return null;
+  for (const item of SHORT_SCENES) {
+    if (item.keys.test(compact)) return item.scene;
+  }
+  return null;
+}
+
+const HUMAN_NARRATIVE_RE = /\b(jesus|christ|crucifixion|players?|athletes?|people|person|man|woman|adult|homem|mulher|pessoa|pessoas|jogadores?|atletas?)\b/i;
+
 // Reescreve o prompt do usuário em inglês descritivo, mantendo FIELMENTE o pedido.
 async function elaboratePrompt(userPrompt: string, style?: string): Promise<string> {
   let userTheme = (userPrompt || "").trim();
+  const shortScene = shortSceneExpansion(userTheme);
+  if (shortScene) userTheme = shortScene;
   const legalScene = legalThemeExpansion(userTheme);
   if (legalScene) {
     userTheme =
@@ -319,6 +347,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
             "You are a director of photography and a specialist in hyper-realistic image prompts (Nano Banana style).",
             "Your task is to convert the user's scene description into ONE single-line English prompt that produces an EXTREMELY realistic photograph — as if captured by a professional DSLR camera, NOT digital art, NOT illustration, NOT 3D render.",
             "STRICT FIDELITY: Never change, replace, simplify or reinterpret the subject. Never invent elements not requested. Preserve ALL elements described by the user (people, objects, setting, mood, action). Translate non-English input to English while keeping exact meaning.",
+            "SHORT PROMPT INTENT: when the user writes only a few words or misspells obvious Portuguese words, correct the spelling and expand only the unmistakable intended scene. Examples: 'jesuis na cruz' means a respectful realistic scene of Jesus Christ on the cross; 'Brasil país do fultebol' means Brazilian football players celebrating a world cup victory. Do not add unrelated subjects.",
             "ALWAYS FILL THESE FIELDS in the output prompt:",
             "- SCENE: describe the scene faithfully from the user theme.",
             "- CHARACTER: realistic appearance, natural skin imperfections, light stubble when appropriate, authentic emotional expression (concern, tiredness, reflection, joy — whatever fits). Never perfect or artificial faces. Brazilian appearance unless the user says otherwise.",
@@ -372,11 +401,12 @@ Deno.serve(async (req) => {
     }
 
     const userElaborated = await elaboratePrompt(prompt, style);
+    const detectionText = `${prompt}\n${userElaborated}`;
     const hybridSubject = hasHybridRequest(prompt);
     const isolatedOnly = isIsolatedObjectOnly(prompt);
-    const eventSubject = !isolatedOnly && EVENT_RE.test(prompt) && !hybridSubject;
+    const eventSubject = !isolatedOnly && EVENT_RE.test(detectionText) && !hybridSubject;
     const scenerySubject = !hybridSubject && isScenerySubject(prompt);
-    const humanSubject = !isolatedOnly && (hasHumanSubject(prompt) || eventSubject) && !hybridSubject;
+    const humanSubject = !isolatedOnly && (hasHumanSubject(prompt) || hasHumanSubject(userElaborated) || HUMAN_NARRATIVE_RE.test(detectionText) || eventSubject) && !hybridSubject;
     const handGuard = handCompositionGuard(prompt);
     const cakeEating = EATING_CAKE_RE.test(prompt);
     const fullPrompt = hybridSubject ? [
