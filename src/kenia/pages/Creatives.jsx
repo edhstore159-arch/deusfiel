@@ -40,6 +40,7 @@ export default function Creatives() {
     title: "", network: "instagram", format: "post",
     topic: "", tone: "profissional", case_type: "",
     caption: "", subtitle: "",
+    provider: "auto",
   });
 
   const [scheduled, setScheduled] = useState([]);
@@ -202,7 +203,7 @@ export default function Creatives() {
       }
       setPreview(data);
       setOpen(false);
-      setForm({ title: "", network: "instagram", format: "post", topic: "", tone: "profissional", case_type: "", caption: "", subtitle: "" });
+      setForm({ title: "", network: "instagram", format: "post", topic: "", tone: "profissional", case_type: "", caption: "", subtitle: "", provider: form.provider });
       setRefImage(null);
       // logoImage permanece salvo (persistente) para próximos criativos
 
@@ -369,6 +370,18 @@ export default function Creatives() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div>
+                <Label>Provedor de imagem</Label>
+                <Select value={form.provider} onValueChange={v => setForm({ ...form, provider: v })}>
+                  <SelectTrigger data-testid="creative-provider"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Automático (Pollinations + refinamento Emergent)</SelectItem>
+                    <SelectItem value="pollinations">Pollinations (gratuito, sem créditos)</SelectItem>
+                    <SelectItem value="emergent">Emergent (alta qualidade — usa créditos)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground mt-1">Se a Emergent ficar sem créditos, o sistema cai automaticamente para Pollinations.</p>
               </div>
               <div><Label>Tema / Mensagem Principal</Label><Textarea rows={3} placeholder="Sobre o que é o post? Qual a mensagem chave?" value={form.topic} onChange={e => setForm({ ...form, topic: e.target.value })} data-testid="creative-topic" /></div>
 

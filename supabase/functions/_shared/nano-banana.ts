@@ -11,6 +11,7 @@ export interface NanoBananaOptions {
   imageUrls?: string[]; // data URLs or http(s) URLs
   mode?: "edit" | "fusion" | "template" | "generate";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
+  preferProvider?: "auto" | "pollinations" | "emergent";
 }
 
 const FACE_PRESERVATION_LOCK =
@@ -427,14 +428,22 @@ export async function generateWithNanoBanana(
 ): Promise<{ url: string | null; provider: string; error?: string }> {
   const errs: string[] = [];
   const hasRefs = Boolean(opts.imageUrls?.length);
+  const pref = opts.preferProvider || "auto";
 
-  // ===== Novo fluxo solicitado: Pollinations PRIMEIRO (rascunho gratuito),
+  // Modo Pollinations puro (gratuito, sem refinar com Emergent).
+  if (pref === "pollinations" && !hasRefs) {
+    const draft = await callPollinations(opts);
+    if (draft.url) return { url: draft.url, provider: "pollinations" };
+    return { url: null, provider: "none", error: draft.error || "Pollinations falhou" };
+  }
+
+  // ===== Fluxo padrão: Pollinations PRIMEIRO (rascunho gratuito),
   // depois Emergent para refinar/corrigir imperfeições usando o rascunho como referência.
   // Só aplica quando não há imagens de referência do usuário (geração pura).
   if (!hasRefs) {
     const draft = await callPollinations(opts);
     if (draft.url) {
-      if (Deno.env.get("EMERGENT_API_KEY")) {
+      if (pref !== "pollinations" && Deno.env.get("EMERGENT_API_KEY")) {
         const refined = await callEmergent({
           ...opts,
           imageUrls: [draft.url],

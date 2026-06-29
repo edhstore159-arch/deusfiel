@@ -910,6 +910,7 @@ const staticPost = (url, body = {}) => {
             case_type: body.case_type || "",
             reference_image_base64: body.reference_image_base64 || null,
             logo_base64: body.logo_base64 || null,
+            provider: body.provider || "auto",
           },
         });
 
