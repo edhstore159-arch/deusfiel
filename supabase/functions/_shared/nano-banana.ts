@@ -438,7 +438,7 @@ export async function generateWithNanoBanana(
         const refined = await callEmergent({
           ...opts,
           imageUrls: [draft.url],
-          prompt: `Refine and fix imperfections (anatomy, hands, eyes, symmetry, lighting, sharpness, artifacts) of this draft image while preserving its composition and subject. ${opts.prompt}`,
+          prompt: `Transform this draft into a HYPER-REALISTIC unretouched DSLR photograph. Fix all imperfections: anatomy, hands (exactly 5 fingers), eyes (natural pupils, individual eyelashes), facial symmetry, teeth, ears, skin (real pores, micro imperfections, subsurface scattering), realistic fabric textures, accurate physical lighting and shadows, true-to-life color science, film grain. Remove ANY illustration/CGI/3D/cartoon/airbrushed/plastic look. Preserve composition, framing, subject and scene. Original prompt: ${opts.prompt}`,
         });
         if (refined.url) {
           console.info("✨ Pollinations → Emergent refine OK");
