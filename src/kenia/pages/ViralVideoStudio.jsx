@@ -870,14 +870,14 @@ export default function ViralVideoStudio() {
             </div>
 
             <div className="space-y-2 rounded-md border border-gold-900/40 bg-nude-950/70 p-3">
-              <Label className="text-gold-200 text-xs uppercase tracking-wide">Chave Emergent (opcional)</Label>
+              <Label className="text-gold-200 text-xs uppercase tracking-wide">Chave Modelo de Crédito (opcional)</Label>
               <Input
                 value={emergentKey}
                 onChange={(e) => saveEmergentKey(e.target.value)}
-                placeholder="sk-emergent-... (deixe em branco para usar a chave do sistema)"
+                placeholder="sk-... (deixe em branco para usar a chave do sistema)"
                 className="bg-nude-950 border-gold-900/40 text-gold-100 placeholder:text-nude-600"
               />
-              <p className="text-[11px] text-nude-400">Salva localmente no navegador. Usada apenas na geração via Emergent (Veo).</p>
+              <p className="text-[11px] text-nude-400">Salva localmente no navegador. Usada apenas na geração via Modelo de Crédito (Veo).</p>
             </div>
 
             <div className="flex flex-wrap justify-end gap-2">
