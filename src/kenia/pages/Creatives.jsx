@@ -446,6 +446,63 @@ export default function Creatives() {
       <div className="flex-1 overflow-auto p-6 space-y-4">
         <CreativeAssetsLibrary onPick={(dataUrl) => { setRefImage(dataUrl); setOpen(true); }} />
 
+        <Card className="p-4 sm:p-6 border-nude-200">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <div className="font-display font-semibold text-base flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-gold-600" /> Modelos prontos
+              </div>
+              <div className="text-sm text-nude-500">
+                Clique em "Usar modelo" para preencher o gerador, ou copie a legenda.
+              </div>
+            </div>
+            <Badge variant="outline" className="hidden sm:inline-flex">{CREATIVE_TEMPLATES.length} modelos</Badge>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {CREATIVE_TEMPLATES.map((tpl) => (
+              <div key={tpl.id} className="border border-nude-200 rounded-md p-3 bg-white hover:shadow-md transition-shadow flex flex-col">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <NetIcon network={tpl.network} className="w-3.5 h-3.5 text-nude-600" />
+                  <Badge variant="outline" className="text-[10px] capitalize">{tpl.case_type}</Badge>
+                  <Badge variant="outline" className="text-[10px] capitalize">{tpl.format}</Badge>
+                </div>
+                <div className="font-semibold text-sm line-clamp-2">{tpl.title}</div>
+                <div className="text-xs text-nude-500 mt-1.5 line-clamp-3 flex-1">{tpl.caption}</div>
+                <div className="flex gap-1.5 mt-3 pt-3 border-t border-nude-100">
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs flex-1 bg-nude-900 hover:bg-nude-800"
+                    onClick={() => {
+                      setForm({
+                        title: tpl.title,
+                        network: tpl.network,
+                        format: tpl.format,
+                        topic: tpl.topic,
+                        tone: tpl.tone,
+                        case_type: tpl.case_type,
+                        caption: tpl.caption,
+                        subtitle: "",
+                      });
+                      setOpen(true);
+                      toast.success("Modelo carregado no gerador");
+                    }}
+                  >
+                    <Wand2 className="w-3 h-3 mr-1" /> Usar modelo
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={() => copyCaption(`${tpl.title}\n\n${tpl.caption}\n\n${tpl.hashtags || ""}`)}
+                  >
+                    <Copy className="w-3 h-3 mr-1" /> Copiar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
         <Card className="p-6 border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="font-display font-semibold text-base">Seus criativos gerados</div>
@@ -462,6 +519,7 @@ export default function Creatives() {
           </Button>
         </Card>
       </div>
+
 
       {/* Preview dialog */}
       {preview && (
