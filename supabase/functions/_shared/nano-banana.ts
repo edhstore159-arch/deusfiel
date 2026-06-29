@@ -16,8 +16,11 @@ export interface NanoBananaOptions {
 const FACE_PRESERVATION_LOCK =
   "Face preservation lock: when any reference image contains a person, preserve the original identity and facial geometry exactly. Keep eyes aligned, pupils natural, nose and mouth realistic, skin texture natural, expression relaxed. Do not redraw the face, do not beautify, do not over-smooth, do not stretch, warp, melt, duplicate, replace, or stylize facial features.";
 
+const HYPERREAL_LOCK =
+  "Photorealism lock: render as an unretouched professional DSLR photograph (Canon EOS R5, 50mm f/1.8 prime lens, ISO 200, natural daylight or soft key light). Real human skin with visible pores, fine hair, micro imperfections, natural subsurface scattering, realistic specular highlights in the eyes, individual eyelashes, asymmetric natural features. Cinematic depth of field, true-to-life color science, accurate shadows and ambient occlusion, film grain, 8k photographic detail. Absolutely NOT illustration, NOT 3D render, NOT CGI, NOT painting, NOT digital art, NOT anime, NOT cartoon, NOT stylized, NOT airbrushed, NOT plastic skin, NOT waxy skin, NOT doll-like.";
+
 function withFacePreservation(prompt: string) {
-  return `${prompt}\n\n${FACE_PRESERVATION_LOCK}\nNegative: distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, plastic skin, over-smoothed skin, changed identity, different person.`;
+  return `${prompt}\n\n${HYPERREAL_LOCK}\n${FACE_PRESERVATION_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, changed identity, different person, deformed hands, extra fingers, blurry, low quality, watermark.`;
 }
 
 function extractImageFromMessage(msg: any): string | null {
