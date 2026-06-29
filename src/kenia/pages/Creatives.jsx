@@ -440,157 +440,28 @@ export default function Creatives() {
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
         <CreativeAssetsLibrary onPick={(dataUrl) => { setRefImage(dataUrl); setOpen(true); }} />
-        
-        {items.length === 0 ? (
-          <Card className="p-12 border-dashed border-nude-300 text-center">
-            <div className="w-12 h-12 rounded-md bg-gold-100 grid place-items-center mx-auto mb-4">
-              <Sparkles className="w-6 h-6 text-gold-700" />
-            </div>
-            <div className="font-display font-semibold text-lg mb-1">Nenhum criativo ainda</div>
-            <div className="text-sm text-nude-500 mb-4 max-w-sm mx-auto">
-              Gere posts profissionais para Instagram, Facebook e LinkedIn em segundos com IA.
-            </div>
-            <Button onClick={() => setOpen(true)} className="bg-nude-900 hover:bg-nude-800">
-              <Wand2 className="w-4 h-4 mr-2" /> Criar primeiro post
-            </Button>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {items.map(item => (
-              <Card key={item.id} className="overflow-hidden border-nude-200 hover:shadow-md transition-shadow" data-testid={`creative-card-${item.id}`}>
-                <div className="aspect-square bg-nude-100 relative overflow-hidden">
-                  {item.image_b64 ? (
-                    <img src={imageSrc(item.image_b64)} alt={item.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full grid place-items-center text-nude-300">
-                      <Sparkles className="w-8 h-8" />
-                    </div>
-                  )}
-                  <Badge className="absolute top-2 left-2 bg-white/90 text-nude-900 hover:bg-white/90 gap-1 backdrop-blur">
-                    <NetIcon network={item.network} className="w-3 h-3" />
-                    {item.network}
-                  </Badge>
-                </div>
-                <div className="p-3">
-                  <div className="font-medium text-sm line-clamp-1">{item.title}</div>
-                  <div className="text-xs text-nude-500 line-clamp-3 mt-1.5 whitespace-pre-wrap min-h-[3rem]">{item.caption}</div>
-                  <div className="flex gap-1 mt-3 pt-3 border-t border-nude-100">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => copyCaption(item.caption)} data-testid={`copy-caption-${item.id}`}>
-                      <Copy className="w-3 h-3 mr-1" /> Legenda
-                    </Button>
-                    {item.image_b64 && (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => download(item)} data-testid={`download-creative-${item.id}`}>
-                        <Download className="w-3 h-3 mr-1" /> PNG
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(item)} data-testid={`edit-creative-${item.id}`}>
-                      <Pencil className="w-3 h-3 mr-1" /> Editar
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openSchedule(item)} data-testid={`schedule-${item.id}`}>
-                      <CalendarClock className="w-3 h-3 mr-1" /> Agendar
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => remove(item.id)} data-testid={`delete-creative-${item.id}`}>
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
 
-                </div>
-              </Card>
-            ))}
+        <Card className="p-6 border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <div className="font-display font-semibold text-base">Seus criativos gerados</div>
+            <div className="text-sm text-nude-500">
+              {items.length > 0
+                ? `${items.length} criativo(s) salvos · veja, edite e agende em uma página dedicada.`
+                : "Nenhum criativo ainda. Gere o primeiro acima."}
+            </div>
           </div>
-        )}
+          <Button asChild className="bg-nude-900 hover:bg-nude-800">
+            <Link to="/app/creatives/gallery">
+              <Sparkles className="w-4 h-4 mr-2" /> Abrir galeria de criativos
+            </Link>
+          </Button>
+        </Card>
       </div>
-
-      {scheduled.length > 0 && (
-        <div className="border-t border-nude-200 bg-white px-6 py-4 max-h-64 overflow-auto">
-          <div className="flex items-center justify-between mb-2">
-            <div className="font-display font-semibold text-sm flex items-center gap-2">
-              <CalendarClock className="w-4 h-4 text-gold-600" /> Publicações agendadas
-            </div>
-            <div className="text-xs text-nude-500">
-              {scheduled.length} na fila • automação ativa quando as redes forem conectadas
-            </div>
-          </div>
-          <div className="space-y-2">
-            {scheduled.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 text-xs bg-nude-50 border border-nude-200 rounded-md px-3 py-2">
-                {p.image_b64 ? (
-                  <img src={imageSrc(p.image_b64)} alt="" className="w-10 h-10 rounded object-cover" />
-                ) : (
-                  <div className="w-10 h-10 rounded bg-nude-200 grid place-items-center text-nude-400"><Sparkles className="w-4 h-4" /></div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{p.title || p.caption?.slice(0, 60) || "Post"}</div>
-                  <div className="text-nude-500 truncate">
-                    {p.scheduled_for ? new Date(p.scheduled_for).toLocaleString("pt-BR") : "sem data"} • {(p.platforms || []).join(", ") || "—"}
-                  </div>
-                </div>
-                <Badge variant="outline" className="capitalize">{p.status}</Badge>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => cancelScheduled(p.id)}>
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Schedule dialog */}
-      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CalendarClock className="w-4 h-4 text-gold-600" /> Agendar publicação
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Legenda</Label>
-              <Textarea rows={4} value={scheduleForm.caption} onChange={(e) => setScheduleForm({ ...scheduleForm, caption: e.target.value })} />
-            </div>
-            <div>
-              <Label>Hashtags (opcional)</Label>
-              <Input placeholder="#direitos #advocacia" value={scheduleForm.hashtags} onChange={(e) => setScheduleForm({ ...scheduleForm, hashtags: e.target.value })} />
-            </div>
-            <div>
-              <Label>Data e hora</Label>
-              <Input type="datetime-local" value={scheduleForm.scheduled_for} onChange={(e) => setScheduleForm({ ...scheduleForm, scheduled_for: e.target.value })} />
-            </div>
-            <div>
-              <Label>Redes</Label>
-              <div className="flex flex-wrap gap-2 mt-1.5">
-                {PLATFORMS.map((p) => {
-                  const active = scheduleForm.platforms.includes(p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => togglePlatform(p.id)}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${active ? "bg-nude-900 text-white border-nude-900" : "bg-white text-nude-700 border-nude-300 hover:bg-nude-50"}`}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-[11px] text-nude-500 mt-2">
-                Para publicar automaticamente é preciso conectar cada rede (Meta, LinkedIn, TikTok, YouTube, X). Enquanto não estiverem conectadas, o post fica na fila e fica visível aqui.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={saveSchedule} className="bg-nude-900 hover:bg-nude-800">
-              <CalendarClock className="w-4 h-4 mr-2" /> Confirmar agendamento
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Preview dialog */}
       {preview && (
         <Dialog open={!!preview} onOpenChange={() => setPreview(null)}>
           <DialogContent className="max-w-2xl">
-
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-gold-500" /> Criativo Gerado
@@ -616,59 +487,9 @@ export default function Creatives() {
                       <Download className="w-4 h-4 mr-2" /> Baixar
                     </Button>
                   )}
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Edit dialog */}
-      {editTarget && (
-        <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) { setEditTarget(null); setEditPreview(null); setEditUpload(null); setEditPrompt(""); } }}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Pencil className="w-4 h-4 text-gold-600" /> Editar criativo com IA
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="aspect-square bg-nude-100 rounded-md overflow-hidden border border-nude-200">
-                  {editPreview ? (
-                    <img src={imageSrc(editPreview)} alt="Prévia" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full grid place-items-center text-nude-400 text-sm">Sem imagem</div>
-                  )}
-                </div>
-                <label className="flex items-center justify-center gap-2 h-10 border border-dashed border-nude-300 rounded-md cursor-pointer hover:bg-nude-50 text-xs text-nude-600">
-                  <Upload className="w-3.5 h-3.5" />
-                  {editUpload ? "Trocar imagem base" : "Enviar nova imagem base (opcional)"}
-                  <input type="file" accept="image/*" className="hidden" onChange={onPickEditUpload} />
-                </label>
-              </div>
-              <div className="flex flex-col">
-                <Label>Modificações desejadas</Label>
-                <Textarea
-                  rows={8}
-                  className="mt-1.5 flex-1"
-                  placeholder="Ex.: Troque o fundo por um escritório de advocacia moderno, mantenha o texto principal, adicione um detalhe dourado no rodapé e melhore o contraste."
-                  value={editPrompt}
-                  onChange={(e) => setEditPrompt(e.target.value)}
-                />
-                <div className="flex gap-2 mt-3">
-                  <Button
-                    onClick={runEdit}
-                    disabled={editing}
-                    className="flex-1 bg-nude-900 hover:bg-nude-800"
-                  >
-                    {editing ? <span className="animate-pulse-soft">Aplicando edição...</span> : <><Wand2 className="w-4 h-4 mr-2" /> Aplicar com IA</>}
+                  <Button asChild variant="outline">
+                    <Link to="/app/creatives/gallery">Ver na galeria</Link>
                   </Button>
-                  {editPreview && (
-                    <Button variant="outline" onClick={() => download({ id: editTarget.id, image_b64: editPreview })}>
-                      <Download className="w-4 h-4 mr-2" /> Baixar
-                    </Button>
-                  )}
                 </div>
               </div>
             </div>
