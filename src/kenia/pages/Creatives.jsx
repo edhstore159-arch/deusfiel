@@ -280,7 +280,12 @@ export default function Creatives() {
     a.click();
   };
 
-  const imageSrc = (value) => String(value || "").startsWith("data:") ? value : `data:image/png;base64,${value}`;
+  const imageSrc = (value) => {
+    const s = String(value || "");
+    if (!s) return "";
+    if (s.startsWith("data:") || s.startsWith("http://") || s.startsWith("https://") || s.startsWith("blob:")) return s;
+    return `data:image/png;base64,${s}`;
+  };
 
   const NetIcon = ({ network, className }) => {
     if (network === "instagram") return <Instagram className={className} />;
