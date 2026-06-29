@@ -16,6 +16,7 @@ export interface ImageOptions {
   prompt: string;
   size?: string;
   quality?: string;
+  preferProvider?: "auto" | "pollinations" | "emergent" | "lovable" | "gemini";
 }
 
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
