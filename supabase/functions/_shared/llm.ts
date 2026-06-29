@@ -718,7 +718,11 @@ async function imagePollinations(opts: ImageOptions) {
 export async function generateImage(opts: ImageOptions) {
   const humanSubject = hasHumanSubject(opts.prompt);
   const faceSafeOpts = { ...opts, prompt: withFaceSafety(opts.prompt), quality: opts.quality || (humanSubject ? "high" : undefined) };
-  // Para imagens com pessoas, prioriza modelos com melhor anatomia facial; Pollinations fica só como fallback.
+  // Pollinations é GRATUITO e sem chave — usa como provider primário para garantir
+  // que o usuário sempre receba a imagem sem depender de créditos pagos (Lovable/Gemini/Emergent).
+  const r0 = await imagePollinations(faceSafeOpts);
+  if (r0.ok) return r0;
+  console.warn("⚠️ Pollinations falhou:", r0.error);
   if (LOVABLE_KEY) {
     const r = await imageLovable(faceSafeOpts);
     if (r.ok) return r;
@@ -729,21 +733,11 @@ export async function generateImage(opts: ImageOptions) {
     if (r.ok) return r;
     console.warn("⚠️ Gemini direto falhou:", r.error);
   }
-  if (humanSubject && EMERGENT_KEY) {
+  if (EMERGENT_KEY) {
     const r = await imageEmergent(faceSafeOpts);
     if (r.ok) return r;
     console.warn("⚠️ Emergent image falhou:", r.error);
   }
-  const r0 = await imagePollinations(faceSafeOpts);
-  if (r0.ok) return r0;
-  console.warn("⚠️ Pollinations falhou:", r0.error);
-  if (!humanSubject) {
-    const r3 = await imageEmergent(faceSafeOpts);
-    if (r3.ok) return r3;
-    return { ok: false as const, error: r3.error || "Nenhum provider de imagem disponível", provider: "none" };
-  }
-  const r3 = await imageEmergent(faceSafeOpts);
-  if (r3.ok) return r3;
-  return { ok: false as const, error: r3.error || "Nenhum provider de imagem disponível", provider: "none" };
+  return { ok: false as const, error: "Nenhum provider de imagem disponível", provider: "none" };
 }
 
