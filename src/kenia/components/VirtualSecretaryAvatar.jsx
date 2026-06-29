@@ -21,25 +21,10 @@ export default function VirtualSecretaryAvatar() {
   const [pos, setPos] = useState({ x: 20, y: 20 }); // bottom-right offsets
   const timerRef = useRef(null);
 
-  const speak = (text) => {
-    setBubble(text);
-    setState("speaking");
-    try {
-      if ("speechSynthesis" in window) {
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = "pt-BR";
-        u.rate = 1.02;
-        u.pitch = 1.05;
-        u.onend = () => setState("idle");
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(u);
-      }
-    } catch {}
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      setBubble("");
-      setState("idle");
-    }, 6000);
+  const speak = (_text) => {
+    // Mensagens da atendente virtual de voz desativadas a pedido do usuário.
+    setBubble("");
+    setState("idle");
   };
 
   useEffect(() => {
