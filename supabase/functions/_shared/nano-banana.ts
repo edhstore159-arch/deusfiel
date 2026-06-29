@@ -11,6 +11,7 @@ export interface NanoBananaOptions {
   imageUrls?: string[]; // data URLs or http(s) URLs
   mode?: "edit" | "fusion" | "template" | "generate";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
+  preferProvider?: "auto" | "pollinations" | "emergent";
 }
 
 const FACE_PRESERVATION_LOCK =
