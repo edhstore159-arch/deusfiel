@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 
 /**
- * Escuta instruções do Debug Tool sem derrubar a aplicação.
- * Antes este componente lançava erro fatal para abrir o overlay de debug,
- * mas isso deixava o painel em tela branca para o usuário final.
+ * DebugErrorThrower
+ *
+ * Escuta o CustomEvent "lovable-debug-error" e, durante o render,
+ * lança um erro fatal de runtime contendo a instrução.
+ *
+ * Esse erro é INTENCIONAL — ele precisa escapar para o overlay global
+ * da Lovable para que o botão "Try to Fix" seja acionado.
+ *
+ * NÃO envolver este componente em ErrorBoundary, Suspense ou try/catch.
+ * NÃO substituir o throw por console.error/toast/log silencioso.
  */
 export const DebugErrorThrower = () => {
   const [message, setMessage] = useState<string | null>(null);
@@ -13,20 +20,18 @@ export const DebugErrorThrower = () => {
       const detail = (event as CustomEvent<string>).detail;
       if (typeof detail === "string" && detail.trim()) {
         setMessage(detail);
-        try {
-          sessionStorage.setItem("kenia.lastDebugInstruction", detail);
-        } catch {}
       }
     };
     window.addEventListener("lovable-debug-error", handler);
     return () => window.removeEventListener("lovable-debug-error", handler);
   }, []);
 
-  useEffect(() => {
-    if (!message) return;
-    console.info("Instrução de debug recebida:", message);
+  if (message) {
+    const toThrow = message;
+    // Clear on next tick so React's error recovery rerender doesn't re-throw forever.
     queueMicrotask(() => setMessage(null));
-  }, [message]);
+    throw new Error(toThrow);
+  }
 
   return null;
 };
