@@ -311,12 +311,12 @@ function EmergentBalance() {
     <div className="flex items-center justify-between flex-wrap gap-3 p-3 rounded-md bg-nude-950/60 border border-gold-900/40">
       <div className="flex items-center gap-2 text-sm text-gold-200">
         <CreditCard className="w-4 h-4 text-gold-400" />
-        <span className="font-semibold">Chave Emergent:</span>
+        <span className="font-semibold">Chave Modelo de Crédito:</span>
         {loading && !data ? (
           <span className="text-nude-400">carregando...</span>
         ) : dailyBlocked ? (
           <span className="text-amber-300">
-            Chave válida, mas a Emergent bloqueou por limite diário. Aguarde o reset ou use outra chave com cota disponível.
+            Chave válida, mas o Modelo de Crédito bloqueou por limite diário. Aguarde o reset ou use outra chave com cota disponível.
           </span>
         ) : data?.ok ? (
           <span className={low ? "text-rose-400" : "text-gold-100"}>
