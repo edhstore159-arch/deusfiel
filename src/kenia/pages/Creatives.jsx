@@ -376,12 +376,12 @@ export default function Creatives() {
                 <Select value={form.provider} onValueChange={v => setForm({ ...form, provider: v })}>
                   <SelectTrigger data-testid="creative-provider"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">Automático (Pollinations + refinamento Emergent)</SelectItem>
-                    <SelectItem value="pollinations">Pollinations (gratuito, sem créditos)</SelectItem>
-                    <SelectItem value="emergent">Emergent (alta qualidade — usa créditos)</SelectItem>
+                    <SelectItem value="auto">Automático (Modelo Grátis + refinamento Modelo de Crédito)</SelectItem>
+                    <SelectItem value="pollinations">Modelo Grátis (sem créditos)</SelectItem>
+                    <SelectItem value="emergent">Modelo de Crédito (alta qualidade)</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground mt-1">Se a Emergent ficar sem créditos, o sistema cai automaticamente para Pollinations.</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Se o Modelo de Crédito ficar sem saldo, o sistema cai automaticamente para o Modelo Grátis.</p>
               </div>
               <div><Label>Tema / Mensagem Principal</Label><Textarea rows={3} placeholder="Sobre o que é o post? Qual a mensagem chave?" value={form.topic} onChange={e => setForm({ ...form, topic: e.target.value })} data-testid="creative-topic" /></div>
 
