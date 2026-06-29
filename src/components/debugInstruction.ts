@@ -1,8 +1,21 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
-export const shouldSuppressLovableDebugInstruction = (_message: string) => false;
+const isDebugThrowOptedIn = () => {
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      params.get("lovableDebugThrow") === "1" ||
+      window.localStorage.getItem("kenia.debug.throwRuntimeError") === "1"
+    );
+  } catch {
+    return false;
+  }
+};
 
-export const isLovableNativeDebugRuntime = () => false;
+export const shouldSuppressLovableDebugInstruction = (_message: string) => !isDebugThrowOptedIn();
+
+export const isLovableNativeDebugRuntime = () => isDebugThrowOptedIn();
 
 /**
  * Dispara o CustomEvent que o DebugErrorThrower converte em erro fatal
@@ -11,6 +24,7 @@ export const isLovableNativeDebugRuntime = () => false;
  */
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined" || !message) return false;
+  if (shouldSuppressLovableDebugInstruction(message)) return false;
   window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
   return true;
 };
