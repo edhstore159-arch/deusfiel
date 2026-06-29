@@ -16,8 +16,11 @@ export interface NanoBananaOptions {
 const FACE_PRESERVATION_LOCK =
   "Face preservation lock: when any reference image contains a person, preserve the original identity and facial geometry exactly. Keep eyes aligned, pupils natural, nose and mouth realistic, skin texture natural, expression relaxed. Do not redraw the face, do not beautify, do not over-smooth, do not stretch, warp, melt, duplicate, replace, or stylize facial features.";
 
+const HYPERREAL_LOCK =
+  "Photorealism lock: render as an unretouched professional DSLR photograph (Canon EOS R5, 50mm f/1.8 prime lens, ISO 200, natural daylight or soft key light). Real human skin with visible pores, fine hair, micro imperfections, natural subsurface scattering, realistic specular highlights in the eyes, individual eyelashes, asymmetric natural features. Cinematic depth of field, true-to-life color science, accurate shadows and ambient occlusion, film grain, 8k photographic detail. Absolutely NOT illustration, NOT 3D render, NOT CGI, NOT painting, NOT digital art, NOT anime, NOT cartoon, NOT stylized, NOT airbrushed, NOT plastic skin, NOT waxy skin, NOT doll-like.";
+
 function withFacePreservation(prompt: string) {
-  return `${prompt}\n\n${FACE_PRESERVATION_LOCK}\nNegative: distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, plastic skin, over-smoothed skin, changed identity, different person.`;
+  return `${prompt}\n\n${HYPERREAL_LOCK}\n${FACE_PRESERVATION_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, changed identity, different person, deformed hands, extra fingers, blurry, low quality, watermark.`;
 }
 
 function extractImageFromMessage(msg: any): string | null {
@@ -399,10 +402,17 @@ async function callPollinations(opts: NanoBananaOptions): Promise<{ url: string 
   try {
     const prompt = withFacePreservation(opts.prompt).slice(0, 1800);
     const seed = Math.floor(Math.random() * 1e9);
+    // flux-realism produces hyper-realistic photographic output; fall back to flux if unavailable.
     const url =
       `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
-      `?width=1024&height=1024&nologo=true&enhance=true&model=flux&seed=${seed}`;
-    const resp = await fetch(url);
+      `?width=1024&height=1024&nologo=true&enhance=true&model=flux-realism&seed=${seed}`;
+    let resp = await fetch(url);
+    if (!resp.ok) {
+      const fallback =
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
+        `?width=1024&height=1024&nologo=true&enhance=true&model=flux&seed=${seed}`;
+      resp = await fetch(fallback);
+    }
     if (!resp.ok) return { url: null, error: `Pollinations ${resp.status}` };
     const buf = new Uint8Array(await resp.arrayBuffer());
     let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.slice(i, i + 0x8000));
@@ -428,7 +438,7 @@ export async function generateWithNanoBanana(
         const refined = await callEmergent({
           ...opts,
           imageUrls: [draft.url],
-          prompt: `Refine and fix imperfections (anatomy, hands, eyes, symmetry, lighting, sharpness, artifacts) of this draft image while preserving its composition and subject. ${opts.prompt}`,
+          prompt: `Transform this draft into a HYPER-REALISTIC unretouched DSLR photograph. Fix all imperfections: anatomy, hands (exactly 5 fingers), eyes (natural pupils, individual eyelashes), facial symmetry, teeth, ears, skin (real pores, micro imperfections, subsurface scattering), realistic fabric textures, accurate physical lighting and shadows, true-to-life color science, film grain. Remove ANY illustration/CGI/3D/cartoon/airbrushed/plastic look. Preserve composition, framing, subject and scene. Original prompt: ${opts.prompt}`,
         });
         if (refined.url) {
           console.info("✨ Pollinations → Emergent refine OK");
