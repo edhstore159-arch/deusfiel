@@ -36,6 +36,7 @@ const CRM = lazyWithReload(() => import("@/kenia/pages/CRM"));
 const Processes = lazyWithReload(() => import("@/kenia/pages/Processes"));
 const Finance = lazyWithReload(() => import("@/kenia/pages/Finance"));
 const Creatives = lazyWithReload(() => import("@/kenia/pages/Creatives"));
+const CreativesGallery = lazyWithReload(() => import("@/kenia/pages/CreativesGallery"));
 const ImageFusion = lazyWithReload(() => import("@/kenia/pages/ImageFusion"));
 const ViralVideoStudio = lazyWithReload(() => import("@/kenia/pages/ViralVideoStudio"));
 const Analytics = lazyWithReload(() => import("@/kenia/pages/Analytics"));
