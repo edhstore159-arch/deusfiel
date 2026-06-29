@@ -442,6 +442,7 @@ Deno.serve(async (req) => {
       const result = await generateWithNanoBanana({
         prompt: promptParts.join("\n\n"),
         imageUrls,
+        preferProvider,
       });
 
       if (!result.url) {
