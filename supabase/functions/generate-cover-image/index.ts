@@ -345,7 +345,8 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { prompt, reference_image_base64, logo_base64, style, title, subtitle, network, format, tone, case_type } = body || {};
+    const { prompt, reference_image_base64, logo_base64, style, title, subtitle, network, format, tone, case_type, provider } = body || {};
+    const preferProvider = (provider === "pollinations" || provider === "emergent") ? provider : "auto";
     if (!prompt || typeof prompt !== "string") {
       return new Response(JSON.stringify({ error: "Prompt obrigatório" }), {
         status: 400,
