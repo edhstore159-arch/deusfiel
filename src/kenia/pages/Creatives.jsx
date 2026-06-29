@@ -203,7 +203,7 @@ export default function Creatives() {
       }
       setPreview(data);
       setOpen(false);
-      setForm({ title: "", network: "instagram", format: "post", topic: "", tone: "profissional", case_type: "", caption: "", subtitle: "" });
+      setForm({ title: "", network: "instagram", format: "post", topic: "", tone: "profissional", case_type: "", caption: "", subtitle: "", provider: form.provider });
       setRefImage(null);
       // logoImage permanece salvo (persistente) para próximos criativos
 
