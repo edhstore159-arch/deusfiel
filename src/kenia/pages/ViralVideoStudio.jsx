@@ -620,11 +620,11 @@ export default function ViralVideoStudio() {
         },
       });
       if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Falha na geração via Emergent");
+      if (!data?.ok) throw new Error(data?.error || "Falha na geração via Modelo de Crédito");
       const url = data.url || (data.b64 ? `data:video/mp4;base64,${data.b64}` : "");
       if (!url) throw new Error("Resposta sem URL de vídeo");
       setVideoUrl(url);
-      const via = data.provider === "replicate" ? "Replicate (Kling v2.1) — fallback" : "Emergent (Veo)";
+      const via = data.provider === "replicate" ? "Replicate (Kling v2.1) — fallback" : "Modelo de Crédito (Veo)";
       toast.success(`Vídeo gerado via ${via} (${seconds}s)`);
     } catch (e) {
       toast.error(e?.message || "Falha ao gerar vídeo");
