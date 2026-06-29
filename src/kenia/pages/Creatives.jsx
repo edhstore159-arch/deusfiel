@@ -40,7 +40,7 @@ export default function Creatives() {
     title: "", network: "instagram", format: "post",
     topic: "", tone: "profissional", case_type: "",
     caption: "", subtitle: "",
-    provider: "auto",
+    provider: "emergent",
   });
 
   const [scheduled, setScheduled] = useState([]);
