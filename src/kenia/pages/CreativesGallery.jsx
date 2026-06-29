@@ -174,12 +174,17 @@ export default function CreativesGallery() {
   const download = (item) => {
     if (!item.image_b64) return;
     const a = document.createElement("a");
-    a.href = String(item.image_b64).startsWith("data:") ? item.image_b64 : `data:image/png;base64,${item.image_b64}`;
+    a.href = imageSrc(item.image_b64);
     a.download = `legalflow-${item.id}.png`;
     a.click();
   };
 
-  const imageSrc = (value) => String(value || "").startsWith("data:") ? value : `data:image/png;base64,${value}`;
+  const imageSrc = (value) => {
+    const s = String(value || "");
+    if (!s) return "";
+    if (s.startsWith("data:") || s.startsWith("http://") || s.startsWith("https://") || s.startsWith("blob:")) return s;
+    return `data:image/png;base64,${s}`;
+  };
 
   const NetIcon = ({ network, className }) => {
     if (network === "instagram") return <Instagram className={className} />;
