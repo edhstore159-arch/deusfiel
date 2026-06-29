@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, X as XIcon, CalendarClock, Pencil, Film } from "lucide-react";
 import { toast } from "sonner";
 import CreativeAssetsLibrary from "@/kenia/components/CreativeAssetsLibrary";
+import { CREATIVE_TEMPLATES } from "@/kenia/lib/creativeTemplates";
 
 const PLATFORMS = [
   { id: "instagram", label: "Instagram" },
