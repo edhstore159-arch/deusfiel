@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kenia/components/ui/select";
 import { Sparkles, Trash2, Download, Copy, Wand2, Upload, X as XIcon, Film } from "lucide-react";
 import { toast } from "sonner";
-import SocialConnections from "@/kenia/components/SocialConnections";
 import CreativeAssetsLibrary from "@/kenia/components/CreativeAssetsLibrary";
 
 const PLATFORMS = [
