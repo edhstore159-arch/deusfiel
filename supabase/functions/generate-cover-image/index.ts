@@ -128,7 +128,21 @@ function detectBird(prompt: string) {
   return null;
 }
 
-const ANIMAL_RE = /\b(p[áa]ssaro|passarinho|ave|bird|sabi[áa]|beija[- ]?flor|hummingbird|arara|macaw|papagaio|parrot|tucano|toucan|can[áa]rio|canary|coruja|owl|[áa]guia|eagle|gavi[ãa]o|hawk|urubu|vulture|bem[- ]?te[- ]?vi|kiskadee|jo[ãa]o[- ]?de[- ]?barro|hornero|andorinha|swallow|pomba|pombo|dove|pigeon|pardal|sparrow|periquito|parakeet|budgie|calopsita|cockatiel|pav[ãa]o|peacock|flamingo|cisne|swan|pato|duck|ganso|goose|pinguim|penguin|avestruz|ostrich|galo|rooster|galinha|hen|chicken|c[ãa]o|cachorro|dog|gato|cat|cavalo|horse|le[ãa]o|lion|tigre|tiger|on[çc]a|jaguar|elefante|elephant|girafa|giraffe|macaco|monkey|lobo|wolf|raposa|fox|urso|bear|coelho|rabbit|veado|deer|peixe|fish|tubar[ãa]o|shark|baleia|whale|golfinho|dolphin|tartaruga|turtle|cobra|snake|lagarto|lizard|sapo|frog|borboleta|butterfly|abelha|bee)\b/i;
+const MAMMAL_SPECIES: Array<{ re: RegExp; en: string; pt: string; traits: string }> = [
+  { re: /\b(on[çc]a[- ]?preta|pantera[- ]?negra|black\s+panther|melanistic\s+jaguar|black\s+jaguar)\b/i, en: "melanistic (black) jaguar (Panthera onca, 'onça-preta')", pt: "onça-preta", traits: "large powerful big cat with entirely jet-black fur, faint ghost rosettes barely visible under direct light, broad muscular head, short rounded ears, thick neck and forelimbs, amber/golden eyes, long tail; NOT a leopard, NOT a regular spotted jaguar, NOT a domestic black cat, NOT a puma" },
+  { re: /\b(on[çc]a[- ]?pintada|on[çc]a|jaguar)\b/i, en: "jaguar (Panthera onca, 'onça-pintada')", pt: "onça-pintada", traits: "large stocky big cat with golden-yellow coat covered in black rosettes that have central spots, broad head, powerful jaw, short tail; NOT a leopard, NOT a cheetah, NOT a tiger" },
+  { re: /\b(pantera|leopardo|leopard)\b/i, en: "leopard (Panthera pardus)", pt: "leopardo", traits: "slender big cat, pale yellow coat with small black rosettes WITHOUT central spots, long tail, smaller head than a jaguar" },
+  { re: /\b(puma|on[çc]a[- ]?parda|cougar|mountain\s+lion)\b/i, en: "cougar (Puma concolor, 'onça-parda')", pt: "onça-parda", traits: "uniformly tawny-brown big cat without spots or stripes, small rounded head, long thick tail with dark tip" },
+  { re: /\b(lobo[- ]?guar[áa]|maned\s+wolf)\b/i, en: "maned wolf (Chrysocyon brachyurus)", pt: "lobo-guará", traits: "tall slender canid with very long thin black legs, reddish-orange fur, large erect ears, black mane along the back" },
+];
+
+function detectMammal(prompt: string) {
+  for (const m of MAMMAL_SPECIES) if (m.re.test(prompt)) return m;
+  return null;
+}
+
+const ANIMAL_RE = /\b(p[áa]ssaro|passarinho|ave|bird|sabi[áa]|beija[- ]?flor|hummingbird|arara|macaw|papagaio|parrot|tucano|toucan|can[áa]rio|canary|coruja|owl|[áa]guia|eagle|gavi[ãa]o|hawk|urubu|vulture|bem[- ]?te[- ]?vi|kiskadee|jo[ãa]o[- ]?de[- ]?barro|hornero|andorinha|swallow|pomba|pombo|dove|pigeon|pardal|sparrow|periquito|parakeet|budgie|calopsita|cockatiel|pav[ãa]o|peacock|flamingo|cisne|swan|pato|duck|ganso|goose|pinguim|penguin|avestruz|ostrich|galo|rooster|galinha|hen|chicken|c[ãa]o|cachorro|dog|gato|cat|cavalo|horse|le[ãa]o|lion|tigre|tiger|on[çc]a|jaguar|pantera|leopardo|leopard|puma|cougar|elefante|elephant|girafa|giraffe|macaco|monkey|lobo|wolf|raposa|fox|urso|bear|coelho|rabbit|veado|deer|peixe|fish|tubar[ãa]o|shark|baleia|whale|golfinho|dolphin|tartaruga|turtle|cobra|snake|lagarto|lizard|sapo|frog|borboleta|butterfly|abelha|bee)\b/i;
+
 
 function objectLockFor(prompt: string) {
   const bird = detectBird(prompt);
