@@ -402,18 +402,17 @@ async function callPollinations(opts: NanoBananaOptions): Promise<{ url: string 
   try {
     const prompt = withFacePreservation(opts.prompt).slice(0, 1800);
     const seed = Math.floor(Math.random() * 1e9);
-    // flux-realism produces hyper-realistic photographic output; fall back to flux if unavailable.
-    const url =
-      `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
-      `?width=1024&height=1024&nologo=true&enhance=true&model=flux-realism&seed=${seed}`;
-    let resp = await fetch(url);
-    if (!resp.ok) {
-      const fallback =
+    // Try highest quality models first (flux-pro, flux-realism), fall back to flux.
+    const candidates = ["flux-pro", "flux-realism", "flux"];
+    let resp: Response | null = null;
+    for (const model of candidates) {
+      const u =
         `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
-        `?width=1024&height=1024&nologo=true&enhance=true&model=flux&seed=${seed}`;
-      resp = await fetch(fallback);
+        `?width=1280&height=1280&nologo=true&enhance=true&model=${model}&seed=${seed}`;
+      const r = await fetch(u);
+      if (r.ok) { resp = r; break; }
     }
-    if (!resp.ok) return { url: null, error: `Pollinations ${resp.status}` };
+    if (!resp) return { url: null, error: `Pollinations indisponível` };
     const buf = new Uint8Array(await resp.arrayBuffer());
     let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.slice(i, i + 0x8000));
     return { url: `data:image/jpeg;base64,${btoa(bin)}` };
