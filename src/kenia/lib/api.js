@@ -1004,8 +1004,24 @@ const staticPost = (url, body = {}) => {
   if (path === "/creatives/edit") {
     return (async () => {
       try {
-        const sourceImage = body.image_base64 || body.image_b64 || body.image || "";
+        let sourceImage = body.image_base64 || body.image_b64 || body.image || "";
         if (!sourceImage) return response({ ok: false, error: "Imagem original ausente" });
+        // If saved generated image is an https signed URL, fetch and convert to base64
+        // so the Emergent/nano-banana edit pipeline receives valid image bytes.
+        if (/^https?:\/\//i.test(sourceImage) || sourceImage.startsWith("blob:")) {
+          try {
+            const r = await fetch(sourceImage);
+            const blob = await r.blob();
+            sourceImage = await new Promise((resolve, reject) => {
+              const fr = new FileReader();
+              fr.onload = () => resolve(String(fr.result || ""));
+              fr.onerror = () => reject(fr.error || new Error("read failed"));
+              fr.readAsDataURL(blob);
+            });
+          } catch (e) {
+            return response({ ok: false, error: "Não foi possível baixar a imagem original para edição" });
+          }
+        }
         const { data, error } = await supabase.functions.invoke("edit-creative", {
           body: { image_base64: sourceImage, prompt: body.prompt || body.instruction || "" },
         });
