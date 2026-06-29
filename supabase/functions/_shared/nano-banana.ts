@@ -253,7 +253,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
       const form = new FormData();
       form.append("model", "gpt-image-1");
       form.append("prompt", prompt);
-      form.append("size", "1024x1024");
+      form.append("size", "1536x1536");
       for (const u of imageUrls.slice(0, 4)) {
         const converted = dataUrlToBlob(u);
         if (!converted) continue;
@@ -279,7 +279,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
     const resp = await fetchWithTimeout("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", n: 1 }),
+      body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1536", n: 1 }),
     }, 25000);
     const text = await resp.text();
     if (!resp.ok) return { url: null, error: `OpenAI imagem ${resp.status}: ${text.slice(0, 240)}` };
@@ -349,7 +349,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
       const files = imageUrls.slice(0, 4).map((u) => dataUrlToBytes(u)).filter(Boolean) as Array<{ bytes: Uint8Array; mime: string; filename: string }>;
       if (files.length) {
         const multipart = buildMultipartBody(
-          { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024" },
+          { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1536x1536" },
           files.map((file) => ({ name: files.length > 1 ? "image[]" : "image", ...file })),
         );
         const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
@@ -374,7 +374,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
       const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/generations", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024", n: 1 }),
+        body: JSON.stringify({ model: "gpt-image-1", prompt: safeOpts.prompt, size: "1536x1536", n: 1 }),
       }, 12000);
       const text = await resp.text();
       if (resp.ok) {
