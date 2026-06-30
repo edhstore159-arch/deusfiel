@@ -282,7 +282,7 @@ export default function CreativesGallery() {
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openSchedule(item)}>
                       <CalendarClock className="w-3 h-3 mr-1" /> Agendar
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => remove(item.id)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" title="Excluir imagem" onClick={() => remove(item)}>
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
