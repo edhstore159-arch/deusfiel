@@ -10,6 +10,7 @@ export interface ChatOptions {
   timeoutMs?: number;
   maxTokens?: number;
   preferFastProvider?: boolean;
+  preferProvider?: "auto" | "emergent" | "lovable" | "gemini" | "ollama";
 }
 
 export interface ImageOptions {
@@ -493,6 +494,20 @@ async function chatOllama(opts: ChatOptions) {
 }
 
 export async function chatCompletion(opts: ChatOptions) {
+  // Permite forçar um provider específico (ex.: "emergent" para análise de casos).
+  if (opts.preferProvider && opts.preferProvider !== "auto") {
+    if (opts.preferProvider === "emergent") {
+      const r = await chatEmergent(opts);
+      if (r.ok) return r;
+      console.warn("⚠️ Emergent (forçado) falhou, caindo para fallback:", r.status, r.error?.slice?.(0, 200));
+    } else if (opts.preferProvider === "lovable" && LOVABLE_KEY) {
+      const r = await chatLovable(opts); if (r.ok) return r;
+    } else if (opts.preferProvider === "gemini" && GEMINI_KEY) {
+      const r = await chatGemini(opts); if (r.ok) return r;
+    } else if (opts.preferProvider === "ollama" && OLLAMA_URL) {
+      const r = await chatOllama(opts); if (r.ok) return r;
+    }
+  }
   // Para voz/atendimento ao vivo, prioriza provedores cloud rápidos antes do Ollama local/ngrok.
   if (opts.preferFastProvider) {
     if (LOVABLE_KEY) {
