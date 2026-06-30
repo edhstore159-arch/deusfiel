@@ -275,12 +275,12 @@ export default function CreativesGallery() {
                 <div className="p-3">
                   <div className="font-medium text-sm line-clamp-1">{item.title}</div>
                   <div className="text-xs text-nude-500 line-clamp-3 mt-1.5 whitespace-pre-wrap min-h-[3rem]">{item.caption}</div>
-                  <div className="flex gap-1 mt-3 pt-3 border-t border-nude-100">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => copyCaption(item.caption)}>
+                  <div className="grid grid-cols-2 gap-1 mt-3 pt-3 border-t border-nude-100">
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => copyCaption(item.caption)}>
                       <Copy className="w-3 h-3 mr-1" /> Legenda
                     </Button>
                     {item.image_b64 && (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => download(item)}>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => download(item)}>
                         <Download className="w-3 h-3 mr-1" /> PNG
                       </Button>
                     )}
@@ -290,8 +290,13 @@ export default function CreativesGallery() {
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openSchedule(item)}>
                       <CalendarClock className="w-3 h-3 mr-1" /> Agendar
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" title="Excluir imagem" onClick={() => remove(item)}>
-                      <Trash2 className="w-3 h-3" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs col-span-2 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                      onClick={() => remove(item)}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" /> Excluir imagem
                     </Button>
                   </div>
                 </div>
