@@ -566,10 +566,10 @@ export default function Creatives() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {instagramHandle ? (
+              {igAccount ? (
                 <>
                   <Badge className="bg-gradient-to-r from-pink-500 to-purple-500 text-white border-0">
-                    <Instagram className="w-3 h-3 mr-1" /> @{instagramHandle}
+                    <Instagram className="w-3 h-3 mr-1" /> @{igAccount.ig_username || "conectado"}
                   </Badge>
                   <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={disconnectInstagram}>
                     Desconectar
