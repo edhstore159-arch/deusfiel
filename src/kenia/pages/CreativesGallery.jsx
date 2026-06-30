@@ -166,10 +166,29 @@ export default function CreativesGallery() {
     }
   };
 
-  const remove = async (id) => {
-    if (!confirm("Excluir criativo?")) return;
-    await api.delete(`/creatives/${id}`);
-    load();
+  const remove = async (item) => {
+    const id = typeof item === "object" ? item?.id : item;
+    if (!id) return;
+    if (!confirm("Excluir esta imagem definitivamente?")) return;
+    try {
+      // 1) Tenta excluir via API (se disponível)
+      try { await api.delete(`/creatives/${id}`); } catch { /* segue fallback */ }
+
+      // 2) Remove do storage se houver caminho
+      const storagePath = (typeof item === "object" && item?.storage_path) || null;
+      if (storagePath) {
+        try { await supabase.storage.from("creative-assets").remove([storagePath]); } catch {}
+      }
+
+      // 3) Remove dos registros do banco (best-effort em ambas as tabelas)
+      try { await supabase.from("generated_images").delete().eq("id", id); } catch {}
+      try { await supabase.from("creatives").delete().eq("id", id); } catch {}
+
+      setItems((prev) => prev.filter((it) => it.id !== id));
+      toast.success("Imagem excluída");
+    } catch (e) {
+      toast.error(`Não foi possível excluir: ${e.message || e}`);
+    }
   };
 
   const copyCaption = (text) => {
@@ -263,7 +282,7 @@ export default function CreativesGallery() {
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openSchedule(item)}>
                       <CalendarClock className="w-3 h-3 mr-1" /> Agendar
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" onClick={() => remove(item.id)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500" title="Excluir imagem" onClick={() => remove(item)}>
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
