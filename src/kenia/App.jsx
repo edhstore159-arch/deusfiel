@@ -114,6 +114,7 @@ function App() {
                 <Route path="/app/whatsapp-logs" element={<WhatsAppLogs />} />
                 <Route path="/app/settings" element={<Settings />} />
                 <Route path="/app/debug" element={<DebugTool />} />
+                <Route path="/app/emergent-login" element={<EmergentLogin />} />
               </Route>
             </Routes>
           </Suspense>
