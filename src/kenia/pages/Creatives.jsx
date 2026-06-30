@@ -36,24 +36,96 @@ export default function Creatives() {
   const [logoImage, setLogoImage] = useState(() => {
     try { return localStorage.getItem("kenia.creative.logo") || null; } catch { return null; }
   }); // data URL (logo do escritório) — persistido entre sessões
-  const [instagramHandle, setInstagramHandle] = useState(() => {
-    try { return localStorage.getItem("kenia.instagram.handle") || ""; } catch { return ""; }
-  });
+  const [igAccount, setIgAccount] = useState(null); // { ig_username, page_name }
+  const [igMedia, setIgMedia] = useState([]);
+  const [igLoading, setIgLoading] = useState(false);
 
-  function connectInstagram() {
-    const handle = window.prompt("Digite seu @ do Instagram para conectar:", instagramHandle || "");
-    if (!handle) return;
-    const clean = handle.trim().replace(/^@/, "");
-    if (!clean) return;
-    try { localStorage.setItem("kenia.instagram.handle", clean); } catch {}
-    setInstagramHandle(clean);
-    toast.success(`Instagram @${clean} conectado`);
+  async function refreshInstagram() {
+    setIgLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("instagram-list-media", { body: {} });
+      if (error) throw error;
+      if (data?.connected) {
+        setIgAccount(data.account || null);
+        setIgMedia(data.media || []);
+      } else {
+        setIgAccount(null);
+        setIgMedia([]);
+      }
+    } catch (e) {
+      console.warn("ig list error", e);
+    } finally {
+      setIgLoading(false);
+    }
   }
-  function disconnectInstagram() {
-    try { localStorage.removeItem("kenia.instagram.handle"); } catch {}
-    setInstagramHandle("");
-    toast.success("Instagram desconectado");
+
+  useEffect(() => { refreshInstagram(); }, []);
+
+  useEffect(() => {
+    function onMsg(ev) {
+      if (ev?.data?.type === "instagram-connected") {
+        toast.success("Instagram conectado");
+        refreshInstagram();
+      }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
+  async function connectInstagram() {
+    try {
+      const { data, error } = await supabase.functions.invoke("instagram-oauth-start", { body: {} });
+      if (error) throw error;
+      if (!data?.url) throw new Error("URL OAuth indisponível");
+      window.open(data.url, "ig_oauth", "width=600,height=720");
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (msg.includes("INSTAGRAM_APP_ID")) {
+        toast.error("Configure INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET nos secrets para conectar.");
+      } else {
+        toast.error("Falha ao iniciar conexão: " + msg);
+      }
+    }
   }
+
+  async function disconnectInstagram() {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u?.user) return;
+      await supabase.from("instagram_accounts").delete().eq("user_id", u.user.id);
+      setIgAccount(null);
+      setIgMedia([]);
+      toast.success("Instagram desconectado");
+    } catch (e) {
+      toast.error("Falha ao desconectar: " + String(e?.message || e));
+    }
+  }
+
+  async function publishToInstagram(creative) {
+    try {
+      if (!igAccount) {
+        toast.error("Conecte o Instagram primeiro");
+        return;
+      }
+      const imgRef = creative.image_b64 || creative.image || creative.image_url;
+      if (!imgRef || !/^https?:\/\//i.test(imgRef)) {
+        toast.error("Esta imagem ainda não tem URL pública. Salve-a na galeria primeiro.");
+        return;
+      }
+      const caption = [creative.title, creative.caption, creative.hashtags].filter(Boolean).join("\n\n");
+      toast.message("Publicando no Instagram…");
+      const { data, error } = await supabase.functions.invoke("instagram-publish", {
+        body: { image_url: imgRef, caption },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Publicado! Atualizando feed…");
+      setTimeout(refreshInstagram, 2000);
+    } catch (e) {
+      toast.error("Falha ao publicar: " + String(e?.message || e));
+    }
+  }
+
   const [form, setForm] = useState({
     title: "", network: "instagram", format: "post",
     topic: "", tone: "profissional", case_type: "",
@@ -494,10 +566,10 @@ export default function Creatives() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {instagramHandle ? (
+              {igAccount ? (
                 <>
                   <Badge className="bg-gradient-to-r from-pink-500 to-purple-500 text-white border-0">
-                    <Instagram className="w-3 h-3 mr-1" /> @{instagramHandle}
+                    <Instagram className="w-3 h-3 mr-1" /> @{igAccount.ig_username || "conectado"}
                   </Badge>
                   <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={disconnectInstagram}>
                     Desconectar
@@ -559,6 +631,41 @@ export default function Creatives() {
             ))}
           </div>
         </Card>
+
+        {igAccount && (
+          <Card className="p-4 sm:p-6 border-nude-200">
+            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div>
+                <div className="font-display font-semibold text-base flex items-center gap-2">
+                  <Instagram className="w-4 h-4 text-pink-500" /> Posts publicados no Instagram
+                </div>
+                <div className="text-sm text-nude-500">
+                  @{igAccount.ig_username} · {igMedia.length} post(s)
+                </div>
+              </div>
+              <Button size="sm" variant="outline" onClick={refreshInstagram} disabled={igLoading}>
+                {igLoading ? "Atualizando…" : "Atualizar"}
+              </Button>
+            </div>
+            {igMedia.length === 0 ? (
+              <div className="text-sm text-nude-500">Nenhum post publicado ainda. Gere um criativo e clique em "Publicar no Instagram".</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {igMedia.map((m) => (
+                  <a key={m.id} href={m.permalink} target="_blank" rel="noopener noreferrer" className="block group">
+                    <div className="aspect-square bg-nude-100 rounded-md overflow-hidden">
+                      <img src={m.thumbnail_url || m.media_url} alt="" className="w-full h-full object-cover group-hover:opacity-90 transition" />
+                    </div>
+                    <div className="text-xs text-nude-500 mt-1 line-clamp-2">{m.caption || "Sem legenda"}</div>
+                    <div className="text-[10px] text-nude-400 mt-0.5">❤ {m.like_count ?? 0} · 💬 {m.comments_count ?? 0}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+
 
         <Card className="p-6 border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
