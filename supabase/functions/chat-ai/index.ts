@@ -920,7 +920,8 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n");
       const aResp = await chatCompletion({
-        model: "google/gemini-3-flash-preview",
+        model: "gpt-4o-mini",
+        preferProvider: "emergent",
         messages: [
           {
             role: "system",
