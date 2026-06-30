@@ -632,6 +632,41 @@ export default function Creatives() {
           </div>
         </Card>
 
+        {igAccount && (
+          <Card className="p-4 sm:p-6 border-nude-200">
+            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <div>
+                <div className="font-display font-semibold text-base flex items-center gap-2">
+                  <Instagram className="w-4 h-4 text-pink-500" /> Posts publicados no Instagram
+                </div>
+                <div className="text-sm text-nude-500">
+                  @{igAccount.ig_username} · {igMedia.length} post(s)
+                </div>
+              </div>
+              <Button size="sm" variant="outline" onClick={refreshInstagram} disabled={igLoading}>
+                {igLoading ? "Atualizando…" : "Atualizar"}
+              </Button>
+            </div>
+            {igMedia.length === 0 ? (
+              <div className="text-sm text-nude-500">Nenhum post publicado ainda. Gere um criativo e clique em "Publicar no Instagram".</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {igMedia.map((m) => (
+                  <a key={m.id} href={m.permalink} target="_blank" rel="noopener noreferrer" className="block group">
+                    <div className="aspect-square bg-nude-100 rounded-md overflow-hidden">
+                      <img src={m.thumbnail_url || m.media_url} alt="" className="w-full h-full object-cover group-hover:opacity-90 transition" />
+                    </div>
+                    <div className="text-xs text-nude-500 mt-1 line-clamp-2">{m.caption || "Sem legenda"}</div>
+                    <div className="text-[10px] text-nude-400 mt-0.5">❤ {m.like_count ?? 0} · 💬 {m.comments_count ?? 0}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+
+
         <Card className="p-6 border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="font-display font-semibold text-base">Seus criativos gerados</div>
