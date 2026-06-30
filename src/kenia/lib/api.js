@@ -567,6 +567,79 @@ const compactImageForStorage = (src, maxSide = 768, quality = 0.82) => new Promi
   img.src = value;
 });
 
+const generatedImageIdFromCreativeId = (id) => {
+  const match = String(id || "").match(/^creative-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+  return match?.[1] || null;
+};
+
+const imageToBlob = async (image) => {
+  const value = String(image || "");
+  const dataUrl = value.startsWith("data:") ? value : `data:image/png;base64,${value}`;
+  const contentType = dataUrl.match(/^data:([^;,]+)/)?.[1] || "image/png";
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    return { blob, contentType };
+  } catch {
+    const pureB64 = dataUrl.split(",")[1] || "";
+    const bin = atob(pureB64.replace(/\s/g, ""));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { blob: new Blob([bytes], { type: contentType }), contentType };
+  }
+};
+
+const persistEditedCreativeImage = async ({ image, prompt, storagePath, generatedImageId }) => {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth?.user?.id;
+    if (!uid || !image) return { saved: false, storagePath: storagePath || null, generatedImageId: generatedImageId || null };
+
+    let targetPath = storagePath || null;
+    let rowId = generatedImageId || null;
+
+    if (!targetPath && rowId) {
+      const { data: existing } = await supabase
+        .from("generated_images")
+        .select("storage_path")
+        .eq("id", rowId)
+        .eq("user_id", uid)
+        .maybeSingle();
+      targetPath = existing?.storage_path || null;
+    }
+
+    const { blob, contentType } = await imageToBlob(image);
+    const extension = contentType.includes("jpeg") ? "jpg" : contentType.includes("webp") ? "webp" : "png";
+    targetPath = targetPath || `${uid}/creative-edited-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("creative-assets")
+      .upload(targetPath, blob, { contentType, upsert: true });
+    if (uploadError) throw uploadError;
+
+    if (rowId) {
+      const { data: updated, error: updateError } = await supabase
+        .from("generated_images")
+        .update({ storage_path: targetPath, prompt: prompt || "Criativo editado", kind: "creative", paid: false })
+        .eq("id", rowId)
+        .eq("user_id", uid)
+        .select("id")
+        .maybeSingle();
+      if (!updateError && updated?.id) return { saved: true, storagePath: targetPath, generatedImageId: updated.id };
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("generated_images")
+      .insert({ user_id: uid, storage_path: targetPath, prompt: prompt || "Criativo editado", kind: "creative", paid: false })
+      .select("id")
+      .maybeSingle();
+    if (insertError) throw insertError;
+    return { saved: true, storagePath: targetPath, generatedImageId: inserted?.id || rowId || null };
+  } catch (e) {
+    console.warn("[creatives] não foi possível salvar edição no armazenamento:", e?.message || e);
+    return { saved: false, storagePath: storagePath || null, generatedImageId: generatedImageId || null };
+  }
+};
+
 const buildLocalCreativeImage = (title = "Criativo jurídico", topic = "") => {
   const safeTitle = String(title || "Criativo jurídico").replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
   const safeTopic = String(topic || "Conteúdo profissional").slice(0, 90).replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
