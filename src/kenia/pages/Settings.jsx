@@ -33,8 +33,8 @@ export default function Settings() {
     const fallback = {
       using_default_text: true,
       using_default_image: true,
-      llm_text_key_masked: "Emergent padrão",
-      llm_image_key_masked: "Emergent padrão",
+      llm_text_key_masked: "Modelo padrão",
+      llm_image_key_masked: "Modelo padrão",
     };
     try {
       const { data } = await api.get("/settings");
@@ -157,7 +157,7 @@ export default function Settings() {
             <div className="text-sm text-nude-700">
               <div className="font-medium mb-1">Sobre as chaves</div>
               <div className="text-xs">
-                Por padrão, usamos a <strong>Emergent Universal Key</strong> que já vem configurada e funciona para chat (GPT-4o-mini) e imagens (gpt-image-1). Se você tiver uma chave OpenAI própria, pode substituir aqui para usar créditos próprios.
+                Por padrão, usamos a <strong>Chave Universal do Modelo</strong> que já vem configurada e funciona para chat (GPT-4o-mini) e imagens (gpt-image-1). Se você tiver uma chave OpenAI própria, pode substituir aqui para usar créditos próprios.
               </div>
             </div>
           </div>
@@ -176,7 +176,7 @@ export default function Settings() {
               </p>
             </div>
             <Badge className={settings.using_default_text ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-gold-100 text-gold-800 hover:bg-gold-100"}>
-              {settings.using_default_text ? "Emergent padrão" : "Chave personalizada"}
+              {settings.using_default_text ? "Modelo padrão" : "Chave personalizada"}
             </Badge>
           </div>
           {!settings.using_default_text && (
@@ -189,7 +189,7 @@ export default function Settings() {
             <div className="flex-1 relative">
               <Input
                 type={showText ? "text" : "password"}
-                placeholder="Cole aqui sua chave Emergent ou OpenAI (sk-...)"
+                placeholder="Cole aqui sua chave do modelo (sk-...) (sk-...)"
                 value={textKey}
                 onChange={(e) => setTextKey(e.target.value)}
                 className="pr-10 font-mono text-xs h-10"
@@ -207,7 +207,7 @@ export default function Settings() {
             <div className={`mt-3 text-sm flex items-center gap-2 ${textResult.ok ? "text-gold-700" : "text-rose-700"}`}>
               {textResult.ok ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
               {textResult.ok ? (
-                <>Funcionando! {textResult.using_custom_key ? "Chave personalizada" : "Emergent padrão"}.</>
+                <>Funcionando! {textResult.using_custom_key ? "Chave personalizada" : "Modelo padrão"}.</>
               ) : (
                 <>Erro: {textResult.error}</>
               )}
@@ -227,7 +227,7 @@ export default function Settings() {
               </p>
             </div>
             <Badge className={settings.using_default_image ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-gold-100 text-gold-800 hover:bg-gold-100"}>
-              {settings.using_default_image ? "Emergent padrão" : "Chave personalizada"}
+              {settings.using_default_image ? "Modelo padrão" : "Chave personalizada"}
             </Badge>
           </div>
           {!settings.using_default_image && (
@@ -240,7 +240,7 @@ export default function Settings() {
             <div className="flex-1 relative">
               <Input
                 type={showImage ? "text" : "password"}
-                placeholder="Cole aqui sua chave Emergent ou OpenAI (sk-...)"
+                placeholder="Cole aqui sua chave do modelo (sk-...) (sk-...)"
                 value={imageKey}
                 onChange={(e) => setImageKey(e.target.value)}
                 className="pr-10 font-mono text-xs h-10"
@@ -258,7 +258,7 @@ export default function Settings() {
             <div className={`mt-3 text-sm flex items-center gap-2 ${imageResult.ok ? "text-gold-700" : "text-rose-700"}`}>
               {imageResult.ok ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
               {imageResult.ok ? (
-                <>Funcionando! Modelo {imageResult.model}. {imageResult.using_custom_key ? "Chave personalizada" : "Emergent padrão"}.</>
+                <>Funcionando! Modelo {imageResult.model}. {imageResult.using_custom_key ? "Chave personalizada" : "Modelo padrão"}.</>
               ) : (
                 <>Erro: {imageResult.error}</>
               )}

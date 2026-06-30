@@ -631,7 +631,7 @@ export default function WhatsAppSettings() {
                 <div className="text-xs text-nude-500 max-w-2xl leading-relaxed">
                   O Baileys roda como serviço local no servidor. Ao escanear o QR Code abaixo com
                   seu WhatsApp (Aparelhos conectados), as mensagens recebidas vão direto para o
-                  dashboard e o robô IA (Emergent LLM) responde automaticamente. Não precisa
+                  dashboard e o robô IA (Modelo de Crédito) responde automaticamente. Não precisa
                   configurar webhook — tudo interno.
                 </div>
 
@@ -931,7 +931,7 @@ export default function WhatsAppSettings() {
                 )}
               </div>
               <p className="text-sm text-nude-500 mt-1">
-                Responde automaticamente as mensagens recebidas usando GPT-4o Mini (Emergent LLM).
+                Responde automaticamente as mensagens recebidas usando GPT-4o Mini (Modelo de Crédito).
               </p>
               <p className="text-xs text-nude-400 mt-1">
                 Para ativar: clique no switch ao lado → o botão fica laranja → clique em <strong>Salvar</strong> no topo.
