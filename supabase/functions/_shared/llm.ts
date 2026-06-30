@@ -10,6 +10,7 @@ export interface ChatOptions {
   timeoutMs?: number;
   maxTokens?: number;
   preferFastProvider?: boolean;
+  preferProvider?: "auto" | "emergent" | "lovable" | "gemini" | "ollama";
 }
 
 export interface ImageOptions {
