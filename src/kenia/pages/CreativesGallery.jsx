@@ -143,6 +143,12 @@ export default function CreativesGallery() {
         id: editTarget.id,
         image_base64: sourceImage,
         prompt: editPrompt.trim(),
+        title: editTarget.title,
+        caption: editTarget.caption,
+        network: editTarget.network,
+        format: editTarget.format,
+        storage_path: editTarget.storage_path || null,
+        generated_image_id: editTarget.generated_image_id || null,
       });
       if (data?.ok && (data.image_b64 || data.image)) {
         const next = data.image_b64 || data.image;
