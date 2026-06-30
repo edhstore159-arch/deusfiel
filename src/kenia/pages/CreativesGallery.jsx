@@ -43,7 +43,14 @@ export default function CreativesGallery() {
     try {
       const { data } = await api.get("/creatives");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.creatives) ? data.creatives : [];
-      setItems(list);
+      const seen = new Set();
+      const unique = list.filter((it) => {
+        const key = it?.id ?? `${it?.created_at}-${it?.title}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setItems(unique);
     } catch { setItems([]); }
   };
 
@@ -249,8 +256,9 @@ export default function CreativesGallery() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {items.map(item => (
-              <Card key={item.id} className="overflow-hidden border-nude-200 hover:shadow-md transition-shadow">
+            {items.map((item, idx) => (
+              <Card key={item.id || `creative-${idx}`} className="overflow-hidden border-nude-200 hover:shadow-md transition-shadow">
+
                 <div className="aspect-square bg-nude-100 relative overflow-hidden">
                   {item.image_b64 ? (
                     <img src={imageSrc(item.image_b64)} alt={item.title} className="w-full h-full object-cover" />
