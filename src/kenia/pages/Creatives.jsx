@@ -466,7 +466,7 @@ export default function Creatives() {
         <CreativeAssetsLibrary onPick={(dataUrl) => { setRefImage(dataUrl); setOpen(true); }} />
 
         <Card className="p-4 sm:p-6 border-nude-200">
-          <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
             <div>
               <div className="font-display font-semibold text-base flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-gold-600" /> Modelos prontos
@@ -475,7 +475,27 @@ export default function Creatives() {
                 Clique em "Usar modelo" para preencher o gerador, ou copie a legenda.
               </div>
             </div>
-            <Badge variant="outline" className="hidden sm:inline-flex">{CREATIVE_TEMPLATES.length} modelos</Badge>
+            <div className="flex items-center gap-2">
+              {instagramHandle ? (
+                <>
+                  <Badge className="bg-gradient-to-r from-pink-500 to-purple-500 text-white border-0">
+                    <Instagram className="w-3 h-3 mr-1" /> @{instagramHandle}
+                  </Badge>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={disconnectInstagram}>
+                    Desconectar
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  className="h-8 text-xs bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-600 hover:opacity-90 text-white border-0"
+                  onClick={connectInstagram}
+                >
+                  <Instagram className="w-3.5 h-3.5 mr-1.5" /> Conectar Instagram
+                </Button>
+              )}
+              <Badge variant="outline" className="hidden sm:inline-flex">{CREATIVE_TEMPLATES.length} modelos</Badge>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {CREATIVE_TEMPLATES.map((tpl) => (
