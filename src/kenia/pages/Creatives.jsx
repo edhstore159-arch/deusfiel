@@ -36,24 +36,96 @@ export default function Creatives() {
   const [logoImage, setLogoImage] = useState(() => {
     try { return localStorage.getItem("kenia.creative.logo") || null; } catch { return null; }
   }); // data URL (logo do escritório) — persistido entre sessões
-  const [instagramHandle, setInstagramHandle] = useState(() => {
-    try { return localStorage.getItem("kenia.instagram.handle") || ""; } catch { return ""; }
-  });
+  const [igAccount, setIgAccount] = useState(null); // { ig_username, page_name }
+  const [igMedia, setIgMedia] = useState([]);
+  const [igLoading, setIgLoading] = useState(false);
 
-  function connectInstagram() {
-    const handle = window.prompt("Digite seu @ do Instagram para conectar:", instagramHandle || "");
-    if (!handle) return;
-    const clean = handle.trim().replace(/^@/, "");
-    if (!clean) return;
-    try { localStorage.setItem("kenia.instagram.handle", clean); } catch {}
-    setInstagramHandle(clean);
-    toast.success(`Instagram @${clean} conectado`);
+  async function refreshInstagram() {
+    setIgLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("instagram-list-media", { body: {} });
+      if (error) throw error;
+      if (data?.connected) {
+        setIgAccount(data.account || null);
+        setIgMedia(data.media || []);
+      } else {
+        setIgAccount(null);
+        setIgMedia([]);
+      }
+    } catch (e) {
+      console.warn("ig list error", e);
+    } finally {
+      setIgLoading(false);
+    }
   }
-  function disconnectInstagram() {
-    try { localStorage.removeItem("kenia.instagram.handle"); } catch {}
-    setInstagramHandle("");
-    toast.success("Instagram desconectado");
+
+  useEffect(() => { refreshInstagram(); }, []);
+
+  useEffect(() => {
+    function onMsg(ev) {
+      if (ev?.data?.type === "instagram-connected") {
+        toast.success("Instagram conectado");
+        refreshInstagram();
+      }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
+  async function connectInstagram() {
+    try {
+      const { data, error } = await supabase.functions.invoke("instagram-oauth-start", { body: {} });
+      if (error) throw error;
+      if (!data?.url) throw new Error("URL OAuth indisponível");
+      window.open(data.url, "ig_oauth", "width=600,height=720");
+    } catch (e) {
+      const msg = String(e?.message || e);
+      if (msg.includes("INSTAGRAM_APP_ID")) {
+        toast.error("Configure INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET nos secrets para conectar.");
+      } else {
+        toast.error("Falha ao iniciar conexão: " + msg);
+      }
+    }
   }
+
+  async function disconnectInstagram() {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u?.user) return;
+      await supabase.from("instagram_accounts").delete().eq("user_id", u.user.id);
+      setIgAccount(null);
+      setIgMedia([]);
+      toast.success("Instagram desconectado");
+    } catch (e) {
+      toast.error("Falha ao desconectar: " + String(e?.message || e));
+    }
+  }
+
+  async function publishToInstagram(creative) {
+    try {
+      if (!igAccount) {
+        toast.error("Conecte o Instagram primeiro");
+        return;
+      }
+      const imgRef = creative.image_b64 || creative.image || creative.image_url;
+      if (!imgRef || !/^https?:\/\//i.test(imgRef)) {
+        toast.error("Esta imagem ainda não tem URL pública. Salve-a na galeria primeiro.");
+        return;
+      }
+      const caption = [creative.title, creative.caption, creative.hashtags].filter(Boolean).join("\n\n");
+      toast.message("Publicando no Instagram…");
+      const { data, error } = await supabase.functions.invoke("instagram-publish", {
+        body: { image_url: imgRef, caption },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Publicado! Atualizando feed…");
+      setTimeout(refreshInstagram, 2000);
+    } catch (e) {
+      toast.error("Falha ao publicar: " + String(e?.message || e));
+    }
+  }
+
   const [form, setForm] = useState({
     title: "", network: "instagram", format: "post",
     topic: "", tone: "profissional", case_type: "",
