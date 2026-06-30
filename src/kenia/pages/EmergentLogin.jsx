@@ -7,9 +7,9 @@ import { ExternalLink, Mail, Copy, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "kenia.emergent.email";
-const EMERGENT_URLS = [
-  { label: "Emergent App (login principal)", url: "https://app.emergent.sh/" },
-  { label: "Emergent Agent (dashboard)", url: "https://emergentagent.com/" },
+const PLATFORM_URLS = [
+  { label: "Plataforma IA (login principal)", url: "https://app.emergent.sh/" },
+  { label: "Painel da Plataforma IA", url: "https://emergentagent.com/" },
   { label: "Esqueci a senha", url: "https://app.emergent.sh/forgot-password" },
 ];
 
@@ -42,16 +42,16 @@ export default function EmergentLogin() {
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
       <div>
         <div className="text-xs uppercase tracking-widest text-gold-600 mb-2">Ferramentas</div>
-        <h1 className="font-display text-3xl text-nude-900">Login Emergent</h1>
+        <h1 className="font-display text-3xl text-nude-900">Login Plataforma IA</h1>
         <p className="text-sm text-nude-500 mt-1">
-          Acesso rápido à plataforma Emergent (créditos de IA). Salve seu e-mail aqui para nunca mais esquecer
+          Acesso rápido à plataforma de créditos de IA. Salve seu e-mail aqui para nunca mais esquecer
           — ao abrir o login, ele é copiado automaticamente para colar no formulário.
         </p>
       </div>
 
       <Card className="p-6 border-nude-200 space-y-4">
         <div>
-          <Label className="text-xs uppercase tracking-wider text-nude-700">Seu e-mail Emergent</Label>
+          <Label className="text-xs uppercase tracking-wider text-nude-700">Seu e-mail de acesso</Label>
           <div className="flex gap-2 mt-1.5">
             <Input
               type="email"
@@ -65,12 +65,12 @@ export default function EmergentLogin() {
             </Button>
           </div>
           <p className="text-xs text-nude-500 mt-1.5">
-            Guardado apenas neste navegador. Use para lembrar qual conta você usa na Emergent.
+            Guardado apenas neste navegador. Use para lembrar qual conta você usa na plataforma.
           </p>
         </div>
 
         <div className="space-y-2">
-          {EMERGENT_URLS.map((item) => (
+          {PLATFORM_URLS.map((item) => (
             <Button
               key={item.url}
               onClick={() => openLogin(item.url)}
@@ -91,9 +91,9 @@ export default function EmergentLogin() {
           <div className="text-sm text-nude-700 space-y-1.5">
             <p><strong>Como funciona:</strong></p>
             <ol className="list-decimal pl-5 space-y-1 text-nude-600">
-              <li>Salve seu e-mail Emergent acima (fica salvo localmente).</li>
-              <li>Clique em "Emergent App (login principal)" — abre em nova aba.</li>
-              <li>O e-mail é copiado automaticamente — basta colar no campo da Emergent e digitar sua senha.</li>
+              <li>Salve seu e-mail acima (fica salvo localmente).</li>
+              <li>Clique em "Plataforma IA (login principal)" — abre em nova aba.</li>
+              <li>O e-mail é copiado automaticamente — basta colar no campo e digitar sua senha.</li>
               <li>Se esqueceu a senha, use o link "Esqueci a senha".</li>
             </ol>
           </div>
