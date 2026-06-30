@@ -36,6 +36,24 @@ export default function Creatives() {
   const [logoImage, setLogoImage] = useState(() => {
     try { return localStorage.getItem("kenia.creative.logo") || null; } catch { return null; }
   }); // data URL (logo do escritório) — persistido entre sessões
+  const [instagramHandle, setInstagramHandle] = useState(() => {
+    try { return localStorage.getItem("kenia.instagram.handle") || ""; } catch { return ""; }
+  });
+
+  function connectInstagram() {
+    const handle = window.prompt("Digite seu @ do Instagram para conectar:", instagramHandle || "");
+    if (!handle) return;
+    const clean = handle.trim().replace(/^@/, "");
+    if (!clean) return;
+    try { localStorage.setItem("kenia.instagram.handle", clean); } catch {}
+    setInstagramHandle(clean);
+    toast.success(`Instagram @${clean} conectado`);
+  }
+  function disconnectInstagram() {
+    try { localStorage.removeItem("kenia.instagram.handle"); } catch {}
+    setInstagramHandle("");
+    toast.success("Instagram desconectado");
+  }
   const [form, setForm] = useState({
     title: "", network: "instagram", format: "post",
     topic: "", tone: "profissional", case_type: "",
