@@ -43,7 +43,14 @@ export default function CreativesGallery() {
     try {
       const { data } = await api.get("/creatives");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.creatives) ? data.creatives : [];
-      setItems(list);
+      const seen = new Set();
+      const unique = list.filter((it) => {
+        const key = it?.id ?? `${it?.created_at}-${it?.title}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setItems(unique);
     } catch { setItems([]); }
   };
 
