@@ -546,19 +546,28 @@ const persistCloudCaseAnalysis = async (record, transcript = []) => {
   }
 };
 
-const compactImageForStorage = (src, maxSide = 768, quality = 0.82) => new Promise((resolve) => {
+const compactImageForStorage = (src, maxSide = 1280, quality = 0.95) => new Promise((resolve) => {
   const value = String(src || "");
   if (!value.startsWith("data:image/") || value.startsWith("data:image/svg")) return resolve(value);
   if (typeof Image === "undefined" || typeof document === "undefined") return resolve(value);
+  const isPng = value.startsWith("data:image/png");
   const img = new Image();
   img.onload = () => {
     try {
-      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth || maxSide, img.naturalHeight || maxSide));
+      const w = img.naturalWidth || maxSide;
+      const h = img.naturalHeight || maxSide;
+      const longest = Math.max(w, h);
+      // Não recomprime se já está dentro do limite — preserva PNG original sem perdas/corrupção.
+      if (longest <= maxSide) return resolve(value);
+      const scale = maxSide / longest;
       const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round((img.naturalWidth || maxSide) * scale));
-      canvas.height = Math.max(1, Math.round((img.naturalHeight || maxSide) * scale));
-      canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      canvas.width = Math.max(1, Math.round(w * scale));
+      canvas.height = Math.max(1, Math.round(h * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(value);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      // Mantém PNG se a entrada for PNG (sem perda); senão JPEG de alta qualidade.
+      resolve(isPng ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", quality));
     } catch {
       resolve(value);
     }
