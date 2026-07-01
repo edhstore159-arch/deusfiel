@@ -298,11 +298,22 @@ export default function CreativesGallery() {
           </div>
           <h1 className="font-display font-bold text-xl sm:text-2xl truncate">Criativos Gerados</h1>
         </div>
-        <Button asChild variant="outline" size="sm" className="border-gold-300 bg-white text-nude-900 hover:bg-gold-50">
-          <Link to="/app/creatives">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao gerador
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className={`border-gold-300 bg-white text-nude-900 hover:bg-gold-50 ${showTrash ? "ring-2 ring-gold-400" : ""}`}
+            onClick={() => setShowTrash((v) => !v)}
+          >
+            <Archive className="w-4 h-4 mr-2" />
+            Lixeira {trash.length > 0 && <Badge className="ml-2 bg-rose-500 text-white">{trash.length}</Badge>}
+          </Button>
+          <Button asChild variant="outline" size="sm" className="border-gold-300 bg-white text-nude-900 hover:bg-gold-50">
+            <Link to="/app/creatives">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao gerador
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
