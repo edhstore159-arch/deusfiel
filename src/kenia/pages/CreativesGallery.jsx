@@ -263,6 +263,46 @@ export default function CreativesGallery() {
     toast.success("Lixeira esvaziada");
   };
 
+  const restoreAll = async () => {
+    if (!trash.length) return;
+    let ok = 0;
+    for (const it of [...trash]) {
+      try { await restore(it); ok++; } catch {}
+    }
+    toast.success(`${ok} criativo(s) recuperado(s)`);
+  };
+
+  const recoverFromStorage = async () => {
+    try {
+      toast.loading("Procurando criativos no armazenamento...", { id: "recover-storage" });
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) { toast.error("Faça login para recuperar", { id: "recover-storage" }); return; }
+      const { data: files, error } = await supabase.storage.from("creative-assets").list(userId, { limit: 1000, sortBy: { column: "created_at", order: "desc" } });
+      if (error) throw error;
+      const existingPaths = new Set(items.map((i) => i.storage_path).filter(Boolean));
+      const orphans = (files || []).filter((f) => f.name && !existingPaths.has(`${userId}/${f.name}`));
+      if (!orphans.length) { toast.success("Nada para recuperar do armazenamento", { id: "recover-storage" }); return; }
+      let restored = 0;
+      for (const f of orphans) {
+        const storage_path = `${userId}/${f.name}`;
+        const { data: signed } = await supabase.storage.from("creative-assets").createSignedUrl(storage_path, 60 * 60 * 24 * 7);
+        const payload = {
+          user_id: userId,
+          title: f.name.replace(/\.[^.]+$/, ""),
+          image_b64: signed?.signedUrl || null,
+          storage_path,
+        };
+        const { error: insErr } = await supabase.from("generated_images").insert(payload);
+        if (!insErr) restored++;
+      }
+      toast.success(`${restored} criativo(s) recuperado(s) do armazenamento`, { id: "recover-storage" });
+      load();
+    } catch (e) {
+      toast.error(`Falha ao recuperar: ${e.message || e}`, { id: "recover-storage" });
+    }
+  };
+
   const copyCaption = (text) => {
     navigator.clipboard.writeText(text);
     toast.success("Legenda copiada");
