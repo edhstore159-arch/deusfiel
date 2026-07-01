@@ -338,7 +338,15 @@ export default function CreativesGallery() {
           </div>
           <h1 className="font-display font-bold text-xl sm:text-2xl truncate">Criativos Gerados</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-sky-300 bg-white text-sky-700 hover:bg-sky-50"
+            onClick={recoverFromStorage}
+          >
+            <RotateCcw className="w-4 h-4 mr-2" /> Recuperar excluídos
+          </Button>
           <Button
             variant="outline"
             size="sm"
