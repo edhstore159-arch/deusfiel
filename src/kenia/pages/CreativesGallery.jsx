@@ -263,6 +263,46 @@ export default function CreativesGallery() {
     toast.success("Lixeira esvaziada");
   };
 
+  const restoreAll = async () => {
+    if (!trash.length) return;
+    let ok = 0;
+    for (const it of [...trash]) {
+      try { await restore(it); ok++; } catch {}
+    }
+    toast.success(`${ok} criativo(s) recuperado(s)`);
+  };
+
+  const recoverFromStorage = async () => {
+    try {
+      toast.loading("Procurando criativos no armazenamento...", { id: "recover-storage" });
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      if (!userId) { toast.error("Faça login para recuperar", { id: "recover-storage" }); return; }
+      const { data: files, error } = await supabase.storage.from("creative-assets").list(userId, { limit: 1000, sortBy: { column: "created_at", order: "desc" } });
+      if (error) throw error;
+      const existingPaths = new Set(items.map((i) => i.storage_path).filter(Boolean));
+      const orphans = (files || []).filter((f) => f.name && !existingPaths.has(`${userId}/${f.name}`));
+      if (!orphans.length) { toast.success("Nada para recuperar do armazenamento", { id: "recover-storage" }); return; }
+      let restored = 0;
+      for (const f of orphans) {
+        const storage_path = `${userId}/${f.name}`;
+        const { data: signed } = await supabase.storage.from("creative-assets").createSignedUrl(storage_path, 60 * 60 * 24 * 7);
+        const payload = {
+          user_id: userId,
+          title: f.name.replace(/\.[^.]+$/, ""),
+          image_b64: signed?.signedUrl || null,
+          storage_path,
+        };
+        const { error: insErr } = await supabase.from("generated_images").insert(payload);
+        if (!insErr) restored++;
+      }
+      toast.success(`${restored} criativo(s) recuperado(s) do armazenamento`, { id: "recover-storage" });
+      load();
+    } catch (e) {
+      toast.error(`Falha ao recuperar: ${e.message || e}`, { id: "recover-storage" });
+    }
+  };
+
   const copyCaption = (text) => {
     navigator.clipboard.writeText(text);
     toast.success("Legenda copiada");
@@ -323,11 +363,21 @@ export default function CreativesGallery() {
               <div className="font-display font-semibold flex items-center gap-2">
                 <Archive className="w-4 h-4 text-gold-600" /> Lixeira ({trash.length})
               </div>
-              {trash.length > 0 && (
-                <Button variant="outline" size="sm" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={emptyTrash}>
-                  <Trash2 className="w-3 h-3 mr-1" /> Esvaziar
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="border-sky-200 text-sky-700 hover:bg-sky-50" onClick={recoverFromStorage}>
+                  <RotateCcw className="w-3 h-3 mr-1" /> Recuperar do armazenamento
                 </Button>
-              )}
+                {trash.length > 0 && (
+                  <>
+                    <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={restoreAll}>
+                      <RotateCcw className="w-3 h-3 mr-1" /> Recuperar todos
+                    </Button>
+                    <Button variant="outline" size="sm" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={emptyTrash}>
+                      <Trash2 className="w-3 h-3 mr-1" /> Esvaziar
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
             {trash.length === 0 ? (
               <div className="text-sm text-nude-500 py-8 text-center">A lixeira está vazia.</div>
