@@ -187,26 +187,80 @@ export default function CreativesGallery() {
   const remove = async (item) => {
     const id = typeof item === "object" ? item?.id : item;
     if (!id) return;
-    if (!confirm("Excluir esta imagem definitivamente?")) return;
+    if (!confirm("Enviar esta imagem para a lixeira? Você poderá recuperá-la depois.")) return;
     try {
-      // 1) Tenta excluir via API (se disponível)
-      try { await api.delete(`/creatives/${id}`); } catch { /* segue fallback */ }
-
-      // 2) Remove do storage se houver caminho
-      const storagePath = (typeof item === "object" && item?.storage_path) || null;
-      if (storagePath) {
-        try { await supabase.storage.from("creative-assets").remove([storagePath]); } catch {}
+      // Snapshot para lixeira (só metadados + data-url, sem apagar storage ainda)
+      if (typeof item === "object") {
+        const snapshot = { ...item, deleted_at: new Date().toISOString() };
+        const next = [snapshot, ...trash.filter((t) => t.id !== id)];
+        saveTrash(next);
       }
 
-      // 3) Remove dos registros do banco (best-effort em ambas as tabelas)
+      // Best-effort: remove dos registros do banco (mantemos storage para permitir restauração)
+      try { await api.delete(`/creatives/${id}`); } catch {}
       try { await supabase.from("generated_images").delete().eq("id", id); } catch {}
       try { await supabase.from("creatives").delete().eq("id", id); } catch {}
 
       setItems((prev) => prev.filter((it) => it.id !== id));
-      toast.success("Imagem excluída");
+      toast.success("Movida para a lixeira", { description: "Abra a Lixeira para recuperar." });
     } catch (e) {
       toast.error(`Não foi possível excluir: ${e.message || e}`);
     }
+  };
+
+  const restore = async (item) => {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      const payload = {
+        user_id: userId || null,
+        title: item.title || null,
+        caption: item.caption || null,
+        image_b64: item.image_b64 || null,
+        network: item.network || null,
+        format: item.format || null,
+        storage_path: item.storage_path || null,
+      };
+      // Tenta reinserir em generated_images
+      let restored = false;
+      try {
+        const { error } = await supabase.from("generated_images").insert(payload);
+        if (!error) restored = true;
+      } catch {}
+      if (!restored) {
+        try {
+          const { error } = await supabase.from("creatives").insert(payload);
+          if (!error) restored = true;
+        } catch {}
+      }
+      const next = trash.filter((t) => t.id !== item.id);
+      saveTrash(next);
+      toast.success(restored ? "Criativo recuperado" : "Recuperado localmente");
+      load();
+    } catch (e) {
+      toast.error(`Não foi possível recuperar: ${e.message || e}`);
+    }
+  };
+
+  const purge = async (item) => {
+    if (!confirm("Excluir permanentemente? Esta ação não pode ser desfeita.")) return;
+    if (item.storage_path) {
+      try { await supabase.storage.from("creative-assets").remove([item.storage_path]); } catch {}
+    }
+    const next = trash.filter((t) => t.id !== item.id);
+    saveTrash(next);
+    toast.success("Excluído permanentemente");
+  };
+
+  const emptyTrash = async () => {
+    if (!trash.length) return;
+    if (!confirm(`Esvaziar lixeira (${trash.length} itens) permanentemente?`)) return;
+    const paths = trash.map((t) => t.storage_path).filter(Boolean);
+    if (paths.length) {
+      try { await supabase.storage.from("creative-assets").remove(paths); } catch {}
+    }
+    saveTrash([]);
+    toast.success("Lixeira esvaziada");
   };
 
   const copyCaption = (text) => {
