@@ -317,7 +317,49 @@ export default function CreativesGallery() {
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
-        {items.length === 0 ? (
+        {showTrash ? (
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-display font-semibold flex items-center gap-2">
+                <Archive className="w-4 h-4 text-gold-600" /> Lixeira ({trash.length})
+              </div>
+              {trash.length > 0 && (
+                <Button variant="outline" size="sm" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={emptyTrash}>
+                  <Trash2 className="w-3 h-3 mr-1" /> Esvaziar
+                </Button>
+              )}
+            </div>
+            {trash.length === 0 ? (
+              <div className="text-sm text-nude-500 py-8 text-center">A lixeira está vazia.</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {trash.map((it) => (
+                  <Card key={`trash-${it.id}`} className="overflow-hidden border-nude-200 opacity-90">
+                    <div className="aspect-square bg-nude-100 relative">
+                      {it.image_b64 ? (
+                        <img src={imageSrc(it.image_b64)} alt={it.title} className="w-full h-full object-cover grayscale" />
+                      ) : (
+                        <div className="w-full h-full grid place-items-center text-nude-300"><Sparkles className="w-8 h-8" /></div>
+                      )}
+                    </div>
+                    <div className="p-2 space-y-1">
+                      <div className="text-xs font-medium line-clamp-1">{it.title || "Sem título"}</div>
+                      <div className="text-[10px] text-nude-500">Excluída {it.deleted_at ? new Date(it.deleted_at).toLocaleString("pt-BR") : ""}</div>
+                      <div className="grid grid-cols-2 gap-1 pt-1">
+                        <Button size="sm" variant="outline" className="h-7 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => restore(it)}>
+                          <RotateCcw className="w-3 h-3 mr-1" /> Recuperar
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => purge(it)}>
+                          <Trash2 className="w-3 h-3 mr-1" /> Excluir
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Card>
+        ) : items.length === 0 ? (
           <Card className="p-12 border-dashed border-nude-300 text-center">
             <div className="w-12 h-12 rounded-md bg-gold-100 grid place-items-center mx-auto mb-4">
               <Sparkles className="w-6 h-6 text-gold-700" />
