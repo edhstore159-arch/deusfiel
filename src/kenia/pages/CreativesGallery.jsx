@@ -36,8 +36,19 @@ export default function CreativesGallery() {
   const [editing, setEditing] = useState(false);
   const [editPreview, setEditPreview] = useState(null);
   const [editUpload, setEditUpload] = useState(null);
+  const [showTrash, setShowTrash] = useState(false);
+  const [trash, setTrash] = useState([]);
 
-  useEffect(() => { load(); loadScheduled(); }, []);
+  const TRASH_KEY = "creatives-trash-v1";
+  const loadTrash = () => {
+    try { setTrash(JSON.parse(localStorage.getItem(TRASH_KEY) || "[]")); } catch { setTrash([]); }
+  };
+  const saveTrash = (list) => {
+    localStorage.setItem(TRASH_KEY, JSON.stringify(list.slice(0, 100)));
+    setTrash(list.slice(0, 100));
+  };
+
+  useEffect(() => { load(); loadScheduled(); loadTrash(); }, []);
 
   const load = async () => {
     try {
