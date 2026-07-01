@@ -7,8 +7,10 @@ import { ExternalLink, Mail, Copy, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 const STORAGE_KEY = "kenia.emergent.email";
+const REFERRAL_SIGNUP_URL = "https://app.emergent.sh/register?ref=mate800341";
 const PLATFORM_URLS = [
   { label: "Plataforma IA (login principal)", url: "https://app.emergent.sh/" },
+  { label: "Criar conta com Google (promoção)", url: REFERRAL_SIGNUP_URL, highlight: true },
   { label: "Painel da Plataforma IA", url: "https://emergentagent.com/" },
   { label: "Esqueci a senha", url: "https://app.emergent.sh/forgot-password" },
 ];
