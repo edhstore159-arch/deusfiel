@@ -9,7 +9,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/kenia/components/ui/dialog";
-import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, CalendarClock, Pencil, ArrowLeft } from "lucide-react";
+import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, CalendarClock, Pencil, ArrowLeft, RotateCcw, Archive } from "lucide-react";
 import { toast } from "sonner";
 
 const PLATFORMS = [
@@ -36,8 +36,19 @@ export default function CreativesGallery() {
   const [editing, setEditing] = useState(false);
   const [editPreview, setEditPreview] = useState(null);
   const [editUpload, setEditUpload] = useState(null);
+  const [showTrash, setShowTrash] = useState(false);
+  const [trash, setTrash] = useState([]);
 
-  useEffect(() => { load(); loadScheduled(); }, []);
+  const TRASH_KEY = "creatives-trash-v1";
+  const loadTrash = () => {
+    try { setTrash(JSON.parse(localStorage.getItem(TRASH_KEY) || "[]")); } catch { setTrash([]); }
+  };
+  const saveTrash = (list) => {
+    localStorage.setItem(TRASH_KEY, JSON.stringify(list.slice(0, 100)));
+    setTrash(list.slice(0, 100));
+  };
+
+  useEffect(() => { load(); loadScheduled(); loadTrash(); }, []);
 
   const load = async () => {
     try {
@@ -176,26 +187,80 @@ export default function CreativesGallery() {
   const remove = async (item) => {
     const id = typeof item === "object" ? item?.id : item;
     if (!id) return;
-    if (!confirm("Excluir esta imagem definitivamente?")) return;
+    if (!confirm("Enviar esta imagem para a lixeira? Você poderá recuperá-la depois.")) return;
     try {
-      // 1) Tenta excluir via API (se disponível)
-      try { await api.delete(`/creatives/${id}`); } catch { /* segue fallback */ }
-
-      // 2) Remove do storage se houver caminho
-      const storagePath = (typeof item === "object" && item?.storage_path) || null;
-      if (storagePath) {
-        try { await supabase.storage.from("creative-assets").remove([storagePath]); } catch {}
+      // Snapshot para lixeira (só metadados + data-url, sem apagar storage ainda)
+      if (typeof item === "object") {
+        const snapshot = { ...item, deleted_at: new Date().toISOString() };
+        const next = [snapshot, ...trash.filter((t) => t.id !== id)];
+        saveTrash(next);
       }
 
-      // 3) Remove dos registros do banco (best-effort em ambas as tabelas)
+      // Best-effort: remove dos registros do banco (mantemos storage para permitir restauração)
+      try { await api.delete(`/creatives/${id}`); } catch {}
       try { await supabase.from("generated_images").delete().eq("id", id); } catch {}
       try { await supabase.from("creatives").delete().eq("id", id); } catch {}
 
       setItems((prev) => prev.filter((it) => it.id !== id));
-      toast.success("Imagem excluída");
+      toast.success("Movida para a lixeira", { description: "Abra a Lixeira para recuperar." });
     } catch (e) {
       toast.error(`Não foi possível excluir: ${e.message || e}`);
     }
+  };
+
+  const restore = async (item) => {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+      const payload = {
+        user_id: userId || null,
+        title: item.title || null,
+        caption: item.caption || null,
+        image_b64: item.image_b64 || null,
+        network: item.network || null,
+        format: item.format || null,
+        storage_path: item.storage_path || null,
+      };
+      // Tenta reinserir em generated_images
+      let restored = false;
+      try {
+        const { error } = await supabase.from("generated_images").insert(payload);
+        if (!error) restored = true;
+      } catch {}
+      if (!restored) {
+        try {
+          const { error } = await supabase.from("creatives").insert(payload);
+          if (!error) restored = true;
+        } catch {}
+      }
+      const next = trash.filter((t) => t.id !== item.id);
+      saveTrash(next);
+      toast.success(restored ? "Criativo recuperado" : "Recuperado localmente");
+      load();
+    } catch (e) {
+      toast.error(`Não foi possível recuperar: ${e.message || e}`);
+    }
+  };
+
+  const purge = async (item) => {
+    if (!confirm("Excluir permanentemente? Esta ação não pode ser desfeita.")) return;
+    if (item.storage_path) {
+      try { await supabase.storage.from("creative-assets").remove([item.storage_path]); } catch {}
+    }
+    const next = trash.filter((t) => t.id !== item.id);
+    saveTrash(next);
+    toast.success("Excluído permanentemente");
+  };
+
+  const emptyTrash = async () => {
+    if (!trash.length) return;
+    if (!confirm(`Esvaziar lixeira (${trash.length} itens) permanentemente?`)) return;
+    const paths = trash.map((t) => t.storage_path).filter(Boolean);
+    if (paths.length) {
+      try { await supabase.storage.from("creative-assets").remove(paths); } catch {}
+    }
+    saveTrash([]);
+    toast.success("Lixeira esvaziada");
   };
 
   const copyCaption = (text) => {
@@ -233,15 +298,68 @@ export default function CreativesGallery() {
           </div>
           <h1 className="font-display font-bold text-xl sm:text-2xl truncate">Criativos Gerados</h1>
         </div>
-        <Button asChild variant="outline" size="sm" className="border-gold-300 bg-white text-nude-900 hover:bg-gold-50">
-          <Link to="/app/creatives">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao gerador
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className={`border-gold-300 bg-white text-nude-900 hover:bg-gold-50 ${showTrash ? "ring-2 ring-gold-400" : ""}`}
+            onClick={() => setShowTrash((v) => !v)}
+          >
+            <Archive className="w-4 h-4 mr-2" />
+            Lixeira {trash.length > 0 && <Badge className="ml-2 bg-rose-500 text-white">{trash.length}</Badge>}
+          </Button>
+          <Button asChild variant="outline" size="sm" className="border-gold-300 bg-white text-nude-900 hover:bg-gold-50">
+            <Link to="/app/creatives">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao gerador
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
-        {items.length === 0 ? (
+        {showTrash ? (
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-display font-semibold flex items-center gap-2">
+                <Archive className="w-4 h-4 text-gold-600" /> Lixeira ({trash.length})
+              </div>
+              {trash.length > 0 && (
+                <Button variant="outline" size="sm" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={emptyTrash}>
+                  <Trash2 className="w-3 h-3 mr-1" /> Esvaziar
+                </Button>
+              )}
+            </div>
+            {trash.length === 0 ? (
+              <div className="text-sm text-nude-500 py-8 text-center">A lixeira está vazia.</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {trash.map((it) => (
+                  <Card key={`trash-${it.id}`} className="overflow-hidden border-nude-200 opacity-90">
+                    <div className="aspect-square bg-nude-100 relative">
+                      {it.image_b64 ? (
+                        <img src={imageSrc(it.image_b64)} alt={it.title} className="w-full h-full object-cover grayscale" />
+                      ) : (
+                        <div className="w-full h-full grid place-items-center text-nude-300"><Sparkles className="w-8 h-8" /></div>
+                      )}
+                    </div>
+                    <div className="p-2 space-y-1">
+                      <div className="text-xs font-medium line-clamp-1">{it.title || "Sem título"}</div>
+                      <div className="text-[10px] text-nude-500">Excluída {it.deleted_at ? new Date(it.deleted_at).toLocaleString("pt-BR") : ""}</div>
+                      <div className="grid grid-cols-2 gap-1 pt-1">
+                        <Button size="sm" variant="outline" className="h-7 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => restore(it)}>
+                          <RotateCcw className="w-3 h-3 mr-1" /> Recuperar
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => purge(it)}>
+                          <Trash2 className="w-3 h-3 mr-1" /> Excluir
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Card>
+        ) : items.length === 0 ? (
           <Card className="p-12 border-dashed border-nude-300 text-center">
             <div className="w-12 h-12 rounded-md bg-gold-100 grid place-items-center mx-auto mb-4">
               <Sparkles className="w-6 h-6 text-gold-700" />
