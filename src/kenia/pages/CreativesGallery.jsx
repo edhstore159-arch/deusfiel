@@ -363,11 +363,21 @@ export default function CreativesGallery() {
               <div className="font-display font-semibold flex items-center gap-2">
                 <Archive className="w-4 h-4 text-gold-600" /> Lixeira ({trash.length})
               </div>
-              {trash.length > 0 && (
-                <Button variant="outline" size="sm" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={emptyTrash}>
-                  <Trash2 className="w-3 h-3 mr-1" /> Esvaziar
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="border-sky-200 text-sky-700 hover:bg-sky-50" onClick={recoverFromStorage}>
+                  <RotateCcw className="w-3 h-3 mr-1" /> Recuperar do armazenamento
                 </Button>
-              )}
+                {trash.length > 0 && (
+                  <>
+                    <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={restoreAll}>
+                      <RotateCcw className="w-3 h-3 mr-1" /> Recuperar todos
+                    </Button>
+                    <Button variant="outline" size="sm" className="border-rose-200 text-rose-600 hover:bg-rose-50" onClick={emptyTrash}>
+                      <Trash2 className="w-3 h-3 mr-1" /> Esvaziar
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
             {trash.length === 0 ? (
               <div className="text-sm text-nude-500 py-8 text-center">A lixeira está vazia.</div>
