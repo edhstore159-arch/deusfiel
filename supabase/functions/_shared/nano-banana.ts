@@ -286,7 +286,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
         if (!converted) continue;
         form.append(imageUrls.length > 1 ? "image[]" : "image", converted.blob, converted.filename);
       }
-      if (!form.has("image")) return { url: null, error: "OpenAI: imagem de referência inválida" };
+      if (!form.has("image") && !form.has("image[]")) return { url: null, error: "OpenAI: imagem de referência inválida" };
 
       const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
         method: "POST",
