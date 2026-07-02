@@ -50,6 +50,7 @@ export default function EmergentLogin() {
   });
   const [newCode, setNewCode] = useState("");
   const [newValue, setNewValue] = useState("");
+  const [newPurchase, setNewPurchase] = useState("first"); // "first" | "second"
   useEffect(() => {
     try { localStorage.setItem(COUPONS_KEY, JSON.stringify(coupons)); } catch {}
   }, [coupons]);
@@ -59,9 +60,12 @@ export default function EmergentLogin() {
     if (!code) { toast.error("Cole o código oficial recebido da plataforma"); return; }
     if (coupons.some((c) => c.code === code)) { toast.error("Esse cupom já está salvo"); return; }
     const value = Number(newValue) || 0;
-    setCoupons((prev) => [{ code, value, createdAt: Date.now(), used: false }, ...prev].slice(0, 30));
+    setCoupons((prev) => [{ code, value, createdAt: Date.now(), used: false, purchase: newPurchase }, ...prev].slice(0, 30));
     setNewCode(""); setNewValue("");
-    toast.success(`Cupom ${code} salvo no cofre`);
+    toast.success(`Cupom ${code} salvo (${newPurchase === "first" ? "1ª compra" : "2ª compra+"})`);
+  }
+  function setPurchase(code, purchase) {
+    setCoupons((prev) => prev.map((c) => c.code === code ? { ...c, purchase } : c));
   }
   function copyCoupon(code) {
     navigator.clipboard.writeText(code).then(
