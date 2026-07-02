@@ -1,1 +1,4 @@
 project_id = "wfycqufqdheluvzhgvfw"
+
+[functions.search-emergent-coupons]
+verify_jwt = false
