@@ -33,7 +33,10 @@ function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) 
   const modeLock = mode === "scene-clone"
     ? SCENE_CLONE_FACE_SWAP_LOCK
     : (mode === "garment" ? GARMENT_TRANSFER_LOCK : FACE_PRESERVATION_LOCK);
-  return `${prompt}\n\n${HYPERREAL_LOCK}\n${REAL_SCALE_LOCK}\n${modeLock}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, changed identity, different person, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, blurry, low quality, watermark.`;
+  const identityNegative = mode === "scene-clone"
+    ? "face from IMAGE 1, unchanged original face, mixed identity, averaged face, new invented face, face not matching IMAGE 2,"
+    : "changed identity, different person,";
+  return `${prompt}\n\n${HYPERREAL_LOCK}\n${REAL_SCALE_LOCK}\n${modeLock}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, ${identityNegative} deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, blurry, low quality, watermark.`;
 }
 
 function extractImageFromMessage(msg: any): string | null {
@@ -60,14 +63,25 @@ function extractImageFromMessage(msg: any): string | null {
   return null;
 }
 
-function buildContent({ prompt, imageUrls }: NanoBananaOptions): Content[] {
+function referenceLabel(mode: NanoBananaOptions["mode"] | undefined, index: number) {
+  if (mode === "scene-clone") {
+    return index === 0
+      ? "REFERENCE IMAGE 1: master scene/look/body/pose/camera blueprint."
+      : "REFERENCE IMAGE 2: target facial identity to transplant onto the person in IMAGE 1.";
+  }
+  if (mode === "garment") {
+    return index === 0
+      ? "REFERENCE IMAGE 1: exact garment/clothing reference."
+      : "REFERENCE IMAGE 2: target person/model whose identity must be preserved.";
+  }
+  return `REFERENCE IMAGE ${index + 1}`;
+}
+
+function buildContent({ prompt, imageUrls, mode }: NanoBananaOptions): Content[] {
   const parts: Content[] = [{ type: "text", text: prompt }];
   const images = imageUrls || [];
   for (let i = 0; i < images.length; i += 1) {
-    const label = i === 0
-      ? "REFERENCE IMAGE 1: master scene/look/body/pose/camera blueprint."
-      : "REFERENCE IMAGE 2: target facial identity to transplant onto the person in IMAGE 1.";
-    parts.push({ type: "text", text: label });
+    parts.push({ type: "text", text: referenceLabel(mode, i) });
     parts.push({ type: "image_url", image_url: { url: images[i] } });
   }
   return parts;
@@ -164,13 +178,9 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   if (!key) return { url: null, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
   const parts: any[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
-  const labels = [
-    "REFERENCE IMAGE 1: master scene/look/body/pose/camera blueprint.",
-    "REFERENCE IMAGE 2: target facial identity to transplant onto the person in IMAGE 1.",
-  ];
   for (let i = 0; i < (opts.imageUrls || []).length; i += 1) {
     const u = opts.imageUrls?.[i] || "";
-    parts.push({ text: labels[i] || `REFERENCE IMAGE ${i + 1}` });
+    parts.push({ text: referenceLabel(opts.mode, i) });
     const m = String(u).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
     if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
   }
@@ -326,7 +336,9 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
   const editPrefix = opts.mode === "edit"
     ? "STRICT IMAGE EDIT MODE: the uploaded image is the exact base canvas. Do not generate a new photo. Preserve all pixels/details except the specifically requested edit. The requested edit must be visibly applied.\n\n"
-    : "";
+    : (opts.mode === "scene-clone"
+      ? "STRICT TWO-IMAGE EDIT MODE: use IMAGE 1 as the base scene/look/body and replace the visible facial identity with IMAGE 2. Do not ignore IMAGE 2.\n\n"
+      : "");
   const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt, opts.mode) };
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
 
