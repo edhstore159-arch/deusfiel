@@ -3,8 +3,10 @@ import { Card } from "@/kenia/components/ui/card";
 import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Button } from "@/kenia/components/ui/button";
-import { ExternalLink, Mail, Copy, Sparkles, Ticket, RefreshCw } from "lucide-react";
+import { ExternalLink, Mail, Copy, Sparkles, Ticket, RefreshCw, Search, Globe, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+
 
 const COUPONS_KEY = "kenia.emergent.coupons";
 
