@@ -422,9 +422,10 @@ export default function ImageFusion() {
 
   const fuse = async (opts = {}) => {
     const templateMode = !!opts.templateMode;
+    const sceneCloneMode = !!opts.sceneCloneMode;
     if (!img1 && !img2) { toast.error("Envie ao menos uma imagem"); return; }
     const singleMode = !!img1 && !img2;
-    if (singleMode && !prompt.trim() && !templateMode) {
+    if (singleMode && !prompt.trim() && !templateMode && !sceneCloneMode) {
       toast.error("Para editar uma única imagem, descreva a alteração (ex: 'mudar a roupa para azul')");
       return;
     }
@@ -442,13 +443,14 @@ export default function ImageFusion() {
       await generateVariants(imageUrl);
     };
     try {
+      const mode = sceneCloneMode ? "scene-clone" : (templateMode ? "template" : (singleMode ? "edit" : "fusion"));
       const { data } = await api.post(
         "/creatives/fuse-images",
-        { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt, mode: templateMode ? "template" : (singleMode ? "edit" : "fusion") },
+        { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt, mode },
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
-        await finishWithImage(data.image, templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : "Imagem gerada! Salvando e criando variações..."));
+        await finishWithImage(data.image, sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : "Imagem gerada! Salvando e criando variações...")));
       } else if (!singleMode) {
         const fallback = await buildClientFusionFallback(img1, img2);
         await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
@@ -614,6 +616,15 @@ export default function ImageFusion() {
                 data-testid="fusion-clone-template">
                 {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Clonando...</>) :
                   (<><Combine className="w-4 h-4 mr-2" />🧬 Clonar este modelo (mesmo layout · novo texto/imagens)</>)}
+              </Button>
+            )}
+            {img1 && img2 && (
+              <Button onClick={() => fuse({ sceneCloneMode: true })} disabled={loading}
+                variant="outline"
+                className="border-gold-500/60 text-gold-200 hover:bg-gold-500/10"
+                data-testid="fusion-clone-scene">
+                {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Clonando cena...</>) :
+                  (<><Combine className="w-4 h-4 mr-2" />🎬 Clonar cena + look da Imagem 1 (rosto da Imagem 2)</>)}
               </Button>
             )}
             <Button onClick={() => fuse()} disabled={loading || (!img1 && !img2)}
