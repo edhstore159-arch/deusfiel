@@ -175,17 +175,19 @@ Deno.serve(async (req) => {
       const userTheme = (prompt || '').trim();
       const hasPerson = !!image2_base64;
       fullPrompt = [
-        'SCENE + LOOK CLONE MODE (1:1 replication of IMAGE 1).',
+        'SCENE + LOOK CLONE WITH FACE TRANSPLANT MODE (strict two-reference edit).',
         'IMAGE 1 = MASTER REFERENCE. Treat it as a pixel-faithful blueprint to reproduce.',
         'CLONE EVERYTHING from IMAGE 1: full scene, background, environment, props, lighting direction, color palette, time of day, camera angle, framing, composition, depth of field, mood; AND the complete LOOK — every garment (type, silhouette, cut, neckline, sleeves, length, fabric, texture, color hex, prints, logos, patterns, embroidery), accessories, shoes, hair style, hair color, makeup and pose.',
         hasPerson
-          ? "IMAGE 2 = PERSON (target model). Replace ONLY the person's facial identity with the person from IMAGE 2: preserve their face, head shape, hairline, skin tone, freckles, eyes, eyebrows, nose, lips, jawline and ears exactly (pixel-faithful). Keep everything else (scene, look, pose, hair styling, framing) identical to IMAGE 1."
+          ? "IMAGE 2 = TARGET FACE / IDENTITY. The final person's face MUST be the person from IMAGE 2, not the face from IMAGE 1. Transplant ONLY the facial identity from IMAGE 2 onto the main person's head/body in IMAGE 1: copy IMAGE 2's face shape, eyes, eyebrows, nose, mouth, lips, teeth, cheeks, jawline, ears, skin tone, facial marks, expression and visible hairline exactly. Keep everything else from IMAGE 1 (scene, look, outfit, body, pose, camera angle, lighting and framing) identical. Do NOT average the two faces, do NOT keep IMAGE 1's face, do NOT generate a new face."
           : 'Reproduce IMAGE 1 exactly, keeping the same person and identity.',
-        'The result MUST be visually indistinguishable from IMAGE 1 in scene and look — a viewer must instantly recognize the SAME setting, SAME outfit, SAME pose, SAME lighting.',
+        hasPerson
+          ? 'Recognition test: a viewer must instantly recognize the SAME setting/outfit/pose/lighting from IMAGE 1 and the SAME facial identity from IMAGE 2.'
+          : 'The result MUST be visually indistinguishable from IMAGE 1 in scene and look — a viewer must instantly recognize the SAME setting, SAME outfit, SAME pose, SAME lighting.',
         'OUTPUT: one seamless photorealistic photograph. No collage, no split-screen, no reference thumbnail.',
         userTheme ? `USER NOTE: ${userTheme}.` : '',
         `STYLE: ${REALISM}.`,
-        `Negative: different scene, different background, different location, different lighting, different outfit, different pose, redesigned garment, altered prints, altered logos, missing accessories, restyled hair, ${NEGATIVE}`,
+        `Negative: face from IMAGE 1, unchanged face, mixed identity, averaged face, new invented face, different face than IMAGE 2, different scene, different background, different location, different lighting, different outfit, different pose, redesigned garment, altered prints, altered logos, missing accessories, ${NEGATIVE}`,
       ].filter(Boolean).join(' ');
     } else if (isGarmentTransfer) {
       const userTheme = (prompt || '').trim();
