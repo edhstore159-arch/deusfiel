@@ -152,7 +152,7 @@ async function callLovableGateway(opts: NanoBananaOptions): Promise<{ url: strin
   if (!key) return { url: null, error: "LOVABLE_API_KEY ausente" };
   const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt, opts.mode) };
   try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const resp = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { "Lovable-API-Key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -160,7 +160,7 @@ async function callLovableGateway(opts: NanoBananaOptions): Promise<{ url: strin
         modalities: ["image", "text"],
         messages: [{ role: "user", content: buildContent(safeOpts) }],
       }),
-    });
+      }, opts.mode === "scene-clone" || opts.mode === "garment" ? 12000 : 30000);
     if (!resp.ok) {
       return { url: null, error: `Lovable Gateway ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
     }
@@ -185,7 +185,7 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
     if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
   }
   try {
-    const resp = await fetch(
+      const resp = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
       {
         method: "POST",
@@ -195,6 +195,7 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
           generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
         }),
       },
+        opts.mode === "scene-clone" || opts.mode === "garment" ? 12000 : 25000,
     );
     if (!resp.ok) {
       return { url: null, error: `Gemini direto ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
@@ -284,6 +285,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
 
   const prompt = withFacePreservation(opts.prompt, opts.mode);
   const imageUrls = (opts.imageUrls || []).filter(Boolean);
+  const timeoutMs = opts.mode === "scene-clone" || opts.mode === "garment" ? 12000 : 25000;
   try {
     if (imageUrls.length > 0) {
       const form = new FormData();
@@ -302,7 +304,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
         method: "POST",
         headers: { Authorization: `Bearer ${key}` },
         body: form,
-      }, 25000);
+      }, timeoutMs);
       const text = await resp.text();
       if (!resp.ok) return { url: null, error: `OpenAI edição ${resp.status}: ${text.slice(0, 240)}` };
       const data = JSON.parse(text);
@@ -317,7 +319,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", quality: "high", n: 1 }),
-    }, 25000);
+    }, timeoutMs);
     const text = await resp.text();
     if (!resp.ok) return { url: null, error: `OpenAI imagem ${resp.status}: ${text.slice(0, 240)}` };
     const data = JSON.parse(text);
@@ -369,7 +371,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           modalities: ["image", "text"],
           messages: [{ role: "user", content: buildContent(safeOpts) }],
         }),
-      }, 45000);
+      }, requiresStrictReferenceEdit ? 12000 : 45000);
       if (!resp.ok) {
         const txt = (await resp.text()).slice(0, 300);
         lastError = `Emergent[${model}] ${resp.status}: ${txt}`;
@@ -399,7 +401,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": multipart.contentType, "Content-Length": multipart.contentLength },
           body: multipart.body,
-        }, requiresStrictReferenceEdit ? 45000 : 20000);
+        }, requiresStrictReferenceEdit ? 12000 : 20000);
         const text = await resp.text();
         if (resp.ok) {
           const data = JSON.parse(text);
