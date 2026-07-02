@@ -474,6 +474,7 @@ export async function generateWithNanoBanana(
   const errs: string[] = [];
   const hasRefs = Boolean(opts.imageUrls?.length);
   const pref = opts.preferProvider || "auto";
+  const strictReferenceMode = opts.mode === "scene-clone" || opts.mode === "garment";
 
   // Modo Pollinations puro (gratuito, sem refinar com Emergent).
   if (pref === "pollinations" && !hasRefs) {
@@ -507,30 +508,39 @@ export async function generateWithNanoBanana(
 
 
 
-  if (Deno.env.get("LOVABLE_API_KEY")) {
-    if (opts.mode === "scene-clone" || opts.mode === "garment") {
+  if (strictReferenceMode) {
+    if (Deno.env.get("LOVABLE_API_KEY")) {
       const r = await callLovableGateway(opts);
       if (r.url) return { url: r.url, provider: "lovable" };
       errs.push(r.error || "Lovable falhou");
       console.warn("⚠️ Lovable edição avançada falhou:", r.error);
     }
 
-    if (opts.mode === "scene-clone" || opts.mode === "garment") {
-      // Advanced two-reference edits need an image-edit model first. Text-first
-      // multimodal chat models may return a plausible image while silently
-      // ignoring the second reference face/garment, which is worse than failing.
-      if (Deno.env.get("OPENAI_API_KEY")) {
-        const rEdit = await callOpenAIImages(opts);
-        if (rEdit.url) return { url: rEdit.url, provider: "openai" };
-        errs.push(rEdit.error || "OpenAI falhou");
-        console.warn("⚠️ OpenAI edição avançada falhou:", rEdit.error);
-      }
-      const rEmergentEdit = await callEmergent(opts);
-      if (rEmergentEdit.url) return { url: rEmergentEdit.url, provider: "emergent" };
-      errs.push(rEmergentEdit.error || "Emergent falhou");
-      console.warn("⚠️ Emergent edição avançada falhou:", rEmergentEdit.error);
+    // Advanced two-reference edits must not fall back to text-only or local
+    // composition, because that silently ignores the target face/garment.
+    if (Deno.env.get("OPENAI_API_KEY")) {
+      const rEdit = await callOpenAIImages(opts);
+      if (rEdit.url) return { url: rEdit.url, provider: "openai" };
+      errs.push(rEdit.error || "OpenAI falhou");
+      console.warn("⚠️ OpenAI edição avançada falhou:", rEdit.error);
     }
 
+    const rEmergentEdit = await callEmergent(opts);
+    if (rEmergentEdit.url) return { url: rEmergentEdit.url, provider: "emergent" };
+    errs.push(rEmergentEdit.error || "Emergent falhou");
+    console.warn("⚠️ Emergent edição avançada falhou:", rEmergentEdit.error);
+
+    if (Deno.env.get("GEMINI_API_KEY")) {
+      const rGemini = await callGeminiDirect(opts);
+      if (rGemini.url) return { url: rGemini.url, provider: "gemini" };
+      errs.push(rGemini.error || "Gemini direto falhou");
+      console.warn("⚠️ Gemini edição avançada falhou:", rGemini.error);
+    }
+
+    return { url: null, provider: "none", error: errs.filter(Boolean).join(" | ") || "Sem modelo de edição com referência disponível" };
+  }
+
+  if (Deno.env.get("LOVABLE_API_KEY")) {
     if (opts.mode !== "scene-clone" && opts.mode !== "garment") {
       const r = await callLovableGateway(opts);
       if (r.url) return { url: r.url, provider: "lovable" };
