@@ -156,8 +156,8 @@ Deno.serve(async (req) => {
     }
 
     const normalizedPrompt = String(prompt || '').toLowerCase();
-    const garmentKeywords = /(roupa|camiseta|camisa|blusa|vestido|jaqueta|casaco|paleto|terno|calca|short|uniforme|shirt|t-?shirt|dress|jacket|outfit|clothing|garment)/i;
-    const transferKeywords = /(mesma|igual|ingual|transfer|vestir|coloc\w+\s+a\s+roupa|use\s+the\s+clothing|wear|swap|troc\w+\s+roupa)/i;
+    const garmentKeywords = /(roupa|look|outfit|camiseta|camisa|blusa|vestido|jaqueta|casaco|paleto|terno|calca|short|uniforme|figurino|shirt|t-?shirt|dress|jacket|clothing|garment|ensaio)/i;
+    const transferKeywords = /(mesma|igual|ingual|transfer|vestir|veste|coloc\w+\s+a\s+roupa|use\s+the\s+clothing|wear|swap|troc\w+\s+roupa|ensaio|fotograf|photoshoot)/i;
     const isGarmentTransfer = !!image2_base64
       && (mode === 'garment' || (garmentKeywords.test(normalizedPrompt) && transferKeywords.test(normalizedPrompt)));
 
@@ -171,7 +171,18 @@ Deno.serve(async (req) => {
     let fullPrompt: string;
     if (isGarmentTransfer) {
       const userTheme = (prompt || '').trim();
-      fullPrompt = `GARMENT TRANSFER MODE. IMAGE 1 = GARMENT REFERENCE (source of clothing). IMAGE 2 = PERSON (target). Task: dress the person from IMAGE 2 with the EXACT SAME garment shown in IMAGE 1 — copy the garment's color, pattern, print, texture, fabric, cut, collar, sleeves, length, buttons, logos and any visible detail 1:1. Fit the garment naturally to the body of the person from IMAGE 2, with realistic folds, shadows and drape matching the scene lighting. STRICT IDENTITY LOCK on IMAGE 2: preserve the face, head shape, hairline, hair color/length/style, skin tone, freckles, marks, eyes, eyebrows, nose, lips, teeth, jawline, ears, hands, body proportions, pose and background of IMAGE 2 exactly — do NOT change the person, do NOT swap the face, do NOT beautify. Keep IMAGE 2's background, lighting, camera angle and composition. Single seamless photorealistic photograph, no collage, no split-screen. ${userTheme ? `User note: ${userTheme}.` : ''} ${REALISM}. Negative: different garment, altered garment color, altered garment print, missing details from the reference garment, different person, face swap, altered face, ${NEGATIVE}`;
+      fullPrompt = [
+        'PROFESSIONAL VIRTUAL TRY-ON / GARMENT TRANSFER MODE.',
+        'IMAGE 1 = GARMENT REFERENCE (the clothing item to copy). IMAGE 2 = PERSON (target model).',
+        'PRIMARY TASK: produce a single photorealistic fashion photograph of the person from IMAGE 2 wearing the EXACT SAME clothing item shown in IMAGE 1.',
+        'GARMENT LOCK (1:1 copy of IMAGE 1): copy the exact garment type, silhouette, cut, length, neckline, collar, sleeves, hem, buttons, zippers, pockets, seams, stitching, fabric type and texture, primary color (match hex), secondary colors, prints, graphics, logos, text, patterns, embroidery and every visible detail. The garment on the final image MUST be visually indistinguishable from the garment in IMAGE 1 — a viewer must instantly recognize it as the SAME piece of clothing, not a similar one. Do NOT re-interpret, re-style, simplify, redesign, recolor, restyle prints, remove logos, or change the neckline/sleeves/length.',
+        'FIT: naturally drape the garment on the body of the person from IMAGE 2, with realistic folds, wrinkles, shadows and highlights matching the scene lighting and the pose. Adjust size so it fits the target body while preserving the garment design.',
+        'IDENTITY LOCK on IMAGE 2 (pixel-faithful): preserve face, head shape, hairline, hair color/length/style, skin tone, freckles, marks, eyes, eyebrows, nose, lips, teeth, jawline, ears, hands, body proportions, pose, background, lighting, camera angle and composition of IMAGE 2 exactly. Do NOT change the person, do NOT swap the face, do NOT beautify, do NOT age or de-age.',
+        'OUTPUT: one seamless photorealistic photograph, professional fashion photoshoot quality. No collage, no split-screen, no side-by-side, no reference thumbnail.',
+        userTheme ? `USER NOTE: ${userTheme}.` : '',
+        `STYLE: ${REALISM}.`,
+        `Negative: different garment, similar-but-different garment, redesigned garment, altered garment color, altered garment print, altered logo, missing prints, missing logos, changed neckline, changed sleeves, changed length, generic clothing, plain t-shirt replacing printed shirt, different person, face swap, altered face, beautified face, ${NEGATIVE}`,
+      ].filter(Boolean).join(' ');
     } else if (isTemplate) {
       fullPrompt = await elaborateTemplatePrompt(prompt);
     } else if (isSingle) {
