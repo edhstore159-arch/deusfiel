@@ -120,6 +120,48 @@ export default function EmergentLogin() {
         </div>
       </Card>
 
+      <Card className="p-6 border-nude-200 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 text-nude-900 font-medium">
+              <Ticket className="w-4 h-4 text-gold-600" /> Cupons de desconto R$ {COUPON_VALUE}
+            </div>
+            <p className="text-xs text-nude-500 mt-1">
+              Códigos promocionais para colar no campo de cupom da Plataforma IA. Válidos até serem aceitos pela plataforma.
+            </p>
+          </div>
+          <Button onClick={addCoupon} className="h-10 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-white">
+            <RefreshCw className="w-4 h-4 mr-2" /> Gerar cupom R$ {COUPON_VALUE}
+          </Button>
+        </div>
+
+        {coupons.length === 0 ? (
+          <p className="text-sm text-nude-500">Nenhum cupom gerado ainda. Clique em "Gerar cupom" para criar um.</p>
+        ) : (
+          <div className="space-y-2">
+            {coupons.map((c) => (
+              <div key={c.code} className={`flex items-center justify-between gap-3 rounded-md border p-3 ${c.used ? "border-nude-200 bg-nude-50 opacity-60" : "border-gold-300/60 bg-gold-50/40"}`}>
+                <div className="min-w-0">
+                  <div className="font-mono text-sm text-nude-900">{c.code}</div>
+                  <div className="text-xs text-nude-500">R$ {c.value},00 • {new Date(c.createdAt).toLocaleString("pt-BR")} {c.used && "• Usado"}</div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Button size="sm" variant="outline" onClick={() => copyCoupon(c.code)}><Copy className="w-3.5 h-3.5" /></Button>
+                  <Button size="sm" variant="outline" onClick={() => toggleUsed(c.code)}>{c.used ? "Reativar" : "Marcar usado"}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => removeCoupon(c.code)} className="text-nude-500">Remover</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="text-[11px] text-nude-500 leading-relaxed">
+          Aviso: os cupons são gerados localmente neste dispositivo para você organizar promoções.
+          A aceitação depende da Plataforma IA — se o código não for reconhecido no checkout, entre em contato
+          com o suporte da plataforma para vincular a promoção à sua conta.
+        </p>
+      </Card>
+
       <Card className="p-5 border-nude-200 bg-nude-50/40">
         <div className="flex items-start gap-3">
           <Mail className="w-5 h-5 text-gold-600 mt-0.5" />
