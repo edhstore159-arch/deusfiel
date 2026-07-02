@@ -70,14 +70,20 @@ async function ddgSearch(q: string) {
   return results;
 }
 
+async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return await Promise.race([
+    p,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const all: Array<{ title: string; url: string; snippet: string }> = [];
-    for (const q of QUERIES) {
-      const r = await ddgSearch(q);
-      all.push(...r.slice(0, 6));
-    }
+    const results = await Promise.all(
+      QUERIES.map((q) => withTimeout(ddgSearch(q), 8000, [] as Array<{ title: string; url: string; snippet: string }>)),
+    );
+    const all = results.flatMap((r) => r.slice(0, 6));
 
     const seen = new Set<string>();
     type Candidate = { code: string; sources: Array<{ title: string; url: string; snippet: string }> };
