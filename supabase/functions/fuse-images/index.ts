@@ -155,18 +155,35 @@ Deno.serve(async (req) => {
       });
     }
 
+    const normalizedPrompt = String(prompt || '').toLowerCase();
+    const garmentKeywords = /(roupa|camiseta|camisa|blusa|vestido|jaqueta|casaco|paleto|terno|calca|short|uniforme|shirt|t-?shirt|dress|jacket|outfit|clothing|garment)/i;
+    const transferKeywords = /(mesma|igual|ingual|transfer|vestir|coloc\w+\s+a\s+roupa|use\s+the\s+clothing|wear|swap|troc\w+\s+roupa)/i;
+    const isGarmentTransfer = !!image2_base64
+      && (mode === 'garment' || (garmentKeywords.test(normalizedPrompt) && transferKeywords.test(normalizedPrompt)));
+
     // If the user is asking for a garment color change, treat as a single-image EDIT
     // even when a second image was provided — this preserves face/hair identity 1:1.
     const localizedColor = buildLocalizedColorEditPrompt(prompt || '');
-    const forceEdit = !!localizedColor;
-    const isSingle = !image2_base64 || forceEdit;
+    const forceEdit = !!localizedColor && !isGarmentTransfer;
+    const isSingle = (!image2_base64 || forceEdit) && !isGarmentTransfer;
     const isTemplate = isSingle && mode === 'template' && !forceEdit;
-    const fullPrompt = isTemplate
-      ? await elaborateTemplatePrompt(prompt)
-      : (isSingle ? await elaborateEditPrompt(prompt) : await elaborateFusionPrompt(prompt));
-    const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64];
 
-    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion') });
+    let fullPrompt: string;
+    if (isGarmentTransfer) {
+      const userTheme = (prompt || '').trim();
+      fullPrompt = `GARMENT TRANSFER MODE. IMAGE 1 = GARMENT REFERENCE (source of clothing). IMAGE 2 = PERSON (target). Task: dress the person from IMAGE 2 with the EXACT SAME garment shown in IMAGE 1 — copy the garment's color, pattern, print, texture, fabric, cut, collar, sleeves, length, buttons, logos and any visible detail 1:1. Fit the garment naturally to the body of the person from IMAGE 2, with realistic folds, shadows and drape matching the scene lighting. STRICT IDENTITY LOCK on IMAGE 2: preserve the face, head shape, hairline, hair color/length/style, skin tone, freckles, marks, eyes, eyebrows, nose, lips, teeth, jawline, ears, hands, body proportions, pose and background of IMAGE 2 exactly — do NOT change the person, do NOT swap the face, do NOT beautify. Keep IMAGE 2's background, lighting, camera angle and composition. Single seamless photorealistic photograph, no collage, no split-screen. ${userTheme ? `User note: ${userTheme}.` : ''} ${REALISM}. Negative: different garment, altered garment color, altered garment print, missing details from the reference garment, different person, face swap, altered face, ${NEGATIVE}`;
+    } else if (isTemplate) {
+      fullPrompt = await elaborateTemplatePrompt(prompt);
+    } else if (isSingle) {
+      fullPrompt = await elaborateEditPrompt(prompt);
+    } else {
+      fullPrompt = await elaborateFusionPrompt(prompt);
+    }
+
+    const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64];
+    const runMode = isGarmentTransfer ? 'garment' : (isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion'));
+
+    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {
