@@ -175,12 +175,15 @@ Deno.serve(async (req) => {
       const userTheme = (prompt || '').trim();
       const hasPerson = !!image2_base64;
       fullPrompt = [
-        'SCENE + LOOK CLONE WITH FACE TRANSPLANT MODE (strict two-reference edit).',
-        'IMAGE 1 = MASTER REFERENCE. Treat it as a pixel-faithful blueprint to reproduce.',
-        'CLONE EVERYTHING from IMAGE 1: full scene, background, environment, props, lighting direction, color palette, time of day, camera angle, framing, composition, depth of field, mood; AND the complete LOOK — every garment (type, silhouette, cut, neckline, sleeves, length, fabric, texture, color hex, prints, logos, patterns, embroidery), accessories, shoes, hair style, hair color, makeup and pose.',
+        'SCENE + LOOK CLONE WITH FACE TRANSPLANT MODE (strict two-reference image edit).',
+        'IMAGE 1 = MASTER REFERENCE / BASE CANVAS. Treat it as a pixel-faithful blueprint to reproduce, BUT its visible face/head identity is NOT allowed to remain when IMAGE 2 is provided.',
+        'CLONE FROM IMAGE 1: full scene, background, environment, props, lighting direction, color palette, time of day, camera angle, framing, composition, depth of field, mood; AND the complete LOOK — every garment (type, silhouette, cut, neckline, sleeves, length, fabric, texture, color hex, prints, logos, patterns, embroidery), accessories, shoes, body pose, hand pose and body placement. Do NOT clone the face from IMAGE 1 when IMAGE 2 exists.',
         hasPerson
-          ? "IMAGE 2 = TARGET FACE / IDENTITY. The final person's face MUST be the person from IMAGE 2, not the face from IMAGE 1. Transplant ONLY the facial identity from IMAGE 2 onto the main person's head/body in IMAGE 1: copy IMAGE 2's face shape, eyes, eyebrows, nose, mouth, lips, teeth, cheeks, jawline, ears, skin tone, facial marks, expression and visible hairline exactly. Keep everything else from IMAGE 1 (scene, look, outfit, body, pose, camera angle, lighting and framing) identical. Do NOT average the two faces, do NOT keep IMAGE 1's face, do NOT generate a new face."
+          ? "IMAGE 2 = TARGET FACE / IDENTITY SOURCE. The final main person's face MUST be recognizably the person from IMAGE 2, not the person from IMAGE 1. Replace the entire visible facial identity area from IMAGE 1 with IMAGE 2: copy IMAGE 2's face shape, forehead, eyes, eyebrows, nose, mouth, lips, teeth, cheeks, jawline, ears if visible, skin tone, facial marks, expression and visible hairline exactly. Adapt only perspective and lighting so the transplanted face fits the pose from IMAGE 1. Keep everything else from IMAGE 1 (scene, outfit, body, pose, camera angle, lighting, framing and background) identical. Do NOT average the two faces, do NOT keep IMAGE 1's face, do NOT invent a new face."
           : 'Reproduce IMAGE 1 exactly, keeping the same person and identity.',
+        hasPerson
+          ? 'NON-NEGOTIABLE CHECK BEFORE OUTPUT: if the generated face still looks like IMAGE 1 or like a blend, the result is wrong. Regenerate until the face identity matches IMAGE 2 while the scene/look still matches IMAGE 1.'
+          : '',
         hasPerson
           ? 'Recognition test: a viewer must instantly recognize the SAME setting/outfit/pose/lighting from IMAGE 1 and the SAME facial identity from IMAGE 2.'
           : 'The result MUST be visually indistinguishable from IMAGE 1 in scene and look — a viewer must instantly recognize the SAME setting, SAME outfit, SAME pose, SAME lighting.',
