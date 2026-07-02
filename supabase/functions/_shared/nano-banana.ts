@@ -354,8 +354,9 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   const isQuotaError = (value: string) => /budget|exceed|quota|daily[_\s-]?(limit|spend)|daily_limit_reached|limit[_\s-]?reached/i.test(value);
   const quotaMessage = (detail: string) =>
     `Emergent: chave válida, mas bloqueada por limite/cota diária no provedor. Detalhe: ${detail}`;
+  const requiresStrictReferenceEdit = opts.mode === "scene-clone" || opts.mode === "garment";
 
-  for (const model of models) {
+  for (const model of requiresStrictReferenceEdit ? [] : models) {
     try {
       const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
         method: "POST",
@@ -388,7 +389,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
       const files = imageUrls.slice(0, 4).map((u) => dataUrlToBytes(u)).filter(Boolean) as Array<{ bytes: Uint8Array; mime: string; filename: string }>;
       if (files.length) {
         const multipart = buildMultipartBody(
-          { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024" },
+          { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024", quality: "high" },
           files.map((file) => ({ name: files.length > 1 ? "image[]" : "image", ...file })),
         );
         const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
@@ -406,8 +407,12 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         } else if (isQuotaError(text)) {
           return { url: null, error: quotaMessage(text.slice(0, 240)) };
         } else {
+          lastError = `Emergent images/edits ${resp.status}: ${text.slice(0, 240)}`;
           console.warn("⚠️ Emergent images/edits falhou:", resp.status, text.slice(0, 240));
         }
+      }
+      if (requiresStrictReferenceEdit) {
+        return { url: null, error: lastError || "Emergent images/edits não aplicou a edição com referências" };
       }
     } else {
       const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/generations", {
