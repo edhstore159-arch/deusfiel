@@ -54,6 +54,31 @@ async function synthesizeSpeech(text: string): Promise<string | null> {
     }
   }
 
+  // Fallback: Voicemagic (WATZZAP_AUDIO_API_KEY)
+  const VM_KEY = Deno.env.get("WATZZAP_AUDIO_API_KEY");
+  if (VM_KEY) {
+    try {
+      const r = await fetch("https://voicemagic.dev/api/v1/tts", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${VM_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean, language: "pt-BR" }),
+      });
+      const ct = r.headers.get("content-type") || "";
+      if (r.ok && ct.includes("audio/")) {
+        const buf = await r.arrayBuffer();
+        return bytesToBase64(new Uint8Array(buf));
+      }
+      if (r.ok) {
+        const j = await r.json().catch(() => ({}));
+        if (j?.audio_base64) return String(j.audio_base64);
+        if (j?.audio) return String(j.audio);
+      }
+      console.error("Voicemagic TTS error:", r.status, (await r.text()).slice(0, 200));
+    } catch (e) {
+      console.error("Voicemagic TTS exception:", e);
+    }
+  }
+
   if (!ELEVENLABS_API_KEY) return null;
   try {
     const resp = await fetch(
