@@ -451,14 +451,14 @@ export default function ImageFusion() {
       );
       if (data.ok && data.image) {
         await finishWithImage(data.image, sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : "Imagem gerada! Salvando e criando variações...")));
-      } else if (!singleMode) {
+      } else if (!singleMode && !sceneCloneMode) {
         const fallback = await buildClientFusionFallback(img1, img2);
         await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
       } else {
-        toast.error(data.error || "Falha ao gerar a imagem");
+        toast.error(data.error || (sceneCloneMode ? "Não foi possível clonar com o rosto da Imagem 2 agora. Tente novamente com fotos mais nítidas." : "Falha ao gerar a imagem"));
       }
     } catch (e) {
-      if (!singleMode) {
+      if (!singleMode && !sceneCloneMode) {
         try {
           const fallback = await buildClientFusionFallback(img1, img2);
           await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
@@ -466,7 +466,7 @@ export default function ImageFusion() {
           toast.error(e.response?.data?.detail || fallbackError?.message || "Erro ao gerar imagem");
         }
       } else {
-        toast.error(e.response?.data?.error || e.message || "Erro ao gerar imagem");
+        toast.error(e.response?.data?.error || e.message || (sceneCloneMode ? "Erro ao clonar cena com rosto da Imagem 2" : "Erro ao gerar imagem"));
       }
     } finally {
       setLoading(false);

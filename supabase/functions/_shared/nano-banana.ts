@@ -529,7 +529,8 @@ export async function generateWithNanoBanana(
     errs.push("Fallback Pollinations ignorado porque não preserva imagem de referência");
   }
 
-  const localFallback = buildLocalFusionFallback(opts);
+  const canUseLocalFallback = opts.mode !== "scene-clone" && opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit";
+  const localFallback = canUseLocalFallback ? buildLocalFusionFallback(opts) : null;
   if (localFallback) {
     console.warn("⚠️ Todos os provedores falharam; usando composição local:", errs.join(" | "));
     return { url: localFallback, provider: "local-fallback" };
