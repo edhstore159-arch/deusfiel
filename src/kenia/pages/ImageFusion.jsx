@@ -589,6 +589,18 @@ export default function ImageFusion() {
           <div className="flex items-center justify-between flex-wrap gap-2 mt-3">
             <Label className="text-gold-200">Instrução adicional (opcional)</Label>
           </div>
+          <div className="mt-3 rounded-md border border-gold-500/50 bg-gold-500/10 p-3">
+            <Button onClick={() => fuse({ sceneCloneMode: true })} disabled={loading || !img1 || !img2}
+              variant="outline"
+              className="w-full min-h-12 justify-center border-gold-500/70 bg-nude-950/70 text-gold-100 hover:bg-gold-500/10 hover:text-gold-50"
+              data-testid="fusion-clone-scene-primary">
+              {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Clonando cena...</>) :
+                (<><Combine className="w-4 h-4 mr-2" />🎬 Clonar cena + look da Imagem 1 (rosto da Imagem 2)</>)}
+            </Button>
+            <p className="mt-2 text-xs text-nude-400 text-center">
+              Envie a Imagem 1 com a cena/look original e a Imagem 2 com o rosto/pessoa que será aplicado.
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2 mt-2">
             <Button type="button" variant="outline" size="sm"
               onClick={() => setPrompt((p) => (p ? p + "\n\n" : "") + REJUVENATE_PROMPT)}
@@ -616,15 +628,6 @@ export default function ImageFusion() {
                 data-testid="fusion-clone-template">
                 {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Clonando...</>) :
                   (<><Combine className="w-4 h-4 mr-2" />🧬 Clonar este modelo (mesmo layout · novo texto/imagens)</>)}
-              </Button>
-            )}
-            {img1 && img2 && (
-              <Button onClick={() => fuse({ sceneCloneMode: true })} disabled={loading}
-                variant="outline"
-                className="border-gold-500/60 text-gold-200 hover:bg-gold-500/10"
-                data-testid="fusion-clone-scene">
-                {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Clonando cena...</>) :
-                  (<><Combine className="w-4 h-4 mr-2" />🎬 Clonar cena + look da Imagem 1 (rosto da Imagem 2)</>)}
               </Button>
             )}
             <Button onClick={() => fuse()} disabled={loading || (!img1 && !img2)}
