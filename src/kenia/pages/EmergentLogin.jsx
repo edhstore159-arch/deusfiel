@@ -1,10 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/kenia/components/ui/card";
 import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Button } from "@/kenia/components/ui/button";
-import { ExternalLink, Mail, Copy, Sparkles } from "lucide-react";
+import { ExternalLink, Mail, Copy, Sparkles, Ticket, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+
+const COUPONS_KEY = "kenia.emergent.coupons";
+const COUPON_VALUE = 6;
+function generateCouponCode() {
+  const rand = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  return `KENIA6-${rand}`;
+}
 
 const STORAGE_KEY = "kenia.emergent.email";
 const REFERRAL_SIGNUP_URL = "https://app.emergent.sh/register?ref=mate800341";
