@@ -9,7 +9,7 @@ type Content =
 export interface NanoBananaOptions {
   prompt: string;
   imageUrls?: string[]; // data URLs or http(s) URLs
-  mode?: "edit" | "fusion" | "template" | "generate";
+  mode?: "edit" | "fusion" | "template" | "generate" | "scene-clone" | "garment";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
   preferProvider?: "auto" | "pollinations" | "emergent";
 }
@@ -23,7 +23,16 @@ const HYPERREAL_LOCK =
 const REAL_SCALE_LOCK =
   "Real-world scale and proportions lock: render every person and object at true anatomical proportions matching a real photograph. Human head-to-body ratio approximately 1:7.5, adult height ~1.70m used as the scale reference for the whole scene. Background people MUST be smaller than foreground people in strict linear perspective (correct depth diminution: figures further from the camera appear proportionally smaller according to distance, never the same size as foreground subjects, never giant, never doll-sized). Consistent single vanishing point, consistent eye-line across figures standing on the same ground plane, feet actually touching the ground, natural cast shadows anchoring each subject to the floor. Objects (cars, doors, chairs, phones, cups) sized correctly relative to nearby humans. No floating figures, no oversized heads, no shrunken bodies, no mismatched scales, no cut-out/collage look, no duplicate limbs, no giants in the crowd.";
 
-function withFacePreservation(prompt: string) {
+const SCENE_CLONE_FACE_SWAP_LOCK =
+  "Scene clone face-transplant lock: REFERENCE ORDER IS MANDATORY. IMAGE 1 is ONLY the master scene/look blueprint: copy its background, location, lighting, camera angle, crop, pose, body placement, outfit, accessories and overall composition. IMAGE 2 is ONLY the target facial identity. The final main person's face/head identity MUST be recognized as the person from IMAGE 2, not the person from IMAGE 1. Replace the visible face from IMAGE 1 with IMAGE 2's facial identity: eyes, eyebrows, nose, mouth, lips, jawline, cheeks, skin tone, facial marks, expression, head shape and visible hairline. Do NOT keep, average, blend, beautify, redraw or reinterpret the face from IMAGE 1. Recognition test: scene/outfit/pose must read as IMAGE 1; face/identity must read as IMAGE 2.";
+
+const GARMENT_TRANSFER_LOCK =
+  "Virtual try-on reference lock: IMAGE 1 supplies the clothing only; IMAGE 2 supplies the person identity. Preserve the face/body/background of IMAGE 2 while copying the garment from IMAGE 1 exactly.";
+
+function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) {
+  const modeLock = mode === "scene-clone"
+    ? SCENE_CLONE_FACE_SWAP_LOCK
+    : (mode === "garment" ? GARMENT_TRANSFER_LOCK : FACE_PRESERVATION_LOCK);
   return `${prompt}\n\n${HYPERREAL_LOCK}\n${REAL_SCALE_LOCK}\n${FACE_PRESERVATION_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, changed identity, different person, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, blurry, low quality, watermark.`;
 }
 
