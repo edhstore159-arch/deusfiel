@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
 
     let result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
 
-    if (isSceneClone && image2_base64 && result.url) {
+    if (isSceneClone && image2_base64 && result.url && result.provider !== 'local-fallback') {
       const faceRepairPrompt = [
         'FACE IDENTITY REPAIR PASS — strict two-reference edit.',
         'IMAGE 1 = the generated scene clone result and MUST remain the exact base canvas: preserve its background, outfit, pose, body, lighting, camera angle, crop, colors and all non-face pixels.',
@@ -241,6 +241,17 @@ Deno.serve(async (req) => {
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (isSceneClone && result.provider === 'local-fallback') {
+      return new Response(JSON.stringify({
+        ok: false,
+        error: 'O modo Clonar cena precisa de um modelo de edição com crédito disponível para aplicar o rosto da Imagem 2. Agora os provedores retornaram limite/cota, então a imagem não foi alterada para evitar um resultado errado.',
+        provider: result.provider,
+        mode: runMode,
+      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

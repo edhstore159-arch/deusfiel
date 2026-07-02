@@ -152,7 +152,7 @@ async function callLovableGateway(opts: NanoBananaOptions): Promise<{ url: strin
   if (!key) return { url: null, error: "LOVABLE_API_KEY ausente" };
   const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt, opts.mode) };
   try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const resp = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { "Lovable-API-Key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -160,7 +160,7 @@ async function callLovableGateway(opts: NanoBananaOptions): Promise<{ url: strin
         modalities: ["image", "text"],
         messages: [{ role: "user", content: buildContent(safeOpts) }],
       }),
-    });
+      }, opts.mode === "scene-clone" || opts.mode === "garment" ? 12000 : 30000);
     if (!resp.ok) {
       return { url: null, error: `Lovable Gateway ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
     }
@@ -185,7 +185,7 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
     if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
   }
   try {
-    const resp = await fetch(
+      const resp = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
       {
         method: "POST",
@@ -195,6 +195,7 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
           generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
         }),
       },
+        opts.mode === "scene-clone" || opts.mode === "garment" ? 12000 : 25000,
     );
     if (!resp.ok) {
       return { url: null, error: `Gemini direto ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
@@ -284,6 +285,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
 
   const prompt = withFacePreservation(opts.prompt, opts.mode);
   const imageUrls = (opts.imageUrls || []).filter(Boolean);
+  const timeoutMs = opts.mode === "scene-clone" || opts.mode === "garment" ? 12000 : 25000;
   try {
     if (imageUrls.length > 0) {
       const form = new FormData();
@@ -302,7 +304,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
         method: "POST",
         headers: { Authorization: `Bearer ${key}` },
         body: form,
-      }, 25000);
+      }, timeoutMs);
       const text = await resp.text();
       if (!resp.ok) return { url: null, error: `OpenAI edição ${resp.status}: ${text.slice(0, 240)}` };
       const data = JSON.parse(text);
@@ -317,7 +319,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", quality: "high", n: 1 }),
-    }, 25000);
+    }, timeoutMs);
     const text = await resp.text();
     if (!resp.ok) return { url: null, error: `OpenAI imagem ${resp.status}: ${text.slice(0, 240)}` };
     const data = JSON.parse(text);
@@ -355,8 +357,11 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   const quotaMessage = (detail: string) =>
     `Emergent: chave válida, mas bloqueada por limite/cota diária no provedor. Detalhe: ${detail}`;
   const requiresStrictReferenceEdit = opts.mode === "scene-clone" || opts.mode === "garment";
+  const chatModels = requiresStrictReferenceEdit
+    ? ["vertex_ai/gemini-2.5-flash-image", "vertex_ai/gemini-3.1-flash-image-preview"]
+    : models;
 
-  for (const model of requiresStrictReferenceEdit ? [] : models) {
+  for (const model of chatModels) {
     try {
       const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
         method: "POST",
@@ -366,7 +371,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           modalities: ["image", "text"],
           messages: [{ role: "user", content: buildContent(safeOpts) }],
         }),
-      }, 45000);
+      }, requiresStrictReferenceEdit ? 12000 : 45000);
       if (!resp.ok) {
         const txt = (await resp.text()).slice(0, 300);
         lastError = `Emergent[${model}] ${resp.status}: ${txt}`;
@@ -396,7 +401,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": multipart.contentType, "Content-Length": multipart.contentLength },
           body: multipart.body,
-        }, 12000);
+        }, requiresStrictReferenceEdit ? 12000 : 20000);
         const text = await resp.text();
         if (resp.ok) {
           const data = JSON.parse(text);
@@ -471,6 +476,7 @@ export async function generateWithNanoBanana(
   const errs: string[] = [];
   const hasRefs = Boolean(opts.imageUrls?.length);
   const pref = opts.preferProvider || "auto";
+  const strictReferenceMode = opts.mode === "scene-clone" || opts.mode === "garment";
 
   // Modo Pollinations puro (gratuito, sem refinar com Emergent).
   if (pref === "pollinations" && !hasRefs) {
@@ -504,27 +510,45 @@ export async function generateWithNanoBanana(
 
 
 
-  if (Deno.env.get("LOVABLE_API_KEY")) {
-    if (opts.mode === "scene-clone" || opts.mode === "garment") {
-      // Advanced two-reference edits need an image-edit model first. Text-first
-      // multimodal chat models may return a plausible image while silently
-      // ignoring the second reference face/garment, which is worse than failing.
-      if (Deno.env.get("OPENAI_API_KEY")) {
-        const rEdit = await callOpenAIImages(opts);
-        if (rEdit.url) return { url: rEdit.url, provider: "openai" };
-        errs.push(rEdit.error || "OpenAI falhou");
-        console.warn("⚠️ OpenAI edição avançada falhou:", rEdit.error);
-      }
-      const rEmergentEdit = await callEmergent(opts);
-      if (rEmergentEdit.url) return { url: rEmergentEdit.url, provider: "emergent" };
-      errs.push(rEmergentEdit.error || "Emergent falhou");
-      console.warn("⚠️ Emergent edição avançada falhou:", rEmergentEdit.error);
+  if (strictReferenceMode) {
+    if (Deno.env.get("LOVABLE_API_KEY")) {
+      const r = await callLovableGateway(opts);
+      if (r.url) return { url: r.url, provider: "lovable" };
+      errs.push(r.error || "Lovable falhou");
+      console.warn("⚠️ Lovable edição avançada falhou:", r.error);
     }
 
-    const r = await callLovableGateway(opts);
-    if (r.url) return { url: r.url, provider: "lovable" };
-    errs.push(r.error || "Lovable falhou");
-    console.warn("⚠️ Lovable falhou:", r.error);
+    // Advanced two-reference edits must not fall back to text-only or local
+    // composition, because that silently ignores the target face/garment.
+    if (Deno.env.get("OPENAI_API_KEY")) {
+      const rEdit = await callOpenAIImages(opts);
+      if (rEdit.url) return { url: rEdit.url, provider: "openai" };
+      errs.push(rEdit.error || "OpenAI falhou");
+      console.warn("⚠️ OpenAI edição avançada falhou:", rEdit.error);
+    }
+
+    const rEmergentEdit = await callEmergent(opts);
+    if (rEmergentEdit.url) return { url: rEmergentEdit.url, provider: "emergent" };
+    errs.push(rEmergentEdit.error || "Emergent falhou");
+    console.warn("⚠️ Emergent edição avançada falhou:", rEmergentEdit.error);
+
+    if (Deno.env.get("GEMINI_API_KEY")) {
+      const rGemini = await callGeminiDirect(opts);
+      if (rGemini.url) return { url: rGemini.url, provider: "gemini" };
+      errs.push(rGemini.error || "Gemini direto falhou");
+      console.warn("⚠️ Gemini edição avançada falhou:", rGemini.error);
+    }
+
+    return { url: null, provider: "none", error: errs.filter(Boolean).join(" | ") || "Sem modelo de edição com referência disponível" };
+  }
+
+  if (Deno.env.get("LOVABLE_API_KEY")) {
+    if (opts.mode !== "scene-clone" && opts.mode !== "garment") {
+      const r = await callLovableGateway(opts);
+      if (r.url) return { url: r.url, provider: "lovable" };
+      errs.push(r.error || "Lovable falhou");
+      console.warn("⚠️ Lovable falhou:", r.error);
+    }
   }
 
   if (Deno.env.get("GEMINI_API_KEY")) {
@@ -562,7 +586,7 @@ export async function generateWithNanoBanana(
     errs.push("Fallback Pollinations ignorado porque não preserva imagem de referência");
   }
 
-  const canUseLocalFallback = opts.mode !== "scene-clone" && opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit";
+  const canUseLocalFallback = opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit";
   const localFallback = canUseLocalFallback ? buildLocalFusionFallback(opts) : null;
   if (localFallback) {
     console.warn("⚠️ Todos os provedores falharam; usando composição local:", errs.join(" | "));
