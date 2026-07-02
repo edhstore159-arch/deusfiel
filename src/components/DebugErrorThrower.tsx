@@ -24,8 +24,7 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
-    console.warn("[DebugErrorThrower]", message);
-    queueMicrotask(() => setMessage(null));
+    throw new Error(message);
   }
 
   return null;
