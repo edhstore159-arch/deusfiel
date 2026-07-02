@@ -177,7 +177,7 @@ export default function EmergentLogin() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_110px_140px_auto] gap-2">
           <Input
             placeholder="Código oficial (ex.: PROMO25)"
             value={newCode}
@@ -191,28 +191,58 @@ export default function EmergentLogin() {
             onChange={(e) => setNewValue(e.target.value)}
             className="h-11 bg-card border-nude-200 focus-visible:ring-gold-400"
           />
+          <select
+            value={newPurchase}
+            onChange={(e) => setNewPurchase(e.target.value)}
+            className="h-11 rounded-md border border-nude-200 bg-card px-2 text-sm text-nude-900 focus-visible:ring-gold-400"
+          >
+            <option value="first">1ª compra</option>
+            <option value="second">2ª compra+</option>
+          </select>
           <Button onClick={addCoupon} className="h-11 bg-nude-900 hover:bg-nude-800 text-white">
-            <RefreshCw className="w-4 h-4 mr-2" /> Salvar no cofre
+            <RefreshCw className="w-4 h-4 mr-2" /> Salvar
           </Button>
         </div>
 
         {coupons.length === 0 ? (
           <p className="text-sm text-nude-500">Nenhum cupom salvo. Cole aqui os códigos oficiais recebidos por e-mail.</p>
         ) : (
-          <div className="space-y-2">
-            {coupons.map((c) => (
-              <div key={c.code} className={`flex items-center justify-between gap-3 rounded-md border p-3 ${c.used ? "border-nude-200 bg-nude-50 opacity-60" : "border-gold-300/60 bg-gold-50/40"}`}>
-                <div className="min-w-0">
-                  <div className="font-mono text-sm text-nude-900">{c.code}</div>
-                  <div className="text-xs text-nude-500">{c.value ? `R$ ${c.value},00 • ` : ""}{new Date(c.createdAt).toLocaleString("pt-BR")} {c.used && "• Usado"}</div>
+          <div className="space-y-4">
+            {[
+              { key: "first", label: "🟢 Válidos na 1ª compra (novos usuários)" },
+              { key: "second", label: "🔵 Válidos a partir da 2ª compra (recompras)" },
+            ].map((group) => {
+              const list = coupons.filter((c) => (c.purchase || "first") === group.key);
+              if (!list.length) return (
+                <div key={group.key}>
+                  <div className="text-xs uppercase tracking-wider text-nude-700 mb-1.5">{group.label}</div>
+                  <p className="text-xs text-nude-500 italic">Nenhum cupom nesta categoria.</p>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Button size="sm" variant="outline" onClick={() => copyCoupon(c.code)}><Copy className="w-3.5 h-3.5" /></Button>
-                  <Button size="sm" variant="outline" onClick={() => toggleUsed(c.code)}>{c.used ? "Reativar" : "Marcar usado"}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => removeCoupon(c.code)} className="text-nude-500">Remover</Button>
+              );
+              return (
+                <div key={group.key}>
+                  <div className="text-xs uppercase tracking-wider text-nude-700 mb-1.5">{group.label} • {list.length}</div>
+                  <div className="space-y-2">
+                    {list.map((c) => (
+                      <div key={c.code} className={`flex items-center justify-between gap-3 rounded-md border p-3 ${c.used ? "border-nude-200 bg-nude-50 opacity-60" : group.key === "first" ? "border-emerald-300/60 bg-emerald-50/40" : "border-blue-300/60 bg-blue-50/40"}`}>
+                        <div className="min-w-0">
+                          <div className="font-mono text-sm text-nude-900">{c.code}</div>
+                          <div className="text-xs text-nude-500">{c.value ? `R$ ${c.value},00 • ` : ""}{new Date(c.createdAt).toLocaleString("pt-BR")} {c.used && "• Usado"}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          <Button size="sm" variant="outline" onClick={() => copyCoupon(c.code)}><Copy className="w-3.5 h-3.5" /></Button>
+                          <Button size="sm" variant="outline" onClick={() => setPurchase(c.code, group.key === "first" ? "second" : "first")}>
+                            → {group.key === "first" ? "2ª" : "1ª"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => toggleUsed(c.code)}>{c.used ? "Reativar" : "Usado"}</Button>
+                          <Button size="sm" variant="ghost" onClick={() => removeCoupon(c.code)} className="text-nude-500">Remover</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
