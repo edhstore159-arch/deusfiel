@@ -123,29 +123,58 @@ export default function EmergentLogin() {
       </Card>
 
       <Card className="p-6 border-nude-200 space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 text-nude-900 font-medium">
-              <Ticket className="w-4 h-4 text-gold-600" /> Cupons de desconto R$ {COUPON_VALUE}
-            </div>
-            <p className="text-xs text-nude-500 mt-1">
-              Códigos promocionais para colar no campo de cupom da Plataforma IA. Válidos até serem aceitos pela plataforma.
-            </p>
+        <div>
+          <div className="flex items-center gap-2 text-nude-900 font-medium">
+            <Ticket className="w-4 h-4 text-gold-600" /> Cofre de cupons oficiais
           </div>
-          <Button onClick={addCoupon} className="h-10 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-white">
-            <RefreshCw className="w-4 h-4 mr-2" /> Gerar cupom R$ {COUPON_VALUE}
+          <p className="text-xs text-nude-500 mt-1 leading-relaxed">
+            <strong>Importante:</strong> cupons válidos só são emitidos pela própria Plataforma IA (por e-mail, promoção
+            ou link de indicação). Este cofre serve para <em>guardar</em> os códigos oficiais que você recebeu, para não
+            perdê-los. Códigos inventados aqui não seriam aceitos no checkout — por isso o gerador foi removido.
+          </p>
+        </div>
+
+        <div className="rounded-md border border-gold-300/60 bg-gold-50/50 p-3 space-y-2">
+          <div className="text-xs text-nude-700">
+            <strong>Ganhe créditos reais:</strong> use o link de indicação abaixo — a promoção aplica bônus automático na
+            sua conta ao se cadastrar (sem precisar de cupom).
+          </div>
+          <Button
+            onClick={() => window.open(REFERRAL_SIGNUP_URL, "_blank", "noopener,noreferrer")}
+            className="w-full h-10 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-white"
+          >
+            <Sparkles className="w-4 h-4 mr-2" /> Abrir link de indicação (bônus automático)
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2">
+          <Input
+            placeholder="Código oficial (ex.: PROMO25)"
+            value={newCode}
+            onChange={(e) => setNewCode(e.target.value)}
+            className="h-11 bg-card border-nude-200 focus-visible:ring-gold-400 font-mono"
+          />
+          <Input
+            type="number"
+            placeholder="Valor R$"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            className="h-11 bg-card border-nude-200 focus-visible:ring-gold-400"
+          />
+          <Button onClick={addCoupon} className="h-11 bg-nude-900 hover:bg-nude-800 text-white">
+            <RefreshCw className="w-4 h-4 mr-2" /> Salvar no cofre
           </Button>
         </div>
 
         {coupons.length === 0 ? (
-          <p className="text-sm text-nude-500">Nenhum cupom gerado ainda. Clique em "Gerar cupom" para criar um.</p>
+          <p className="text-sm text-nude-500">Nenhum cupom salvo. Cole aqui os códigos oficiais recebidos por e-mail.</p>
         ) : (
           <div className="space-y-2">
             {coupons.map((c) => (
               <div key={c.code} className={`flex items-center justify-between gap-3 rounded-md border p-3 ${c.used ? "border-nude-200 bg-nude-50 opacity-60" : "border-gold-300/60 bg-gold-50/40"}`}>
                 <div className="min-w-0">
                   <div className="font-mono text-sm text-nude-900">{c.code}</div>
-                  <div className="text-xs text-nude-500">R$ {c.value},00 • {new Date(c.createdAt).toLocaleString("pt-BR")} {c.used && "• Usado"}</div>
+                  <div className="text-xs text-nude-500">{c.value ? `R$ ${c.value},00 • ` : ""}{new Date(c.createdAt).toLocaleString("pt-BR")} {c.used && "• Usado"}</div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Button size="sm" variant="outline" onClick={() => copyCoupon(c.code)}><Copy className="w-3.5 h-3.5" /></Button>
@@ -156,13 +185,9 @@ export default function EmergentLogin() {
             ))}
           </div>
         )}
-
-        <p className="text-[11px] text-nude-500 leading-relaxed">
-          Aviso: os cupons são gerados localmente neste dispositivo para você organizar promoções.
-          A aceitação depende da Plataforma IA — se o código não for reconhecido no checkout, entre em contato
-          com o suporte da plataforma para vincular a promoção à sua conta.
-        </p>
       </Card>
+
+
 
       <Card className="p-5 border-nude-200 bg-nude-50/40">
         <div className="flex items-start gap-3">
