@@ -33,7 +33,7 @@ function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) 
   const modeLock = mode === "scene-clone"
     ? SCENE_CLONE_FACE_SWAP_LOCK
     : (mode === "garment" ? GARMENT_TRANSFER_LOCK : FACE_PRESERVATION_LOCK);
-  return `${prompt}\n\n${HYPERREAL_LOCK}\n${REAL_SCALE_LOCK}\n${FACE_PRESERVATION_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, changed identity, different person, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, blurry, low quality, watermark.`;
+  return `${prompt}\n\n${HYPERREAL_LOCK}\n${REAL_SCALE_LOCK}\n${modeLock}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, changed identity, different person, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, blurry, low quality, watermark.`;
 }
 
 function extractImageFromMessage(msg: any): string | null {
@@ -129,7 +129,7 @@ function buildLocalFusionFallback(opts: NanoBananaOptions): string | null {
 async function callLovableGateway(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("LOVABLE_API_KEY");
   if (!key) return { url: null, error: "LOVABLE_API_KEY ausente" };
-  const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt) };
+  const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt, opts.mode) };
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -156,7 +156,7 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return { url: null, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
-  const parts: any[] = [{ text: withFacePreservation(opts.prompt) }];
+  const parts: any[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
   for (const u of opts.imageUrls || []) {
     const m = String(u).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
     if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
@@ -259,7 +259,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) return { url: null, error: "OPENAI_API_KEY ausente" };
 
-  const prompt = withFacePreservation(opts.prompt);
+  const prompt = withFacePreservation(opts.prompt, opts.mode);
   const imageUrls = (opts.imageUrls || []).filter(Boolean);
   try {
     if (imageUrls.length > 0) {
@@ -314,7 +314,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   const editPrefix = opts.mode === "edit"
     ? "STRICT IMAGE EDIT MODE: the uploaded image is the exact base canvas. Do not generate a new photo. Preserve all pixels/details except the specifically requested edit. The requested edit must be visibly applied.\n\n"
     : "";
-  const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt) };
+  const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt, opts.mode) };
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
 
   // A chave Emergent expõe os modelos de imagem Gemini via Vertex AI no endpoint
@@ -414,7 +414,7 @@ async function callPollinations(opts: NanoBananaOptions): Promise<{ url: string 
   // is preserved only via the elaborated prompt (the prompt engineer already
   // describes the subject from IMAGE 1 in detail).
   try {
-    const prompt = withFacePreservation(opts.prompt).slice(0, 1800);
+    const prompt = withFacePreservation(opts.prompt, opts.mode).slice(0, 1800);
     const seed = Math.floor(Math.random() * 1e9);
     // Try highest quality models first (flux-pro, flux-realism), fall back to flux.
     const candidates = ["flux-pro", "flux-realism", "flux"];
