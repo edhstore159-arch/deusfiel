@@ -62,7 +62,14 @@ function extractImageFromMessage(msg: any): string | null {
 
 function buildContent({ prompt, imageUrls }: NanoBananaOptions): Content[] {
   const parts: Content[] = [{ type: "text", text: prompt }];
-  for (const u of imageUrls || []) parts.push({ type: "image_url", image_url: { url: u } });
+  const images = imageUrls || [];
+  for (let i = 0; i < images.length; i += 1) {
+    const label = i === 0
+      ? "REFERENCE IMAGE 1: master scene/look/body/pose/camera blueprint."
+      : "REFERENCE IMAGE 2: target facial identity to transplant onto the person in IMAGE 1.";
+    parts.push({ type: "text", text: label });
+    parts.push({ type: "image_url", image_url: { url: images[i] } });
+  }
   return parts;
 }
 
@@ -157,7 +164,13 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   if (!key) return { url: null, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
   const parts: any[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
-  for (const u of opts.imageUrls || []) {
+  const labels = [
+    "REFERENCE IMAGE 1: master scene/look/body/pose/camera blueprint.",
+    "REFERENCE IMAGE 2: target facial identity to transplant onto the person in IMAGE 1.",
+  ];
+  for (let i = 0; i < (opts.imageUrls || []).length; i += 1) {
+    const u = opts.imageUrls?.[i] || "";
+    parts.push({ text: labels[i] || `REFERENCE IMAGE ${i + 1}` });
     const m = String(u).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
     if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
   }
