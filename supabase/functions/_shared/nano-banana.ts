@@ -9,7 +9,7 @@ type Content =
 export interface NanoBananaOptions {
   prompt: string;
   imageUrls?: string[]; // data URLs or http(s) URLs
-  mode?: "edit" | "fusion" | "template" | "generate";
+  mode?: "edit" | "fusion" | "template" | "generate" | "scene-clone" | "garment";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
   preferProvider?: "auto" | "pollinations" | "emergent";
 }
@@ -23,8 +23,20 @@ const HYPERREAL_LOCK =
 const REAL_SCALE_LOCK =
   "Real-world scale and proportions lock: render every person and object at true anatomical proportions matching a real photograph. Human head-to-body ratio approximately 1:7.5, adult height ~1.70m used as the scale reference for the whole scene. Background people MUST be smaller than foreground people in strict linear perspective (correct depth diminution: figures further from the camera appear proportionally smaller according to distance, never the same size as foreground subjects, never giant, never doll-sized). Consistent single vanishing point, consistent eye-line across figures standing on the same ground plane, feet actually touching the ground, natural cast shadows anchoring each subject to the floor. Objects (cars, doors, chairs, phones, cups) sized correctly relative to nearby humans. No floating figures, no oversized heads, no shrunken bodies, no mismatched scales, no cut-out/collage look, no duplicate limbs, no giants in the crowd.";
 
-function withFacePreservation(prompt: string) {
-  return `${prompt}\n\n${HYPERREAL_LOCK}\n${REAL_SCALE_LOCK}\n${FACE_PRESERVATION_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, changed identity, different person, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, blurry, low quality, watermark.`;
+const SCENE_CLONE_FACE_SWAP_LOCK =
+  "Scene clone face-transplant lock: REFERENCE ORDER IS MANDATORY. IMAGE 1 is ONLY the master scene/look blueprint: copy its background, location, lighting, camera angle, crop, pose, body placement, outfit, accessories and overall composition. IMAGE 2 is ONLY the target facial identity. The final main person's face/head identity MUST be recognized as the person from IMAGE 2, not the person from IMAGE 1. Replace the visible face from IMAGE 1 with IMAGE 2's facial identity: eyes, eyebrows, nose, mouth, lips, jawline, cheeks, skin tone, facial marks, expression, head shape and visible hairline. Do NOT keep, average, blend, beautify, redraw or reinterpret the face from IMAGE 1. Recognition test: scene/outfit/pose must read as IMAGE 1; face/identity must read as IMAGE 2.";
+
+const GARMENT_TRANSFER_LOCK =
+  "Virtual try-on reference lock: IMAGE 1 supplies the clothing only; IMAGE 2 supplies the person identity. Preserve the face/body/background of IMAGE 2 while copying the garment from IMAGE 1 exactly.";
+
+function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) {
+  const modeLock = mode === "scene-clone"
+    ? SCENE_CLONE_FACE_SWAP_LOCK
+    : (mode === "garment" ? GARMENT_TRANSFER_LOCK : FACE_PRESERVATION_LOCK);
+  const identityNegative = mode === "scene-clone"
+    ? "face from IMAGE 1, unchanged original face, mixed identity, averaged face, new invented face, face not matching IMAGE 2,"
+    : "changed identity, different person,";
+  return `${prompt}\n\n${HYPERREAL_LOCK}\n${REAL_SCALE_LOCK}\n${modeLock}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, ${identityNegative} deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, blurry, low quality, watermark.`;
 }
 
 function extractImageFromMessage(msg: any): string | null {
@@ -51,9 +63,27 @@ function extractImageFromMessage(msg: any): string | null {
   return null;
 }
 
-function buildContent({ prompt, imageUrls }: NanoBananaOptions): Content[] {
+function referenceLabel(mode: NanoBananaOptions["mode"] | undefined, index: number) {
+  if (mode === "scene-clone") {
+    return index === 0
+      ? "REFERENCE IMAGE 1: master scene/look/body/pose/camera blueprint."
+      : "REFERENCE IMAGE 2: target facial identity to transplant onto the person in IMAGE 1.";
+  }
+  if (mode === "garment") {
+    return index === 0
+      ? "REFERENCE IMAGE 1: exact garment/clothing reference."
+      : "REFERENCE IMAGE 2: target person/model whose identity must be preserved.";
+  }
+  return `REFERENCE IMAGE ${index + 1}`;
+}
+
+function buildContent({ prompt, imageUrls, mode }: NanoBananaOptions): Content[] {
   const parts: Content[] = [{ type: "text", text: prompt }];
-  for (const u of imageUrls || []) parts.push({ type: "image_url", image_url: { url: u } });
+  const images = imageUrls || [];
+  for (let i = 0; i < images.length; i += 1) {
+    parts.push({ type: "text", text: referenceLabel(mode, i) });
+    parts.push({ type: "image_url", image_url: { url: images[i] } });
+  }
   return parts;
 }
 
@@ -120,7 +150,7 @@ function buildLocalFusionFallback(opts: NanoBananaOptions): string | null {
 async function callLovableGateway(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("LOVABLE_API_KEY");
   if (!key) return { url: null, error: "LOVABLE_API_KEY ausente" };
-  const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt) };
+  const safeOpts = { ...opts, prompt: withFacePreservation(opts.prompt, opts.mode) };
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -147,8 +177,10 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return { url: null, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
-  const parts: any[] = [{ text: withFacePreservation(opts.prompt) }];
-  for (const u of opts.imageUrls || []) {
+  const parts: any[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
+  for (let i = 0; i < (opts.imageUrls || []).length; i += 1) {
+    const u = opts.imageUrls?.[i] || "";
+    parts.push({ text: referenceLabel(opts.mode, i) });
     const m = String(u).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
     if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
   }
@@ -250,7 +282,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) return { url: null, error: "OPENAI_API_KEY ausente" };
 
-  const prompt = withFacePreservation(opts.prompt);
+  const prompt = withFacePreservation(opts.prompt, opts.mode);
   const imageUrls = (opts.imageUrls || []).filter(Boolean);
   try {
     if (imageUrls.length > 0) {
@@ -264,7 +296,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
         if (!converted) continue;
         form.append(imageUrls.length > 1 ? "image[]" : "image", converted.blob, converted.filename);
       }
-      if (!form.has("image")) return { url: null, error: "OpenAI: imagem de referência inválida" };
+      if (!form.has("image") && !form.has("image[]")) return { url: null, error: "OpenAI: imagem de referência inválida" };
 
       const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
         method: "POST",
@@ -304,8 +336,10 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
   const editPrefix = opts.mode === "edit"
     ? "STRICT IMAGE EDIT MODE: the uploaded image is the exact base canvas. Do not generate a new photo. Preserve all pixels/details except the specifically requested edit. The requested edit must be visibly applied.\n\n"
-    : "";
-  const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt) };
+    : (opts.mode === "scene-clone"
+      ? "STRICT TWO-IMAGE EDIT MODE: use IMAGE 1 as the base scene/look/body and replace the visible facial identity with IMAGE 2. Do not ignore IMAGE 2.\n\n"
+      : "");
+  const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt, opts.mode) };
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
 
   // A chave Emergent expõe os modelos de imagem Gemini via Vertex AI no endpoint
@@ -405,7 +439,7 @@ async function callPollinations(opts: NanoBananaOptions): Promise<{ url: string 
   // is preserved only via the elaborated prompt (the prompt engineer already
   // describes the subject from IMAGE 1 in detail).
   try {
-    const prompt = withFacePreservation(opts.prompt).slice(0, 1800);
+    const prompt = withFacePreservation(opts.prompt, opts.mode).slice(0, 1800);
     const seed = Math.floor(Math.random() * 1e9);
     // Try highest quality models first (flux-pro, flux-realism), fall back to flux.
     const candidates = ["flux-pro", "flux-realism", "flux"];
@@ -507,7 +541,8 @@ export async function generateWithNanoBanana(
     errs.push("Fallback Pollinations ignorado porque não preserva imagem de referência");
   }
 
-  const localFallback = buildLocalFusionFallback(opts);
+  const canUseLocalFallback = opts.mode !== "scene-clone" && opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit";
+  const localFallback = canUseLocalFallback ? buildLocalFusionFallback(opts) : null;
   if (localFallback) {
     console.warn("⚠️ Todos os provedores falharam; usando composição local:", errs.join(" | "));
     return { url: localFallback, provider: "local-fallback" };
