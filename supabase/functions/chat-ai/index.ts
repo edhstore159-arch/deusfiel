@@ -54,30 +54,31 @@ async function synthesizeSpeech(text: string): Promise<string | null> {
     }
   }
 
-  // Fallback: Voicemagic (WATZZAP_AUDIO_API_KEY)
-  const VM_KEY = Deno.env.get("WATZZAP_AUDIO_API_KEY");
-  if (VM_KEY) {
+  // Fallback: OpenAI TTS direto (suporta PT-BR)
+  const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
+  if (OPENAI_KEY) {
     try {
-      const r = await fetch("https://voicemagic.dev/api/v1/tts", {
+      const r = await fetch("https://api.openai.com/v1/audio/speech", {
         method: "POST",
-        headers: { Authorization: `Bearer ${VM_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ text: clean, language: "pt-BR" }),
+        headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-4o-mini-tts",
+          input: clean,
+          voice: "coral",
+          instructions: "Fale em português do Brasil como uma atendente jurídica humana, calorosa e clara.",
+          response_format: "mp3",
+        }),
       });
-      const ct = r.headers.get("content-type") || "";
-      if (r.ok && ct.includes("audio/")) {
+      if (r.ok) {
         const buf = await r.arrayBuffer();
         return bytesToBase64(new Uint8Array(buf));
       }
-      if (r.ok) {
-        const j = await r.json().catch(() => ({}));
-        if (j?.audio_base64) return String(j.audio_base64);
-        if (j?.audio) return String(j.audio);
-      }
-      console.error("Voicemagic TTS error:", r.status, (await r.text()).slice(0, 200));
+      console.error("OpenAI TTS error:", r.status, (await r.text()).slice(0, 200));
     } catch (e) {
-      console.error("Voicemagic TTS exception:", e);
+      console.error("OpenAI TTS exception:", e);
     }
   }
+
 
   if (!ELEVENLABS_API_KEY) return null;
   try {
