@@ -24,7 +24,7 @@ const REAL_SCALE_LOCK =
   "Real-world scale and proportions lock: render every person and object at true anatomical proportions matching a real photograph. Human head-to-body ratio approximately 1:7.5, adult height ~1.70m used as the scale reference for the whole scene. Background people MUST be smaller than foreground people in strict linear perspective (correct depth diminution: figures further from the camera appear proportionally smaller according to distance, never the same size as foreground subjects, never giant, never doll-sized). Consistent single vanishing point, consistent eye-line across figures standing on the same ground plane, feet actually touching the ground, natural cast shadows anchoring each subject to the floor. Objects (cars, doors, chairs, phones, cups) sized correctly relative to nearby humans. No floating figures, no oversized heads, no shrunken bodies, no mismatched scales, no cut-out/collage look, no duplicate limbs, no giants in the crowd.";
 
 const SCENE_CLONE_FACE_SWAP_LOCK =
-  "Scene clone face-transplant lock: REFERENCE ORDER IS MANDATORY. IMAGE 1 is ONLY the master scene/look blueprint: copy its background, location, lighting, camera angle, crop, pose, body placement, outfit, accessories and overall composition. IMAGE 2 is ONLY the target facial identity. The final main person's face/head identity MUST be recognized as the person from IMAGE 2, not the person from IMAGE 1. Replace the visible face from IMAGE 1 with IMAGE 2's facial identity: eyes, eyebrows, nose, mouth, lips, jawline, cheeks, skin tone, facial marks, expression, head shape and visible hairline. Do NOT keep, average, blend, beautify, redraw or reinterpret the face from IMAGE 1. Recognition test: scene/outfit/pose must read as IMAGE 1; face/identity must read as IMAGE 2.";
+  "Scene clone face-transplant lock: REFERENCE ORDER IS MANDATORY. IMAGE 1 is ONLY the master scene/look/body/pose/camera blueprint; do not keep its visible face when IMAGE 2 exists. IMAGE 2 is ONLY the target facial identity source. The final main person's face/head identity MUST be recognized as the person from IMAGE 2, not the person from IMAGE 1. Replace the entire visible facial identity area from IMAGE 1 with IMAGE 2's identity: face shape, forehead, eyes, eyebrows, nose, mouth, lips, jawline, cheeks, ears if visible, skin tone, facial marks, expression, head shape and visible hairline. Adapt only angle and lighting to fit IMAGE 1. Do NOT keep, average, blend, beautify, redraw or reinterpret the face from IMAGE 1. Recognition test: scene/outfit/pose must read as IMAGE 1; face/identity must read as IMAGE 2.";
 
 const GARMENT_TRANSFER_LOCK =
   "Virtual try-on reference lock: IMAGE 1 supplies the clothing only; IMAGE 2 supplies the person identity. Preserve the face/body/background of IMAGE 2 while copying the garment from IMAGE 1 exactly.";
@@ -354,8 +354,9 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   const isQuotaError = (value: string) => /budget|exceed|quota|daily[_\s-]?(limit|spend)|daily_limit_reached|limit[_\s-]?reached/i.test(value);
   const quotaMessage = (detail: string) =>
     `Emergent: chave válida, mas bloqueada por limite/cota diária no provedor. Detalhe: ${detail}`;
+  const requiresStrictReferenceEdit = opts.mode === "scene-clone" || opts.mode === "garment";
 
-  for (const model of models) {
+  for (const model of requiresStrictReferenceEdit ? [] : models) {
     try {
       const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
         method: "POST",
@@ -388,7 +389,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
       const files = imageUrls.slice(0, 4).map((u) => dataUrlToBytes(u)).filter(Boolean) as Array<{ bytes: Uint8Array; mime: string; filename: string }>;
       if (files.length) {
         const multipart = buildMultipartBody(
-          { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024" },
+          { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024", quality: "high" },
           files.map((file) => ({ name: files.length > 1 ? "image[]" : "image", ...file })),
         );
         const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
@@ -406,8 +407,12 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
         } else if (isQuotaError(text)) {
           return { url: null, error: quotaMessage(text.slice(0, 240)) };
         } else {
+          lastError = `Emergent images/edits ${resp.status}: ${text.slice(0, 240)}`;
           console.warn("⚠️ Emergent images/edits falhou:", resp.status, text.slice(0, 240));
         }
+      }
+      if (requiresStrictReferenceEdit) {
+        return { url: null, error: lastError || "Emergent images/edits não aplicou a edição com referências" };
       }
     } else {
       const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/generations", {
@@ -500,6 +505,22 @@ export async function generateWithNanoBanana(
 
 
   if (Deno.env.get("LOVABLE_API_KEY")) {
+    if (opts.mode === "scene-clone" || opts.mode === "garment") {
+      // Advanced two-reference edits need an image-edit model first. Text-first
+      // multimodal chat models may return a plausible image while silently
+      // ignoring the second reference face/garment, which is worse than failing.
+      if (Deno.env.get("OPENAI_API_KEY")) {
+        const rEdit = await callOpenAIImages(opts);
+        if (rEdit.url) return { url: rEdit.url, provider: "openai" };
+        errs.push(rEdit.error || "OpenAI falhou");
+        console.warn("⚠️ OpenAI edição avançada falhou:", rEdit.error);
+      }
+      const rEmergentEdit = await callEmergent(opts);
+      if (rEmergentEdit.url) return { url: rEmergentEdit.url, provider: "emergent" };
+      errs.push(rEmergentEdit.error || "Emergent falhou");
+      console.warn("⚠️ Emergent edição avançada falhou:", rEmergentEdit.error);
+    }
+
     const r = await callLovableGateway(opts);
     if (r.url) return { url: r.url, provider: "lovable" };
     errs.push(r.error || "Lovable falhou");
