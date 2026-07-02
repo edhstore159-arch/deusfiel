@@ -355,8 +355,11 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   const quotaMessage = (detail: string) =>
     `Emergent: chave válida, mas bloqueada por limite/cota diária no provedor. Detalhe: ${detail}`;
   const requiresStrictReferenceEdit = opts.mode === "scene-clone" || opts.mode === "garment";
+  const chatModels = requiresStrictReferenceEdit
+    ? ["vertex_ai/gemini-2.5-flash-image", "vertex_ai/gemini-3.1-flash-image-preview"]
+    : models;
 
-  for (const model of requiresStrictReferenceEdit ? [] : models) {
+  for (const model of chatModels) {
     try {
       const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
         method: "POST",
@@ -396,7 +399,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
           method: "POST",
           headers: { Authorization: `Bearer ${key}`, "Content-Type": multipart.contentType, "Content-Length": multipart.contentLength },
           body: multipart.body,
-        }, 12000);
+        }, requiresStrictReferenceEdit ? 45000 : 20000);
         const text = await resp.text();
         if (resp.ok) {
           const data = JSON.parse(text);
@@ -506,6 +509,13 @@ export async function generateWithNanoBanana(
 
   if (Deno.env.get("LOVABLE_API_KEY")) {
     if (opts.mode === "scene-clone" || opts.mode === "garment") {
+      const r = await callLovableGateway(opts);
+      if (r.url) return { url: r.url, provider: "lovable" };
+      errs.push(r.error || "Lovable falhou");
+      console.warn("⚠️ Lovable edição avançada falhou:", r.error);
+    }
+
+    if (opts.mode === "scene-clone" || opts.mode === "garment") {
       // Advanced two-reference edits need an image-edit model first. Text-first
       // multimodal chat models may return a plausible image while silently
       // ignoring the second reference face/garment, which is worse than failing.
@@ -521,10 +531,12 @@ export async function generateWithNanoBanana(
       console.warn("⚠️ Emergent edição avançada falhou:", rEmergentEdit.error);
     }
 
-    const r = await callLovableGateway(opts);
-    if (r.url) return { url: r.url, provider: "lovable" };
-    errs.push(r.error || "Lovable falhou");
-    console.warn("⚠️ Lovable falhou:", r.error);
+    if (opts.mode !== "scene-clone" && opts.mode !== "garment") {
+      const r = await callLovableGateway(opts);
+      if (r.url) return { url: r.url, provider: "lovable" };
+      errs.push(r.error || "Lovable falhou");
+      console.warn("⚠️ Lovable falhou:", r.error);
+    }
   }
 
   if (Deno.env.get("GEMINI_API_KEY")) {
@@ -562,7 +574,7 @@ export async function generateWithNanoBanana(
     errs.push("Fallback Pollinations ignorado porque não preserva imagem de referência");
   }
 
-  const canUseLocalFallback = opts.mode !== "scene-clone" && opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit";
+  const canUseLocalFallback = opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit";
   const localFallback = canUseLocalFallback ? buildLocalFusionFallback(opts) : null;
   if (localFallback) {
     console.warn("⚠️ Todos os provedores falharam; usando composição local:", errs.join(" | "));
