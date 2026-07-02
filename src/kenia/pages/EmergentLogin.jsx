@@ -46,19 +46,24 @@ export default function EmergentLogin() {
   const [coupons, setCoupons] = useState(() => {
     try { return JSON.parse(localStorage.getItem(COUPONS_KEY) || "[]"); } catch { return []; }
   });
+  const [newCode, setNewCode] = useState("");
+  const [newValue, setNewValue] = useState("");
   useEffect(() => {
     try { localStorage.setItem(COUPONS_KEY, JSON.stringify(coupons)); } catch {}
   }, [coupons]);
 
   function addCoupon() {
-    const code = generateCouponCode();
-    setCoupons((prev) => [{ code, value: COUPON_VALUE, createdAt: Date.now(), used: false }, ...prev].slice(0, 20));
-    try { navigator.clipboard.writeText(code); } catch {}
-    toast.success(`Cupom ${code} gerado e copiado (R$ ${COUPON_VALUE})`);
+    const code = newCode.trim().toUpperCase();
+    if (!code) { toast.error("Cole o código oficial recebido da plataforma"); return; }
+    if (coupons.some((c) => c.code === code)) { toast.error("Esse cupom já está salvo"); return; }
+    const value = Number(newValue) || 0;
+    setCoupons((prev) => [{ code, value, createdAt: Date.now(), used: false }, ...prev].slice(0, 30));
+    setNewCode(""); setNewValue("");
+    toast.success(`Cupom ${code} salvo no cofre`);
   }
   function copyCoupon(code) {
     navigator.clipboard.writeText(code).then(
-      () => toast.success("Cupom copiado"),
+      () => toast.success("Cupom copiado — cole no checkout"),
       () => toast.error("Não foi possível copiar"),
     );
   }
@@ -68,6 +73,7 @@ export default function EmergentLogin() {
   function removeCoupon(code) {
     setCoupons((prev) => prev.filter((c) => c.code !== code));
   }
+
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
