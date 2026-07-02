@@ -76,6 +76,30 @@ export default function EmergentLogin() {
     setCoupons((prev) => prev.filter((c) => c.code !== code));
   }
 
+  // ---- Buscador de cupons Emergent na internet ----
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState(null);
+  async function searchOnline() {
+    setSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("search-emergent-coupons", { body: {} });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Falha na busca");
+      setSearchResult(data);
+      toast.success(`${data.candidates?.length || 0} códigos candidatos encontrados`);
+    } catch (e) {
+      toast.error(`Erro na busca: ${e.message || e}`);
+    } finally {
+      setSearching(false);
+    }
+  }
+  function saveCandidate(code) {
+    const up = code.toUpperCase();
+    if (coupons.some((c) => c.code === up)) { toast.info("Já está no cofre"); return; }
+    setCoupons((prev) => [{ code: up, value: 0, createdAt: Date.now(), used: false }, ...prev].slice(0, 30));
+    toast.success(`${up} salvo no cofre`);
+  }
+
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
