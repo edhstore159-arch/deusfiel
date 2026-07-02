@@ -7,11 +7,7 @@ import { ExternalLink, Mail, Copy, Sparkles, Ticket, RefreshCw } from "lucide-re
 import { toast } from "sonner";
 
 const COUPONS_KEY = "kenia.emergent.coupons";
-const COUPON_VALUE = 6;
-function generateCouponCode() {
-  const rand = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-  return `KENIA6-${rand}`;
-}
+
 
 const STORAGE_KEY = "kenia.emergent.email";
 const REFERRAL_SIGNUP_URL = "https://app.emergent.sh/register?ref=mate800341";
