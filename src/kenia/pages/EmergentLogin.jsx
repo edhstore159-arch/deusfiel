@@ -3,8 +3,10 @@ import { Card } from "@/kenia/components/ui/card";
 import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Button } from "@/kenia/components/ui/button";
-import { ExternalLink, Mail, Copy, Sparkles, Ticket, RefreshCw } from "lucide-react";
+import { ExternalLink, Mail, Copy, Sparkles, Ticket, RefreshCw, Search, Globe, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+
 
 const COUPONS_KEY = "kenia.emergent.coupons";
 
@@ -72,6 +74,30 @@ export default function EmergentLogin() {
   }
   function removeCoupon(code) {
     setCoupons((prev) => prev.filter((c) => c.code !== code));
+  }
+
+  // ---- Buscador de cupons Emergent na internet ----
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState(null);
+  async function searchOnline() {
+    setSearching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("search-emergent-coupons", { body: {} });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Falha na busca");
+      setSearchResult(data);
+      toast.success(`${data.candidates?.length || 0} códigos candidatos encontrados`);
+    } catch (e) {
+      toast.error(`Erro na busca: ${e.message || e}`);
+    } finally {
+      setSearching(false);
+    }
+  }
+  function saveCandidate(code) {
+    const up = code.toUpperCase();
+    if (coupons.some((c) => c.code === up)) { toast.info("Já está no cofre"); return; }
+    setCoupons((prev) => [{ code: up, value: 0, createdAt: Date.now(), used: false }, ...prev].slice(0, 30));
+    toast.success(`${up} salvo no cofre`);
   }
 
 
@@ -187,6 +213,63 @@ export default function EmergentLogin() {
         )}
       </Card>
 
+      <Card className="p-6 border-nude-200 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2 text-nude-900 font-medium">
+              <Search className="w-4 h-4 text-gold-600" /> Buscar cupons Emergent na internet
+            </div>
+            <p className="text-xs text-nude-500 mt-1 leading-relaxed">
+              Varre resultados públicos (Reddit, blogs, sites de cupons) e extrai códigos candidatos.
+              Nenhum código é garantido — teste no checkout antes de considerar válido.
+            </p>
+          </div>
+          <Button onClick={searchOnline} disabled={searching} className="h-10 bg-nude-900 hover:bg-nude-800 text-white">
+            {searching ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+            {searching ? "Buscando..." : "Buscar agora"}
+          </Button>
+        </div>
+
+        {searchResult && (
+          <>
+            {searchResult.candidates?.length ? (
+              <div className="space-y-2">
+                {searchResult.candidates.map((c) => (
+                  <div key={c.code} className="rounded-md border border-nude-200 p-3 bg-card">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="font-mono text-sm text-nude-900">{c.code}</div>
+                      <div className="flex gap-1.5">
+                        <Button size="sm" variant="outline" onClick={() => copyCoupon(c.code)}>
+                          <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
+                        </Button>
+                        <Button size="sm" onClick={() => saveCandidate(c.code)} className="bg-gold-600 hover:bg-gold-700 text-white">
+                          <Plus className="w-3.5 h-3.5 mr-1" /> Salvar
+                        </Button>
+                      </div>
+                    </div>
+                    {c.sources?.[0] && (
+                      <a
+                        href={c.sources[0].url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1.5 flex items-center gap-1 text-[11px] text-nude-500 hover:text-gold-700 truncate"
+                      >
+                        <Globe className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{c.sources[0].title || c.sources[0].url}</span>
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-nude-500">Nenhum código candidato encontrado nesta busca.</p>
+            )}
+            <p className="text-[11px] text-nude-500">
+              {new Date(searchResult.generatedAt).toLocaleString("pt-BR")} • {searchResult.disclaimer}
+            </p>
+          </>
+        )}
+      </Card>
 
 
       <Card className="p-5 border-nude-200 bg-nude-50/40">
