@@ -217,7 +217,27 @@ Deno.serve(async (req) => {
     const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64].filter(Boolean);
     const runMode = isSceneClone ? 'scene-clone' : (isGarmentTransfer ? 'garment' : (isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion')));
 
-    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
+    let result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
+
+    if (isSceneClone && image2_base64 && result.url) {
+      const faceRepairPrompt = [
+        'FACE IDENTITY REPAIR PASS — strict two-reference edit.',
+        'IMAGE 1 = the generated scene clone result and MUST remain the exact base canvas: preserve its background, outfit, pose, body, lighting, camera angle, crop, colors and all non-face pixels.',
+        'IMAGE 2 = the only correct facial identity source. Replace ONLY the visible face/head identity in IMAGE 1 with the person from IMAGE 2.',
+        "The final face MUST match IMAGE 2: face shape, eyes, eyebrows, nose, mouth, lips, jawline, cheeks, skin tone, marks, expression and visible hairline. Do not keep the face currently visible in IMAGE 1.",
+        'Do not alter clothes, hands, body pose, background, scene, framing, perspective or lighting except to naturally relight the transplanted face.',
+        'If the face still resembles IMAGE 1, the edit is wrong. Output one seamless photorealistic image.',
+        `Negative: face from IMAGE 1, unchanged face, mixed identity, averaged face, new invented face, altered outfit, altered background, altered pose, ${NEGATIVE}`,
+      ].join(' ');
+      const repaired = await generateWithNanoBanana({
+        prompt: faceRepairPrompt,
+        imageUrls: [result.url, image2_base64],
+        mode: 'scene-clone',
+      });
+      if (repaired.url) {
+        result = { ...repaired, provider: `${result.provider}+face-repair-${repaired.provider}` };
+      }
+    }
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {
