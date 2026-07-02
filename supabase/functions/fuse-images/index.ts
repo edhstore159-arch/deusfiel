@@ -158,18 +158,36 @@ Deno.serve(async (req) => {
     const normalizedPrompt = String(prompt || '').toLowerCase();
     const garmentKeywords = /(roupa|look|outfit|camiseta|camisa|blusa|vestido|jaqueta|casaco|paleto|terno|calca|short|uniforme|figurino|shirt|t-?shirt|dress|jacket|clothing|garment|ensaio)/i;
     const transferKeywords = /(mesma|igual|ingual|transfer|vestir|veste|coloc\w+\s+a\s+roupa|use\s+the\s+clothing|wear|swap|troc\w+\s+roupa|ensaio|fotograf|photoshoot)/i;
-    const isGarmentTransfer = !!image2_base64
+    const sceneCloneKeywords = /(clon\w+|replic\w+|reproduz\w+|mesma\s+cena|mesmo\s+cenario|mesmo\s+fundo|copia\w*\s+(a\s+)?cena|copiar\s+(o\s+)?look|look\s+e\s+(a\s+)?cena|cena\s+e\s+(o\s+)?look|same\s+scene|clone\s+the\s+scene)/i;
+    const isSceneClone = mode === 'scene-clone' || sceneCloneKeywords.test(normalizedPrompt);
+    const isGarmentTransfer = !isSceneClone && !!image2_base64
       && (mode === 'garment' || (garmentKeywords.test(normalizedPrompt) && transferKeywords.test(normalizedPrompt)));
 
     // If the user is asking for a garment color change, treat as a single-image EDIT
     // even when a second image was provided — this preserves face/hair identity 1:1.
     const localizedColor = buildLocalizedColorEditPrompt(prompt || '');
-    const forceEdit = !!localizedColor && !isGarmentTransfer;
-    const isSingle = (!image2_base64 || forceEdit) && !isGarmentTransfer;
+    const forceEdit = !!localizedColor && !isGarmentTransfer && !isSceneClone;
+    const isSingle = !isSceneClone && (!image2_base64 || forceEdit) && !isGarmentTransfer;
     const isTemplate = isSingle && mode === 'template' && !forceEdit;
 
     let fullPrompt: string;
-    if (isGarmentTransfer) {
+    if (isSceneClone) {
+      const userTheme = (prompt || '').trim();
+      const hasPerson = !!image2_base64;
+      fullPrompt = [
+        'SCENE + LOOK CLONE MODE (1:1 replication of IMAGE 1).',
+        'IMAGE 1 = MASTER REFERENCE. Treat it as a pixel-faithful blueprint to reproduce.',
+        'CLONE EVERYTHING from IMAGE 1: full scene, background, environment, props, lighting direction, color palette, time of day, camera angle, framing, composition, depth of field, mood; AND the complete LOOK — every garment (type, silhouette, cut, neckline, sleeves, length, fabric, texture, color hex, prints, logos, patterns, embroidery), accessories, shoes, hair style, hair color, makeup and pose.',
+        hasPerson
+          ? "IMAGE 2 = PERSON (target model). Replace ONLY the person's facial identity with the person from IMAGE 2: preserve their face, head shape, hairline, skin tone, freckles, eyes, eyebrows, nose, lips, jawline and ears exactly (pixel-faithful). Keep everything else (scene, look, pose, hair styling, framing) identical to IMAGE 1."
+          : 'Reproduce IMAGE 1 exactly, keeping the same person and identity.',
+        'The result MUST be visually indistinguishable from IMAGE 1 in scene and look — a viewer must instantly recognize the SAME setting, SAME outfit, SAME pose, SAME lighting.',
+        'OUTPUT: one seamless photorealistic photograph. No collage, no split-screen, no reference thumbnail.',
+        userTheme ? `USER NOTE: ${userTheme}.` : '',
+        `STYLE: ${REALISM}.`,
+        `Negative: different scene, different background, different location, different lighting, different outfit, different pose, redesigned garment, altered prints, altered logos, missing accessories, restyled hair, ${NEGATIVE}`,
+      ].filter(Boolean).join(' ');
+    } else if (isGarmentTransfer) {
       const userTheme = (prompt || '').trim();
       fullPrompt = [
         'PROFESSIONAL VIRTUAL TRY-ON / GARMENT TRANSFER MODE.',
@@ -191,8 +209,8 @@ Deno.serve(async (req) => {
       fullPrompt = await elaborateFusionPrompt(prompt);
     }
 
-    const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64];
-    const runMode = isGarmentTransfer ? 'garment' : (isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion'));
+    const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64].filter(Boolean);
+    const runMode = isSceneClone ? 'scene-clone' : (isGarmentTransfer ? 'garment' : (isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion')));
 
     const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
 
