@@ -618,6 +618,15 @@ export default function ImageFusion() {
                   (<><Combine className="w-4 h-4 mr-2" />🧬 Clonar este modelo (mesmo layout · novo texto/imagens)</>)}
               </Button>
             )}
+            {img1 && img2 && (
+              <Button onClick={() => fuse({ sceneCloneMode: true })} disabled={loading}
+                variant="outline"
+                className="border-gold-500/60 text-gold-200 hover:bg-gold-500/10"
+                data-testid="fusion-clone-scene">
+                {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Clonando cena...</>) :
+                  (<><Combine className="w-4 h-4 mr-2" />🎬 Clonar cena + look da Imagem 1 (rosto da Imagem 2)</>)}
+              </Button>
+            )}
             <Button onClick={() => fuse()} disabled={loading || (!img1 && !img2)}
               className="bg-gradient-to-r from-gold-500 to-gold-700 hover:from-gold-400 hover:to-gold-600 text-nude-950 font-semibold"
               data-testid="fusion-generate">
