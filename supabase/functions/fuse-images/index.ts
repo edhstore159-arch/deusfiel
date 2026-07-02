@@ -175,15 +175,12 @@ Deno.serve(async (req) => {
       const userTheme = (prompt || '').trim();
       const hasPerson = !!image2_base64;
       fullPrompt = [
-        'SCENE + LOOK CLONE WITH FACE TRANSPLANT MODE (strict two-reference image edit).',
-        'IMAGE 1 = MASTER REFERENCE / BASE CANVAS. Treat it as a pixel-faithful blueprint to reproduce, BUT its visible face/head identity is NOT allowed to remain when IMAGE 2 is provided.',
-        'CLONE FROM IMAGE 1: full scene, background, environment, props, lighting direction, color palette, time of day, camera angle, framing, composition, depth of field, mood; AND the complete LOOK — every garment (type, silhouette, cut, neckline, sleeves, length, fabric, texture, color hex, prints, logos, patterns, embroidery), accessories, shoes, body pose, hand pose and body placement. Do NOT clone the face from IMAGE 1 when IMAGE 2 exists.',
+        'SCENE + LOOK CLONE WITH FACE TRANSPLANT MODE (strict two-reference edit).',
+        'IMAGE 1 = MASTER REFERENCE. Treat it as a pixel-faithful blueprint to reproduce.',
+        'CLONE EVERYTHING from IMAGE 1: full scene, background, environment, props, lighting direction, color palette, time of day, camera angle, framing, composition, depth of field, mood; AND the complete LOOK — every garment (type, silhouette, cut, neckline, sleeves, length, fabric, texture, color hex, prints, logos, patterns, embroidery), accessories, shoes, hair style, hair color, makeup and pose.',
         hasPerson
-          ? "IMAGE 2 = TARGET FACE / IDENTITY SOURCE. The final main person's face MUST be recognizably the person from IMAGE 2, not the person from IMAGE 1. Replace the entire visible facial identity area from IMAGE 1 with IMAGE 2: copy IMAGE 2's face shape, forehead, eyes, eyebrows, nose, mouth, lips, teeth, cheeks, jawline, ears if visible, skin tone, facial marks, expression and visible hairline exactly. Adapt only perspective and lighting so the transplanted face fits the pose from IMAGE 1. Keep everything else from IMAGE 1 (scene, outfit, body, pose, camera angle, lighting, framing and background) identical. Do NOT average the two faces, do NOT keep IMAGE 1's face, do NOT invent a new face."
+          ? "IMAGE 2 = TARGET FACE / IDENTITY. The final person's face MUST be the person from IMAGE 2, not the face from IMAGE 1. Transplant ONLY the facial identity from IMAGE 2 onto the main person's head/body in IMAGE 1: copy IMAGE 2's face shape, eyes, eyebrows, nose, mouth, lips, teeth, cheeks, jawline, ears, skin tone, facial marks, expression and visible hairline exactly. Keep everything else from IMAGE 1 (scene, look, outfit, body, pose, camera angle, lighting and framing) identical. Do NOT average the two faces, do NOT keep IMAGE 1's face, do NOT generate a new face."
           : 'Reproduce IMAGE 1 exactly, keeping the same person and identity.',
-        hasPerson
-          ? 'NON-NEGOTIABLE CHECK BEFORE OUTPUT: if the generated face still looks like IMAGE 1 or like a blend, the result is wrong. Regenerate until the face identity matches IMAGE 2 while the scene/look still matches IMAGE 1.'
-          : '',
         hasPerson
           ? 'Recognition test: a viewer must instantly recognize the SAME setting/outfit/pose/lighting from IMAGE 1 and the SAME facial identity from IMAGE 2.'
           : 'The result MUST be visually indistinguishable from IMAGE 1 in scene and look — a viewer must instantly recognize the SAME setting, SAME outfit, SAME pose, SAME lighting.',
@@ -217,41 +214,10 @@ Deno.serve(async (req) => {
     const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64].filter(Boolean);
     const runMode = isSceneClone ? 'scene-clone' : (isGarmentTransfer ? 'garment' : (isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion')));
 
-    let result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
-
-    if (isSceneClone && image2_base64 && result.url && result.provider !== 'local-fallback') {
-      const faceRepairPrompt = [
-        'FACE IDENTITY REPAIR PASS — strict two-reference edit.',
-        'IMAGE 1 = the generated scene clone result and MUST remain the exact base canvas: preserve its background, outfit, pose, body, lighting, camera angle, crop, colors and all non-face pixels.',
-        'IMAGE 2 = the only correct facial identity source. Replace ONLY the visible face/head identity in IMAGE 1 with the person from IMAGE 2.',
-        "The final face MUST match IMAGE 2: face shape, eyes, eyebrows, nose, mouth, lips, jawline, cheeks, skin tone, marks, expression and visible hairline. Do not keep the face currently visible in IMAGE 1.",
-        'Do not alter clothes, hands, body pose, background, scene, framing, perspective or lighting except to naturally relight the transplanted face.',
-        'If the face still resembles IMAGE 1, the edit is wrong. Output one seamless photorealistic image.',
-        `Negative: face from IMAGE 1, unchanged face, mixed identity, averaged face, new invented face, altered outfit, altered background, altered pose, ${NEGATIVE}`,
-      ].join(' ');
-      const repaired = await generateWithNanoBanana({
-        prompt: faceRepairPrompt,
-        imageUrls: [result.url, image2_base64],
-        mode: 'scene-clone',
-      });
-      if (repaired.url) {
-        result = { ...repaired, provider: `${result.provider}+face-repair-${repaired.provider}` };
-      }
-    }
+    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (isSceneClone && result.provider === 'local-fallback') {
-      return new Response(JSON.stringify({
-        ok: false,
-        error: 'O modo Clonar cena precisa de um modelo de edição com crédito disponível para aplicar o rosto da Imagem 2. Agora os provedores retornaram limite/cota, então a imagem não foi alterada para evitar um resultado errado.',
-        provider: result.provider,
-        mode: runMode,
-      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
