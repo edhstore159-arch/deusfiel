@@ -47,6 +47,32 @@ export default function EmergentLogin() {
     );
   }
 
+  const [coupons, setCoupons] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(COUPONS_KEY) || "[]"); } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(COUPONS_KEY, JSON.stringify(coupons)); } catch {}
+  }, [coupons]);
+
+  function addCoupon() {
+    const code = generateCouponCode();
+    setCoupons((prev) => [{ code, value: COUPON_VALUE, createdAt: Date.now(), used: false }, ...prev].slice(0, 20));
+    try { navigator.clipboard.writeText(code); } catch {}
+    toast.success(`Cupom ${code} gerado e copiado (R$ ${COUPON_VALUE})`);
+  }
+  function copyCoupon(code) {
+    navigator.clipboard.writeText(code).then(
+      () => toast.success("Cupom copiado"),
+      () => toast.error("Não foi possível copiar"),
+    );
+  }
+  function toggleUsed(code) {
+    setCoupons((prev) => prev.map((c) => c.code === code ? { ...c, used: !c.used } : c));
+  }
+  function removeCoupon(code) {
+    setCoupons((prev) => prev.filter((c) => c.code !== code));
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
       <div>
