@@ -106,10 +106,14 @@ export default function Immersive3DViewer({ open, image, title, onClose }) {
               <img src={image} alt="" aria-hidden
                 className="absolute inset-0 w-full h-full object-cover rounded-lg opacity-30 blur-md"
                 style={{ transform: "translateZ(-60px) scale(1.05)" }} />
-              {/* Imagem principal */}
+              {/* Imagem principal (frente) */}
               <img src={image} alt={title || "criativo"}
                 className="absolute inset-0 w-full h-full object-cover rounded-lg shadow-2xl"
-                style={{ transform: "translateZ(0px)" }} />
+                style={{ transform: "translateZ(0px)", backfaceVisibility: "hidden" }} />
+              {/* Verso (para giro 360° não mostrar espelhado) */}
+              <img src={image} alt="" aria-hidden
+                className="absolute inset-0 w-full h-full object-cover rounded-lg shadow-2xl"
+                style={{ transform: "rotateY(180deg) translateZ(0px)", backfaceVisibility: "hidden" }} />
               {/* Brilho especular reagindo à posição */}
               <div className="absolute inset-0 rounded-lg pointer-events-none mix-blend-overlay"
                 style={{
