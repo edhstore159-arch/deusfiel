@@ -468,6 +468,11 @@ export default function CreativesGallery() {
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openSchedule(item)}>
                       <CalendarClock className="w-3 h-3 mr-1" /> Agendar
                     </Button>
+                    {item.image_b64 && (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs col-span-2 text-gold-700 hover:bg-gold-50" onClick={() => setViewer3D({ image_b64: item.image_b64, title: item.title })}>
+                        <Box className="w-3 h-3 mr-1" /> Visualizar em 3D / 4D
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
