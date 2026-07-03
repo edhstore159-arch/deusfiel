@@ -353,13 +353,13 @@ export default function CreativesGallery() {
 
   const hydrateImageSources = async (list) => {
     const rows = Array.isArray(list) ? list : [];
-    const missing = rows.filter((item) => !getImageValue(item) && item?.storage_path).map((item) => item.storage_path);
-    if (!missing.length) return rows;
+    const paths = [...new Set(rows.map((item) => item?.storage_path).filter(Boolean))];
+    if (!paths.length) return rows;
     try {
-      const { data: signed } = await supabase.storage.from("creative-assets").createSignedUrls(missing, 60 * 60 * 24);
+      const { data: signed } = await supabase.storage.from("creative-assets").createSignedUrls(paths, 60 * 60 * 24);
       const byPath = {};
       (signed || []).forEach((entry, index) => {
-        if (entry?.signedUrl) byPath[missing[index]] = entry.signedUrl;
+        if (entry?.signedUrl) byPath[paths[index]] = entry.signedUrl;
       });
       return rows.map((item) => item?.storage_path && byPath[item.storage_path]
         ? { ...item, image_b64: byPath[item.storage_path], signedUrl: byPath[item.storage_path] }
