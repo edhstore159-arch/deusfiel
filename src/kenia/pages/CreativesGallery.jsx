@@ -614,6 +614,7 @@ export default function CreativesGallery() {
             </div>
           </DialogContent>
         </Dialog>
+      )}
       <Immersive3DViewer
         open={!!viewer3D}
         image={viewer3D?.image_b64 ? imageSrc(viewer3D.image_b64) : null}
