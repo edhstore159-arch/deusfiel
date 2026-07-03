@@ -12,13 +12,13 @@ import { Box, Sparkles, RotateCw, MousePointer2 } from "lucide-react";
  * Implementação 100% CSS/DOM (sem WebGL) para funcionar em qualquer navegador.
  */
 export default function Immersive3DViewer({ open, image, title, onClose }) {
-  const [mode, setMode] = useState("3d"); // '3d' | '4d'
+  const [mode, setMode] = useState("4d"); // '3d' | '4d'
   const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
   const [t, setT] = useState(0);
   const wrapRef = useRef(null);
   const rafRef = useRef(null);
 
-  useEffect(() => { if (!open) { setMode("3d"); setTilt({ rx: 0, ry: 0 }); } }, [open]);
+  useEffect(() => { if (!open) { setMode("4d"); setTilt({ rx: 0, ry: 0 }); } }, [open]);
 
   // Animação 4D (tempo + rotação completa 360°)
   useEffect(() => {
