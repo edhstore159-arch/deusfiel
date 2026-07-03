@@ -518,7 +518,7 @@ export default function CreativesGallery() {
                         src: imageSrc(getImageValue(item)),
                         title: item.title,
                       })}>
-                      <Box className="w-3 h-3 mr-1" /> Visualizar em 3D / 4D / 360°
+                      <Box className="w-3 h-3 mr-1" /> Visualizar em 3D / 4D
                     </Button>
                     <Button
                       variant="outline"
