@@ -12,7 +12,7 @@ import { Box, Sparkles, RotateCw, MousePointer2 } from "lucide-react";
  * Implementação 100% CSS/DOM (sem WebGL) para funcionar em qualquer navegador.
  */
 export default function Immersive3DViewer({ open, image, title, onClose }) {
-  const [mode, setMode] = useState("3d"); // '3d' | '4d'
+  const [mode, setMode] = useState("3d"); // '3d' | '4d' | '360'
   const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
   const [t, setT] = useState(0);
   const wrapRef = useRef(null);
@@ -20,9 +20,9 @@ export default function Immersive3DViewer({ open, image, title, onClose }) {
 
   useEffect(() => { if (!open) { setMode("3d"); setTilt({ rx: 0, ry: 0 }); } }, [open]);
 
-  // Animação 4D (tempo)
+  // Animação por tempo (4D e 360°)
   useEffect(() => {
-    if (!open || mode !== "4d") return;
+    if (!open || (mode !== "4d" && mode !== "360")) return;
     const start = performance.now();
     const loop = (now) => {
       setT((now - start) / 1000);
@@ -33,7 +33,7 @@ export default function Immersive3DViewer({ open, image, title, onClose }) {
   }, [open, mode]);
 
   const onMove = (e) => {
-    if (mode === "4d") return;
+    if (mode !== "3d") return;
     const el = wrapRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
@@ -43,10 +43,19 @@ export default function Immersive3DViewer({ open, image, title, onClose }) {
   };
   const onLeave = () => setTilt({ rx: 0, ry: 0 });
 
-  const rx = mode === "4d" ? Math.sin(t * 0.9) * 18 : tilt.rx;
-  const ry = mode === "4d" ? Math.cos(t * 0.7) * 28 : tilt.ry;
-  const depth = mode === "4d" ? 40 + Math.sin(t * 1.3) * 25 : 30;
-  const glowX = 50 + ry * 1.2;
+  let rx, ry, depth;
+  if (mode === "360") {
+    rx = 0;
+    ry = (t * 90) % 360; // volta completa a cada 4s
+    depth = 30;
+  } else if (mode === "4d") {
+    rx = Math.sin(t * 0.9) * 18;
+    ry = Math.cos(t * 0.7) * 28;
+    depth = 40 + Math.sin(t * 1.3) * 25;
+  } else {
+    rx = tilt.rx; ry = tilt.ry; depth = 30;
+  }
+  const glowX = 50 + Math.sin((ry * Math.PI) / 180) * 40;
   const glowY = 50 - rx * 1.2;
 
   return (
@@ -55,11 +64,11 @@ export default function Immersive3DViewer({ open, image, title, onClose }) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white">
             <Box className="w-4 h-4 text-gold-400" />
-            Visualização imersiva {mode === "4d" ? "4D (animada)" : "3D (interativa)"} — {title || "criativo"}
+            Visualização imersiva {mode === "360" ? "360° (giro completo)" : mode === "4d" ? "4D (animada)" : "3D (interativa)"} — {title || "criativo"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-center justify-center gap-2 mb-2">
+        <div className="flex items-center justify-center gap-2 mb-2 flex-wrap">
           <Button size="sm" variant={mode === "3d" ? "default" : "outline"} onClick={() => setMode("3d")}
             className={mode === "3d" ? "bg-gold-600 hover:bg-gold-700 text-white" : "border-nude-700 text-nude-200 hover:bg-nude-900"}>
             <MousePointer2 className="w-3.5 h-3.5 mr-1" /> 3D interativo
@@ -68,7 +77,12 @@ export default function Immersive3DViewer({ open, image, title, onClose }) {
             className={mode === "4d" ? "bg-gold-600 hover:bg-gold-700 text-white" : "border-nude-700 text-nude-200 hover:bg-nude-900"}>
             <RotateCw className="w-3.5 h-3.5 mr-1" /> 4D animado
           </Button>
+          <Button size="sm" variant={mode === "360" ? "default" : "outline"} onClick={() => setMode("360")}
+            className={mode === "360" ? "bg-gold-600 hover:bg-gold-700 text-white" : "border-nude-700 text-nude-200 hover:bg-nude-900"}>
+            <RotateCw className="w-3.5 h-3.5 mr-1" /> 360°
+          </Button>
         </div>
+
 
         <div
           ref={wrapRef}
