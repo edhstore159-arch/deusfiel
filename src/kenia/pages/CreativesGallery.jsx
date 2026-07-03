@@ -9,7 +9,8 @@ import { Input } from "@/kenia/components/ui/input";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/kenia/components/ui/dialog";
-import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, CalendarClock, Pencil, ArrowLeft, RotateCcw, Archive } from "lucide-react";
+import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, CalendarClock, Pencil, ArrowLeft, RotateCcw, Archive, Box } from "lucide-react";
+import Immersive3DViewer from "@/kenia/components/Immersive3DViewer";
 import { toast } from "sonner";
 
 const PLATFORMS = [
