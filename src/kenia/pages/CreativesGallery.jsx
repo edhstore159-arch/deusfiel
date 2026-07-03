@@ -39,6 +39,7 @@ export default function CreativesGallery() {
   const [editUpload, setEditUpload] = useState(null);
   const [showTrash, setShowTrash] = useState(false);
   const [trash, setTrash] = useState([]);
+  const [viewer3D, setViewer3D] = useState(null); // { image_b64, title }
 
   const TRASH_KEY = "creatives-trash-v1";
   const loadTrash = () => {
