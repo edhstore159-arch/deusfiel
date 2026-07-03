@@ -12,15 +12,15 @@ import { Box, Sparkles, RotateCw, MousePointer2 } from "lucide-react";
  * Implementação 100% CSS/DOM (sem WebGL) para funcionar em qualquer navegador.
  */
 export default function Immersive3DViewer({ open, image, title, onClose }) {
-  const [mode, setMode] = useState("3d"); // '3d' | '4d'
+  const [mode, setMode] = useState("4d"); // '3d' | '4d'
   const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
   const [t, setT] = useState(0);
   const wrapRef = useRef(null);
   const rafRef = useRef(null);
 
-  useEffect(() => { if (!open) { setMode("3d"); setTilt({ rx: 0, ry: 0 }); } }, [open]);
+  useEffect(() => { if (!open) { setMode("4d"); setTilt({ rx: 0, ry: 0 }); } }, [open]);
 
-  // Animação 4D (tempo)
+  // Animação 4D (tempo + rotação completa 360°)
   useEffect(() => {
     if (!open || mode !== "4d") return;
     const start = performance.now();
@@ -43,8 +43,8 @@ export default function Immersive3DViewer({ open, image, title, onClose }) {
   };
   const onLeave = () => setTilt({ rx: 0, ry: 0 });
 
-  const rx = mode === "4d" ? Math.sin(t * 0.9) * 18 : tilt.rx;
-  const ry = mode === "4d" ? Math.cos(t * 0.7) * 28 : tilt.ry;
+  const rx = mode === "4d" ? Math.sin(t * 0.9) * 16 : tilt.rx;
+  const ry = mode === "4d" ? (t * 38) % 360 : tilt.ry;
   const depth = mode === "4d" ? 40 + Math.sin(t * 1.3) * 25 : 30;
   const glowX = 50 + ry * 1.2;
   const glowY = 50 - rx * 1.2;
@@ -116,7 +116,7 @@ export default function Immersive3DViewer({ open, image, title, onClose }) {
         <p className="text-xs text-nude-400 text-center mt-3">
           {mode === "3d"
             ? "Passe o mouse sobre a imagem para inclinar em 3D."
-            : "4D = 3D + tempo: rotação e profundidade animadas automaticamente."}
+            : "4D = rotação 360° automática com profundidade animada."}
         </p>
       </DialogContent>
     </Dialog>
