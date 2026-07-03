@@ -619,7 +619,7 @@ export default function CreativesGallery() {
       )}
       <Immersive3DViewer
         open={!!viewer3D}
-        image={viewer3D?.image_b64 ? imageSrc(viewer3D.image_b64) : null}
+        image={viewer3D?.src || null}
         title={viewer3D?.title}
         onClose={() => setViewer3D(null)}
       />
