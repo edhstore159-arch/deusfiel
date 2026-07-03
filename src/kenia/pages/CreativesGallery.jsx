@@ -56,10 +56,8 @@ export default function CreativesGallery() {
     try {
       const { data } = await api.get("/creatives");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.creatives) ? data.creatives : [];
-      const hydrated = await hydrateImageSources(list);
-      const withImagesOnly = hydrated.filter((item) => getImageValue(item));
       const seen = new Set();
-      const unique = withImagesOnly.filter((it) => {
+      const unique = list.filter((it) => {
         const key = it?.id ?? `${it?.created_at}-${it?.title}`;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -113,7 +111,7 @@ export default function CreativesGallery() {
         title: scheduleTarget.title,
         caption: scheduleForm.caption,
         hashtags: scheduleForm.hashtags || null,
-        image_b64: getImageValue(scheduleTarget) || null,
+        image_b64: scheduleTarget.image_b64 || null,
         platforms: scheduleForm.platforms,
         scheduled_for: new Date(scheduleForm.scheduled_for).toISOString(),
         status: "scheduled",
@@ -137,7 +135,7 @@ export default function CreativesGallery() {
   const openEdit = (item) => {
     setEditTarget(item);
     setEditPrompt(item.last_edit_prompt || "");
-    setEditPreview(getImageValue(item) || null);
+    setEditPreview(item.image_b64 || null);
     setEditUpload(null);
   };
 
@@ -157,7 +155,7 @@ export default function CreativesGallery() {
   const runEdit = async () => {
     if (!editTarget) return;
     if (!editPrompt.trim()) { toast.error("Descreva a modificação desejada"); return; }
-    const sourceImage = editUpload || getImageValue(editTarget);
+    const sourceImage = editUpload || editTarget.image_b64;
     if (!sourceImage) { toast.error("Sem imagem original para editar"); return; }
     setEditing(true);
     try {
@@ -220,7 +218,7 @@ export default function CreativesGallery() {
         user_id: userId || null,
         title: item.title || null,
         caption: item.caption || null,
-        image_b64: getImageValue(item) || null,
+        image_b64: item.image_b64 || null,
         network: item.network || null,
         format: item.format || null,
         storage_path: item.storage_path || null,
@@ -313,61 +311,18 @@ export default function CreativesGallery() {
   };
 
   const download = (item) => {
-    const src = getImageValue(item);
-    if (!src) return;
+    if (!item.image_b64) return;
     const a = document.createElement("a");
-    a.href = imageSrc(src);
+    a.href = imageSrc(item.image_b64);
     a.download = `legalflow-${item.id}.png`;
     a.click();
-  };
-
-  const getNestedImageValue = (value) => {
-    if (!value) return "";
-    if (typeof value === "string") return value;
-    if (typeof value !== "object") return "";
-    return value.signedUrl || value.publicUrl || value.url || value.src || value.href || value.image_url?.url || value.image?.url || "";
-  };
-
-  const getImageValue = (item) => {
-    if (!item) return "";
-    const candidates = [
-      item.image_b64,
-      item.image_url,
-      item.signedUrl,
-      item.publicUrl,
-      item.url,
-      item.image,
-      item.src,
-      item.thumbnail_url,
-      item.media_url,
-    ];
-    return candidates.map(getNestedImageValue).find(Boolean) || "";
   };
 
   const imageSrc = (value) => {
     const s = String(value || "");
     if (!s) return "";
-    if (s.startsWith("data:") || s.startsWith("http://") || s.startsWith("https://") || s.startsWith("blob:") || s.startsWith("/")) return s;
-    if (/^[A-Za-z0-9+/=\s]+$/.test(s) && s.length > 80) return `data:image/png;base64,${s.replace(/\s/g, "")}`;
-    return s;
-  };
-
-  const hydrateImageSources = async (list) => {
-    const rows = Array.isArray(list) ? list : [];
-    const paths = [...new Set(rows.map((item) => item?.storage_path).filter(Boolean))];
-    if (!paths.length) return rows;
-    try {
-      const { data: signed } = await supabase.storage.from("creative-assets").createSignedUrls(paths, 60 * 60 * 24);
-      const byPath = {};
-      (signed || []).forEach((entry, index) => {
-        if (entry?.signedUrl) byPath[paths[index]] = entry.signedUrl;
-      });
-      return rows.map((item) => item?.storage_path && byPath[item.storage_path]
-        ? { ...item, image_b64: byPath[item.storage_path], signedUrl: byPath[item.storage_path] }
-        : item);
-    } catch {
-      return rows;
-    }
+    if (s.startsWith("data:") || s.startsWith("http://") || s.startsWith("https://") || s.startsWith("blob:")) return s;
+    return `data:image/png;base64,${s}`;
   };
 
   const NetIcon = ({ network, className }) => {
@@ -441,8 +396,8 @@ export default function CreativesGallery() {
                 {trash.map((it) => (
                   <Card key={`trash-${it.id}`} className="overflow-hidden border-nude-200 opacity-90">
                     <div className="aspect-square bg-nude-100 relative">
-                      {getImageValue(it) ? (
-                        <img src={imageSrc(getImageValue(it))} alt={it.title} className="w-full h-full object-cover grayscale" />
+                      {it.image_b64 ? (
+                        <img src={imageSrc(it.image_b64)} alt={it.title} className="w-full h-full object-cover grayscale" />
                       ) : (
                         <div className="w-full h-full grid place-items-center text-nude-300"><Sparkles className="w-8 h-8" /></div>
                       )}
@@ -483,8 +438,8 @@ export default function CreativesGallery() {
               <Card key={item.id || `creative-${idx}`} className="overflow-hidden border-nude-200 hover:shadow-md transition-shadow">
 
                 <div className="aspect-square bg-nude-100 relative overflow-hidden">
-                  {getImageValue(item) ? (
-                    <img src={imageSrc(getImageValue(item))} alt={item.title} className="w-full h-full object-cover" />
+                  {item.image_b64 ? (
+                    <img src={imageSrc(item.image_b64)} alt={item.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full grid place-items-center text-nude-300">
                       <Sparkles className="w-8 h-8" />
@@ -502,7 +457,7 @@ export default function CreativesGallery() {
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => copyCaption(item.caption)}>
                       <Copy className="w-3 h-3 mr-1" /> Legenda
                     </Button>
-                    {getImageValue(item) && (
+                    {item.image_b64 && (
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => download(item)}>
                         <Download className="w-3 h-3 mr-1" /> PNG
                       </Button>
@@ -515,7 +470,7 @@ export default function CreativesGallery() {
                     </Button>
                     <Button variant="ghost" size="sm" className="h-7 text-xs col-span-2 text-gold-700 hover:bg-gold-50"
                       onClick={() => setViewer3D({
-                        src: imageSrc(getImageValue(item)),
+                        src: imageSrc(item.image_b64 || item.image_url || item.url || item.image || item.signedUrl || ""),
                         title: item.title,
                       })}>
                       <Box className="w-3 h-3 mr-1" /> Visualizar em 3D / 4D
@@ -547,8 +502,8 @@ export default function CreativesGallery() {
           <div className="space-y-2">
             {scheduled.map((p) => (
               <div key={p.id} className="flex items-center gap-3 text-xs bg-nude-50 border border-nude-200 rounded-md px-3 py-2">
-                {getImageValue(p) ? (
-                  <img src={imageSrc(getImageValue(p))} alt="" className="w-10 h-10 rounded object-cover" />
+                {p.image_b64 ? (
+                  <img src={imageSrc(p.image_b64)} alt="" className="w-10 h-10 rounded object-cover" />
                 ) : (
                   <div className="w-10 h-10 rounded bg-nude-200 grid place-items-center text-nude-400"><Sparkles className="w-4 h-4" /></div>
                 )}
