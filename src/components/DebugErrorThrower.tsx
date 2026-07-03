@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { DEBUG_INSTRUCTION_PREFIX } from "@/components/debugInstruction";
 
 /**
  * DebugErrorThrower
@@ -25,16 +24,6 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
-    const shouldThrowFatal =
-      import.meta.env.VITE_ENABLE_FATAL_DEBUG === "true" ||
-      new URLSearchParams(window.location.search).get("fatalDebug") === "1";
-
-    if (!shouldThrowFatal || message.startsWith(DEBUG_INSTRUCTION_PREFIX)) {
-      console.warn("Instrução de debug recebida sem quebrar a tela:", message);
-      setTimeout(() => setMessage(null), 0);
-      return null;
-    }
-
     throw new Error(message);
   }
 
