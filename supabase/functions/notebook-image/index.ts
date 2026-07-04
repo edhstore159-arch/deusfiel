@@ -66,14 +66,15 @@ const buildNotebookSvg = (text: string) => {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { text } = await req.json();
+    const { text, imageUrl } = await req.json();
     const userText = String(text || "").trim();
+    const refImage = typeof imageUrl === "string" && imageUrl.trim() ? imageUrl.trim() : null;
     if (!userText) {
       return new Response(JSON.stringify({ error: "text obrigatório" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const prompt = [
+    const promptLines = [
       "Create a photorealistic top-view photo of a slightly wrinkled white sheet of paper",
       "on a wooden desk (softly blurred background, natural lighting, subtle shadows).",
       "The paper contains a full handwritten solution written by a university student in",
@@ -85,14 +86,25 @@ Deno.serve(async (req) => {
       "if useful. The solution must be mathematically coherent, not random symbols.",
       "Must look 100% handwritten (no digital/typographic fonts), high-fidelity photorealistic.",
       "Do NOT add watermarks or extra printed text.",
+    ];
+    if (refImage) {
+      promptLines.push(
+        "",
+        "REFERENCE IMAGE PROVIDED: match the handwriting style, pencil/pen color and stroke thickness",
+        "of the attached reference exactly (same ink hue, same slant, same letter shapes).",
+      );
+    }
+    promptLines.push(
       "",
       "CONTENT TO HANDWRITE AS THE SOLUTION (preserve exactly, including line breaks):",
       userText,
-    ].join("\n");
+    );
+    const prompt = promptLines.join("\n");
 
     const result = await generateWithNanoBanana({
       prompt,
-      mode: "generate",
+      imageUrls: refImage ? [refImage] : undefined,
+      mode: refImage ? "edit" : "generate",
       preferProvider: Deno.env.get("EMERGENT_API_KEY") ? "emergent" : "pollinations",
     });
 
