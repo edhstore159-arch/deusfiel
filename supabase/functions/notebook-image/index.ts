@@ -74,13 +74,19 @@ Deno.serve(async (req) => {
       });
     }
     const prompt = [
-      "Create a photorealistic image of an open lined notebook page (caderno pautado)",
-      "with the following text handwritten in blue or black ballpoint pen, in natural,",
-      "slightly imperfect cursive handwriting as if written by a real person. The paper",
-      "should show subtle texture, light shadows, and horizontal ruled lines. Keep the",
-      "handwriting legible and well-spaced. Do NOT add any other text or watermarks.",
+      "Create a photorealistic top-view photo of a slightly wrinkled white sheet of paper",
+      "on a wooden desk (softly blurred background, natural lighting, subtle shadows).",
+      "The paper contains a full handwritten solution written by a university student in",
+      "blue or black ballpoint pen: natural, slightly slanted cursive with small human",
+      "imperfections and light corrections. Preserve real math symbols (∫, dA, dx, dy, π,",
+      "sen, cos, Σ, √, =, →) and number the exercises (e.g. 3., 4.). Include step-by-step",
+      "calculations — integrals, derivatives, parametric functions, algebra — with",
+      "substitutions, equalities and final results. Add small auxiliary sketches/graphs",
+      "if useful. The solution must be mathematically coherent, not random symbols.",
+      "Must look 100% handwritten (no digital/typographic fonts), high-fidelity photorealistic.",
+      "Do NOT add watermarks or extra printed text.",
       "",
-      "TEXT TO HANDWRITE (preserve exactly, including line breaks):",
+      "CONTENT TO HANDWRITE AS THE SOLUTION (preserve exactly, including line breaks):",
       userText,
     ].join("\n");
 
