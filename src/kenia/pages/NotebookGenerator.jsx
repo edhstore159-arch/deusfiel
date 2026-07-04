@@ -129,7 +129,7 @@ export default function NotebookGenerator() {
               className="flex items-center gap-2 border-2 border-dashed border-nude-300 rounded-md px-4 py-3 cursor-pointer hover:bg-nude-50 w-fit"
             >
               <ImagePlus className="w-4 h-4 text-nude-500" />
-              <span className="text-sm text-nude-600">Anexar imagem</span>
+              <span className="text-sm text-nude-600">Anexar imagem ou PDF</span>
               <input
                 ref={fileRef}
                 type="file"
