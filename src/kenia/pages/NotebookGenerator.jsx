@@ -1,15 +1,39 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/kenia/components/ui/button";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Card } from "@/kenia/components/ui/card";
-import { NotebookPen, Loader2, Download } from "lucide-react";
+import { NotebookPen, Loader2, Download, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function NotebookGenerator() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState(null);
+  const [refImage, setRefImage] = useState(null);
+  const fileRef = useRef(null);
+
+  const toDataUrl = (file) =>
+    new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(file);
+    });
+
+  const onFile = async (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Envie um arquivo de imagem.");
+      return;
+    }
+    try {
+      const url = await toDataUrl(file);
+      setRefImage(url);
+    } catch {
+      toast.error("Falha ao ler a imagem.");
+    }
+  };
 
   const generate = async () => {
     if (!text.trim()) {
@@ -20,7 +44,7 @@ export default function NotebookGenerator() {
     setImage(null);
     try {
       const { data, error } = await supabase.functions.invoke("notebook-image", {
-        body: { text },
+        body: { text, imageUrl: refImage || undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -61,6 +85,44 @@ export default function NotebookGenerator() {
           rows={6}
           className="text-sm"
         />
+
+        <div>
+          <label className="text-xs font-semibold text-nude-700 uppercase tracking-wider">
+            Imagem de referência (opcional)
+          </label>
+          <p className="text-xs text-nude-500 mb-2">
+            Anexe uma foto da sua letra/lápis para o modelo copiar o estilo e a cor.
+          </p>
+          {refImage ? (
+            <div className="relative inline-block">
+              <img src={refImage} alt="Referência" className="max-h-40 rounded border border-nude-200" />
+              <button
+                onClick={() => { setRefImage(null); if (fileRef.current) fileRef.current.value = ""; }}
+                className="absolute -top-2 -right-2 bg-rose-600 hover:bg-rose-700 text-white rounded-full p-1 shadow"
+                aria-label="Remover imagem"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <label
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); onFile(e.dataTransfer?.files?.[0]); }}
+              className="flex items-center gap-2 border-2 border-dashed border-nude-300 rounded-md px-4 py-3 cursor-pointer hover:bg-nude-50 w-fit"
+            >
+              <ImagePlus className="w-4 h-4 text-nude-500" />
+              <span className="text-sm text-nude-600">Anexar imagem</span>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => onFile(e.target.files?.[0])}
+              />
+            </label>
+          )}
+        </div>
+
         <div className="flex gap-2">
           <Button onClick={generate} disabled={loading} className="bg-gold-600 hover:bg-gold-700 text-white">
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <NotebookPen className="w-4 h-4 mr-2" />}
