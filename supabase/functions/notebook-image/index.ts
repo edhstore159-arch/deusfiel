@@ -66,8 +66,9 @@ const buildNotebookSvg = (text: string) => {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { text } = await req.json();
+    const { text, imageUrl } = await req.json();
     const userText = String(text || "").trim();
+    const refImage = typeof imageUrl === "string" && imageUrl.trim() ? imageUrl.trim() : null;
     if (!userText) {
       return new Response(JSON.stringify({ error: "text obrigatório" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
