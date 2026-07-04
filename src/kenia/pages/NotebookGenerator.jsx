@@ -21,17 +21,35 @@ export default function NotebookGenerator() {
       r.readAsDataURL(file);
     });
 
+  const pdfFirstPageToDataUrl = async (file) => {
+    const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
+    const workerSrc = (await import("pdfjs-dist/build/pdf.worker.mjs?url")).default;
+    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+    const buf = await file.arrayBuffer();
+    const doc = await pdfjs.getDocument({ data: buf }).promise;
+    const page = await doc.getPage(1);
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport, canvas }).promise;
+    return canvas.toDataURL("image/png");
+  };
+
   const onFile = async (file) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Envie um arquivo de imagem.");
+    const isImage = file.type.startsWith("image/");
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (!isImage && !isPdf) {
+      toast.error("Envie uma imagem ou PDF.");
       return;
     }
     try {
-      const url = await toDataUrl(file);
+      const url = isPdf ? await pdfFirstPageToDataUrl(file) : await toDataUrl(file);
       setRefImage(url);
-    } catch {
-      toast.error("Falha ao ler a imagem.");
+      if (isPdf) toast.success("PDF convertido (página 1) para referência.");
+    } catch (e) {
+      toast.error(`Falha ao ler o arquivo: ${e?.message || e}`);
     }
   };
 
