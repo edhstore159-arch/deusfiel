@@ -133,7 +133,7 @@ export default function NotebookGenerator() {
               <input
                 ref={fileRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 className="hidden"
                 onChange={(e) => onFile(e.target.files?.[0])}
               />
