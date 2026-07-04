@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       prompt,
       imageUrls: refImage ? [refImage] : undefined,
       mode: refImage ? "edit" : "generate",
-      preferProvider: Deno.env.get("EMERGENT_API_KEY") ? "emergent" : "pollinations",
+      preferProvider: "auto",
     });
 
     return new Response(JSON.stringify({
