@@ -35,6 +35,7 @@ const NAV = [
   { to: "/app/whatsapp-logs", label: "Logs WhatsApp", icon: Radio, testid: "nav-whatsapp-logs" },
   { to: "/app/settings", label: "Configurações", icon: SettingsIcon, testid: "nav-settings" },
   { to: "/app/debug", label: "Debug Tool", icon: Wrench, testid: "nav-debug" },
+  { to: "/app/notebook-generator", label: "Gerador de Caderno", icon: NotebookPen, testid: "nav-notebook-generator" },
   { to: "/app/emergent-login", label: "Login Plataforma IA", icon: SettingsIcon, testid: "nav-emergent-login" },
 ];
 
