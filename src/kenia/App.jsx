@@ -49,6 +49,7 @@ const Settings = lazyWithReload(() => import("@/kenia/pages/Settings"));
 const DebugTool = lazyWithReload(() => import("@/kenia/pages/DebugTool"));
 const EmergentLogin = lazyWithReload(() => import("@/kenia/pages/EmergentLogin"));
 const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
+const NotebookGenerator = lazyWithReload(() => import("@/kenia/pages/NotebookGenerator"));
 const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
 
