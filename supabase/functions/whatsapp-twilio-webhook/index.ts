@@ -279,6 +279,20 @@ Deno.serve(async (req) => {
       return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
     }
 
+    // === Geração de imagem sob demanda ===
+    const imgPrompt = detectImagePrompt(userText);
+    if (imgPrompt) {
+      console.log("[whatsapp] intent imagem detectado", { imgPrompt });
+      const bytes = await generateImagePng(imgPrompt);
+      const url = bytes ? await uploadImagePublic(bytes) : null;
+      if (url) {
+        await sendTwilioMessage(to, from, `Pronto! Aqui está a imagem sobre: ${imgPrompt}`, url);
+      } else {
+        await sendTwilioMessage(to, from, "Não consegui gerar a imagem agora. Pode tentar novamente com uma descrição diferente?");
+      }
+      return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
+    }
+
     const { reply, audio_base64 } = await callChatAI(userText, from.replace(/[^\d+]/g, ""), inboundWasAudio);
     await sleep(1000 + Math.floor(Math.random() * 2000));
     let mediaUrl: string | null = null;
