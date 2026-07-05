@@ -1,16 +1,18 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
-export const shouldSuppressLovableDebugInstruction = (_message: string) => true;
+export const shouldSuppressLovableDebugInstruction = (_message: string) => false;
 
 export const isLovableNativeDebugRuntime = () => false;
 
 /**
- * Mantém compatibilidade com os chamadores antigos sem criar erro fatal.
- * Instruções técnicas devem ser salvas pelo fallback do chamador.
+ * Dispara o CustomEvent que o DebugErrorThrower converte em erro fatal
+ * de runtime — necessário para acionar o overlay global da Lovable e o
+ * botão "Try to Fix". NÃO substituir por chat/API/toast.
  */
 export const dispatchLovableDebugError = (message: string) => {
-  if (typeof window === "undefined" || !message || shouldSuppressLovableDebugInstruction(message)) return false;
-  return false;
+  if (typeof window === "undefined" || !message) return false;
+  window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
+  return true;
 };
 
 export const deliverLovableDebugInstruction = (message: string) => {
