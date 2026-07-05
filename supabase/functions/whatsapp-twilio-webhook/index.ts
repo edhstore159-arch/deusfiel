@@ -187,9 +187,34 @@ async function uploadImagePublic(bytes: Uint8Array): Promise<string | null> {
       console.error("[whatsapp] upload imagem falhou", r.status, await r.text());
       return null;
     }
-    return `${SUPABASE_URL}/storage/v1/object/public/${AUDIO_BUCKET}/${path}`;
+    return await signStorageUrl(AUDIO_BUCKET, path);
   } catch (e) {
     console.error("[whatsapp] upload imagem exceção", e);
+    return null;
+  }
+}
+
+async function signStorageUrl(bucket: string, path: string, expiresIn = 60 * 60 * 24): Promise<string | null> {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${bucket}/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ expiresIn }),
+    });
+    if (!r.ok) {
+      console.error("[whatsapp] signed url falhou", r.status, await r.text());
+      return null;
+    }
+    const d = await r.json();
+    const signed = d?.signedURL || d?.signedUrl;
+    if (!signed) return null;
+    return `${SUPABASE_URL}/storage/v1${signed.startsWith("/") ? signed : "/" + signed}`;
+  } catch (e) {
+    console.error("[whatsapp] signed url exceção", e);
     return null;
   }
 }
