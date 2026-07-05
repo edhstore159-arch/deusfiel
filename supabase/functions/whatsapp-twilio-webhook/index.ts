@@ -171,39 +171,63 @@ async function tryOpenAIImage(prompt: string): Promise<Uint8Array | null> {
 async function tryEmergentImage(prompt: string): Promise<Uint8Array | null> {
   const key = Deno.env.get("EMERGENT_API_KEY");
   if (!key) return null;
+  // Try LiteLLM /images/generations first (OpenAI-compatible)
   try {
-    const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+    const r = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: "gemini-2.5-flash-image",
-        modalities: ["image", "text"],
-        messages: [{ role: "user", content: prompt }],
-      }),
+      body: JSON.stringify({ model: "openai/gpt-image-1", prompt, size: "1024x1024", n: 1 }),
     });
-    if (!r.ok) {
-      console.error("[whatsapp] emergent image falhou", r.status, (await r.text()).slice(0, 300));
-      return null;
-    }
-    const d = await r.json();
-    const msg = d?.choices?.[0]?.message;
-    const url: string | undefined = msg?.images?.[0]?.image_url?.url;
-    if (url && url.startsWith("data:")) {
-      const b64 = url.split(",")[1];
+    if (r.ok) {
+      const d = await r.json();
+      const b64 = d?.data?.[0]?.b64_json;
       if (b64) return b64ToBytes(b64);
+      const url = d?.data?.[0]?.url;
+      if (url) {
+        const ir = await fetch(url);
+        if (ir.ok) return new Uint8Array(await ir.arrayBuffer());
+      }
+    } else {
+      console.error("[whatsapp] emergent /images falhou", r.status, (await r.text()).slice(0, 300));
     }
-    if (url) {
-      const ir = await fetch(url);
-      if (ir.ok) return new Uint8Array(await ir.arrayBuffer());
-    }
-    const content = String(msg?.content || "");
-    const m = content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]+)/);
-    if (m) return b64ToBytes(m[1]);
-    return null;
   } catch (e) {
-    console.error("[whatsapp] emergent image exceção", e);
-    return null;
+    console.error("[whatsapp] emergent /images exceção", e);
   }
+  // Fallback: chat/completions with gemini image modality
+  for (const model of ["gemini/gemini-2.5-flash-image-preview", "vertex_ai/gemini-2.5-flash-image-preview", "google/gemini-2.5-flash-image-preview"]) {
+    try {
+      const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          modalities: ["image", "text"],
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (!r.ok) {
+        console.error("[whatsapp] emergent chat img falhou", model, r.status, (await r.text()).slice(0, 200));
+        continue;
+      }
+      const d = await r.json();
+      const msg = d?.choices?.[0]?.message;
+      const url: string | undefined = msg?.images?.[0]?.image_url?.url;
+      if (url?.startsWith("data:")) {
+        const b64 = url.split(",")[1];
+        if (b64) return b64ToBytes(b64);
+      }
+      if (url) {
+        const ir = await fetch(url);
+        if (ir.ok) return new Uint8Array(await ir.arrayBuffer());
+      }
+      const content = String(msg?.content || "");
+      const m = content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]+)/);
+      if (m) return b64ToBytes(m[1]);
+    } catch (e) {
+      console.error("[whatsapp] emergent chat img exceção", model, e);
+    }
+  }
+  return null;
 }
 
 async function tryLovableImage(prompt: string): Promise<Uint8Array | null> {
