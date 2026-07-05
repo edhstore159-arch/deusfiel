@@ -23,7 +23,10 @@ REGRAS OBRIGATÓRIAS:
 QUESTÃO A RESOLVER (transcreva o enunciado no topo e resolva abaixo, passo a passo):
 {QUESTAO}`;
 
+const EXAMPLE_QUESTION = `Calcule a integral dupla ∬_R (x² + y²) dA, onde R é a região limitada por y = x, y = 0 e x = 2.`;
+
 export default function NotebookGenerator() {
+  const [activeTab, setActiveTab] = useState("gerador");
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState(null);
@@ -112,7 +115,7 @@ export default function NotebookGenerator() {
         </div>
       </div>
 
-      <Tabs defaultValue="gerador" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="gerador">Gerador</TabsTrigger>
           <TabsTrigger value="prompt">Prompt Vismo Studio</TabsTrigger>
@@ -216,10 +219,9 @@ export default function NotebookGenerator() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  const exemplo = `Calcule a integral dupla ∬_R (x² + y²) dA, onde R é a região limitada por y = x, y = 0 e x = 2.`;
-                  const filled = VISMO_STUDIO_PROMPT.replace("{QUESTAO}", exemplo);
-                  setText(filled);
-                  toast.success("Exemplo carregado no gerador. Vá até a aba Gerador e clique em Gerar imagem.");
+                  setText(EXAMPLE_QUESTION);
+                  setActiveTab("gerador");
+                  toast.success("Questão exemplo carregada no gerador.");
                 }}
               >
                 <NotebookPen className="w-4 h-4 mr-2" /> Testar com exemplo
