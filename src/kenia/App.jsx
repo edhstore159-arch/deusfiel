@@ -77,8 +77,11 @@ function App() {
   return (
     <div className="App">
       <AuthProvider>
+        <DebugErrorThrower />
+        <ErrorDebugPopup />
         <BrowserRouter>
           <ScrollToTop />
+
 
 
           <Suspense fallback={<PageFallback />}>
