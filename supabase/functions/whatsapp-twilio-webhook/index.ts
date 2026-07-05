@@ -194,7 +194,7 @@ async function tryEmergentImage(prompt: string): Promise<Uint8Array | null> {
     console.error("[whatsapp] emergent /images exceção", e);
   }
   // Fallback: chat/completions with gemini image modality
-  for (const model of ["gemini/gemini-2.5-flash-image-preview", "vertex_ai/gemini-2.5-flash-image-preview", "google/gemini-2.5-flash-image-preview"]) {
+  for (const model of ["vertex_ai/gemini-2.5-flash-image", "vertex_ai/gemini-3.1-flash-image-preview"]) {
     try {
       const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
         method: "POST",
