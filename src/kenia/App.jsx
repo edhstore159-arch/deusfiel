@@ -1,6 +1,5 @@
 import "@/kenia/App.css";
 import React, { lazy, Suspense } from "react";
-import { DebugErrorThrower } from "@/components/DebugErrorThrower";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/kenia/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/kenia/contexts/AuthContext";
@@ -75,7 +74,6 @@ function PageFallback() {
 function App() {
   return (
     <div className="App">
-      <DebugErrorThrower />
       <AuthProvider>
         <BrowserRouter>
           <ScrollToTop />

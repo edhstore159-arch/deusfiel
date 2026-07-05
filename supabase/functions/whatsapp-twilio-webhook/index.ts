@@ -77,8 +77,12 @@ async function transcribe(buffer: ArrayBuffer, mime: string): Promise<string> {
 
 function bufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
+  const chunkSize = 8192;
   let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    bin += String.fromCharCode(...Array.from(chunk));
+  }
   return btoa(bin);
 }
 
@@ -469,11 +473,6 @@ Deno.serve(async (req) => {
       return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
     }
 
-    if (!isBusinessHours()) {
-      await sendTwilioMessage(to, from, "Recebi sua mensagem. Nosso atendimento funciona das 8h às 20h, e retornaremos no próximo horário útil. ✨");
-      return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
-    }
-
     // === Geração de imagem sob demanda ===
     const imgPrompt = detectImagePrompt(userText);
     if (imgPrompt) {
@@ -485,6 +484,11 @@ Deno.serve(async (req) => {
       } else {
         await sendTwilioMessage(to, from, "Não consegui gerar a imagem agora. Pode tentar novamente com uma descrição diferente?");
       }
+      return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
+    }
+
+    if (!isBusinessHours()) {
+      await sendTwilioMessage(to, from, "Recebi sua mensagem. Nosso atendimento funciona das 8h às 20h, e retornaremos no próximo horário útil. ✨");
       return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
     }
 
