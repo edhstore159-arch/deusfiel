@@ -75,6 +75,66 @@ async function transcribe(buffer: ArrayBuffer, mime: string): Promise<string> {
   return d.text || d.transcript || "";
 }
 
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+async function describeImage(buffer: ArrayBuffer, mime: string, userCaption: string): Promise<string> {
+  const b64 = bufferToBase64(buffer);
+  const dataUrl = `data:${mime};base64,${b64}`;
+  const question = userCaption?.trim()
+    ? `O cliente enviou esta imagem junto com o texto: "${userCaption.trim()}". Descreva detalhadamente o que aparece na imagem e relacione com o texto quando fizer sentido.`
+    : `O cliente enviou esta imagem. Descreva detalhadamente o que aparece nela (objetos, pessoas, textos visíveis, contexto). Se for um documento, extraia o texto principal.`;
+  const messages = [{
+    role: "user",
+    content: [
+      { type: "text", text: question },
+      { type: "image_url", image_url: { url: dataUrl } },
+    ],
+  }];
+
+  // Try Lovable first, then Emergent
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (lovableKey) {
+    try {
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
+        body: JSON.stringify({ model: "google/gemini-2.5-flash", messages }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const txt = d?.choices?.[0]?.message?.content;
+        if (typeof txt === "string" && txt.trim()) return txt.trim();
+      } else {
+        console.error("[whatsapp] vision lovable falhou", r.status, (await r.text()).slice(0, 200));
+      }
+    } catch (e) { console.error("[whatsapp] vision lovable exc", e); }
+  }
+  const emergentKey = Deno.env.get("EMERGENT_API_KEY");
+  if (emergentKey) {
+    try {
+      const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${emergentKey}` },
+        body: JSON.stringify({ model: "gemini/gemini-2.5-pro", messages }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const txt = d?.choices?.[0]?.message?.content;
+        if (typeof txt === "string" && txt.trim()) return txt.trim();
+      } else {
+        console.error("[whatsapp] vision emergent falhou", r.status, (await r.text()).slice(0, 200));
+      }
+    } catch (e) { console.error("[whatsapp] vision emergent exc", e); }
+  }
+  return "";
+}
+
+
 async function callChatAI(userText: string, sessionId: string, wantAudio: boolean): Promise<{ reply: string; audio_base64: string | null }> {
   const r = await fetch(`${SUPABASE_URL}/functions/v1/chat-ai`, {
     method: "POST",
