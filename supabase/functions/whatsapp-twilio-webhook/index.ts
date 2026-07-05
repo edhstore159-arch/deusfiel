@@ -305,6 +305,48 @@ async function tryEmergentImage(prompt: string): Promise<Uint8Array | null> {
   return null;
 }
 
+async function tryLovableGeminiImage(prompt: string): Promise<Uint8Array | null> {
+  if (!LOVABLE_API_KEY) return null;
+  // Gemini "Nano Banana" image generation via chat/completions with image modality
+  for (const model of ["google/gemini-2.5-flash-image", "google/gemini-3.1-flash-image"]) {
+    try {
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Lovable-API-Key": LOVABLE_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          modalities: ["image", "text"],
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (!r.ok) {
+        console.error("[whatsapp] gemini image falhou", model, r.status, (await r.text()).slice(0, 300));
+        continue;
+      }
+      const d = await r.json();
+      const msg = d?.choices?.[0]?.message;
+      const url: string | undefined = msg?.images?.[0]?.image_url?.url;
+      if (url?.startsWith("data:")) {
+        const b64 = url.split(",")[1];
+        if (b64) return b64ToBytes(b64);
+      }
+      if (url) {
+        const ir = await fetch(url);
+        if (ir.ok) return new Uint8Array(await ir.arrayBuffer());
+      }
+      const content = String(msg?.content || "");
+      const m = content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]+)/);
+      if (m) return b64ToBytes(m[1]);
+    } catch (e) {
+      console.error("[whatsapp] gemini image exceção", model, e);
+    }
+  }
+  return null;
+}
+
 async function tryLovableImage(prompt: string): Promise<Uint8Array | null> {
   if (!LOVABLE_API_KEY) return null;
   try {
@@ -331,7 +373,9 @@ async function tryLovableImage(prompt: string): Promise<Uint8Array | null> {
 }
 
 async function generateImagePng(prompt: string): Promise<Uint8Array | null> {
-  return (await tryOpenAIImage(prompt))
+  // Prioridade: Gemini (Lovable AI) → OpenAI → Emergent → Lovable gpt-image
+  return (await tryLovableGeminiImage(prompt))
+      ?? (await tryOpenAIImage(prompt))
       ?? (await tryEmergentImage(prompt))
       ?? (await tryLovableImage(prompt));
 }
