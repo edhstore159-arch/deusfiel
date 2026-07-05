@@ -409,13 +409,14 @@ Deno.serve(async (req) => {
     let userText = body;
     let audioFailed = false;
     let inboundWasAudio = false;
+    let inboundImageDescription = "";
 
-    // Processa áudio sempre que houver mídia de áudio (mesmo se também vier Body)
     if (numMedia > 0) {
       const mediaUrl = String(form.get("MediaUrl0") || "");
       const mediaTypeRaw = String(form.get("MediaContentType0") || "audio/ogg");
       const mediaType = mediaTypeRaw.split(";")[0].trim().toLowerCase();
       const isAudio = mediaType.startsWith("audio") || mediaType.includes("ogg") || mediaType.includes("opus");
+      const isImage = mediaType.startsWith("image/");
       if (mediaUrl && isAudio) {
         inboundWasAudio = true;
         try {
@@ -431,8 +432,26 @@ Deno.serve(async (req) => {
           console.error("[whatsapp] erro no áudio:", audioErr);
           audioFailed = true;
         }
+      } else if (mediaUrl && isImage) {
+        try {
+          console.log("[whatsapp] baixando imagem", { mediaUrl, mediaType });
+          const { buffer, contentType } = await fetchTwilioMedia(mediaUrl);
+          const cleanCt = (contentType || mediaType).split(";")[0].trim().toLowerCase();
+          console.log("[whatsapp] imagem baixada", { bytes: buffer.byteLength, cleanCt });
+          const desc = await describeImage(buffer, cleanCt, body);
+          console.log("[whatsapp] descrição imagem", { chars: desc.length, preview: desc.slice(0, 120) });
+          if (desc) {
+            inboundImageDescription = desc;
+            userText = body?.trim()
+              ? `${body.trim()}\n\n[Imagem enviada pelo cliente — descrição: ${desc}]`
+              : `[O cliente enviou uma imagem. Descrição do conteúdo: ${desc}]\n\nResponda de forma útil e acolhedora sobre essa imagem.`;
+          }
+        } catch (imgErr) {
+          console.error("[whatsapp] erro na imagem:", imgErr);
+        }
       }
     }
+
 
     if (!userText) {
       if (audioFailed) {
