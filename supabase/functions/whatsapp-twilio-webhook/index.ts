@@ -120,6 +120,80 @@ async function uploadAudioPublic(audioB64: string): Promise<string | null> {
   }
 }
 
+function detectImagePrompt(text: string): string | null {
+  const t = String(text || "").trim();
+  if (!t) return null;
+  // gatilhos: "gera/gere/crie/faça/desenhe/ilustre uma imagem/foto/figura/desenho/arte de ..."
+  const re = /\b(gera(?:r)?|gere|cria(?:r)?|crie|fa[çc]a|desenha(?:r)?|desenhe|ilustre|ilustra(?:r)?|produza|monte)\s+(?:uma\s+|um\s+|essa\s+|esse\s+)?(?:imagem|foto|figura|desenho|arte|ilustra[cç][aã]o|logo|logotipo|banner|poster|p[oô]ster|thumbnail)\s+(?:de\s+|com\s+|sobre\s+|do\s+|da\s+|dos\s+|das\s+)?(.+)/i;
+  const m = t.match(re);
+  if (m && m[2] && m[2].trim().length >= 2) return m[2].trim();
+  // padrão alternativo: "imagem: xxx" / "foto: xxx"
+  const m2 = t.match(/^\s*(?:imagem|foto|figura|ilustra[cç][aã]o|arte)\s*[:\-]\s*(.+)/i);
+  if (m2 && m2[1].trim().length >= 2) return m2[1].trim();
+  return null;
+}
+
+async function generateImagePng(prompt: string): Promise<Uint8Array | null> {
+  try {
+    const r = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Lovable-API-Key": LOVABLE_API_KEY,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-image-2",
+        prompt,
+        quality: "low",
+        size: "1024x1024",
+        n: 1,
+      }),
+    });
+    if (!r.ok) {
+      console.error("[whatsapp] image gen falhou", r.status, (await r.text()).slice(0, 300));
+      return null;
+    }
+    const d = await r.json();
+    const b64 = d?.data?.[0]?.b64_json;
+    if (!b64) {
+      console.error("[whatsapp] image gen sem b64_json", JSON.stringify(d).slice(0, 200));
+      return null;
+    }
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  } catch (e) {
+    console.error("[whatsapp] image gen exceção", e);
+    return null;
+  }
+}
+
+async function uploadImagePublic(bytes: Uint8Array): Promise<string | null> {
+  try {
+    const path = `wa-img/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${AUDIO_BUCKET}/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": "image/png",
+        "x-upsert": "true",
+      },
+      body: bytes,
+    });
+    if (!r.ok) {
+      console.error("[whatsapp] upload imagem falhou", r.status, await r.text());
+      return null;
+    }
+    return `${SUPABASE_URL}/storage/v1/object/public/${AUDIO_BUCKET}/${path}`;
+  } catch (e) {
+    console.error("[whatsapp] upload imagem exceção", e);
+    return null;
+  }
+}
+
 async function sendTwilioMessage(from: string, to: string, body: string, mediaUrl?: string | null) {
   const params: Record<string, string> = { From: from, To: to, Body: body };
   if (mediaUrl) params.MediaUrl = mediaUrl;
