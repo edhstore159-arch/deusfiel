@@ -52,7 +52,6 @@ const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
 const NotebookGenerator = lazyWithReload(() => import("@/kenia/pages/NotebookGenerator"));
 const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
-const MoodleExercises = lazyWithReload(() => import("@/kenia/pages/MoodleExercises"));
 
 
 const ResetPassword = lazy(() => import("@/kenia/pages/ResetPassword"));
@@ -117,7 +116,6 @@ function App() {
                 <Route path="/app/settings" element={<Settings />} />
                 <Route path="/app/debug" element={<DebugTool />} />
                 <Route path="/app/notebook-generator" element={<NotebookGenerator />} />
-                <Route path="/app/moodle-exercises" element={<MoodleExercises />} />
                 <Route path="/app/emergent-login" element={<EmergentLogin />} />
               </Route>
             </Routes>
