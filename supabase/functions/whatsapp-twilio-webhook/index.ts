@@ -494,7 +494,9 @@ Deno.serve(async (req) => {
     if (imgPrompt) {
       console.log("[whatsapp] intent imagem detectado", { imgPrompt });
       const bytes = await generateImagePng(imgPrompt);
+      console.log("[whatsapp] geração imagem", { ok: !!bytes, bytes: bytes?.byteLength || 0 });
       const url = bytes ? await uploadImagePublic(bytes) : null;
+      console.log("[whatsapp] upload imagem whatsapp", { hasUrl: !!url });
       if (url) {
         await sendTwilioMessage(to, from, `Pronto! Aqui está a imagem sobre: ${imgPrompt}`, url);
       } else {
