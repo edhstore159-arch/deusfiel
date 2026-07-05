@@ -40,12 +40,6 @@ function isOptOut(text: string) {
 }
 
 async function fetchTwilioMedia(mediaUrl: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
-  if (mediaUrl.startsWith("data:")) {
-    const match = mediaUrl.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.+)$/);
-    if (!match) throw new Error("data URL de mídia inválida");
-    const bytes = b64ToBytes(match[2]);
-    return { buffer: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), contentType: match[1] };
-  }
   // MediaUrl no formato: https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/{MSid}/Media/{MeSid}
   // Reescrevemos para o gateway: /Messages/{MSid}/Media/{MeSid}
   const m = mediaUrl.match(/\/Messages\/([^/]+)\/Media\/([^/?]+)/);
@@ -88,18 +82,9 @@ function bufferToBase64(buffer: ArrayBuffer): string {
   return btoa(bin);
 }
 
-function cleanBase64(value: string): string {
-  let cleaned = String(value || "").trim();
-  if (cleaned.startsWith("data:") && cleaned.includes(",")) cleaned = cleaned.split(",").pop() || "";
-  cleaned = cleaned.replace(/\s/g, "");
-  if (!cleaned || !/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) throw new Error("invalid base64 image data");
-  return cleaned;
-}
-
 async function describeImage(buffer: ArrayBuffer, mime: string, userCaption: string): Promise<string> {
-  const cleanMime = (mime || "image/jpeg").split(";")[0].trim().toLowerCase();
-  const b64 = cleanBase64(bufferToBase64(buffer));
-  const dataUrl = `data:${cleanMime};base64,${b64}`;
+  const b64 = bufferToBase64(buffer);
+  const dataUrl = `data:${mime};base64,${b64}`;
   const question = userCaption?.trim()
     ? `O cliente enviou esta imagem junto com o texto: "${userCaption.trim()}". Descreva detalhadamente o que aparece na imagem e relacione com o texto quando fizer sentido.`
     : `O cliente enviou esta imagem. Descreva detalhadamente o que aparece nela (objetos, pessoas, textos visíveis, contexto). Se for um documento, extraia o texto principal.`;
@@ -135,7 +120,7 @@ async function describeImage(buffer: ArrayBuffer, mime: string, userCaption: str
       const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${emergentKey}` },
-        body: JSON.stringify({ model: "gemini/gemini-2.5-flash", messages }),
+        body: JSON.stringify({ model: "gemini/gemini-2.5-pro", messages }),
       });
       if (r.ok) {
         const d = await r.json();
@@ -209,7 +194,7 @@ function detectImagePrompt(text: string): string | null {
 }
 
 function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(cleanBase64(b64));
+  const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
@@ -494,9 +479,7 @@ Deno.serve(async (req) => {
     if (imgPrompt) {
       console.log("[whatsapp] intent imagem detectado", { imgPrompt });
       const bytes = await generateImagePng(imgPrompt);
-      console.log("[whatsapp] geração imagem", { ok: !!bytes, bytes: bytes?.byteLength || 0 });
       const url = bytes ? await uploadImagePublic(bytes) : null;
-      console.log("[whatsapp] upload imagem whatsapp", { hasUrl: !!url });
       if (url) {
         await sendTwilioMessage(to, from, `Pronto! Aqui está a imagem sobre: ${imgPrompt}`, url);
       } else {
