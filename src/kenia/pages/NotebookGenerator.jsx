@@ -3,8 +3,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/kenia/components/ui/button";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Card } from "@/kenia/components/ui/card";
-import { NotebookPen, Loader2, Download, ImagePlus, X } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/tabs";
+import { NotebookPen, Loader2, Download, ImagePlus, X, Copy, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+
+const VISMO_STUDIO_PROMPT = `Crie uma imagem hiper-realista, vista de cima, de uma folha de papel sulfite branca, levemente amassada, sobre uma mesa de madeira clara (fundo desfocado, luz natural suave vindo da esquerda, sombras sutis).
+
+A folha contém a RESOLUÇÃO MANUSCRITA COMPLETA de uma questão de matemática, escrita por um estudante universitário com caneta esferográfica azul (ou preta), em letra cursiva natural, levemente inclinada, com pequenas imperfeições humanas e uma ou outra rasura discreta.
+
+REGRAS OBRIGATÓRIAS:
+- 100% manuscrito — NENHUMA fonte digital, NENHUMA tipografia.
+- Preserve símbolos matemáticos reais: ∫, ∬, ∮, dA, dx, dy, dz, π, θ, Σ, √, ≤, ≥, →, sen, cos, tg, ln, lim.
+- Numere os itens (1., 2., 3., a), b), c)).
+- Mostre o passo a passo COMPLETO: enunciado resumido → identificação do método → substituições → cálculo → resultado final destacado (com caixa ou sublinhado).
+- Se útil, inclua um pequeno esboço/gráfico à mão ao lado.
+- Matematicamente coerente e correto — jamais símbolos aleatórios.
+- SEM marca d'água, SEM texto impresso extra, SEM legendas digitais.
+
+QUESTÃO A RESOLVER (transcreva o enunciado no topo e resolva abaixo, passo a passo):
+{QUESTAO}`;
 
 export default function NotebookGenerator() {
   const [text, setText] = useState("");
