@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/kenia/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/kenia/contexts/AuthContext";
 import "@/kenia/storage"; // registra window.__keniaStorage e mantém persistência das secretárias
+import DebugErrorThrower from "@/components/DebugErrorThrower";
 import ErrorDebugPopup from "@/components/ErrorDebugPopup";
 
 // Eager: landing + login para first paint rápido
