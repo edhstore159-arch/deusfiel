@@ -75,6 +75,66 @@ async function transcribe(buffer: ArrayBuffer, mime: string): Promise<string> {
   return d.text || d.transcript || "";
 }
 
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+async function describeImage(buffer: ArrayBuffer, mime: string, userCaption: string): Promise<string> {
+  const b64 = bufferToBase64(buffer);
+  const dataUrl = `data:${mime};base64,${b64}`;
+  const question = userCaption?.trim()
+    ? `O cliente enviou esta imagem junto com o texto: "${userCaption.trim()}". Descreva detalhadamente o que aparece na imagem e relacione com o texto quando fizer sentido.`
+    : `O cliente enviou esta imagem. Descreva detalhadamente o que aparece nela (objetos, pessoas, textos visíveis, contexto). Se for um documento, extraia o texto principal.`;
+  const messages = [{
+    role: "user",
+    content: [
+      { type: "text", text: question },
+      { type: "image_url", image_url: { url: dataUrl } },
+    ],
+  }];
+
+  // Try Lovable first, then Emergent
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (lovableKey) {
+    try {
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
+        body: JSON.stringify({ model: "google/gemini-2.5-flash", messages }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const txt = d?.choices?.[0]?.message?.content;
+        if (typeof txt === "string" && txt.trim()) return txt.trim();
+      } else {
+        console.error("[whatsapp] vision lovable falhou", r.status, (await r.text()).slice(0, 200));
+      }
+    } catch (e) { console.error("[whatsapp] vision lovable exc", e); }
+  }
+  const emergentKey = Deno.env.get("EMERGENT_API_KEY");
+  if (emergentKey) {
+    try {
+      const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${emergentKey}` },
+        body: JSON.stringify({ model: "gemini/gemini-2.5-pro", messages }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const txt = d?.choices?.[0]?.message?.content;
+        if (typeof txt === "string" && txt.trim()) return txt.trim();
+      } else {
+        console.error("[whatsapp] vision emergent falhou", r.status, (await r.text()).slice(0, 200));
+      }
+    } catch (e) { console.error("[whatsapp] vision emergent exc", e); }
+  }
+  return "";
+}
+
+
 async function callChatAI(userText: string, sessionId: string, wantAudio: boolean): Promise<{ reply: string; audio_base64: string | null }> {
   const r = await fetch(`${SUPABASE_URL}/functions/v1/chat-ai`, {
     method: "POST",
@@ -349,13 +409,14 @@ Deno.serve(async (req) => {
     let userText = body;
     let audioFailed = false;
     let inboundWasAudio = false;
+    let inboundImageDescription = "";
 
-    // Processa áudio sempre que houver mídia de áudio (mesmo se também vier Body)
     if (numMedia > 0) {
       const mediaUrl = String(form.get("MediaUrl0") || "");
       const mediaTypeRaw = String(form.get("MediaContentType0") || "audio/ogg");
       const mediaType = mediaTypeRaw.split(";")[0].trim().toLowerCase();
       const isAudio = mediaType.startsWith("audio") || mediaType.includes("ogg") || mediaType.includes("opus");
+      const isImage = mediaType.startsWith("image/");
       if (mediaUrl && isAudio) {
         inboundWasAudio = true;
         try {
@@ -371,8 +432,26 @@ Deno.serve(async (req) => {
           console.error("[whatsapp] erro no áudio:", audioErr);
           audioFailed = true;
         }
+      } else if (mediaUrl && isImage) {
+        try {
+          console.log("[whatsapp] baixando imagem", { mediaUrl, mediaType });
+          const { buffer, contentType } = await fetchTwilioMedia(mediaUrl);
+          const cleanCt = (contentType || mediaType).split(";")[0].trim().toLowerCase();
+          console.log("[whatsapp] imagem baixada", { bytes: buffer.byteLength, cleanCt });
+          const desc = await describeImage(buffer, cleanCt, body);
+          console.log("[whatsapp] descrição imagem", { chars: desc.length, preview: desc.slice(0, 120) });
+          if (desc) {
+            inboundImageDescription = desc;
+            userText = body?.trim()
+              ? `${body.trim()}\n\n[Imagem enviada pelo cliente — descrição: ${desc}]`
+              : `[O cliente enviou uma imagem. Descrição do conteúdo: ${desc}]\n\nResponda de forma útil e acolhedora sobre essa imagem.`;
+          }
+        } catch (imgErr) {
+          console.error("[whatsapp] erro na imagem:", imgErr);
+        }
       }
     }
+
 
     if (!userText) {
       if (audioFailed) {
