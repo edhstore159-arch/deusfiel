@@ -82,9 +82,18 @@ function bufferToBase64(buffer: ArrayBuffer): string {
   return btoa(bin);
 }
 
+function cleanBase64(value: string): string {
+  let cleaned = String(value || "").trim();
+  if (cleaned.startsWith("data:") && cleaned.includes(",")) cleaned = cleaned.split(",").pop() || "";
+  cleaned = cleaned.replace(/\s/g, "");
+  if (!cleaned || !/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) throw new Error("invalid base64 image data");
+  return cleaned;
+}
+
 async function describeImage(buffer: ArrayBuffer, mime: string, userCaption: string): Promise<string> {
-  const b64 = bufferToBase64(buffer);
-  const dataUrl = `data:${mime};base64,${b64}`;
+  const cleanMime = (mime || "image/jpeg").split(";")[0].trim().toLowerCase();
+  const b64 = cleanBase64(bufferToBase64(buffer));
+  const dataUrl = `data:${cleanMime};base64,${b64}`;
   const question = userCaption?.trim()
     ? `O cliente enviou esta imagem junto com o texto: "${userCaption.trim()}". Descreva detalhadamente o que aparece na imagem e relacione com o texto quando fizer sentido.`
     : `O cliente enviou esta imagem. Descreva detalhadamente o que aparece nela (objetos, pessoas, textos visíveis, contexto). Se for um documento, extraia o texto principal.`;
@@ -120,7 +129,7 @@ async function describeImage(buffer: ArrayBuffer, mime: string, userCaption: str
       const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${emergentKey}` },
-        body: JSON.stringify({ model: "gemini/gemini-2.5-pro", messages }),
+        body: JSON.stringify({ model: "gemini/gemini-2.5-flash", messages }),
       });
       if (r.ok) {
         const d = await r.json();
@@ -194,7 +203,7 @@ function detectImagePrompt(text: string): string | null {
 }
 
 function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
+  const bin = atob(cleanBase64(b64));
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
