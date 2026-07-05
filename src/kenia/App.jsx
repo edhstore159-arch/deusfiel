@@ -77,7 +77,6 @@ function PageFallback() {
 function App() {
   return (
     <div className="App">
-      <DebugErrorThrower />
       <AuthProvider>
         <DebugErrorThrower />
         <ErrorDebugPopup />
