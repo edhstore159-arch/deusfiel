@@ -113,7 +113,7 @@ async function uploadAudioPublic(audioB64: string): Promise<string | null> {
       console.error("[whatsapp] upload áudio falhou", r.status, await r.text());
       return null;
     }
-    return `${SUPABASE_URL}/storage/v1/object/public/${AUDIO_BUCKET}/${path}`;
+    return await signStorageUrl(AUDIO_BUCKET, path);
   } catch (e) {
     console.error("[whatsapp] upload exceção", e);
     return null;
