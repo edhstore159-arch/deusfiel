@@ -11,8 +11,8 @@ export const isLovableNativeDebugRuntime = () => false;
  */
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined" || !message) return false;
-  console.warn("[debug-instruction] ignored runtime throw request");
-  return false;
+  window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
+  return true;
 };
 
 export const deliverLovableDebugInstruction = (message: string) => {
