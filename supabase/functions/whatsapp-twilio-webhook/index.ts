@@ -40,6 +40,11 @@ function isOptOut(text: string) {
 }
 
 async function fetchTwilioMedia(mediaUrl: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  if (mediaUrl.startsWith("data:")) {
+    const match = mediaUrl.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.+)$/);
+    if (!match) throw new Error("data URL de mídia inválida");
+    return { buffer: b64ToBytes(match[2]).buffer, contentType: match[1] };
+  }
   // MediaUrl no formato: https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/{MSid}/Media/{MeSid}
   // Reescrevemos para o gateway: /Messages/{MSid}/Media/{MeSid}
   const m = mediaUrl.match(/\/Messages\/([^/]+)\/Media\/([^/?]+)/);
