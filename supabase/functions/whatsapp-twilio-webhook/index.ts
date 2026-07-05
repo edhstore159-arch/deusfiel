@@ -176,7 +176,7 @@ async function tryEmergentImage(prompt: string): Promise<Uint8Array | null> {
     const r = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: "openai/gpt-image-1", prompt, size: "1024x1024", n: 1 }),
+      body: JSON.stringify({ model: "gpt-image-2", prompt, size: "1024x1024", n: 1 }),
     });
     if (r.ok) {
       const d = await r.json();
