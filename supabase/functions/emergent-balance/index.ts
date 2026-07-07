@@ -1,3 +1,4 @@
+import { requireAdmin } from "../_shared/auth.ts";
 // Emergent balance/spend probe — extracts LiteLLM headers from a cheap call.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,6 +7,9 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+    const _auth = await requireAdmin(req);
+    if (_auth instanceof Response) return _auth;
+
   const key = Deno.env.get("EMERGENT_API_KEY");
   if (!key) {
     return new Response(JSON.stringify({ ok: false, error: "EMERGENT_API_KEY ausente" }), {

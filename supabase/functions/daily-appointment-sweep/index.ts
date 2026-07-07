@@ -56,6 +56,15 @@ function extractAppointmentFromText(text: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Require shared secret (pg_cron/scheduler must send it).
+  const SWEEP_SECRET = Deno.env.get("SWEEP_SECRET");
+  const provided = req.headers.get("x-sweep-secret") || (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!SWEEP_SECRET || provided !== SWEEP_SECRET) {
+    return new Response(JSON.stringify({ error: "forbidden" }), {
+      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
