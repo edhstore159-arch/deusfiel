@@ -21,32 +21,10 @@ export default function VirtualSecretaryAvatar() {
   const [pos, setPos] = useState({ x: 20, y: 20 }); // bottom-right offsets
   const timerRef = useRef(null);
 
-  const speak = (text) => {
-    const msg = String(text || "").trim();
-    if (!msg) return;
-    setBubble(msg);
-    setState("speaking");
-    try {
-      const synth = window.speechSynthesis;
-      if (synth) {
-        synth.cancel();
-        synth.resume?.();
-        const utterance = new SpeechSynthesisUtterance(msg);
-        utterance.lang = "pt-BR";
-        utterance.rate = 1;
-        utterance.pitch = 1;
-        utterance.onend = () => setState("idle");
-        utterance.onerror = () => setState("idle");
-        synth.speak(utterance);
-      }
-    } catch {
-      setState("idle");
-    }
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      setBubble("");
-      setState("idle");
-    }, 4200);
+  const speak = (_text) => {
+    // Mensagens da atendente virtual de voz desativadas a pedido do usuário.
+    setBubble("");
+    setState("idle");
   };
 
   useEffect(() => {
@@ -76,9 +54,9 @@ export default function VirtualSecretaryAvatar() {
   const handleClick = () => {
     // Aciona a secretária virtual completa (FloatingVoiceOrb) — abre painel,
     // libera fala e ativa o microfone com todas as funções (rotas, agenda, IA).
-    window.dispatchEvent(new CustomEvent("kenia-voice-open", {
-      detail: { listen: true, speak: "Estou te ouvindo. Como posso ajudar?" },
-    }));
+    const btn = document.querySelector('[data-testid="voice-orb"]');
+    if (btn) (btn).click();
+    speak("Estou te ouvindo. Como posso ajudar?");
   };
 
   return (
