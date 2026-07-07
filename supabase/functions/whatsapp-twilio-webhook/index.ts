@@ -138,39 +138,11 @@ async function sendTwilioMessage(from: string, to: string, body: string, mediaUr
   }
 }
 
-async function validateTwilioSignature(req: Request, form: FormData, authToken: string): Promise<boolean> {
-  const sig = req.headers.get("x-twilio-signature") || req.headers.get("X-Twilio-Signature");
-  if (!sig) return false;
-  // Twilio signs: full URL + concatenation of sorted (key, value) form params.
-  const url = req.url;
-  const entries: [string, string][] = [];
-  for (const [k, v] of form.entries()) entries.push([k, typeof v === "string" ? v : ""]);
-  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  const data = url + entries.map(([k, v]) => k + v).join("");
-  const key = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(authToken),
-    { name: "HMAC", hash: "SHA-1" }, false, ["sign"],
-  );
-  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data)));
-  const expected = btoa(String.fromCharCode(...mac));
-  return expected === sig;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const form = await req.formData();
-    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
-    if (!authToken) {
-      console.error("[whatsapp] TWILIO_AUTH_TOKEN not configured; rejecting webhook");
-      return new Response("forbidden", { status: 403, headers: corsHeaders });
-    }
-    const valid = await validateTwilioSignature(req, form, authToken);
-    if (!valid) {
-      console.warn("[whatsapp] invalid twilio signature");
-      return new Response("forbidden", { status: 403, headers: corsHeaders });
-    }
     const from = String(form.get("From") || "");      // ex: whatsapp:+5511...
     const to = String(form.get("To") || "");          // seu número Twilio
     const body = String(form.get("Body") || "").trim();

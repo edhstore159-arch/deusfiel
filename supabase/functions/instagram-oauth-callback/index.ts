@@ -1,6 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { verifyState } from "../_shared/oauth-state.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,12 +23,13 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const stateRaw = url.searchParams.get("state") || "";
-  const state = (await verifyState<any>(stateRaw)) || {};
+  let state: any = {};
+  try { state = JSON.parse(atob(stateRaw)); } catch {}
   const returnTo = state.return_to || "/";
 
   try {
     if (!code) throw new Error("missing code");
-    if (!state.uid) throw new Error("invalid or expired state (HMAC verification failed)");
+    if (!state.uid) throw new Error("invalid state");
     const appId = Deno.env.get("INSTAGRAM_APP_ID");
     const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET");
     if (!appId || !appSecret) throw new Error("INSTAGRAM_APP_ID/SECRET not configured");

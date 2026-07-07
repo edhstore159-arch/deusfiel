@@ -642,8 +642,7 @@ Deno.serve(async (req) => {
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
     const sessionId: string = body.session_id ? String(body.session_id) : `chat-${crypto.randomUUID()}`;
-    // SECURITY: never trust caller-supplied user_id; derive only from a valid JWT below.
-    let userId: string | null = null;
+    let userId: string | null = body.user_id ? String(body.user_id) : null;
     const authHeader = req.headers.get("Authorization") || "";
     if (authHeader && SUPABASE_ANON_KEY) {
       try {
