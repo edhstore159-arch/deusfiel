@@ -1,6 +1,7 @@
 // Testa pipeline Ollama (texto) -> Voicemagic (áudio).
 // Ollama não sintetiza voz; usamos Voicemagic para TTS.
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { requireUser } from "../_shared/auth.ts";
 
 async function callOllama(prompt: string) {
   const raw = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "").replace(/\/api\/(generate|chat|tags)$/, "");
