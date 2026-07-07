@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-const AuthContext = createContext(null);
+const AuthContext = createContext({ user: null, loading: true, login: async () => {}, register: async () => {}, logout: async () => {} });
 
 function buildUser(authUser) {
   if (!authUser) return null;
