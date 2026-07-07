@@ -44,6 +44,63 @@ export default function FloatingVoiceOrb() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const recognitionRef = useRef(null);
+  const [activeTab, setActiveTab] = useState("voice");
+  const [genPrompt, setGenPrompt] = useState("");
+  const [genImage, setGenImage] = useState("");
+  const [genLoading, setGenLoading] = useState(false);
+  const [genError, setGenError] = useState("");
+  const [analyzeB64, setAnalyzeB64] = useState("");
+  const [analyzeFileName, setAnalyzeFileName] = useState("");
+  const [analyzePrompt, setAnalyzePrompt] = useState("");
+  const [analyzeResult, setAnalyzeResult] = useState("");
+  const [analyzeLoading, setAnalyzeLoading] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState("");
+
+  const onPickAnalyzeFile = (file) => {
+    if (!file) return;
+    setAnalyzeFileName(file.name);
+    setAnalyzeError("");
+    setAnalyzeResult("");
+    const reader = new FileReader();
+    reader.onload = () => setAnalyzeB64(String(reader.result || ""));
+    reader.onerror = () => setAnalyzeError("Não consegui ler o arquivo.");
+    reader.readAsDataURL(file);
+  };
+
+  const runGenerate = async () => {
+    if (!genPrompt.trim()) return;
+    setGenLoading(true); setGenError(""); setGenImage("");
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-cover-image", {
+        body: { prompt: genPrompt.trim() },
+      });
+      if (error) throw error;
+      const img = data?.image_base64 || data?.image || data?.url;
+      if (!img) throw new Error("Nenhuma imagem retornada.");
+      setGenImage(img.startsWith("data:") || img.startsWith("http") ? img : `data:image/png;base64,${img}`);
+    } catch (e) {
+      setGenError(e?.message || "Falha ao gerar imagem.");
+    } finally {
+      setGenLoading(false);
+    }
+  };
+
+  const runAnalyze = async () => {
+    if (!analyzeB64) return;
+    setAnalyzeLoading(true); setAnalyzeError(""); setAnalyzeResult("");
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-image", {
+        body: { image_base64: analyzeB64, prompt: analyzePrompt.trim() || undefined },
+      });
+      if (error) throw error;
+      setAnalyzeResult(data?.text || "(sem resposta)");
+    } catch (e) {
+      setAnalyzeError(e?.message || "Falha ao analisar imagem.");
+    } finally {
+      setAnalyzeLoading(false);
+    }
+  };
+
   const supported =
     typeof window !== "undefined" &&
     (window.SpeechRecognition || window.webkitSpeechRecognition);
