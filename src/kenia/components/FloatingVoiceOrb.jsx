@@ -978,6 +978,45 @@ export default function FloatingVoiceOrb() {
   const [ytIds, setYtIds] = useState([]);
   const [ytIdx, setYtIdx] = useState(0);
 
+  // Imagens/quadrinhos gerados por comando de voz
+  const [genImage, setGenImage] = useState(null); // { url, prompt, comic }
+
+  const generateImageFromVoice = async (rawPrompt, { comic = false } = {}) => {
+    const cleanPrompt = String(rawPrompt || "").trim();
+    if (!cleanPrompt) return;
+    userMinimizedRef.current = false;
+    setOpen(true);
+    setGenImage(null);
+    setThinking(true);
+    const announce = comic
+      ? `Criando uma história em quadrinhos sobre ${cleanPrompt}. Um instante.`
+      : `Gerando a imagem: ${cleanPrompt}. Um instante.`;
+    setReply(announce);
+    speak(announce);
+    try {
+      const finalPrompt = comic
+        ? `Comic book page, multi-panel sequential art (4 to 6 panels arranged in a clear grid with gutters and speech bubbles in Portuguese), vibrant ink-and-color illustration in the style of a modern graphic novel, dynamic poses, expressive faces, clear panel-to-panel storytelling about: ${cleanPrompt}. Include short dialogue in speech balloons and a title panel on top.`
+        : cleanPrompt;
+      const { data, error } = await supabase.functions.invoke("generate-cover-image", {
+        body: { prompt: finalPrompt, style: comic ? "comic" : undefined },
+      });
+      if (error) throw error;
+      const url = data?.image_data_url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : null);
+      if (!url) throw new Error(data?.error || "Sem imagem gerada");
+      setGenImage({ url, prompt: cleanPrompt, comic });
+      const done = comic ? "Sua história em quadrinhos está pronta." : "Imagem gerada com sucesso.";
+      setReply(done);
+      speak(done);
+    } catch (e) {
+      const msg = `Não consegui gerar ${comic ? "a história em quadrinhos" : "a imagem"}: ${e?.message || e}`;
+      setReply(msg);
+      toast.error(msg);
+      speak(comic ? "Não consegui gerar a história em quadrinhos agora." : "Não consegui gerar a imagem agora.");
+    } finally {
+      setThinking(false);
+    }
+  };
+
   const playYouTube = async (query) => {
     const q = (query || "").trim();
     if (!q) return;
