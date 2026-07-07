@@ -360,6 +360,7 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const _auth = await requireUser(req); if (!_auth.ok) return _auth.response;
 
   try {
     const body = await req.json();
