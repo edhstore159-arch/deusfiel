@@ -35,7 +35,12 @@ export async function requireUser(req: Request): Promise<AuthResult> {
   const token = authHeader.slice(7).trim();
   const url = Deno.env.get("SUPABASE_URL");
   const anon = Deno.env.get("SUPABASE_ANON_KEY");
+  const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !anon) return { ok: false, response: unauthorized("auth not configured") };
+  // Allow internal server-to-server calls signed with the service role key.
+  if (service && token === service) {
+    return { ok: true, userId: "service", email: null, token };
+  }
   try {
     const client = createClient(url, anon, {
       global: { headers: { Authorization: authHeader } },
