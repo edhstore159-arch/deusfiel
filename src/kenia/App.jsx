@@ -5,8 +5,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/kenia/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/kenia/contexts/AuthContext";
 import "@/kenia/storage"; // registra window.__keniaStorage e mantém persistência das secretárias
-import DebugErrorThrower from "@/components/DebugErrorThrower";
-import ErrorDebugPopup from "@/components/ErrorDebugPopup";
 
 // Eager: landing + login para first paint rápido
 import Landing from "@/kenia/pages/Landing";
@@ -79,11 +77,8 @@ function App() {
     <div className="App">
       <DebugErrorThrower />
       <AuthProvider>
-        <DebugErrorThrower />
-        <ErrorDebugPopup />
         <BrowserRouter>
           <ScrollToTop />
-
 
 
           <Suspense fallback={<PageFallback />}>

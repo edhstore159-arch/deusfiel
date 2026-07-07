@@ -40,12 +40,6 @@ function isOptOut(text: string) {
 }
 
 async function fetchTwilioMedia(mediaUrl: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
-  if (mediaUrl.startsWith("data:")) {
-    const match = mediaUrl.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.+)$/);
-    if (!match) throw new Error("data URL de mídia inválida");
-    const bytes = b64ToBytes(match[2]);
-    return { buffer: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), contentType: match[1] };
-  }
   // MediaUrl no formato: https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/{MSid}/Media/{MeSid}
   // Reescrevemos para o gateway: /Messages/{MSid}/Media/{MeSid}
   const m = mediaUrl.match(/\/Messages\/([^/]+)\/Media\/([^/?]+)/);
@@ -80,75 +74,6 @@ async function transcribe(buffer: ArrayBuffer, mime: string): Promise<string> {
   if (!r.ok) throw new Error(`transcribe ${r.status}: ${JSON.stringify(d)}`);
   return d.text || d.transcript || "";
 }
-
-function bufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-
-function cleanBase64(value: string): string {
-  let cleaned = String(value || "").trim();
-  if (cleaned.startsWith("data:") && cleaned.includes(",")) cleaned = cleaned.split(",").pop() || "";
-  cleaned = cleaned.replace(/\s/g, "");
-  if (!cleaned || !/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) throw new Error("invalid base64 image data");
-  return cleaned;
-}
-
-async function describeImage(buffer: ArrayBuffer, mime: string, userCaption: string): Promise<string> {
-  const cleanMime = (mime || "image/jpeg").split(";")[0].trim().toLowerCase();
-  const b64 = cleanBase64(bufferToBase64(buffer));
-  const dataUrl = `data:${cleanMime};base64,${b64}`;
-  const question = userCaption?.trim()
-    ? `O cliente enviou esta imagem junto com o texto: "${userCaption.trim()}". Descreva detalhadamente o que aparece na imagem e relacione com o texto quando fizer sentido.`
-    : `O cliente enviou esta imagem. Descreva detalhadamente o que aparece nela (objetos, pessoas, textos visíveis, contexto). Se for um documento, extraia o texto principal.`;
-  const messages = [{
-    role: "user",
-    content: [
-      { type: "text", text: question },
-      { type: "image_url", image_url: { url: dataUrl } },
-    ],
-  }];
-
-  // Try Lovable first, then Emergent
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (lovableKey) {
-    try {
-      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
-        body: JSON.stringify({ model: "google/gemini-2.5-flash", messages }),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        const txt = d?.choices?.[0]?.message?.content;
-        if (typeof txt === "string" && txt.trim()) return txt.trim();
-      } else {
-        console.error("[whatsapp] vision lovable falhou", r.status, (await r.text()).slice(0, 200));
-      }
-    } catch (e) { console.error("[whatsapp] vision lovable exc", e); }
-  }
-  const emergentKey = Deno.env.get("EMERGENT_API_KEY");
-  if (emergentKey) {
-    try {
-      const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${emergentKey}` },
-        body: JSON.stringify({ model: "gemini/gemini-2.5-flash", messages }),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        const txt = d?.choices?.[0]?.message?.content;
-        if (typeof txt === "string" && txt.trim()) return txt.trim();
-      } else {
-        console.error("[whatsapp] vision emergent falhou", r.status, (await r.text()).slice(0, 200));
-      }
-    } catch (e) { console.error("[whatsapp] vision emergent exc", e); }
-  }
-  return "";
-}
-
 
 async function callChatAI(userText: string, sessionId: string, wantAudio: boolean): Promise<{ reply: string; audio_base64: string | null }> {
   const r = await fetch(`${SUPABASE_URL}/functions/v1/chat-ai`, {
@@ -209,7 +134,7 @@ function detectImagePrompt(text: string): string | null {
 }
 
 function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(cleanBase64(b64));
+  const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
@@ -305,48 +230,6 @@ async function tryEmergentImage(prompt: string): Promise<Uint8Array | null> {
   return null;
 }
 
-async function tryLovableGeminiImage(prompt: string): Promise<Uint8Array | null> {
-  if (!LOVABLE_API_KEY) return null;
-  // Gemini "Nano Banana" image generation via chat/completions with image modality
-  for (const model of ["google/gemini-2.5-flash-image", "google/gemini-3.1-flash-image"]) {
-    try {
-      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Lovable-API-Key": LOVABLE_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          modalities: ["image", "text"],
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-      if (!r.ok) {
-        console.error("[whatsapp] gemini image falhou", model, r.status, (await r.text()).slice(0, 300));
-        continue;
-      }
-      const d = await r.json();
-      const msg = d?.choices?.[0]?.message;
-      const url: string | undefined = msg?.images?.[0]?.image_url?.url;
-      if (url?.startsWith("data:")) {
-        const b64 = url.split(",")[1];
-        if (b64) return b64ToBytes(b64);
-      }
-      if (url) {
-        const ir = await fetch(url);
-        if (ir.ok) return new Uint8Array(await ir.arrayBuffer());
-      }
-      const content = String(msg?.content || "");
-      const m = content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]+)/);
-      if (m) return b64ToBytes(m[1]);
-    } catch (e) {
-      console.error("[whatsapp] gemini image exceção", model, e);
-    }
-  }
-  return null;
-}
-
 async function tryLovableImage(prompt: string): Promise<Uint8Array | null> {
   if (!LOVABLE_API_KEY) return null;
   try {
@@ -373,9 +256,7 @@ async function tryLovableImage(prompt: string): Promise<Uint8Array | null> {
 }
 
 async function generateImagePng(prompt: string): Promise<Uint8Array | null> {
-  // Prioridade: Gemini (Lovable AI) → OpenAI → Emergent → Lovable gpt-image
-  return (await tryLovableGeminiImage(prompt))
-      ?? (await tryOpenAIImage(prompt))
+  return (await tryOpenAIImage(prompt))
       ?? (await tryEmergentImage(prompt))
       ?? (await tryLovableImage(prompt));
 }
@@ -468,14 +349,13 @@ Deno.serve(async (req) => {
     let userText = body;
     let audioFailed = false;
     let inboundWasAudio = false;
-    let inboundImageDescription = "";
 
+    // Processa áudio sempre que houver mídia de áudio (mesmo se também vier Body)
     if (numMedia > 0) {
       const mediaUrl = String(form.get("MediaUrl0") || "");
       const mediaTypeRaw = String(form.get("MediaContentType0") || "audio/ogg");
       const mediaType = mediaTypeRaw.split(";")[0].trim().toLowerCase();
       const isAudio = mediaType.startsWith("audio") || mediaType.includes("ogg") || mediaType.includes("opus");
-      const isImage = mediaType.startsWith("image/");
       if (mediaUrl && isAudio) {
         inboundWasAudio = true;
         try {
@@ -491,26 +371,8 @@ Deno.serve(async (req) => {
           console.error("[whatsapp] erro no áudio:", audioErr);
           audioFailed = true;
         }
-      } else if (mediaUrl && isImage) {
-        try {
-          console.log("[whatsapp] baixando imagem", { mediaUrl, mediaType });
-          const { buffer, contentType } = await fetchTwilioMedia(mediaUrl);
-          const cleanCt = (contentType || mediaType).split(";")[0].trim().toLowerCase();
-          console.log("[whatsapp] imagem baixada", { bytes: buffer.byteLength, cleanCt });
-          const desc = await describeImage(buffer, cleanCt, body);
-          console.log("[whatsapp] descrição imagem", { chars: desc.length, preview: desc.slice(0, 120) });
-          if (desc) {
-            inboundImageDescription = desc;
-            userText = body?.trim()
-              ? `${body.trim()}\n\n[Imagem enviada pelo cliente — descrição: ${desc}]`
-              : `[O cliente enviou uma imagem. Descrição do conteúdo: ${desc}]\n\nResponda de forma útil e acolhedora sobre essa imagem.`;
-          }
-        } catch (imgErr) {
-          console.error("[whatsapp] erro na imagem:", imgErr);
-        }
       }
     }
-
 
     if (!userText) {
       if (audioFailed) {
@@ -538,9 +400,7 @@ Deno.serve(async (req) => {
     if (imgPrompt) {
       console.log("[whatsapp] intent imagem detectado", { imgPrompt });
       const bytes = await generateImagePng(imgPrompt);
-      console.log("[whatsapp] geração imagem", { ok: !!bytes, bytes: bytes?.byteLength || 0 });
       const url = bytes ? await uploadImagePublic(bytes) : null;
-      console.log("[whatsapp] upload imagem whatsapp", { hasUrl: !!url });
       if (url) {
         await sendTwilioMessage(to, from, `Pronto! Aqui está a imagem sobre: ${imgPrompt}`, url);
       } else {
