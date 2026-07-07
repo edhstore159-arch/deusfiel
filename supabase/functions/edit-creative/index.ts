@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { generateWithNanoBanana } from "../_shared/nano-banana.ts";
+import { requireUser } from "../_shared/auth.ts";
 
 const REALISM =
   "high quality, sharp focus, natural lighting, realistic textures, balanced composition";
