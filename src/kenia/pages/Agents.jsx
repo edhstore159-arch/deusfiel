@@ -46,12 +46,32 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
+// Default seed agent to ensure "Juiz Virtual" is visible in the dashboard's Agents area
+const DEFAULT_AGENT = {
+  id: "agent-juiz-virtual",
+  name: "Juiz Virtual — Em Build",
+  area: "Cível",
+  tone: "Formal",
+  model: MODELS[0].id,
+  greeting: "Olá, sou o Juiz Virtual — Em Build. Posso ajudar com orientações iniciais e simulações de decisões.",
+  goal: "Atender usuários, qualificar solicitações e fornecer orientações jurídicas básicas.",
+  instructions: "Responda com cuidado, evite emitir pareceres definitivos; sempre recomende consulta com advogado quando necessário.",
+  avatar: "",
+  active: true,
+  createdAt: new Date().toISOString(),
+};
+
 const readAgents = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    // If no agents saved yet, seed with the default Juiz Virtual agent and persist it
+    const seed = [DEFAULT_AGENT];
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(seed)); } catch {}
+    return seed;
   } catch {
-    return [];
+    return [DEFAULT_AGENT];
   }
 };
 const writeAgents = (list) => localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
