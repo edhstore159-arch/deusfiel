@@ -1256,6 +1256,26 @@ export default function FloatingVoiceOrb() {
             </div>
           )}
 
+          {genImage && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-nude-900 truncate">
+                  {genImage.comic ? "Quadrinhos" : "Imagem"}: {genImage.prompt}
+                </span>
+                <div className="flex items-center gap-2">
+                  <a href={genImage.url} download={`kenia-${genImage.comic ? "hq" : "imagem"}.png`} className="text-gold-700 hover:text-gold-900 text-xs">baixar</a>
+                  <button onClick={() => setGenImage(null)} className="text-nude-500 hover:text-nude-900 text-xs">fechar</button>
+                </div>
+              </div>
+              <img
+                src={genImage.url}
+                alt={genImage.prompt}
+                className="w-full rounded border border-nude-200"
+                data-testid="voice-orb-generated-image"
+              />
+            </div>
+          )}
+
           {ytQuery && (
             <div className="mt-3">
               <div className="flex items-center justify-between mb-1">
