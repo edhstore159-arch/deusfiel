@@ -1152,31 +1152,8 @@ export default function FloatingVoiceOrb() {
             </button>
           </div>
 
-          <div className="flex gap-1 mb-3 border-b border-nude-200">
-            {[
-              { id: "voice", label: "Voz", icon: Mic },
-              { id: "generate", label: "Gerar", icon: Sparkles },
-              { id: "analyze", label: "Analisar", icon: ImageIcon },
-            ].map((t) => {
-              const Icon = t.icon;
-              const active = activeTab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id)}
-                  className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium border-b-2 transition-colors ${
-                    active ? "border-gold-600 text-gold-700" : "border-transparent text-nude-600 hover:text-nude-900"
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
+          <>
 
-          {activeTab === "voice" && (
-            <>
               <p className="text-xs text-nude-600 mb-3">
                 Toque no microfone e diga, por exemplo: <em>“abrir agenda”</em>. Ou ative a <strong>escuta contínua</strong> e diga <em>“secretária”</em> antes do comando.
               </p>
