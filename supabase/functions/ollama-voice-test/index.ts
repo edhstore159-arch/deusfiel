@@ -57,6 +57,7 @@ async function callVoicemagic(text: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const _auth = await requireUser(req); if (!_auth.ok) return _auth.response;
   let prompt = "Diga em uma frase curta: Olá, eu sou a secretária virtual.";
   try {
     if (req.method === "POST") {
