@@ -1,4 +1,5 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { requireUser } from "../_shared/auth.ts";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/twilio";
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -13,6 +14,7 @@ function normalize(num: string): string {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const _auth = await requireUser(req); if (!_auth.ok) return _auth.response;
 
   try {
     if (!LOVABLE_API_KEY || !TWILIO_API_KEY) {

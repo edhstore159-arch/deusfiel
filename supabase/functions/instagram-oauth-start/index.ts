@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { signState } from "../_shared/oauthState.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +22,9 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const redirectUri = `https://wfycqufqdheluvzhgvfw.supabase.co/functions/v1/instagram-oauth-callback`;
     const returnTo = url.searchParams.get("return_to") || "";
-    const state = btoa(JSON.stringify({ uid: u.user.id, ts: Date.now(), return_to: returnTo }));
+    const stateSecret = Deno.env.get("INSTAGRAM_STATE_SECRET");
+    if (!stateSecret) throw new Error("INSTAGRAM_STATE_SECRET not configured");
+    const state = await signState(stateSecret, { uid: u.user.id, return_to: returnTo });
     const scope = [
       "instagram_basic",
       "instagram_content_publish",

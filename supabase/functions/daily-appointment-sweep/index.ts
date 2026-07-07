@@ -56,6 +56,20 @@ function extractAppointmentFromText(text: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Auth: requires a shared secret (SWEEP_SECRET) via Authorization: Bearer <secret>
+  // or x-sweep-secret header. Used by pg_cron / external monitors only.
+  const sweepSecret = Deno.env.get("SWEEP_SECRET");
+  const authHeader = req.headers.get("Authorization") || "";
+  const bearer = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+  const headerSecret = req.headers.get("x-sweep-secret") || "";
+  if (!sweepSecret || (bearer !== sweepSecret && headerSecret !== sweepSecret)) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
