@@ -138,6 +138,7 @@ async function checkOpenAIImage() {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const _auth = await requireRole(req, "admin"); if (!_auth.ok) return _auth.response;
   const url = new URL(req.url);
   const deep = url.searchParams.get("deep") === "1";
   const ollama = await checkOllama();
