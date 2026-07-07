@@ -642,19 +642,22 @@ Deno.serve(async (req) => {
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
     const sessionId: string = body.session_id ? String(body.session_id) : `chat-${crypto.randomUUID()}`;
-    let userId: string | null = body.user_id ? String(body.user_id) : null;
+    // SECURITY: never trust body.user_id — only derive from a validated JWT.
+    let userId: string | null = null;
     const authHeader = req.headers.get("Authorization") || "";
-    if (authHeader && SUPABASE_ANON_KEY) {
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    if (token && SUPABASE_ANON_KEY) {
       try {
         const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-          global: { headers: { Authorization: authHeader } },
+          global: { headers: { Authorization: `Bearer ${token}` } },
         });
-        const { data: authData, error: authError } = await userClient.auth.getUser();
+        const { data: authData, error: authError } = await userClient.auth.getUser(token);
         if (!authError && authData?.user?.id) userId = authData.user.id;
       } catch (err) {
         console.warn("[chat-ai] não foi possível validar usuário autenticado:", err);
       }
     }
+
 
     if (!userMessage) {
       return new Response(JSON.stringify({ error: "message vazio" }), {
