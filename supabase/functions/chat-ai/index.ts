@@ -688,7 +688,7 @@ Deno.serve(async (req) => {
       hourSp >= 5 && hourSp < 12 ? "Bom dia" : hourSp >= 12 && hourSp < 18 ? "Boa tarde" : "Boa noite";
 
     const wantsLittleRedRidingHood = /\b(chapeuzinho|chap[eé]uzinho)\s+vermelh[oa]\b/i.test(userMessage) && /\b(conta|conte|contar|hist[oó]ria|historinha|conto|narra|narre)\b/i.test(userMessage);
-    if (isVoiceOrbRequest(body, sessionId) && wantsLittleRedRidingHood) {
+    if (sessionId === "kenia-voice-orb" && wantsLittleRedRidingHood) {
       const reply = `${saudacao}! Claro. Era uma vez uma menina muito querida, conhecida por todos como Chapeuzinho Vermelho, porque usava sempre uma capa vermelha feita por sua avó. Um dia, sua mãe preparou uma cesta com bolo, frutas e um pouco de mel e pediu que ela levasse tudo até a casa da vovó, que estava doente e morava do outro lado da floresta.
 
 Antes de sair, a mãe avisou: “Vá pelo caminho certo, não converse com estranhos e não se distraia na floresta.” Chapeuzinho prometeu obedecer e seguiu feliz pelo caminho, ouvindo os pássaros e olhando as flores.
