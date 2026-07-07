@@ -1,9 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { requireAuthenticatedUser } from "../_shared/require-auth.ts";
 
 const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
 
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -88,11 +86,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const auth = await requireAuthenticatedUser(req, corsHeaders);
-    if (!auth.ok) return auth.response;
-
     const body = await req.json();
-
     const { audio_base64, mime_type } = body || {};
     const mt = mime_type || "audio/webm";
 
