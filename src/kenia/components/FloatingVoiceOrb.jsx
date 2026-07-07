@@ -221,7 +221,7 @@ export default function FloatingVoiceOrb() {
     .replace(/^[\s,;:.\-!?]+/, "")
     .trim();
 
-  useEffect(() => {
+  const createRecognition = () => {
     if (!supported) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const rec = new SR();
@@ -306,23 +306,35 @@ export default function FloatingVoiceOrb() {
       if (!shouldRestartRef.current || !alwaysOnRef.current) return;
       restartContinuousRecognition(speakingRef.current ? 700 : 300);
     };
-    recognitionRef.current = rec;
+    return rec;
+  };
+
+  const getRecognition = () => {
+    if (!recognitionRef.current) recognitionRef.current = createRecognition();
+    return recognitionRef.current;
+  };
+
+  useEffect(() => {
     return () => {
       shouldRestartRef.current = false;
       commandSessionActiveRef.current = false;
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+      const rec = recognitionRef.current;
       recognitionRef.current = null;
-      rec.onend = null;
-      try { rec.abort?.(); } catch {}
-      try { rec.stop(); } catch {}
+      if (rec) {
+        rec.onend = null;
+        try { rec.abort?.(); } catch {}
+        try { rec.stop?.(); } catch {}
+      }
     };
-  }, [supported]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleAlwaysOn = () => {
     unlockSpeech();
     if (!supported) { toast.error("Reconhecimento de voz não suportado."); return; }
-    const rec = recognitionRef.current; if (!rec) return;
+    const rec = getRecognition(); if (!rec) return;
     if (alwaysOnRef.current) {
       shouldRestartRef.current = false;
       alwaysOnRef.current = false;
@@ -1139,7 +1151,7 @@ export default function FloatingVoiceOrb() {
       toast.error("Reconhecimento de voz não suportado neste navegador.");
       return;
     }
-    const rec = recognitionRef.current;
+    const rec = getRecognition();
     if (!rec) return;
     if (listening || recognitionActiveRef.current) {
       shouldRestartRef.current = false;
