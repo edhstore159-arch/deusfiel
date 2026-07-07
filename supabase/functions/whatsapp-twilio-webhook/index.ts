@@ -40,6 +40,12 @@ function isOptOut(text: string) {
 }
 
 async function fetchTwilioMedia(mediaUrl: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  if (mediaUrl.startsWith("data:")) {
+    const match = mediaUrl.match(/^data:([^;,]+)(?:;[^,]*)?;base64,(.+)$/);
+    if (!match) throw new Error("data URL de mídia inválida");
+    const bytes = b64ToBytes(match[2]);
+    return { buffer: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), contentType: match[1] };
+  }
   // MediaUrl no formato: https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/{MSid}/Media/{MeSid}
   // Reescrevemos para o gateway: /Messages/{MSid}/Media/{MeSid}
   const m = mediaUrl.match(/\/Messages\/([^/]+)\/Media\/([^/?]+)/);
@@ -82,9 +88,18 @@ function bufferToBase64(buffer: ArrayBuffer): string {
   return btoa(bin);
 }
 
+function cleanBase64(value: string): string {
+  let cleaned = String(value || "").trim();
+  if (cleaned.startsWith("data:") && cleaned.includes(",")) cleaned = cleaned.split(",").pop() || "";
+  cleaned = cleaned.replace(/\s/g, "");
+  if (!cleaned || !/^[A-Za-z0-9+/]*={0,2}$/.test(cleaned)) throw new Error("invalid base64 image data");
+  return cleaned;
+}
+
 async function describeImage(buffer: ArrayBuffer, mime: string, userCaption: string): Promise<string> {
-  const b64 = bufferToBase64(buffer);
-  const dataUrl = `data:${mime};base64,${b64}`;
+  const cleanMime = (mime || "image/jpeg").split(";")[0].trim().toLowerCase();
+  const b64 = cleanBase64(bufferToBase64(buffer));
+  const dataUrl = `data:${cleanMime};base64,${b64}`;
   const question = userCaption?.trim()
     ? `O cliente enviou esta imagem junto com o texto: "${userCaption.trim()}". Descreva detalhadamente o que aparece na imagem e relacione com o texto quando fizer sentido.`
     : `O cliente enviou esta imagem. Descreva detalhadamente o que aparece nela (objetos, pessoas, textos visíveis, contexto). Se for um documento, extraia o texto principal.`;
@@ -120,7 +135,7 @@ async function describeImage(buffer: ArrayBuffer, mime: string, userCaption: str
       const r = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${emergentKey}` },
-        body: JSON.stringify({ model: "gemini/gemini-2.5-pro", messages }),
+        body: JSON.stringify({ model: "gemini/gemini-2.5-flash", messages }),
       });
       if (r.ok) {
         const d = await r.json();
@@ -194,7 +209,7 @@ function detectImagePrompt(text: string): string | null {
 }
 
 function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
+  const bin = atob(cleanBase64(b64));
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
@@ -290,6 +305,48 @@ async function tryEmergentImage(prompt: string): Promise<Uint8Array | null> {
   return null;
 }
 
+async function tryLovableGeminiImage(prompt: string): Promise<Uint8Array | null> {
+  if (!LOVABLE_API_KEY) return null;
+  // Gemini "Nano Banana" image generation via chat/completions with image modality
+  for (const model of ["google/gemini-2.5-flash-image", "google/gemini-3.1-flash-image"]) {
+    try {
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Lovable-API-Key": LOVABLE_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          modalities: ["image", "text"],
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (!r.ok) {
+        console.error("[whatsapp] gemini image falhou", model, r.status, (await r.text()).slice(0, 300));
+        continue;
+      }
+      const d = await r.json();
+      const msg = d?.choices?.[0]?.message;
+      const url: string | undefined = msg?.images?.[0]?.image_url?.url;
+      if (url?.startsWith("data:")) {
+        const b64 = url.split(",")[1];
+        if (b64) return b64ToBytes(b64);
+      }
+      if (url) {
+        const ir = await fetch(url);
+        if (ir.ok) return new Uint8Array(await ir.arrayBuffer());
+      }
+      const content = String(msg?.content || "");
+      const m = content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]+)/);
+      if (m) return b64ToBytes(m[1]);
+    } catch (e) {
+      console.error("[whatsapp] gemini image exceção", model, e);
+    }
+  }
+  return null;
+}
+
 async function tryLovableImage(prompt: string): Promise<Uint8Array | null> {
   if (!LOVABLE_API_KEY) return null;
   try {
@@ -316,7 +373,9 @@ async function tryLovableImage(prompt: string): Promise<Uint8Array | null> {
 }
 
 async function generateImagePng(prompt: string): Promise<Uint8Array | null> {
-  return (await tryOpenAIImage(prompt))
+  // Prioridade: Gemini (Lovable AI) → OpenAI → Emergent → Lovable gpt-image
+  return (await tryLovableGeminiImage(prompt))
+      ?? (await tryOpenAIImage(prompt))
       ?? (await tryEmergentImage(prompt))
       ?? (await tryLovableImage(prompt));
 }
@@ -388,22 +447,48 @@ async function sendTwilioMessage(from: string, to: string, body: string, mediaUr
   }
 }
 
+import { verifyTwilioSignature } from "../_shared/twilio-signature.ts";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const form = await req.formData();
-    const from = String(form.get("From") || "");      // ex: whatsapp:+5511...
-    const to = String(form.get("To") || "");          // seu número Twilio
-    const body = String(form.get("Body") || "").trim();
-    const numMedia = Number(form.get("NumMedia") || "0");
+    // SECURITY: verify Twilio HMAC signature so only Twilio can invoke this webhook.
+    // Set TWILIO_AUTH_TOKEN in secrets (Console → Account → Auth Token).
+    const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
+    const signature = req.headers.get("X-Twilio-Signature");
+    const rawBody = await req.text();
+    const form = new URLSearchParams(rawBody);
+    const formData = new FormData();
+    for (const [k, v] of form.entries()) formData.append(k, v);
+
+    if (!twilioAuthToken) {
+      console.error("[whatsapp] TWILIO_AUTH_TOKEN ausente — recusando webhook não verificado");
+      return new Response("Forbidden", { status: 403, headers: corsHeaders });
+    }
+    // Twilio signs the exact public URL it POSTed to.
+    const fwdProto = req.headers.get("x-forwarded-proto") || "https";
+    const fwdHost = req.headers.get("x-forwarded-host") || req.headers.get("host") || new URL(req.url).host;
+    const publicPath = new URL(req.url).pathname + new URL(req.url).search;
+    const publicUrl = `${fwdProto}://${fwdHost}${publicPath}`;
+    const valid = await verifyTwilioSignature(twilioAuthToken, publicUrl, formData, signature);
+    if (!valid) {
+      console.warn("[whatsapp] assinatura Twilio inválida", { publicUrl, hasSig: !!signature });
+      return new Response("Forbidden", { status: 403, headers: corsHeaders });
+    }
+
+    const from = String(formData.get("From") || "");      // ex: whatsapp:+5511...
+    const to = String(formData.get("To") || "");          // seu número Twilio
+    const body = String(formData.get("Body") || "").trim();
+    const numMedia = Number(formData.get("NumMedia") || "0");
+
 
     console.log("[whatsapp] inbound", {
       from,
       to,
       hasBody: body.length > 0,
       numMedia,
-      mediaType0: form.get("MediaContentType0"),
+      mediaType0: formData.get("MediaContentType0"),
     });
 
     let userText = body;
@@ -412,8 +497,8 @@ Deno.serve(async (req) => {
     let inboundImageDescription = "";
 
     if (numMedia > 0) {
-      const mediaUrl = String(form.get("MediaUrl0") || "");
-      const mediaTypeRaw = String(form.get("MediaContentType0") || "audio/ogg");
+      const mediaUrl = String(formData.get("MediaUrl0") || "");
+      const mediaTypeRaw = String(formData.get("MediaContentType0") || "audio/ogg");
       const mediaType = mediaTypeRaw.split(";")[0].trim().toLowerCase();
       const isAudio = mediaType.startsWith("audio") || mediaType.includes("ogg") || mediaType.includes("opus");
       const isImage = mediaType.startsWith("image/");
@@ -479,7 +564,9 @@ Deno.serve(async (req) => {
     if (imgPrompt) {
       console.log("[whatsapp] intent imagem detectado", { imgPrompt });
       const bytes = await generateImagePng(imgPrompt);
+      console.log("[whatsapp] geração imagem", { ok: !!bytes, bytes: bytes?.byteLength || 0 });
       const url = bytes ? await uploadImagePublic(bytes) : null;
+      console.log("[whatsapp] upload imagem whatsapp", { hasUrl: !!url });
       if (url) {
         await sendTwilioMessage(to, from, `Pronto! Aqui está a imagem sobre: ${imgPrompt}`, url);
       } else {
