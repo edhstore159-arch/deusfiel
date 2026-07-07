@@ -134,8 +134,41 @@ async function checkOpenAIImage() {
   }
 }
 
+async function isAdminCaller(req: Request): Promise<boolean> {
+  try {
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    const url = Deno.env.get("SUPABASE_URL");
+    const anon = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!token || !url || !anon) return false;
+    const { createClient } = await import("npm:@supabase/supabase-js@2");
+    const client = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${token}` } } });
+    const { data, error } = await client.auth.getUser(token);
+    if (error || !data?.user?.id) return false;
+    const { data: role } = await client
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+    return !!role;
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Public callers only get a liveness signal. Provider details leak infra
+  // information and are restricted to authenticated admins.
+  const admin = await isAdminCaller(req);
+  if (!admin) {
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const url = new URL(req.url);
   const deep = url.searchParams.get("deep") === "1";
   const ollama = await checkOllama();
@@ -156,3 +189,4 @@ Deno.serve(async (req) => {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
+
