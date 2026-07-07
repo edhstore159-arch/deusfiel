@@ -1,17 +1,6 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
-const DEBUG_INSTRUCTION_TOKEN = "INSTRUCAO DE DESENVOLVIMENTO";
 
-const normalizeDebugMessage = (message: string) =>
-  String(message || "")
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .trim()
-    .toUpperCase();
-
-export const shouldSuppressLovableDebugInstruction = (message: string) => {
-  const text = normalizeDebugMessage(message);
-  return text.includes(DEBUG_INSTRUCTION_TOKEN) && !isLovableNativeDebugRuntime();
-};
+export const shouldSuppressLovableDebugInstruction = (_message: string) => false;
 
 export const isLovableNativeDebugRuntime = () => false;
 
@@ -27,7 +16,6 @@ export const dispatchLovableDebugError = (message: string) => {
 };
 
 export const deliverLovableDebugInstruction = (message: string) => {
-  if (shouldSuppressLovableDebugInstruction(message)) return "skipped" as const;
   return dispatchLovableDebugError(message) ? ("dispatched" as const) : ("skipped" as const);
 };
 

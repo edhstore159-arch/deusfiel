@@ -45,7 +45,6 @@ export default function FloatingVoiceOrb() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [responseLang, setResponseLang] = useState(() => loadVoiceConfig().responseLang || "pt-BR");
-  const [needsGestureRestart, setNeedsGestureRestart] = useState(false);
   const recognitionRef = useRef(null);
   const supported =
     typeof window !== "undefined" &&
@@ -124,12 +123,7 @@ export default function FloatingVoiceOrb() {
         shouldRestartRef.current = true;
         const rec = recognitionRef.current;
         if (rec && !recognitionActiveRef.current) rec.start();
-      } catch {
-        shouldRestartRef.current = false;
-        recognitionActiveRef.current = false;
-        setListening(false);
-        setNeedsGestureRestart(true);
-      }
+      } catch {}
     }, 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,11 +147,12 @@ export default function FloatingVoiceOrb() {
           return;
         }
         shouldRestartRef.current = false;
+        alwaysOnRef.current = false;
         commandSessionActiveRef.current = false;
-        setNeedsGestureRestart(true);
+        setAlwaysOn(false);
         setListening(false);
         if (err?.name === "NotAllowedError") {
-          toast.error("Toque em retomar para continuar a escuta contínua.");
+          toast.error("Permissão de microfone bloqueada. Ative novamente a escuta contínua.");
         }
       }
     }, delay);
@@ -181,7 +176,6 @@ export default function FloatingVoiceOrb() {
     rec.maxAlternatives = 1;
     rec.onstart = () => {
       recognitionActiveRef.current = true;
-      setNeedsGestureRestart(false);
       setListening(true);
     };
     rec.onresult = (e) => {
@@ -242,11 +236,11 @@ export default function FloatingVoiceOrb() {
     rec.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         shouldRestartRef.current = false;
+        alwaysOnRef.current = false;
         commandSessionActiveRef.current = false;
         recognitionActiveRef.current = false;
-        setListening(false);
-        setNeedsGestureRestart(true);
-        toast.error("Microfone pausado. Toque em retomar para liberar novamente.");
+        setListening(false); setAlwaysOn(false);
+        toast.error("Permissão de microfone negada.");
       } else if (e.error !== "no-speech" && e.error !== "aborted") {
         // keep going for transient errors
       }
@@ -274,31 +268,11 @@ export default function FloatingVoiceOrb() {
     unlockSpeech();
     if (!supported) { toast.error("Reconhecimento de voz não suportado."); return; }
     const rec = recognitionRef.current; if (!rec) return;
-    if (alwaysOnRef.current && needsGestureRestart) {
-      shouldRestartRef.current = true;
-      alwaysOnRef.current = true;
-      setAlwaysOn(true);
-      setNeedsGestureRestart(false);
-      setTranscript("");
-      try {
-        rec.continuous = true;
-        rec.interimResults = true;
-        if (!recognitionActiveRef.current) rec.start();
-        toast.success('Escuta contínua retomada. Diga "secretária" para ativar.');
-      } catch {
-        setNeedsGestureRestart(true);
-        recognitionActiveRef.current = false;
-        setListening(false);
-        toast.error("Toque novamente para liberar o microfone ou confira a permissão do navegador.");
-      }
-      return;
-    }
     if (alwaysOnRef.current) {
       shouldRestartRef.current = false;
       alwaysOnRef.current = false;
       commandSessionActiveRef.current = false;
       setAlwaysOn(false);
-      setNeedsGestureRestart(false);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       try { rec.abort?.(); } catch {}
       setListening(false);
@@ -307,7 +281,6 @@ export default function FloatingVoiceOrb() {
       setAlwaysOn(true); alwaysOnRef.current = true; shouldRestartRef.current = true;
       commandSessionActiveRef.current = false;
       awakeUntilRef.current = 0;
-      setNeedsGestureRestart(false);
       setTranscript("");
       try {
         rec.continuous = true;
@@ -325,7 +298,6 @@ export default function FloatingVoiceOrb() {
         alwaysOnRef.current = false;
         commandSessionActiveRef.current = false;
         setAlwaysOn(false);
-        setNeedsGestureRestart(true);
         setListening(false);
         toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
       }
@@ -431,7 +403,7 @@ export default function FloatingVoiceOrb() {
 
   const speak = (text) => {
     // Em outras abas (não-líder) a secretária permanece em silêncio para não duplicar a fala.
-    if (!isLeaderRef.current && typeof document !== "undefined" && document.hidden) return;
+    if (!isLeaderRef.current) return;
     try {
       const synth = window.speechSynthesis;
       if (audioRef.current) {
@@ -705,8 +677,7 @@ export default function FloatingVoiceOrb() {
           session_id: "kenia-voice-orb",
           system_prompt: enrichedSystem,
           context: ctxSummary,
-          want_audio: true,
-          speech_language: responseLanguage,
+          want_audio: false,
           fast_mode: true,
           user_id: authUserId,
         },
@@ -1007,45 +978,6 @@ export default function FloatingVoiceOrb() {
   const [ytIds, setYtIds] = useState([]);
   const [ytIdx, setYtIdx] = useState(0);
 
-  // Imagens/quadrinhos gerados por comando de voz
-  const [genImage, setGenImage] = useState(null); // { url, prompt, comic }
-
-  const generateImageFromVoice = async (rawPrompt, { comic = false } = {}) => {
-    const cleanPrompt = String(rawPrompt || "").trim();
-    if (!cleanPrompt) return;
-    userMinimizedRef.current = false;
-    setOpen(true);
-    setGenImage(null);
-    setThinking(true);
-    const announce = comic
-      ? `Criando uma história em quadrinhos sobre ${cleanPrompt}. Um instante.`
-      : `Gerando a imagem: ${cleanPrompt}. Um instante.`;
-    setReply(announce);
-    speak(announce);
-    try {
-      const finalPrompt = comic
-        ? `Comic book page, multi-panel sequential art (4 to 6 panels arranged in a clear grid with gutters and speech bubbles in Portuguese), vibrant ink-and-color illustration in the style of a modern graphic novel, dynamic poses, expressive faces, clear panel-to-panel storytelling about: ${cleanPrompt}. Include short dialogue in speech balloons and a title panel on top.`
-        : cleanPrompt;
-      const { data, error } = await supabase.functions.invoke("generate-cover-image", {
-        body: { prompt: finalPrompt, style: comic ? "comic" : undefined },
-      });
-      if (error) throw error;
-      const url = data?.image_data_url || (data?.b64_json ? `data:image/png;base64,${data.b64_json}` : null);
-      if (!url) throw new Error(data?.error || "Sem imagem gerada");
-      setGenImage({ url, prompt: cleanPrompt, comic });
-      const done = comic ? "Sua história em quadrinhos está pronta." : "Imagem gerada com sucesso.";
-      setReply(done);
-      speak(done);
-    } catch (e) {
-      const msg = `Não consegui gerar ${comic ? "a história em quadrinhos" : "a imagem"}: ${e?.message || e}`;
-      setReply(msg);
-      toast.error(msg);
-      speak(comic ? "Não consegui gerar a história em quadrinhos agora." : "Não consegui gerar a imagem agora.");
-    } finally {
-      setThinking(false);
-    }
-  };
-
   const playYouTube = async (query) => {
     const q = (query || "").trim();
     if (!q) return;
@@ -1147,17 +1079,6 @@ export default function FloatingVoiceOrb() {
       setOpen(false);
       return;
     }
-    // Histórias em quadrinhos / gibi
-    const comicMatch = effectiveText.match(/\b(?:cria[r]?|crie|desenha[r]?|desenhe|faz|faça|faca|gera[r]?|gere|monta[r]?|monte)\s+(?:uma?\s+)?(?:hist[oó]ria\s+em\s+quadrinhos?|quadrinh[oa]s?|gibi|comic|comics|hq)\s*(?:sobre|de|do|da|com)?\s*(.+)/i);
-    if (comicMatch) { generateImageFromVoice(comicMatch[1].trim(), { comic: true }); return; }
-    if (/\b(?:hist[oó]ria\s+em\s+quadrinhos?|quadrinh[oa]s?|gibi|hq)\b/i.test(lower)) {
-      const topic = effectiveText.replace(/\b(?:cria[r]?|crie|desenha[r]?|desenhe|faz|faça|faca|gera[r]?|gere|monta[r]?|monte|uma?|hist[oó]ria\s+em\s+quadrinhos?|quadrinh[oa]s?|gibi|hq|sobre|de|do|da|com)\b/gi, "").trim();
-      if (topic) { generateImageFromVoice(topic, { comic: true }); return; }
-    }
-    // Geração de imagem por voz: "gerar/criar/desenhar imagem/figura/foto de X"
-    const imgMatch = effectiveText.match(/\b(?:gera[r]?|gere|cria[r]?|crie|desenha[r]?|desenhe|faz|faça|faca|produz[ir]?|monta[r]?|monte)\s+(?:uma?\s+|o\s+|a\s+)?(?:imagem|imagens|figura|foto|fotografia|ilustra[çc][ãa]o|arte|desenho|pintura|picture|image)\s*(?:de|do|da|dos|das|com|sobre|mostrando)?\s*(.+)/i);
-    if (imgMatch) { generateImageFromVoice(imgMatch[1].trim(), { comic: false }); return; }
-
     // Caso geral: pergunta ao assistente (Ollama via chat-ai)
     askOllama(effectiveText);
   };
@@ -1208,43 +1129,6 @@ export default function FloatingVoiceOrb() {
       }
     }
   };
-
-  useEffect(() => {
-    const handler = (event) => {
-      const detail = event?.detail || {};
-      userMinimizedRef.current = false;
-      unlockSpeech();
-      setOpen(true);
-      if (detail.speak) {
-        setReply(String(detail.speak));
-        speak(String(detail.speak));
-      }
-      if (detail.listen && supported) {
-        const rec = recognitionRef.current;
-        if (!rec || recognitionActiveRef.current) return;
-        shouldRestartRef.current = false;
-        alwaysOnRef.current = false;
-        commandSessionActiveRef.current = false;
-        setAlwaysOn(false);
-        setTranscript("");
-        try {
-          rec.continuous = false;
-          rec.interimResults = true;
-          rec.start();
-          recognitionActiveRef.current = true;
-          setListening(true);
-        } catch (err) {
-          if (err?.name !== "InvalidStateError") {
-            recognitionActiveRef.current = false;
-            setListening(false);
-            toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
-          }
-        }
-      }
-    };
-    window.addEventListener("kenia-voice-open", handler);
-    return () => window.removeEventListener("kenia-voice-open", handler);
-  });
 
   return (
     <>
@@ -1298,11 +1182,7 @@ export default function FloatingVoiceOrb() {
             onClick={toggleAlwaysOn}
             className={`w-full mb-2 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${alwaysOn ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-nude-100 text-nude-800 hover:bg-nude-200"}`}
           >
-            {needsGestureRestart
-              ? '🟡 Retomar escuta contínua'
-              : alwaysOn
-                ? '🟢 Escuta contínua ATIVA — diga "secretária"'
-                : "Ativar escuta contínua (palavra: secretária)"}
+            {alwaysOn ? '🟢 Escuta contínua ATIVA — diga "secretária"' : "Ativar escuta contínua (palavra: secretária)"}
           </button>
           <button
             onClick={toggleListen}
@@ -1323,26 +1203,6 @@ export default function FloatingVoiceOrb() {
           {reply && (
             <div className="mt-2 p-2 rounded bg-gold-50 text-xs text-nude-800 break-words max-h-40 overflow-auto">
               <span className="font-medium text-gold-700">Kênia:</span> {reply}
-            </div>
-          )}
-
-          {genImage && (
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-nude-900 truncate">
-                  {genImage.comic ? "Quadrinhos" : "Imagem"}: {genImage.prompt}
-                </span>
-                <div className="flex items-center gap-2">
-                  <a href={genImage.url} download={`kenia-${genImage.comic ? "hq" : "imagem"}.png`} className="text-gold-700 hover:text-gold-900 text-xs">baixar</a>
-                  <button onClick={() => setGenImage(null)} className="text-nude-500 hover:text-nude-900 text-xs">fechar</button>
-                </div>
-              </div>
-              <img
-                src={genImage.url}
-                alt={genImage.prompt}
-                className="w-full rounded border border-nude-200"
-                data-testid="voice-orb-generated-image"
-              />
             </div>
           )}
 
