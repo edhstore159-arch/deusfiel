@@ -5,14 +5,16 @@ import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Textarea } from "@/kenia/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kenia/components/ui/select";
 import { Badge } from "@/kenia/components/ui/badge";
 import { Separator } from "@/kenia/components/ui/separator";
 import { toast } from "sonner";
 import {
   Key, MessageSquare, Image, Loader2, CheckCircle2,
-  XCircle, Sparkles, Save, Info, Eye, EyeOff, Mic, RotateCcw,
+  XCircle, Sparkles, Save, Info, Eye, EyeOff, Mic, RotateCcw, Languages,
 } from "lucide-react";
 import { loadKeniaPrompt, saveKeniaPrompt, DEFAULT_KENIA_PROMPT } from "@/kenia/lib/keniaPrompt";
+import { loadVoiceConfig, saveVoiceConfig, VOICE_LANGUAGE_OPTIONS } from "@/kenia/storage/voiceSecretary";
 
 export default function Settings() {
   const [settings, setSettings] = useState(null);
@@ -26,8 +28,13 @@ export default function Settings() {
   const [textResult, setTextResult] = useState(null);
   const [imageResult, setImageResult] = useState(null);
   const [keniaPrompt, setKeniaPrompt] = useState("");
+  const [voiceLang, setVoiceLang] = useState("pt-BR");
 
-  useEffect(() => { load(); setKeniaPrompt(loadKeniaPrompt()); }, []);
+  useEffect(() => {
+    load();
+    setKeniaPrompt(loadKeniaPrompt());
+    setVoiceLang(loadVoiceConfig().responseLang || "pt-BR");
+  }, []);
 
   const load = async () => {
     const fallback = {
@@ -127,6 +134,33 @@ export default function Settings() {
               <div className="text-xs text-nude-600">
                 Edite como a Kênia responde. Placeholders: <code>{"{dateContext}"}</code>, <code>{"{ctxSummary}"}</code>, <code>{"{jusContext}"}</code>.
               </div>
+            </div>
+          </div>
+          <div className="mb-4 grid gap-2 sm:grid-cols-[220px_1fr] sm:items-end">
+            <div>
+              <Label className="flex items-center gap-2 text-sm">
+                <Languages className="w-4 h-4 text-gold-700" /> Idioma padrão da resposta
+              </Label>
+              <Select
+                value={voiceLang}
+                onValueChange={(value) => {
+                  setVoiceLang(value);
+                  saveVoiceConfig({ responseLang: value });
+                  toast.success("Idioma da Kênia atualizado");
+                }}
+              >
+                <SelectTrigger className="mt-1 h-10" data-testid="voice-language-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {VOICE_LANGUAGE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-xs text-nude-600">
+              A Kênia usa este idioma por padrão, e também pode trocar antes de cada resposta no painel de voz.
             </div>
           </div>
           <Textarea
