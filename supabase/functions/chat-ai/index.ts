@@ -639,6 +639,7 @@ Deno.serve(async (req) => {
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
     const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
     const fastMode = body.fast_mode === true;
+    const creativeMode = body.creative_mode === true || /\b(conta|conte|contar|narra|narre|narrar|inventa|invente|cria|crie|escreve|escreva)\b[\s\S]*\b(hist[oó]ria|conto|f[aá]bula|poema|roteiro|personagem|di[aá]logo|chapeuzinho|chap[eé]uzinho)\b/i.test(userMessage.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase());
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
     const sessionId: string = body.session_id ? String(body.session_id) : `chat-${crypto.randomUUID()}`;
@@ -865,7 +866,7 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       : "";
 
     const finalSystem = isVoiceOrb && overrideSystem
-      ? `${overrideSystem}\n\nCONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime}.`
+      ? `${overrideSystem}\n\nCONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime}.\n\nMODO CRIATIVO DE VOZ: quando o usuário pedir história, conto, poema, roteiro, personagem ou texto criativo, cumpra imediatamente o pedido com uma resposta completa, natural e finalizada. Não faça triagem jurídica, não peça nome, não tente agendar e não responda com evasivas.`
       : isWhatsApp
         ? `${whatsappPrompt}${extraContext ? `\n\nDADOS INTERNOS DISPONÍVEIS (use-os literalmente; não diga que não tem acesso):\n${extraContext}` : ""}`
         : extraContext
@@ -884,8 +885,8 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       messages,
       temperature: 0.72,
       preferFastProvider: fastMode,
-      timeoutMs: fastMode ? 9000 : undefined,
-      maxTokens: fastMode ? 260 : undefined,
+      timeoutMs: fastMode && !creativeMode ? 9000 : undefined,
+      maxTokens: fastMode ? (creativeMode ? 900 : 260) : (creativeMode ? 1200 : undefined),
     });
 
     let data: any = aiResult.ok ? aiResult.data : null;
