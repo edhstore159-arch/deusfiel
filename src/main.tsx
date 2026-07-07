@@ -1,4 +1,5 @@
 import { StrictMode } from "react";
+import { Component } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./kenia/App.jsx";
@@ -9,7 +10,7 @@ const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO,
 const isDebugInstructionCrash = (error: unknown) =>
   String(error instanceof Error ? error.message : error || "").includes(DEBUG_INSTRUCTION_PREFIX);
 
-class RootErrorBoundary extends React.Component<{ children: ReactNode }, { debugCrash: boolean }> {
+class RootErrorBoundary extends Component<{ children: ReactNode }, { debugCrash: boolean }> {
   state = { debugCrash: false };
 
   static getDerivedStateFromError(error: unknown) {
