@@ -1,6 +1,7 @@
 import { generateWithNanoBanana, stripDataUrl } from '../_shared/nano-banana.ts';
 import { generateImage, hasHumanSubject, hasHybridRequest, isScenerySubject } from '../_shared/llm.ts';
 import { chatCompletion } from '../_shared/llm.ts';
+import { requireUser } from '../_shared/auth.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
