@@ -1,6 +1,8 @@
 import { generateWithNanoBanana, stripDataUrl } from '../_shared/nano-banana.ts';
 import { generateImage, hasHumanSubject, hasHybridRequest, isScenerySubject } from '../_shared/llm.ts';
 import { chatCompletion } from '../_shared/llm.ts';
+import { requireAuthenticatedUser } from '../_shared/require-auth.ts';
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -361,8 +363,12 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const auth = await requireAuthenticatedUser(req, corsHeaders);
+    if (!auth.ok) return auth.response;
+
     const body = await req.json();
     const { prompt, reference_image_base64, logo_base64, style, title, subtitle, network, format, tone, case_type, provider } = body || {};
+
     const preferProvider = (provider === "pollinations" || provider === "emergent") ? provider : "auto";
     if (!prompt || typeof prompt !== "string") {
       return new Response(JSON.stringify({ error: "Prompt obrigatório" }), {
