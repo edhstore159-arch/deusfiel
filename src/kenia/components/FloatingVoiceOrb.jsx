@@ -124,7 +124,12 @@ export default function FloatingVoiceOrb() {
         shouldRestartRef.current = true;
         const rec = recognitionRef.current;
         if (rec && !recognitionActiveRef.current) rec.start();
-      } catch {}
+      } catch {
+        shouldRestartRef.current = false;
+        recognitionActiveRef.current = false;
+        setListening(false);
+        setNeedsGestureRestart(true);
+      }
     }, 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
