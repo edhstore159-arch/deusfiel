@@ -1,6 +1,9 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
-export const shouldSuppressLovableDebugInstruction = (_message: string) => false;
+export const shouldSuppressLovableDebugInstruction = (message: string) => {
+  const text = String(message || "");
+  return text.includes(DEBUG_INSTRUCTION_PREFIX) || text.includes("lovable-debug-error");
+};
 
 export const isLovableNativeDebugRuntime = () => true;
 
