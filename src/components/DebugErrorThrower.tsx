@@ -1,20 +1,33 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { shouldSuppressLovableDebugInstruction } from "@/components/debugInstruction";
 
 /**
- * DebugErrorThrower — desativado.
- * Instruções de debug são apenas registradas no console; nunca derrubam o app.
+ * DebugErrorThrower
+ *
+ * Escuta o CustomEvent "lovable-debug-error". Instruções disparadas pela
+ * ferramenta interna não devem derrubar o app em preview/publicação.
  */
 export const DebugErrorThrower = () => {
+  const [message, setMessage] = useState<string | null>(null);
+
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
       if (typeof detail === "string" && detail.trim()) {
-        console.info("[debug-instruction]", detail);
+        if (shouldSuppressLovableDebugInstruction(detail)) {
+          console.info("Instrução de debug registrada sem interromper a interface.");
+          return;
+        }
+        setMessage(detail);
       }
     };
     window.addEventListener("lovable-debug-error", handler);
     return () => window.removeEventListener("lovable-debug-error", handler);
   }, []);
+
+  if (message) {
+    throw new Error(message);
+  }
 
   return null;
 };
