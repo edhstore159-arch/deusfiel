@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { verifyState } from "../_shared/oauth-state.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
