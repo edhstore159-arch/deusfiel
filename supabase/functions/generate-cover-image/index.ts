@@ -1,6 +1,7 @@
 import { generateWithNanoBanana, stripDataUrl } from '../_shared/nano-banana.ts';
 import { generateImage, hasHumanSubject, hasHybridRequest, isScenerySubject } from '../_shared/llm.ts';
 import { chatCompletion } from '../_shared/llm.ts';
+import { requireUser } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -359,6 +360,9 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+    const _auth = await requireUser(req);
+    if (_auth instanceof Response) return _auth;
+
 
   try {
     const body = await req.json();

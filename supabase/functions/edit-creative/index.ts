@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { generateWithNanoBanana } from "../_shared/nano-banana.ts";
+import { requireUser } from "../_shared/auth.ts";
 
 const REALISM =
   "high quality, sharp focus, natural lighting, realistic textures, balanced composition";
@@ -24,6 +25,9 @@ function buildEditPrompt(userInstruction: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+    const _auth = await requireUser(req);
+    if (_auth instanceof Response) return _auth;
+
   try {
     const body = await req.json().catch(() => ({}));
     const image: string = String(body.image_base64 || body.image || "").trim();
