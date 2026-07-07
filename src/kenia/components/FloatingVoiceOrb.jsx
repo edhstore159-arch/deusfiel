@@ -45,6 +45,7 @@ export default function FloatingVoiceOrb() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [responseLang, setResponseLang] = useState(() => loadVoiceConfig().responseLang || "pt-BR");
+  const [needsGestureRestart, setNeedsGestureRestart] = useState(false);
   const recognitionRef = useRef(null);
   const supported =
     typeof window !== "undefined" &&
@@ -123,7 +124,12 @@ export default function FloatingVoiceOrb() {
         shouldRestartRef.current = true;
         const rec = recognitionRef.current;
         if (rec && !recognitionActiveRef.current) rec.start();
-      } catch {}
+      } catch {
+        shouldRestartRef.current = false;
+        recognitionActiveRef.current = false;
+        setListening(false);
+        setNeedsGestureRestart(true);
+      }
     }, 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,12 +153,11 @@ export default function FloatingVoiceOrb() {
           return;
         }
         shouldRestartRef.current = false;
-        alwaysOnRef.current = false;
         commandSessionActiveRef.current = false;
-        setAlwaysOn(false);
+        setNeedsGestureRestart(true);
         setListening(false);
         if (err?.name === "NotAllowedError") {
-          toast.error("Permissão de microfone bloqueada. Ative novamente a escuta contínua.");
+          toast.error("Toque em retomar para continuar a escuta contínua.");
         }
       }
     }, delay);
@@ -176,6 +181,7 @@ export default function FloatingVoiceOrb() {
     rec.maxAlternatives = 1;
     rec.onstart = () => {
       recognitionActiveRef.current = true;
+      setNeedsGestureRestart(false);
       setListening(true);
     };
     rec.onresult = (e) => {
@@ -236,11 +242,11 @@ export default function FloatingVoiceOrb() {
     rec.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         shouldRestartRef.current = false;
-        alwaysOnRef.current = false;
         commandSessionActiveRef.current = false;
         recognitionActiveRef.current = false;
-        setListening(false); setAlwaysOn(false);
-        toast.error("Permissão de microfone negada.");
+        setListening(false);
+        setNeedsGestureRestart(true);
+        toast.error("Microfone pausado. Toque em retomar para liberar novamente.");
       } else if (e.error !== "no-speech" && e.error !== "aborted") {
         // keep going for transient errors
       }
@@ -268,11 +274,31 @@ export default function FloatingVoiceOrb() {
     unlockSpeech();
     if (!supported) { toast.error("Reconhecimento de voz não suportado."); return; }
     const rec = recognitionRef.current; if (!rec) return;
+    if (alwaysOnRef.current && needsGestureRestart) {
+      shouldRestartRef.current = true;
+      alwaysOnRef.current = true;
+      setAlwaysOn(true);
+      setNeedsGestureRestart(false);
+      setTranscript("");
+      try {
+        rec.continuous = true;
+        rec.interimResults = true;
+        if (!recognitionActiveRef.current) rec.start();
+        toast.success('Escuta contínua retomada. Diga "secretária" para ativar.');
+      } catch {
+        setNeedsGestureRestart(true);
+        recognitionActiveRef.current = false;
+        setListening(false);
+        toast.error("Toque novamente para liberar o microfone ou confira a permissão do navegador.");
+      }
+      return;
+    }
     if (alwaysOnRef.current) {
       shouldRestartRef.current = false;
       alwaysOnRef.current = false;
       commandSessionActiveRef.current = false;
       setAlwaysOn(false);
+      setNeedsGestureRestart(false);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       try { rec.abort?.(); } catch {}
       setListening(false);
@@ -281,6 +307,7 @@ export default function FloatingVoiceOrb() {
       setAlwaysOn(true); alwaysOnRef.current = true; shouldRestartRef.current = true;
       commandSessionActiveRef.current = false;
       awakeUntilRef.current = 0;
+      setNeedsGestureRestart(false);
       setTranscript("");
       try {
         rec.continuous = true;
@@ -298,6 +325,7 @@ export default function FloatingVoiceOrb() {
         alwaysOnRef.current = false;
         commandSessionActiveRef.current = false;
         setAlwaysOn(false);
+        setNeedsGestureRestart(true);
         setListening(false);
         toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
       }
@@ -403,7 +431,7 @@ export default function FloatingVoiceOrb() {
 
   const speak = (text) => {
     // Em outras abas (não-líder) a secretária permanece em silêncio para não duplicar a fala.
-    if (!isLeaderRef.current) return;
+    if (!isLeaderRef.current && typeof document !== "undefined" && document.hidden) return;
     try {
       const synth = window.speechSynthesis;
       if (audioRef.current) {
@@ -677,7 +705,8 @@ export default function FloatingVoiceOrb() {
           session_id: "kenia-voice-orb",
           system_prompt: enrichedSystem,
           context: ctxSummary,
-          want_audio: false,
+          want_audio: true,
+          speech_language: responseLanguage,
           fast_mode: true,
           user_id: authUserId,
         },
@@ -1180,6 +1209,43 @@ export default function FloatingVoiceOrb() {
     }
   };
 
+  useEffect(() => {
+    const handler = (event) => {
+      const detail = event?.detail || {};
+      userMinimizedRef.current = false;
+      unlockSpeech();
+      setOpen(true);
+      if (detail.speak) {
+        setReply(String(detail.speak));
+        speak(String(detail.speak));
+      }
+      if (detail.listen && supported) {
+        const rec = recognitionRef.current;
+        if (!rec || recognitionActiveRef.current) return;
+        shouldRestartRef.current = false;
+        alwaysOnRef.current = false;
+        commandSessionActiveRef.current = false;
+        setAlwaysOn(false);
+        setTranscript("");
+        try {
+          rec.continuous = false;
+          rec.interimResults = true;
+          rec.start();
+          recognitionActiveRef.current = true;
+          setListening(true);
+        } catch (err) {
+          if (err?.name !== "InvalidStateError") {
+            recognitionActiveRef.current = false;
+            setListening(false);
+            toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
+          }
+        }
+      }
+    };
+    window.addEventListener("kenia-voice-open", handler);
+    return () => window.removeEventListener("kenia-voice-open", handler);
+  });
+
   return (
     <>
       <div className="sr-only" data-testid="voice-orb-wrap" aria-hidden="true">
@@ -1232,7 +1298,11 @@ export default function FloatingVoiceOrb() {
             onClick={toggleAlwaysOn}
             className={`w-full mb-2 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${alwaysOn ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-nude-100 text-nude-800 hover:bg-nude-200"}`}
           >
-            {alwaysOn ? '🟢 Escuta contínua ATIVA — diga "secretária"' : "Ativar escuta contínua (palavra: secretária)"}
+            {needsGestureRestart
+              ? '🟡 Retomar escuta contínua'
+              : alwaysOn
+                ? '🟢 Escuta contínua ATIVA — diga "secretária"'
+                : "Ativar escuta contínua (palavra: secretária)"}
           </button>
           <button
             onClick={toggleListen}
