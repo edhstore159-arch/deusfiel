@@ -12,10 +12,6 @@ Deno.serve(async (req) => {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  if (new URL(req.url).searchParams.get("models") === "1") {
-    const rm = await fetch("https://integrations.emergentagent.com/llm/v1/models", { headers: { Authorization: `Bearer ${key}` } });
-    return new Response(await rm.text(), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  }
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), 15000);
   try {
