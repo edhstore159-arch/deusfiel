@@ -1,22 +1,25 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
-export const shouldSuppressLovableDebugInstruction = (_message: string) => false;
+export const shouldSuppressLovableDebugInstruction = (message: string) => {
+  const text = String(message || "");
+  return text.includes(DEBUG_INSTRUCTION_PREFIX) || text.includes("lovable-debug-error");
+};
 
 export const isLovableNativeDebugRuntime = () => false;
 
 /**
- * Dispara o CustomEvent que o DebugErrorThrower converte em erro fatal
- * de runtime — necessário para acionar o overlay global da Lovable e o
- * botão "Try to Fix". NÃO substituir por chat/API/toast.
+ * Canal desativado: o CustomEvent antigo acionava erro fatal e podia deixar a
+ * preview em branco quando o Vite/browser servia módulo em cache.
  */
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined" || !message) return false;
-  window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
-  return true;
+  console.info("Debug instruction captured without runtime throw.");
+  return false;
 };
 
 export const deliverLovableDebugInstruction = (message: string) => {
-  return dispatchLovableDebugError(message) ? ("dispatched" as const) : ("skipped" as const);
+  dispatchLovableDebugError(message);
+  return "skipped" as const;
 };
 
 export type DebugAttachment = {
