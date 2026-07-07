@@ -1,9 +1,6 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
-export const shouldSuppressLovableDebugInstruction = (message: string) => {
-  const text = String(message || "").trim();
-  return text.startsWith(DEBUG_INSTRUCTION_PREFIX) && !isLovableNativeDebugRuntime();
-};
+export const shouldSuppressLovableDebugInstruction = (_message: string) => false;
 
 export const isLovableNativeDebugRuntime = () => false;
 
@@ -19,7 +16,6 @@ export const dispatchLovableDebugError = (message: string) => {
 };
 
 export const deliverLovableDebugInstruction = (message: string) => {
-  if (shouldSuppressLovableDebugInstruction(message)) return "skipped" as const;
   return dispatchLovableDebugError(message) ? ("dispatched" as const) : ("skipped" as const);
 };
 

@@ -403,7 +403,7 @@ export default function FloatingVoiceOrb() {
 
   const speak = (text) => {
     // Em outras abas (não-líder) a secretária permanece em silêncio para não duplicar a fala.
-    if (!isLeaderRef.current && typeof document !== "undefined" && document.hidden) return;
+    if (!isLeaderRef.current) return;
     try {
       const synth = window.speechSynthesis;
       if (audioRef.current) {
@@ -677,8 +677,7 @@ export default function FloatingVoiceOrb() {
           session_id: "kenia-voice-orb",
           system_prompt: enrichedSystem,
           context: ctxSummary,
-          want_audio: true,
-          speech_language: responseLanguage,
+          want_audio: false,
           fast_mode: true,
           user_id: authUserId,
         },
@@ -1180,43 +1179,6 @@ export default function FloatingVoiceOrb() {
       }
     }
   };
-
-  useEffect(() => {
-    const handler = (event) => {
-      const detail = event?.detail || {};
-      userMinimizedRef.current = false;
-      unlockSpeech();
-      setOpen(true);
-      if (detail.speak) {
-        setReply(String(detail.speak));
-        speak(String(detail.speak));
-      }
-      if (detail.listen && supported) {
-        const rec = recognitionRef.current;
-        if (!rec || recognitionActiveRef.current) return;
-        shouldRestartRef.current = false;
-        alwaysOnRef.current = false;
-        commandSessionActiveRef.current = false;
-        setAlwaysOn(false);
-        setTranscript("");
-        try {
-          rec.continuous = false;
-          rec.interimResults = true;
-          rec.start();
-          recognitionActiveRef.current = true;
-          setListening(true);
-        } catch (err) {
-          if (err?.name !== "InvalidStateError") {
-            recognitionActiveRef.current = false;
-            setListening(false);
-            toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
-          }
-        }
-      }
-    };
-    window.addEventListener("kenia-voice-open", handler);
-    return () => window.removeEventListener("kenia-voice-open", handler);
-  });
 
   return (
     <>
