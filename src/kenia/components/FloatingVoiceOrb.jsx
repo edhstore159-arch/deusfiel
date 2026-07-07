@@ -1184,71 +1184,9 @@ export default function FloatingVoiceOrb() {
                   <span className="font-medium text-gold-700">Kênia:</span> {reply}
                 </div>
               )}
-            </>
-          )}
+          </>
 
-          {activeTab === "generate" && (
-            <div className="space-y-2">
-              <p className="text-xs text-nude-600">Descreva a imagem que quer gerar (via Emergent/Nano Banana).</p>
-              <textarea
-                value={genPrompt}
-                onChange={(e) => setGenPrompt(e.target.value)}
-                placeholder="Ex.: cartaz para post de reforma trabalhista, tons dourados"
-                className="w-full min-h-[70px] rounded border border-nude-300 p-2 text-xs"
-              />
-              <button
-                onClick={runGenerate}
-                disabled={genLoading || !genPrompt.trim()}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium bg-gold-600 text-white hover:bg-gold-700 disabled:opacity-60"
-              >
-                {genLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {genLoading ? "Gerando…" : "Gerar imagem"}
-              </button>
-              {genImage && (
-                <img src={genImage} alt="Gerada" className="w-full rounded border border-nude-200" />
-              )}
-              {genError && <div className="text-xs text-rose-600">{genError}</div>}
-            </div>
-          )}
 
-          {activeTab === "analyze" && (
-            <div className="space-y-2">
-              <p className="text-xs text-nude-600">Envie uma imagem para a Kênia analisar.</p>
-              <label className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium bg-nude-100 text-nude-800 hover:bg-nude-200 cursor-pointer">
-                <Upload className="w-4 h-4" />
-                {analyzeFileName || "Escolher imagem"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => onPickAnalyzeFile(e.target.files?.[0])}
-                />
-              </label>
-              <input
-                value={analyzePrompt}
-                onChange={(e) => setAnalyzePrompt(e.target.value)}
-                placeholder="Pergunta opcional sobre a imagem"
-                className="w-full rounded border border-nude-300 p-2 text-xs"
-              />
-              <button
-                onClick={runAnalyze}
-                disabled={analyzeLoading || !analyzeB64}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium bg-gold-600 text-white hover:bg-gold-700 disabled:opacity-60"
-              >
-                {analyzeLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                {analyzeLoading ? "Analisando…" : "Analisar imagem"}
-              </button>
-              {analyzeB64 && (
-                <img src={analyzeB64} alt="Preview" className="w-full max-h-40 object-contain rounded border border-nude-200" />
-              )}
-              {analyzeResult && (
-                <div className="p-2 rounded bg-gold-50 text-xs text-nude-800 break-words max-h-48 overflow-auto whitespace-pre-wrap">
-                  {analyzeResult}
-                </div>
-              )}
-              {analyzeError && <div className="text-xs text-rose-600">{analyzeError}</div>}
-            </div>
-          )}
 
           {ytQuery && (
             <div className="mt-3">
