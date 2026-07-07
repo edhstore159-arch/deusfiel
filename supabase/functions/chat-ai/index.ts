@@ -26,7 +26,7 @@ function cleanTextForSpeech(text: string): string {
     .slice(0, 1500);
 }
 
-async function synthesizeSpeech(text: string, language = "Português do Brasil"): Promise<string | null> {
+async function synthesizeSpeech(text: string): Promise<string | null> {
   const clean = cleanTextForSpeech(text);
   if (!clean) return null;
 
@@ -39,7 +39,7 @@ async function synthesizeSpeech(text: string, language = "Português do Brasil")
           model: "openai/gpt-4o-mini-tts",
           input: clean,
           voice: "coral",
-          instructions: `Fale em ${language} como uma atendente jurídica humana, calorosa, clara e natural.`,
+          instructions: "Fale em português do Brasil como uma atendente jurídica humana, calorosa, clara e natural.",
           response_format: "mp3",
           stream_format: "audio",
         }),
@@ -65,7 +65,7 @@ async function synthesizeSpeech(text: string, language = "Português do Brasil")
           model: "gpt-4o-mini-tts",
           input: clean,
           voice: "coral",
-          instructions: `Fale em ${language} como uma atendente jurídica humana, calorosa e clara.`,
+          instructions: "Fale em português do Brasil como uma atendente jurídica humana, calorosa e clara.",
           response_format: "mp3",
         }),
       });
@@ -1007,8 +1007,7 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
 
     // Gera áudio (TTS ElevenLabs) se o cliente pediu
     const wantAudio = body.want_audio !== false; // default true
-    const speechLanguage = String(body.speech_language || body.response_language || "Português do Brasil").slice(0, 80);
-    const audio_base64 = wantAudio ? await synthesizeSpeech(reply, speechLanguage) : null;
+    const audio_base64 = wantAudio ? await synthesizeSpeech(reply) : null;
 
     // Salva conversa e agendamento no banco. No modo voz rápido, usa waitUntil para não segurar a resposta falada.
     const saveConversationAndAppointment = async () => {
