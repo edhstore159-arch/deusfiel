@@ -147,6 +147,7 @@ async function elaborateTemplatePrompt(userPrompt: string): Promise<string> {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const _auth = await requireUser(req); if (!_auth.ok) return _auth.response;
 
   try {
     const { image1_base64, image2_base64, prompt, mode } = await req.json();
