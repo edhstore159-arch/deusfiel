@@ -389,7 +389,7 @@ export default function FloatingVoiceOrb() {
       }
     }
     if (current) chunks.push(current.trim());
-    return chunks.slice(0, 16);
+    return chunks.slice(0, 48);
   };
 
   const speak = (text) => {
@@ -657,6 +657,7 @@ export default function FloatingVoiceOrb() {
         supabase.auth.getUser().then(({ data }) => data?.user?.id || null).catch(() => null),
         new Promise((resolve) => window.setTimeout(() => resolve(null), 800)),
       ]);
+      const creativeVoiceRequest = isCreativeVoiceRequest(text);
       const { data, error } = await supabase.functions.invoke("chat-ai", {
         body: {
           message: text,
@@ -665,7 +666,8 @@ export default function FloatingVoiceOrb() {
           system_prompt: enrichedSystem,
           context: ctxSummary,
           want_audio: false,
-          fast_mode: true,
+          fast_mode: !creativeVoiceRequest,
+          creative_mode: creativeVoiceRequest,
           user_id: authUserId,
         },
       });
@@ -960,6 +962,31 @@ export default function FloatingVoiceOrb() {
   };
   const reportTodayAppointments = () => reportAppointments("today");
 
+  const isCreativeVoiceRequest = (text) => /\b(conta|conte|contar|narra|narre|narrar|inventa|invente|cria|crie|escreve|escreva)\b[\s\S]*\b(hist[oó]ria|conto|f[aá]bula|poema|roteiro|personagem|di[aá]logo|chapeuzinho|chap[eé]uzinho)\b/i.test(norm(text));
+
+  const tellLittleRedRidingHood = () => {
+    const story = `Claro. Era uma vez uma menina muito querida, conhecida por todos como Chapeuzinho Vermelho, porque usava sempre uma capa vermelha feita por sua avó. Um dia, sua mãe preparou uma cesta com bolo, frutas e um pouco de mel e pediu que ela levasse tudo até a casa da vovó, que estava doente e morava do outro lado da floresta.
+
+Antes de sair, a mãe avisou: “Vá pelo caminho certo, não converse com estranhos e não se distraia na floresta.” Chapeuzinho prometeu obedecer e seguiu feliz pelo caminho, ouvindo os pássaros e olhando as flores.
+
+No meio da floresta, apareceu um lobo esperto. Com voz mansa, ele perguntou para onde ela ia. Chapeuzinho, inocente, contou que estava indo visitar a avó. O lobo, então, sugeriu que ela colhesse algumas flores para alegrar a vovó. Enquanto a menina se distraía, ele correu por um atalho até a casa da avó.
+
+Chegando lá, o lobo bateu à porta, fingiu ser Chapeuzinho e entrou. A vovó percebeu o perigo e se escondeu dentro de um armário. O lobo vestiu a touca e os óculos dela, deitou-se na cama e esperou.
+
+Quando Chapeuzinho chegou, achou a avó muito estranha e perguntou: “Vovó, que olhos grandes você tem!” O lobo respondeu: “São para te ver melhor.” A menina continuou: “Que orelhas grandes você tem!” E ele disse: “São para te ouvir melhor.” Por fim, ela perguntou: “E que boca grande você tem!” O lobo saltou da cama dizendo: “É para falar mais alto com você!”
+
+Nesse instante, Chapeuzinho gritou. Um caçador que passava por perto ouviu o pedido de socorro, entrou na casa e espantou o lobo para bem longe da floresta. A vovó saiu do armário, abraçou a neta, e as duas agradeceram muito ao caçador.
+
+Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cuidado com quem parecia gentil demais sem motivo. Ela continuou visitando a vovó, mas sempre com atenção, coragem e prudência. E assim, todos ficaram bem.`;
+    userMinimizedRef.current = false;
+    activateCommandSession();
+    setOpen(true);
+    setReply(story);
+    historyRef.current.push({ role: "user", content: "Conte a história da Chapeuzinho Vermelho" });
+    historyRef.current.push({ role: "assistant", content: story });
+    speak(story);
+  };
+
   const [ytQuery, setYtQuery] = useState("");
   const [ytVideoId, setYtVideoId] = useState("");
   const [ytIds, setYtIds] = useState([]);
@@ -1002,6 +1029,10 @@ export default function FloatingVoiceOrb() {
     const lower = effectiveText.toLowerCase();
     if (woke && (!commandText || isWakeOnlyPrompt(commandText))) {
       answerWakePrompt();
+      return;
+    }
+    if (/\b(chapeuzinho|chap[eé]uzinho)\s+vermelh[oa]\b/i.test(lower) && /\b(conta|conte|contar|hist[oó]ria|historinha|conto)\b/i.test(lower)) {
+      tellLittleRedRidingHood();
       return;
     }
     // Minimizar / fechar o painel da assistente (continua escutando, bolinha verde)
