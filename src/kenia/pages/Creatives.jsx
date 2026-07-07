@@ -392,7 +392,7 @@ export default function Creatives() {
   };
 
   return (
-    <div className="min-h-full flex flex-col bg-nude-50">
+    <div className="h-screen flex flex-col bg-nude-50 overflow-hidden">
       <div className="px-4 sm:px-6 py-4 bg-white border-b border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold flex items-center gap-1.5">
