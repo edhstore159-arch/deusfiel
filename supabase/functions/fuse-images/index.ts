@@ -1,6 +1,8 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { generateWithNanoBanana } from '../_shared/nano-banana.ts';
 import { chatCompletion } from '../_shared/llm.ts';
+import { requireAuthenticatedUser } from '../_shared/require-auth.ts';
+
 
 const REALISM =
   "ultra realistic photography, 50mm lens, shallow depth of field, natural skin texture, " +
@@ -148,8 +150,12 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
+    const auth = await requireAuthenticatedUser(req, corsHeaders);
+    if (!auth.ok) return auth.response;
+
     const { image1_base64, image2_base64, prompt, mode } = await req.json();
     if (!image1_base64) {
+
       return new Response(JSON.stringify({ ok: false, error: 'Envie ao menos uma imagem.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
