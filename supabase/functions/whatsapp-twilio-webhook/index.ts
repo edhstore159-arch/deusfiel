@@ -447,48 +447,22 @@ async function sendTwilioMessage(from: string, to: string, body: string, mediaUr
   }
 }
 
-import { verifyTwilioSignature } from "../_shared/twilio-signature.ts";
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // SECURITY: verify Twilio HMAC signature so only Twilio can invoke this webhook.
-    // Set TWILIO_AUTH_TOKEN in secrets (Console → Account → Auth Token).
-    const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
-    const signature = req.headers.get("X-Twilio-Signature");
-    const rawBody = await req.text();
-    const form = new URLSearchParams(rawBody);
-    const formData = new FormData();
-    for (const [k, v] of form.entries()) formData.append(k, v);
-
-    if (!twilioAuthToken) {
-      console.error("[whatsapp] TWILIO_AUTH_TOKEN ausente — recusando webhook não verificado");
-      return new Response("Forbidden", { status: 403, headers: corsHeaders });
-    }
-    // Twilio signs the exact public URL it POSTed to.
-    const fwdProto = req.headers.get("x-forwarded-proto") || "https";
-    const fwdHost = req.headers.get("x-forwarded-host") || req.headers.get("host") || new URL(req.url).host;
-    const publicPath = new URL(req.url).pathname + new URL(req.url).search;
-    const publicUrl = `${fwdProto}://${fwdHost}${publicPath}`;
-    const valid = await verifyTwilioSignature(twilioAuthToken, publicUrl, formData, signature);
-    if (!valid) {
-      console.warn("[whatsapp] assinatura Twilio inválida", { publicUrl, hasSig: !!signature });
-      return new Response("Forbidden", { status: 403, headers: corsHeaders });
-    }
-
-    const from = String(formData.get("From") || "");      // ex: whatsapp:+5511...
-    const to = String(formData.get("To") || "");          // seu número Twilio
-    const body = String(formData.get("Body") || "").trim();
-    const numMedia = Number(formData.get("NumMedia") || "0");
-
+    const form = await req.formData();
+    const from = String(form.get("From") || "");      // ex: whatsapp:+5511...
+    const to = String(form.get("To") || "");          // seu número Twilio
+    const body = String(form.get("Body") || "").trim();
+    const numMedia = Number(form.get("NumMedia") || "0");
 
     console.log("[whatsapp] inbound", {
       from,
       to,
       hasBody: body.length > 0,
       numMedia,
-      mediaType0: formData.get("MediaContentType0"),
+      mediaType0: form.get("MediaContentType0"),
     });
 
     let userText = body;
@@ -497,8 +471,8 @@ Deno.serve(async (req) => {
     let inboundImageDescription = "";
 
     if (numMedia > 0) {
-      const mediaUrl = String(formData.get("MediaUrl0") || "");
-      const mediaTypeRaw = String(formData.get("MediaContentType0") || "audio/ogg");
+      const mediaUrl = String(form.get("MediaUrl0") || "");
+      const mediaTypeRaw = String(form.get("MediaContentType0") || "audio/ogg");
       const mediaType = mediaTypeRaw.split(";")[0].trim().toLowerCase();
       const isAudio = mediaType.startsWith("audio") || mediaType.includes("ogg") || mediaType.includes("opus");
       const isImage = mediaType.startsWith("image/");

@@ -300,34 +300,13 @@ function isNearDuplicateReply(reply: string, history: Array<{ role: string; cont
 function buildNonRepeatingFallback(userMessage: string, fmtDate: string, fmtTime: string): string {
   const text = String(userMessage || "").toLowerCase();
   if (userAskedTemporalInfo(text)) return `Hoje é ${fmtDate}, e agora são ${fmtTime}.`;
-  if (/\b(abrir|abra|ir|vai|v[aá]|navegar|mostrar|mostre|ver|acessar)\b/i.test(text)) {
-    if (/\b(agenda|agendamento|consulta|hor[aá]rio)\b/i.test(text)) return "Abrindo a agenda para você conferir os atendimentos e horários.";
-    if (/\b(chat|ia|assistente)\b/i.test(text)) return "Abrindo o chat de IA para continuar o atendimento.";
-    if (/\b(crm|lead|pipeline)\b/i.test(text)) return "Abrindo o CRM para você acompanhar os leads e contatos.";
-    if (/\b(processos?|casos?)\b/i.test(text)) return "Abrindo a área de processos e casos para consulta.";
-    if (/\b(financeiro|finan[cç]as?)\b/i.test(text)) return "Abrindo o financeiro para você verificar receitas, despesas e pendências.";
-    if (/\b(whatsapp|zap|mensagens?)\b/i.test(text)) return "Abrindo a central de WhatsApp e mensagens.";
-    return "Certo, vou abrir a área solicitada. Se não carregar automaticamente, me diga o nome exato da tela.";
-  }
   if (/\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|atendimento)\b/i.test(text)) {
     return "Claro. Para eu deixar a consulta registrada corretamente, me informe nome completo, telefone, e-mail, cidade/estado, área do caso, data e horário desejados.";
   }
   if (/\b(div[oó]rcio|guarda|pens[aã]o|fam[ií]lia|invent[aá]rio|trabalhista|demiss[aã]o|rescis[aã]o|inss|aposentadoria|consumidor|cobran[cç]a|audi[eê]ncia|intima[cç][aã]o)\b/i.test(text)) {
     return "Entendi. Para eu direcionar melhor seu atendimento, me conte quando isso aconteceu, sua cidade/estado e se existe algum prazo ou audiência marcado.";
   }
-  if (/\b(hist[oó]ria|conto|roteiro|texto|escrev|crie|criar|fa[cç]a|desenvolv|ideia|post|legenda)\b/i.test(text)) {
-    return "Claro. Vou desenvolver isso do começo ao fim: me diga o tema, o público e o tom desejado para eu montar uma versão completa.";
-  }
-  if (/\b(analisar|analise|imagem|foto|documento|arquivo)\b/i.test(text)) {
-    return "Posso analisar. Envie a imagem ou documento na aba Analisar e diga o que você quer identificar: texto, problema, prova, resumo ou próximos passos.";
-  }
-  if (/\b(gerar|imagem|arte|capa|criativo|desenho)\b/i.test(text)) {
-    return "Posso gerar a imagem. Na aba Gerar, descreva a cena, estilo, cores e objetivo da arte para eu criar uma versão completa.";
-  }
-  if (/\b(como|o que|qual|quais|porque|por que|explique|me ajuda|ajuda|d[uú]vida)\b/i.test(text)) {
-    return "Vou te orientar de forma prática. Pelo que você pediu, o primeiro passo é separar os fatos principais, documentos ou prints que comprovem a situação; depois, me diga qual resultado você quer alcançar para eu indicar o caminho mais adequado.";
-  }
-  return "Certo, estou acompanhando. Me diga o objetivo final desse comando para eu executar ou orientar o próximo passo com precisão.";
+  return "Entendi. Para seguir sem repetir informações, me conte em poucas palavras o que aconteceu e qual ajuda você precisa agora.";
 }
 
 const caseAreaMatchers = [
@@ -663,22 +642,19 @@ Deno.serve(async (req) => {
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
     const sessionId: string = body.session_id ? String(body.session_id) : `chat-${crypto.randomUUID()}`;
-    // SECURITY: never trust body.user_id — only derive from a validated JWT.
-    let userId: string | null = null;
+    let userId: string | null = body.user_id ? String(body.user_id) : null;
     const authHeader = req.headers.get("Authorization") || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-    if (token && SUPABASE_ANON_KEY) {
+    if (authHeader && SUPABASE_ANON_KEY) {
       try {
         const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-          global: { headers: { Authorization: `Bearer ${token}` } },
+          global: { headers: { Authorization: authHeader } },
         });
-        const { data: authData, error: authError } = await userClient.auth.getUser(token);
+        const { data: authData, error: authError } = await userClient.auth.getUser();
         if (!authError && authData?.user?.id) userId = authData.user.id;
       } catch (err) {
         console.warn("[chat-ai] não foi possível validar usuário autenticado:", err);
       }
     }
-
 
     if (!userMessage) {
       return new Response(JSON.stringify({ error: "message vazio" }), {
