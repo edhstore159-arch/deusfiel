@@ -65,8 +65,17 @@ const readAgents = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    // If no agents saved yet, seed with the default Juiz Virtual agent and persist it
+    if (Array.isArray(parsed)) {
+      // If the default agent is not present, prepend it and persist
+      const hasJuiz = parsed.some((a) => a.id === DEFAULT_AGENT.id || a.name === DEFAULT_AGENT.name);
+      if (!hasJuiz) {
+        const next = [DEFAULT_AGENT, ...parsed];
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+        return next;
+      }
+      return parsed;
+    }
+    // No agents saved at all — seed with default
     const seed = [DEFAULT_AGENT];
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(seed)); } catch {}
     return seed;
@@ -382,39 +391,39 @@ export default function Agents() {
               </label>
               <Textarea
                 value={draft.instructions}
-                onChange={(e) => setDraft({ ...draft, instructions: e.target.value })}
-                rows={6}
-                placeholder="Ex.: Sempre solicitar TRCT e holerites. Encaminhar urgências para a agenda…"
-                className="mt-1.5"
-              />
-            </div>
+                    onChange={(e) => setDraft({ ...draft, instructions: e.target.value })}
+                    rows={6}
+                    placeholder="Ex.: Sempre solicitar TRCT e holerites. Encaminhar urgências para a agenda…"
+                    className="mt-1.5"
+                  />
+                </div>
 
-            <div className="flex items-center justify-between rounded-md border border-nude-200 bg-nude-50/50 px-4 py-3">
-              <div>
-                <div className="text-sm font-medium text-nude-900">Agente ativo</div>
-                <p className="text-xs text-nude-500 mt-0.5">
-                  Quando desativado, o agente não responde em nenhum canal.
-                </p>
+                <div className="flex items-center justify-between rounded-md border border-nude-200 bg-nude-50/50 px-4 py-3">
+                  <div>
+                    <div className="text-sm font-medium text-nude-900">Agente ativo</div>
+                    <p className="text-xs text-nude-500 mt-0.5">
+                      Quando desativado, o agente não responde em nenhum canal.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={!!draft.active}
+                    onCheckedChange={(v) => setDraft({ ...draft, active: v })}
+                  />
+                </div>
+
+                <Separator />
+
+                <div>
+                  <div className="text-xs uppercase tracking-widest text-nude-500 font-semibold mb-2">
+                    Prévia do prompt do sistema
+                  </div>
+                  <pre className="text-xs text-nude-700 bg-nude-50 border border-nude-200 rounded-md p-3 whitespace-pre-wrap leading-relaxed max-h-64 overflow-auto">
+                    {buildSystemPrompt(draft)}
+                  </pre>
+                </div>
               </div>
-              <Switch
-                checked={!!draft.active}
-                onCheckedChange={(v) => setDraft({ ...draft, active: v })}
-              />
-            </div>
-
-            <Separator />
-
-            <div>
-              <div className="text-xs uppercase tracking-widest text-nude-500 font-semibold mb-2">
-                Prévia do prompt do sistema
-              </div>
-              <pre className="text-xs text-nude-700 bg-nude-50 border border-nude-200 rounded-md p-3 whitespace-pre-wrap leading-relaxed max-h-64 overflow-auto">
-                {buildSystemPrompt(draft)}
-              </pre>
-            </div>
+            </Card>
           </div>
-        </Card>
-      </div>
-    </div>
-  );
+        </div>
+      );
 }
