@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { chatCompletion } from "../_shared/llm.ts";
+import { requireUser } from "../_shared/auth.ts";
 
 const SYSTEM = `Você é um diretor de fotografia e prompt engineer especializado em geração de vídeo realista no estilo HEYGEN — apresentador virtual humano falando para a câmera (Veo / Sora / Runway / Kling).
 Sua tarefa: receber uma cena/roteiro em português e produzir UM ÚNICO prompt em INGLÊS, otimizado para vídeo full HD 1080p de um AVATAR HUMANO REALISTA apresentando, com sincronização labial perfeita.
