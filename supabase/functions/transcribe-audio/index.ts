@@ -85,6 +85,7 @@ async function transcribeWithLovableAI(audio_base64: string, mime: string): Prom
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const _auth = await requireUser(req); if (!_auth.ok) return _auth.response;
 
   try {
     const body = await req.json();
