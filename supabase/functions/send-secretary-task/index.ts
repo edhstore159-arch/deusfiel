@@ -1,4 +1,5 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { requireUser } from "../_shared/auth.ts";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/twilio";
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
