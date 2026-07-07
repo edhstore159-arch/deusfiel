@@ -1,10 +1,10 @@
 import "@/kenia/App.css";
 import React, { lazy, Suspense } from "react";
+import { DebugErrorThrower } from "@/components/DebugErrorThrower";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/kenia/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/kenia/contexts/AuthContext";
 import "@/kenia/storage"; // registra window.__keniaStorage e mantém persistência das secretárias
-import ErrorDebugPopup from "@/components/ErrorDebugPopup";
 
 // Eager: landing + login para first paint rápido
 import Landing from "@/kenia/pages/Landing";
@@ -75,11 +75,10 @@ function PageFallback() {
 function App() {
   return (
     <div className="App">
+      <DebugErrorThrower />
       <AuthProvider>
-        <ErrorDebugPopup />
         <BrowserRouter>
           <ScrollToTop />
-
 
 
           <Suspense fallback={<PageFallback />}>

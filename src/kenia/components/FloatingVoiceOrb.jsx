@@ -44,9 +44,6 @@ export default function FloatingVoiceOrb() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const recognitionRef = useRef(null);
-
-
-
   const supported =
     typeof window !== "undefined" &&
     (window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -1142,7 +1139,7 @@ export default function FloatingVoiceOrb() {
 
       {open && (
         <div
-          className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-80 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4"
+          className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-72 max-w-[calc(100vw-2.5rem)] bg-white border border-nude-200 rounded-xl shadow-2xl p-4"
           data-testid="voice-orb-panel"
         >
           <div className="flex items-center justify-between mb-2">
@@ -1151,42 +1148,36 @@ export default function FloatingVoiceOrb() {
               <X className="w-4 h-4" />
             </button>
           </div>
-
-          <>
-
-              <p className="text-xs text-nude-600 mb-3">
-                Toque no microfone e diga, por exemplo: <em>“abrir agenda”</em>. Ou ative a <strong>escuta contínua</strong> e diga <em>“secretária”</em> antes do comando.
-              </p>
-              <button
-                onClick={toggleAlwaysOn}
-                className={`w-full mb-2 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${alwaysOn ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-nude-100 text-nude-800 hover:bg-nude-200"}`}
-              >
-                {alwaysOn ? '🟢 Escuta contínua ATIVA — diga "secretária"' : "Ativar escuta contínua (palavra: secretária)"}
-              </button>
-              <button
-                onClick={toggleListen}
-                disabled={thinking}
-                className={`w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
-                  listening ? "bg-rose-600 text-white hover:bg-rose-700" : "bg-gold-600 text-white hover:bg-gold-700"
-                }`}
-                data-testid="voice-orb-mic"
-              >
-                {thinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
-                {thinking ? "Pensando…" : listening ? "Ouvindo… toque para parar" : "Falar comando"}
-              </button>
-              {transcript && (
-                <div className="mt-3 p-2 rounded bg-nude-50 text-xs text-nude-700 break-words">
-                  <span className="font-medium text-nude-900">Você:</span> {transcript}
-                </div>
-              )}
-              {reply && (
-                <div className="mt-2 p-2 rounded bg-gold-50 text-xs text-nude-800 break-words max-h-40 overflow-auto">
-                  <span className="font-medium text-gold-700">Kênia:</span> {reply}
-                </div>
-              )}
-          </>
-
-
+          <p className="text-xs text-nude-600 mb-3">
+            Toque no microfone e diga, por exemplo: <em>“abrir agenda”</em>. Ou ative a <strong>escuta contínua</strong> e diga <em>“secretária”</em> antes do comando.
+          </p>
+          <button
+            onClick={toggleAlwaysOn}
+            className={`w-full mb-2 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors ${alwaysOn ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-nude-100 text-nude-800 hover:bg-nude-200"}`}
+          >
+            {alwaysOn ? '🟢 Escuta contínua ATIVA — diga "secretária"' : "Ativar escuta contínua (palavra: secretária)"}
+          </button>
+          <button
+            onClick={toggleListen}
+            disabled={thinking}
+            className={`w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
+              listening ? "bg-rose-600 text-white hover:bg-rose-700" : "bg-gold-600 text-white hover:bg-gold-700"
+            }`}
+            data-testid="voice-orb-mic"
+          >
+            {thinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+            {thinking ? "Pensando…" : listening ? "Ouvindo… toque para parar" : "Falar comando"}
+          </button>
+          {transcript && (
+            <div className="mt-3 p-2 rounded bg-nude-50 text-xs text-nude-700 break-words">
+              <span className="font-medium text-nude-900">Você:</span> {transcript}
+            </div>
+          )}
+          {reply && (
+            <div className="mt-2 p-2 rounded bg-gold-50 text-xs text-nude-800 break-words max-h-40 overflow-auto">
+              <span className="font-medium text-gold-700">Kênia:</span> {reply}
+            </div>
+          )}
 
           {ytQuery && (
             <div className="mt-3">
