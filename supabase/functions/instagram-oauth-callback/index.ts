@@ -1,6 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { verifyState } from "../_shared/oauthState.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,17 +24,12 @@ Deno.serve(async (req) => {
   const code = url.searchParams.get("code");
   const stateRaw = url.searchParams.get("state") || "";
   let state: any = {};
-  const stateSecret = Deno.env.get("INSTAGRAM_STATE_SECRET");
-  if (stateSecret) {
-    const verified = await verifyState(stateSecret, stateRaw);
-    if (verified) state = verified;
-  }
+  try { state = JSON.parse(atob(stateRaw)); } catch {}
   const returnTo = state.return_to || "/";
 
   try {
     if (!code) throw new Error("missing code");
-    if (!stateSecret) throw new Error("INSTAGRAM_STATE_SECRET not configured");
-    if (!state.uid) throw new Error("invalid or forged state — reject");
+    if (!state.uid) throw new Error("invalid state");
     const appId = Deno.env.get("INSTAGRAM_APP_ID");
     const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET");
     if (!appId || !appSecret) throw new Error("INSTAGRAM_APP_ID/SECRET not configured");

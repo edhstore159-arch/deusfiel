@@ -1,9 +1,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { requireUser } from '../_shared/auth.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  const _auth = await requireUser(req); if (!_auth.ok) return _auth.response;
 
   try {
     const apiKey = Deno.env.get('WATZZAP_AUDIO_API_KEY');

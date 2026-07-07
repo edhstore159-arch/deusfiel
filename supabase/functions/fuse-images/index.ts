@@ -1,7 +1,6 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { generateWithNanoBanana } from '../_shared/nano-banana.ts';
 import { chatCompletion } from '../_shared/llm.ts';
-import { requireUser } from '../_shared/auth.ts';
 
 const REALISM =
   "ultra realistic photography, 50mm lens, shallow depth of field, natural skin texture, " +
@@ -147,7 +146,6 @@ async function elaborateTemplatePrompt(userPrompt: string): Promise<string> {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  const _auth = await requireUser(req); if (!_auth.ok) return _auth.response;
 
   try {
     const { image1_base64, image2_base64, prompt, mode } = await req.json();
