@@ -6,12 +6,11 @@ import { buildDebugInstructionMessage, deliverLovableDebugInstruction } from "@/
  * ErrorDebugPopup
  *
  * Popup flutuante de admin que coleta uma instrução em texto + arquivos
- * anexados e dispara um CustomEvent("lovable-debug-error"). Arquivos vão para
+ * anexados e salva a instrução com segurança. Arquivos vão para
  * o bucket público "debug-uploads" e suas URLs são incluídas na mensagem do
  * erro intencional, para que o "Try to Fix" da Lovable possa acessá-los.
  *
- * No editor da Lovable usa CustomEvent para acionar o "Try to Fix" nativo.
- * Fora do editor salva a instrução no backend para não quebrar a tela.
+ * O disparo por erro fatal foi removido para evitar tela branca por cache/HMR.
  */
 const BUCKET = "debug-attachments";
 

@@ -1,34 +1,8 @@
-import { useEffect, useState } from "react";
-import { shouldSuppressLovableDebugInstruction } from "./debugInstruction";
-
 /**
- * DebugErrorThrower
- *
- * Escuta o CustomEvent "lovable-debug-error" e converte a mensagem em um
- * erro fatal de runtime, para que o overlay global da Lovable apareça e o
- * usuário use o botão "Try to Fix". NÃO envolver em ErrorBoundary.
+ * Mantido apenas por compatibilidade com versões antigas do app.
+ * Não lança erro de runtime e não monta listeners: instruções de debug agora
+ * são salvas pelo próprio formulário, evitando tela branca e cache antigo.
  */
-export const DebugErrorThrower = () => {
-  const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<string>).detail;
-      if (typeof detail === "string" && detail.trim()) {
-        if (shouldSuppressLovableDebugInstruction(detail)) return;
-        setMessage(detail);
-      }
-    };
-    window.addEventListener("lovable-debug-error", handler);
-    return () => window.removeEventListener("lovable-debug-error", handler);
-  }, []);
-
-  if (message) {
-    console.warn("Lovable debug instruction received:", message);
-    return null;
-  }
-
-  return null;
-};
+export const DebugErrorThrower = () => null;
 
 export default DebugErrorThrower;
