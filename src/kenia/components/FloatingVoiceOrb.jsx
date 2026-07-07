@@ -1118,6 +1118,17 @@ export default function FloatingVoiceOrb() {
       setOpen(false);
       return;
     }
+    // Histórias em quadrinhos / gibi
+    const comicMatch = effectiveText.match(/\b(?:cria[r]?|crie|desenha[r]?|desenhe|faz|faça|faca|gera[r]?|gere|monta[r]?|monte)\s+(?:uma?\s+)?(?:hist[oó]ria\s+em\s+quadrinhos?|quadrinh[oa]s?|gibi|comic|comics|hq)\s*(?:sobre|de|do|da|com)?\s*(.+)/i);
+    if (comicMatch) { generateImageFromVoice(comicMatch[1].trim(), { comic: true }); return; }
+    if (/\b(?:hist[oó]ria\s+em\s+quadrinhos?|quadrinh[oa]s?|gibi|hq)\b/i.test(lower)) {
+      const topic = effectiveText.replace(/\b(?:cria[r]?|crie|desenha[r]?|desenhe|faz|faça|faca|gera[r]?|gere|monta[r]?|monte|uma?|hist[oó]ria\s+em\s+quadrinhos?|quadrinh[oa]s?|gibi|hq|sobre|de|do|da|com)\b/gi, "").trim();
+      if (topic) { generateImageFromVoice(topic, { comic: true }); return; }
+    }
+    // Geração de imagem por voz: "gerar/criar/desenhar imagem/figura/foto de X"
+    const imgMatch = effectiveText.match(/\b(?:gera[r]?|gere|cria[r]?|crie|desenha[r]?|desenhe|faz|faça|faca|produz[ir]?|monta[r]?|monte)\s+(?:uma?\s+|o\s+|a\s+)?(?:imagem|imagens|figura|foto|fotografia|ilustra[çc][ãa]o|arte|desenho|pintura|picture|image)\s*(?:de|do|da|dos|das|com|sobre|mostrando)?\s*(.+)/i);
+    if (imgMatch) { generateImageFromVoice(imgMatch[1].trim(), { comic: false }); return; }
+
     // Caso geral: pergunta ao assistente (Ollama via chat-ai)
     askOllama(effectiveText);
   };
