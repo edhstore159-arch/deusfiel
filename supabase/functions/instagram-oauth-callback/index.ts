@@ -25,12 +25,17 @@ Deno.serve(async (req) => {
   const code = url.searchParams.get("code");
   const stateRaw = url.searchParams.get("state") || "";
   let state: any = {};
-  try { state = JSON.parse(atob(stateRaw)); } catch {}
+  const stateSecret = Deno.env.get("INSTAGRAM_STATE_SECRET");
+  if (stateSecret) {
+    const verified = await verifyState(stateSecret, stateRaw);
+    if (verified) state = verified;
+  }
   const returnTo = state.return_to || "/";
 
   try {
     if (!code) throw new Error("missing code");
-    if (!state.uid) throw new Error("invalid state");
+    if (!stateSecret) throw new Error("INSTAGRAM_STATE_SECRET not configured");
+    if (!state.uid) throw new Error("invalid or forged state — reject");
     const appId = Deno.env.get("INSTAGRAM_APP_ID");
     const appSecret = Deno.env.get("INSTAGRAM_APP_SECRET");
     if (!appId || !appSecret) throw new Error("INSTAGRAM_APP_ID/SECRET not configured");
