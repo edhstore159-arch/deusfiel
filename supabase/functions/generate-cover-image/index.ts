@@ -154,7 +154,9 @@ function objectLockFor(prompt: string) {
   const mammal = detectMammal(prompt);
   if (mammal) {
     return `SUBJECT LOCK (CRITICAL): the subject is a ${mammal.en} — in Portuguese "${mammal.pt}". Render EXACTLY this species, faithful to its real-world appearance: ${mammal.traits}. Do NOT substitute for a different species, do NOT mix traits with other big cats/canids/mammals. Photorealistic wildlife photography, anatomically correct head, eyes, fur/coat pattern, paws and tail. Do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
+  }
   if (ANIMAL_RE.test(prompt)) {
+
     return `SUBJECT LOCK (CRITICAL): the subject is the specific animal literally named by the user. Render ONLY that exact species with correct real-world anatomy, proportions, coloration and natural habitat. Do not substitute species, do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
   }
   const isFruit = FRUIT_RE.test(prompt);
