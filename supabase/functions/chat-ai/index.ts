@@ -687,6 +687,27 @@ Deno.serve(async (req) => {
     const saudacao =
       hourSp >= 5 && hourSp < 12 ? "Bom dia" : hourSp >= 12 && hourSp < 18 ? "Boa tarde" : "Boa noite";
 
+    const wantsLittleRedRidingHood = /\b(chapeuzinho|chap[eé]uzinho)\s+vermelh[oa]\b/i.test(userMessage) && /\b(conta|conte|contar|hist[oó]ria|historinha|conto|narra|narre)\b/i.test(userMessage);
+    if (isVoiceOrbRequest(body, sessionId) && wantsLittleRedRidingHood) {
+      const reply = `${saudacao}! Claro. Era uma vez uma menina muito querida, conhecida por todos como Chapeuzinho Vermelho, porque usava sempre uma capa vermelha feita por sua avó. Um dia, sua mãe preparou uma cesta com bolo, frutas e um pouco de mel e pediu que ela levasse tudo até a casa da vovó, que estava doente e morava do outro lado da floresta.
+
+Antes de sair, a mãe avisou: “Vá pelo caminho certo, não converse com estranhos e não se distraia na floresta.” Chapeuzinho prometeu obedecer e seguiu feliz pelo caminho, ouvindo os pássaros e olhando as flores.
+
+No meio da floresta, apareceu um lobo esperto. Com voz mansa, ele perguntou para onde ela ia. Chapeuzinho, inocente, contou que estava indo visitar a avó. O lobo sugeriu que ela colhesse flores para alegrar a vovó. Enquanto a menina se distraía, ele correu por um atalho até a casa da avó.
+
+Chegando lá, o lobo bateu à porta, fingiu ser Chapeuzinho. A vovó percebeu o perigo e conseguiu se esconder dentro de um armário. O lobo vestiu a touca e os óculos dela, deitou-se na cama e esperou.
+
+Quando Chapeuzinho chegou, achou a avó muito estranha e perguntou: “Vovó, que olhos grandes você tem!” O lobo respondeu: “São para te ver melhor.” A menina continuou: “Que orelhas grandes você tem!” E ele disse: “São para te ouvir melhor.” Por fim, ela perguntou: “E que boca grande você tem!” O lobo saltou da cama, mas Chapeuzinho gritou por ajuda.
+
+Um caçador que passava por perto ouviu o pedido de socorro, entrou na casa e espantou o lobo para bem longe da floresta. A vovó saiu do armário, abraçou a neta, e as duas agradeceram muito ao caçador.
+
+Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cuidado com estranhos. Ela continuou visitando a vovó, mas sempre com atenção, coragem e prudência. E assim, todos ficaram bem.`;
+      const wantAudio = body.want_audio !== false;
+      return new Response(JSON.stringify({ response: reply, session_id: sessionId, appointment: null, audio_base64: wantAudio ? await synthesizeSpeech(reply) : null, handoff: false, speaker: "Secretária", analysis: null }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const assistantReplies = recentAssistantReplies(history);
     const antiRepetitionContext = assistantReplies.length
       ? `\n\nANTI-REPETIÇÃO OPERACIONAL:\n- As últimas respostas da secretária foram:\n${assistantReplies.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n- Não repita nenhuma delas, nem a mesma saudação, nem a mesma pergunta. Responda diretamente à última mensagem do cliente com avanço real na conversa.`
