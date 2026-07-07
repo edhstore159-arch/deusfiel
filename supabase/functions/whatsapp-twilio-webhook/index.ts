@@ -488,7 +488,7 @@ Deno.serve(async (req) => {
       to,
       hasBody: body.length > 0,
       numMedia,
-      mediaType0: form.get("MediaContentType0"),
+      mediaType0: formData.get("MediaContentType0"),
     });
 
     let userText = body;
@@ -497,8 +497,8 @@ Deno.serve(async (req) => {
     let inboundImageDescription = "";
 
     if (numMedia > 0) {
-      const mediaUrl = String(form.get("MediaUrl0") || "");
-      const mediaTypeRaw = String(form.get("MediaContentType0") || "audio/ogg");
+      const mediaUrl = String(formData.get("MediaUrl0") || "");
+      const mediaTypeRaw = String(formData.get("MediaContentType0") || "audio/ogg");
       const mediaType = mediaTypeRaw.split(";")[0].trim().toLowerCase();
       const isAudio = mediaType.startsWith("audio") || mediaType.includes("ogg") || mediaType.includes("opus");
       const isImage = mediaType.startsWith("image/");
