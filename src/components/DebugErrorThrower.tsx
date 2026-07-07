@@ -16,6 +16,7 @@ export const DebugErrorThrower = () => {
       if (typeof detail === "string" && detail.trim()) {
         if (shouldSuppressLovableDebugInstruction(detail)) {
           console.info("Instrução de debug registrada sem interromper a interface.");
+          setMessage(null);
           return;
         }
         setMessage(detail);
@@ -25,7 +26,14 @@ export const DebugErrorThrower = () => {
     return () => window.removeEventListener("lovable-debug-error", handler);
   }, []);
 
+  useEffect(() => {
+    if (message && shouldSuppressLovableDebugInstruction(message)) {
+      setMessage(null);
+    }
+  }, [message]);
+
   if (message) {
+    if (shouldSuppressLovableDebugInstruction(message)) return null;
     throw new Error(message);
   }
 
