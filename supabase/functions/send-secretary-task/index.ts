@@ -14,6 +14,7 @@ function normalize(num: string): string {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const _auth = await requireUser(req); if (!_auth.ok) return _auth.response;
 
   try {
     if (!LOVABLE_API_KEY || !TWILIO_API_KEY) {
