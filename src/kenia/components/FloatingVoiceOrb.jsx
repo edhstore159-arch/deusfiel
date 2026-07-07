@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mic, X, Loader2, Image as ImageIcon, Upload, Sparkles } from "lucide-react";
+import { Mic, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { api } from "@/kenia/lib/api";
