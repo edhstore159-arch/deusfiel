@@ -1,6 +1,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { generateWithNanoBanana } from '../_shared/nano-banana.ts';
 import { chatCompletion } from '../_shared/llm.ts';
+import { requireUser } from '../_shared/auth.ts';
 
 const REALISM =
   "ultra realistic photography, 50mm lens, shallow depth of field, natural skin texture, " +
