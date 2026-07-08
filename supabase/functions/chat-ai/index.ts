@@ -619,8 +619,11 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   const all = [...history.map(h => h.content), t].join("\n");
   const phone = (all.match(/\+?\d{2}\s?\(?\d{2}\)?\s?\d{4,5}-?\d{4}/) || [])[0] || null;
   const email = (all.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0] || null;
-  const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
-  const client_name = nameMatch?.[1]?.trim() || "Cliente do WhatsApp";
+  const nameMatch = all.match(/(?:meu nome\s+(?:e|é)|me chamo|sou\s+[oa]?)\s+([^\n,.;]+)/i);
+  const client_name = nameMatch?.[1]
+    ?.trim()
+    .replace(/\s+\b(?:quero|gostaria|preciso|desejo|vou)\b[\s\S]*$/i, "")
+    .trim() || "Cliente do WhatsApp";
 
   return {
     client_name,
@@ -1044,6 +1047,9 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
       const dateStr = appointment.appointment_date || "";
       const timeStr = appointment.appointment_time || "";
       const confirmation = formatAppointmentConfirmation(dateStr, timeStr);
+      if ((appointment.raw_payload as any)?.source === "text_fallback") {
+        reply = `Agendamento confirmado para ${appointment.client_name || "o cliente"}: ${confirmation}.`;
+      }
       const needsConfirmation = !/agendamento[\s\S]{0,80}confirmad|confirmad[\s\S]{0,80}agendamento/i.test(reply) || !reply.includes(timeStr);
       if (needsConfirmation || !reply.includes(meetUrl)) {
         reply = `${reply}\n\n✅ Agendamento confirmado para ${confirmation}.\n🔗 Link da reunião: ${meetUrl}`.trim();
