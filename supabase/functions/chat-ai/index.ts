@@ -558,17 +558,6 @@ function parseAppointmentBlock(text: string) {
   }
 }
 
-function formatAppointmentConfirmation(date: string, time: string) {
-  const [year, month, day] = String(date || "").split("-").map(Number);
-  if (!year || !month || !day || !/^\d{2}:\d{2}$/.test(String(time || ""))) {
-    return `${date} às ${time}`.trim();
-  }
-  const noonUtc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  const weekday = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", weekday: "long" }).format(noonUtc);
-  const fullDate = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" }).format(noonUtc);
-  return `${weekday}, ${fullDate}, às ${time}`;
-}
-
 // Extrai um agendamento direto do texto do cliente (sem depender da IA).
 // Procura uma intenção de agendamento + data + hora explícitos.
 function extractAppointmentFromText(text: string, history: Array<{ role: string; content: string }> = []) {
@@ -579,11 +568,8 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   const intentInHistory = KEYWORD_RE.test(recentHistoryText);
   if (!intentHere && !intentInHistory) return null;
 
-  // Hora: 14:30, 14h, 14h30, às 14. Não aceita número solto para não confundir data (10/07) com horário.
-  const timeMatch =
-    t.match(/\b(?:[aà]s\s*)?(\d{1,2})[:h](\d{2})\b/i) ||
-    t.match(/\b(?:[aà]s\s+)(\d{1,2})(?:\s*(h|hs|horas))?\b/i) ||
-    t.match(/\b(\d{1,2})\s*(h|hs|horas)\b/i);
+  // Hora: 14:30, 14h, 14h30, às 14
+  const timeMatch = t.match(/\b(?:[aà]s\s*)?(\d{1,2})(?:[:h](\d{2}))?\s*(h|hs|horas)?\b/i);
   // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
   const todayMatch = /\bhoje\b/i.test(t);
   const tomorrowMatch = /\bamanh[aã]\b/i.test(t);
@@ -608,7 +594,7 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
     if (dateMatch[3]) { y = Number(dateMatch[3]); if (y < 100) y += 2000; }
   }
   const hh = Math.max(0, Math.min(23, Number(timeMatch[1])));
-  const mm = Math.max(0, Math.min(59, /^\d{2}$/.test(String(timeMatch[2] || "")) ? Number(timeMatch[2]) : 0));
+  const mm = Math.max(0, Math.min(59, Number(timeMatch[2] || "0")));
   if (!Number.isFinite(hh)) return null;
 
   const date = `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -619,11 +605,8 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   const all = [...history.map(h => h.content), t].join("\n");
   const phone = (all.match(/\+?\d{2}\s?\(?\d{2}\)?\s?\d{4,5}-?\d{4}/) || [])[0] || null;
   const email = (all.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0] || null;
-  const nameMatch = all.match(/(?:meu nome\s+(?:e|é)|me chamo|sou\s+[oa]?)\s+([^\n,.;]+)/i);
-  const client_name = nameMatch?.[1]
-    ?.trim()
-    .replace(/\s+\b(?:quero|gostaria|preciso|desejo|vou)\b[\s\S]*$/i, "")
-    .trim() || "Cliente do WhatsApp";
+  const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
+  const client_name = nameMatch?.[1]?.trim() || "Cliente do WhatsApp";
 
   return {
     client_name,
@@ -790,13 +773,6 @@ Só envie a resposta depois que os 7 itens estiverem satisfeitos.${antiRepetitio
     // ====== PROMPT SECRETÁRIA VIRTUAL DO WHATSAPP (totalmente separado do prompt da voz) ======
     const whatsappPrompt = isWhatsApp
       ? `OBJETIVO: investigar a dor do cliente em PROFUNDIDADE, VERIFICAR se ele atende aos requisitos legais/técnicos do pedido, OFERECER um produto/serviço específico da plataforma, e AGENDAR conversa com o especialista certo.
-
-AGENDAMENTO OBJETIVO (OBRIGATÓRIO):
-- Se o cliente disser que quer agendar/marcar/remarcar horário, NÃO prolongue a triagem jurídica e NÃO peça para ele falar muito do caso.
-- Colete apenas os dados mínimos que faltarem: nome, telefone se necessário, data e horário. Se data e horário já vierem na mensagem, confirme imediatamente.
-- Se o cliente disser que não quer falar muito, seja objetiva e conduza direto para o agendamento.
-- Ao confirmar, escreva obrigatoriamente uma frase contendo as palavras "agendamento" e "confirmado", com dia da semana, data DD/MM/AAAA e horário HH:MM.
-- Quando data e horário estiverem definidos, finalize com o bloco <AGENDAMENTO> preenchido para salvar no dashboard.
 
 SAUDAÇÃO E CORTESIA (OBRIGATÓRIO):
 - A PRIMEIRA mensagem da conversa DEVE começar com "${saudacao}!" (já calculado pelo horário de Brasília — NÃO use outra saudação).
@@ -1046,13 +1022,8 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
       meetUrl = `https://meet.jit.si/${room}`;
       const dateStr = appointment.appointment_date || "";
       const timeStr = appointment.appointment_time || "";
-      const confirmation = formatAppointmentConfirmation(dateStr, timeStr);
-      if ((appointment.raw_payload as any)?.source === "text_fallback") {
-        reply = `Agendamento confirmado para ${appointment.client_name || "o cliente"}: ${confirmation}.\n🔗 Link da reunião: ${meetUrl}`;
-      }
-      const needsConfirmation = !/agendamento[\s\S]{0,80}confirmad|confirmad[\s\S]{0,80}agendamento/i.test(reply) || !reply.includes(timeStr);
-      if (needsConfirmation || !reply.includes(meetUrl)) {
-        reply = `${reply}\n\n✅ Agendamento confirmado para ${confirmation}.\n🔗 Link da reunião: ${meetUrl}`.trim();
+      if (!reply.includes(meetUrl)) {
+        reply = `${reply}\n\n✅ Agendamento confirmado para ${dateStr} às ${timeStr}.\n🔗 Link da reunião: ${meetUrl}`.trim();
       }
     }
 
@@ -1118,7 +1089,7 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
             ...appointment,
             raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente" },
             source: "chat_ai",
-            status: "confirmado",
+            status: "scheduled",
           })
           .select("id")
           .maybeSingle();
