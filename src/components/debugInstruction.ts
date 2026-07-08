@@ -9,11 +9,11 @@ export const isLovableNativeDebugRuntime = () => false;
 
 /**
  * Dispara o CustomEvent de depuração que o DebugErrorThrower converte em
- * erro fatal real, acionando o overlay "Try to Fix" nativo da Lovable.
+ * erro global assíncrono, acionando o overlay "Try to Fix" sem tela branca.
  *
  * Importante: NÃO suprimir por prefixo — o Debug Tool SEMPRE envia com o
- * prefixo "INSTRUÇÃO DE DESENVOLVIMENTO..." e precisa mesmo assim escapar
- * até o overlay global.
+ * prefixo "INSTRUÇÃO DE DESENVOLVIMENTO..." e precisa mesmo assim chegar
+ * ao overlay global.
  */
 export const dispatchLovableDebugError = (message: string) => {
   if (typeof window === "undefined" || !message) return false;

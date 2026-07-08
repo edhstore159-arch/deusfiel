@@ -809,7 +809,7 @@ export default function FloatingVoiceOrb() {
         appointment_date: newDate.toISOString().slice(0, 10),
         appointment_time: newDate.toTimeString().slice(0, 5),
         starts_at: newDate.toISOString(),
-        status: "scheduled",
+        status: "confirmado",
         source: "voice_orb",
       };
       let ok = false;
@@ -820,7 +820,7 @@ export default function FloatingVoiceOrb() {
         if (error) throw error;
       }
       contextRef.current = null;
-      const msg = `Agendamento criado para ${client_name} em ${fmtDateTime(newDate.toISOString())}.`;
+      const msg = `Agendamento confirmado para ${client_name}: ${fmtDateTimeFull(newDate.toISOString())}.`;
       setReply(msg); speak(msg); toast.success(msg);
     } catch (e) {
       toast.error("Falha ao agendar: " + (e?.message || e));
@@ -874,6 +874,13 @@ export default function FloatingVoiceOrb() {
     try {
       const d = new Date(iso);
       return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+    } catch { return String(iso || ""); }
+  };
+
+  const fmtDateTimeFull = (iso) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
     } catch { return String(iso || ""); }
   };
 
@@ -1059,7 +1066,16 @@ Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cu
       const q = (ytMatch ? ytMatch[1] : (musicOnly ? musicOnly[1] : effectiveText)).replace(/youtube/gi, "").replace(/\b(toca|tocar|toque|coloca|colocar|coloque|p[oõ]e|reproduz|m[uú]sica|som|v[ií]deo|can[cç][aã]o|playlist|clipe)\b/gi, "").trim();
       if (q) { userMinimizedRef.current = false; setOpen(true); playYouTube(q); return; }
     }
-    // Intenção: agendamentos (hoje, amanhã, semana, todos)
+    // Criar novo agendamento antes da consulta genérica de agenda.
+    // Ex.: "agendar consulta com João para amanhã às 15h" deve criar, não listar.
+    const newApptMatch = effectiveText.match(/\b(?:agendar|agende|marcar|marque|cria[r]?|criar|nova?|novo)\s+(?:um[a]?\s+)?(?:agendamento|consulta|reuni[ãa]o|compromisso|atendimento|hor[áa]rio)?\s*(?:com|para|pro|pra|de|do|da)\s+(.+?)\s+(?:para|pra|pro|no\s+dia|em|às|as)\s+(.+)/i);
+    if (newApptMatch) { scheduleNewAppointment(newApptMatch[1].trim(), newApptMatch[2].trim()); return; }
+
+    // Mudar data do agendamento: "mudar/alterar/remarcar agendamento de [nome] para [data]"
+    const chMatch = effectiveText.match(/\b(?:mudar|alterar|trocar|remarcar|reagendar|mover|adiar)\s+(?:o\s+|a\s+)?(?:agendamento|reuniao|reunião|consulta|compromisso|hor[aá]rio)?\s*(?:de|do|da|com)?\s*(.+?)\s+(?:para|pra|pro)\s+(.+)/i);
+    if (chMatch) { changeAppointmentDate(chMatch[1].trim(), chMatch[2].trim()); return; }
+
+    // Intenção: consultar agendamentos (hoje, amanhã, semana, todos)
     if (/\b(agendamento[s]?|agenda|compromisso[s]?|consulta[s]?)\b/.test(lower)) {
       let scope = "today";
       if (/\b(amanh[aã])\b/.test(lower)) scope = "tomorrow";
@@ -1074,12 +1090,6 @@ Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cu
     // Enviar mensagem no WhatsApp: "enviar/mandar mensagem/whatsapp para [nome] dizendo/falando/: [texto]"
     const waMatch = effectiveText.match(/\b(?:enviar|mandar|envie|mande)\s+(?:uma\s+)?(?:mensagem|whats?app|zap)\s+(?:para|pro|pra|ao|a|o)\s+(.+?)\s+(?:dizendo|falando|com\s+a\s+mensagem|que|:)\s+(.+)/i);
     if (waMatch) { sendWhatsAppTo(waMatch[1].trim(), waMatch[2].trim()); return; }
-    // Criar novo agendamento: "agendar/marcar [consulta/reunião] com/para [nome] para/no dia [data/hora]"
-    const newApptMatch = effectiveText.match(/\b(?:agendar|agende|marcar|marque|cria[r]?|criar|nova?|novo)\s+(?:um[a]?\s+)?(?:agendamento|consulta|reuni[ãa]o|compromisso|atendimento|hor[áa]rio)?\s*(?:com|para|pro|pra|de|do|da)\s+(.+?)\s+(?:para|pra|pro|no\s+dia|em|às|as)\s+(.+)/i);
-    if (newApptMatch) { scheduleNewAppointment(newApptMatch[1].trim(), newApptMatch[2].trim()); return; }
-    // Mudar data do agendamento: "mudar/alterar/remarcar agendamento de [nome] para [data]"
-    const chMatch = effectiveText.match(/\b(?:mudar|alterar|trocar|remarcar|reagendar|mover|adiar)\s+(?:o\s+|a\s+)?(?:agendamento|reuniao|reunião|consulta|compromisso|hor[aá]rio)?\s*(?:de|do|da|com)?\s*(.+?)\s+(?:para|pra|pro)\s+(.+)/i);
-    if (chMatch) { changeAppointmentDate(chMatch[1].trim(), chMatch[2].trim()); return; }
     // Ligar para [nome]
     const callMatch = effectiveText.match(/\b(?:ligar|telefonar|chamar|ligue|telefone)\s+(?:para|pro|pra|o|a)?\s*(.+)/i);
     if (callMatch) { callClient(callMatch[1].trim()); return; }
