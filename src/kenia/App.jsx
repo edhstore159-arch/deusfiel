@@ -51,6 +51,7 @@ const EmergentLogin = lazyWithReload(() => import("@/kenia/pages/EmergentLogin")
 const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
 const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
+const JuizVirtual = lazyWithReload(() => import("@/kenia/pages/JuizVirtual"));
 
 
 const ResetPassword = lazy(() => import("@/kenia/pages/ResetPassword"));
@@ -99,6 +100,8 @@ function App() {
                 <Route path="/app/chat-ia" element={<ChatIA />} />
                 <Route path="/app/admin" element={<AdminCases />} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
+                <Route path="/app/juiz-virtual" element={<JuizVirtual />} />
+                
                 
                 <Route path="/app/onboarding" element={<Onboarding />} />
                 <Route path="/app/agenda" element={<Agenda />} />
