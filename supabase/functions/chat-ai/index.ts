@@ -1048,7 +1048,7 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
       const timeStr = appointment.appointment_time || "";
       const confirmation = formatAppointmentConfirmation(dateStr, timeStr);
       if ((appointment.raw_payload as any)?.source === "text_fallback") {
-        reply = `Agendamento confirmado para ${appointment.client_name || "o cliente"}: ${confirmation}.`;
+        reply = `Agendamento confirmado para ${appointment.client_name || "o cliente"}: ${confirmation}.\n🔗 Link da reunião: ${meetUrl}`;
       }
       const needsConfirmation = !/agendamento[\s\S]{0,80}confirmad|confirmad[\s\S]{0,80}agendamento/i.test(reply) || !reply.includes(timeStr);
       if (needsConfirmation || !reply.includes(meetUrl)) {
