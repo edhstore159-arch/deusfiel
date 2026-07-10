@@ -1,4 +1,5 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { requireUser } from "../_shared/auth.ts";
 
 const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -84,6 +85,8 @@ async function transcribeWithLovableAI(audio_base64: string, mime: string): Prom
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const _auth_res = await requireUser(req);
+  if (_auth_res instanceof Response) return _auth_res;
 
   try {
     const body = await req.json();
