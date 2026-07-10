@@ -1,3 +1,4 @@
+import { requireAdmin } from "../_shared/auth.ts";
 // Health-check endpoint: verifica se Ollama e demais providers estão respondendo.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -136,6 +137,8 @@ async function checkOpenAIImage() {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const _auth_res = await requireAdmin(req);
+  if (_auth_res instanceof Response) return _auth_res;
   const url = new URL(req.url);
   const deep = url.searchParams.get("deep") === "1";
   const ollama = await checkOllama();

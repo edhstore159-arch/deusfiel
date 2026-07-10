@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { chatCompletion } from "../_shared/llm.ts";
+import { requireUser } from "../_shared/auth.ts";
 
 const SYSTEM = `Você é um diretor de fotografia e prompt engineer especializado em geração de vídeo realista no estilo HEYGEN — apresentador virtual humano falando para a câmera (Veo / Sora / Runway / Kling).
 Sua tarefa: receber uma cena/roteiro em português e produzir UM ÚNICO prompt em INGLÊS, otimizado para vídeo full HD 1080p de um AVATAR HUMANO REALISTA apresentando, com sincronização labial perfeita.
@@ -20,6 +21,8 @@ REGRAS DUROS (HeyGen-style virtual presenter):
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const _auth_res = await requireUser(req);
+  if (_auth_res instanceof Response) return _auth_res;
   try {
     const { scene, category, mood, durationSeconds } = await req.json();
     if (!scene || typeof scene !== "string") {

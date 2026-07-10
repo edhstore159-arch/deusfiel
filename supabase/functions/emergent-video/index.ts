@@ -1,3 +1,4 @@
+import { requireUser } from "../_shared/auth.ts";
 // Emergent video generation proxy.
 // Uses OpenAI-compatible Videos API exposed by Emergent at:
 //   POST   /llm/videos                    -> create job
@@ -72,6 +73,8 @@ async function replicateFallback(prompt: string, ratio: "9:16" | "16:9", seconds
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const _auth_res = await requireUser(req);
+  if (_auth_res instanceof Response) return _auth_res;
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
