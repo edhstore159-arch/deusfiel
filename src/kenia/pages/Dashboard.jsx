@@ -465,6 +465,7 @@ export default function Dashboard() {
         want_audio: true,
         model: aiAgent,
         return_analysis: true,
+        system_prompt: COPILOTO_JURIDICO_PROMPT,
       });
       setAiSession(data.session_id);
       setAiMessages((m) => [...m, {
