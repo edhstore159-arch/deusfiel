@@ -934,7 +934,7 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     if (aiResult.ok && !fastMode && isNearDuplicateReply(rawReply, history)) {
       const retryResult = await chatCompletion({
-        model: "claude-3-5-sonnet-20241022",
+        model: agentModel,
         preferProvider: "emergent",
         messages: [
           {
