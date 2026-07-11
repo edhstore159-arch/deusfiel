@@ -47,19 +47,65 @@ async function callLovable(messages: unknown[], model: string) {
   return fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Lovable-API-Key": LOVABLE_API_KEY ?? "",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model, messages, stream: true }),
   });
 }
 
+const EMERGENT_FALLBACK_MODEL = "gpt-4o-mini";
+
+function isClaudeModel(model: string) {
+  return /claude/i.test(model);
+}
+
+function normalizeEmergentModel(model: string) {
+  const raw = String(model || "").trim();
+  if (!raw) return EMERGENT_FALLBACK_MODEL;
+  if (/^anthropic\/claude/i.test(raw)) return raw.replace(/^anthropic\//i, "");
+  if (/^claude/i.test(raw)) return raw;
+  if (/^(openai\/)?gpt-4o(-mini)?$/i.test(raw)) return raw;
+  if (/^google\//i.test(raw)) return raw;
+  return EMERGENT_FALLBACK_MODEL;
+}
+
+function emergentCandidateModels(model: string) {
+  const primary = normalizeEmergentModel(model);
+  if (!isClaudeModel(model)) return [primary];
+  const lower = primary.toLowerCase();
+  const base = lower.includes("haiku") ? "claude-3-5-haiku" : "claude-3-5-sonnet";
+  return Array.from(new Set([
+    primary,
+    `${base}-latest`,
+    base,
+    EMERGENT_FALLBACK_MODEL,
+  ]));
+}
+
 async function callEmergent(messages: unknown[], model: string) {
+  const emergentModel = normalizeEmergentModel(model);
   return fetch("https://integrations.emergentagent.com/llm/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${EMERGENT_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true }),
+    body: JSON.stringify({ model: emergentModel, messages, stream: true }),
   });
+}
+
+async function callEmergentWithFallback(messages: unknown[], requestedModel: string) {
+  const candidates = emergentCandidateModels(requestedModel);
+  let last: Response | null = null;
+
+  for (const candidate of candidates) {
+    const upstream = await callEmergent(messages, candidate);
+    if (upstream.ok) return { upstream, model: candidate };
+    const errText = await upstream.text().catch(() => "");
+    console.error(`judge-ai emergent failed (${candidate}): ${upstream.status} ${errText}`);
+    last = new Response(errText, { status: upstream.status, headers: upstream.headers });
+    if (!isClaudeModel(requestedModel) || ![400, 404].includes(upstream.status)) break;
+  }
+
+  return { upstream: last ?? jsonError("Falha no gateway de IA.", 502), model: candidates[candidates.length - 1] ?? EMERGENT_FALLBACK_MODEL };
 }
 
 Deno.serve(async (req) => {
@@ -98,16 +144,14 @@ Deno.serve(async (req) => {
       console.error(`judge-ai lovable failed: ${upstream.status} ${errText}`);
       // Se for 402/429 e houver Emergent, tenta fallback
       if ((upstream.status === 402 || upstream.status === 429) && EMERGENT_API_KEY) {
-        const EMERGENT_ALLOWED = new Set(["gpt-4o-mini", "gpt-4o", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]);
-        const emergentModel = EMERGENT_ALLOWED.has(requestedModel) ? requestedModel : "gpt-4o-mini";
-        const up2 = await callEmergent(fullMessages, emergentModel);
+        const { upstream: up2, model: emergentModel } = await callEmergentWithFallback(fullMessages, requestedModel);
         if (up2.ok) {
           return new Response(up2.body, {
             headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Judge-Provider": "emergent", "X-Judge-Model": emergentModel },
           });
         }
         const errText2 = await up2.text().catch(() => "");
-        console.error(`judge-ai emergent fallback failed: ${up2.status} ${errText2}`);
+        console.error(`judge-ai emergent fallback failed (${emergentModel}): ${up2.status} ${errText2}`);
       }
       const friendly = upstream.status === 402
         ? "Créditos da IA esgotados. Adicione créditos no workspace da Lovable para continuar usando o Juiz Virtual."
@@ -119,16 +163,14 @@ Deno.serve(async (req) => {
 
     // Provider 2 (sem Lovable): Emergent
     if (EMERGENT_API_KEY) {
-      const EMERGENT_ALLOWED = new Set(["gpt-4o-mini", "gpt-4o", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]);
-      const emergentModel = EMERGENT_ALLOWED.has(requestedModel) ? requestedModel : "gpt-4o-mini";
-      const upstream = await callEmergent(fullMessages, emergentModel);
+      const { upstream, model: emergentModel } = await callEmergentWithFallback(fullMessages, requestedModel);
       if (upstream.ok) {
         return new Response(upstream.body, {
           headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Judge-Provider": "emergent", "X-Judge-Model": emergentModel },
         });
       }
       const errText = await upstream.text().catch(() => "");
-      console.error(`judge-ai emergent failed: ${upstream.status} ${errText}`);
+      console.error(`judge-ai emergent final failed (${emergentModel}): ${upstream.status} ${errText}`);
       const friendly = upstream.status === 402
         ? "Créditos da chave Emergent esgotados."
         : upstream.status === 429

@@ -18,13 +18,14 @@ export const DebugErrorThrower = () => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
       if (typeof detail !== "string" || !detail.trim()) return;
+      if (shouldSuppressLovableDebugInstruction(detail)) return;
       setMessage(detail);
     };
     window.addEventListener("lovable-debug-error", handler);
     return () => window.removeEventListener("lovable-debug-error", handler);
   }, []);
 
-  if (message && !shouldSuppressLovableDebugInstruction(message)) {
+  if (message) {
     // Intencional: erro fatal durante o render para o overlay/"Try to Fix" da Lovable.
     throw new Error(message);
   }
