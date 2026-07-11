@@ -24,7 +24,13 @@ export const DebugErrorThrower = () => {
     return () => window.removeEventListener("lovable-debug-error", handler);
   }, []);
 
-  if (message && !shouldSuppressLovableDebugInstruction(message)) {
+  const normalizedMessage = String(message || "").replace(/^\s*(?:Uncaught\s+)?Error:\s*/i, "");
+
+  if (message && shouldSuppressLovableDebugInstruction(normalizedMessage)) {
+    return null;
+  }
+
+  if (message) {
     // Intencional: erro fatal durante o render para o overlay/"Try to Fix" da Lovable.
     throw new Error(message);
   }
