@@ -903,8 +903,10 @@ SIM
 CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação correta agora: "${saudacao}".${jusbrasilContext}`
       : "";
 
-    const finalSystem = isVoiceOrb && overrideSystem
-      ? `${overrideSystem}\n\nCONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime}.\n\nMODO CRIATIVO DE VOZ: quando o usuário pedir história, conto, poema, roteiro, personagem ou texto criativo, cumpra imediatamente o pedido com uma resposta completa, natural e finalizada. Não faça triagem jurídica, não peça nome, não tente agendar e não responda com evasivas.`
+    const finalSystem = overrideSystem
+      ? (isVoiceOrb
+          ? `${overrideSystem}\n\nCONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime}.\n\nMODO CRIATIVO DE VOZ: quando o usuário pedir história, conto, poema, roteiro, personagem ou texto criativo, cumpra imediatamente o pedido com uma resposta completa, natural e finalizada. Não faça triagem jurídica, não peça nome, não tente agendar e não responda com evasivas.`
+          : `${overrideSystem}\n\nCONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime}.`)
       : isWhatsApp
         ? `${whatsappPrompt}${extraContext ? `\n\nDADOS INTERNOS DISPONÍVEIS (use-os literalmente; não diga que não tem acesso):\n${extraContext}` : ""}`
         : extraContext
