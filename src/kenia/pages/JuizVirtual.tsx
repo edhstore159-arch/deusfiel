@@ -52,9 +52,15 @@ export default function JuizVirtual() {
         },
         body: JSON.stringify({ messages: next.slice(0, -1), model }),
       });
+      const contentType = res.headers.get("content-type") || "";
       if (!res.ok || !res.body) {
         const body = await res.text().catch(() => "");
         throw new Error(`Juiz Virtual falhou (${res.status}): ${body || "sem detalhes"}`);
+      }
+      // Se o backend retornou JSON (erro amigável 200), mostra toast e sai sem crashar.
+      if (contentType.includes("application/json")) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || "Falha ao consultar o Juiz Virtual.");
       }
 
       const reader = res.body.getReader();
