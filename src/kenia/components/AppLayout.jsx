@@ -48,6 +48,8 @@ const PREFETCH = {
   "/app/admin": () => import("@/kenia/pages/AdminCases"),
   "/app/secretary-tasks": () => import("@/kenia/pages/SecretaryTasks"),
   "/app/juiz-virtual": () => import("@/kenia/pages/JuizVirtual"),
+  "/app/agents": () => import("@/kenia/pages/Agents"),
+  
   
   "/app/crm": () => import("@/kenia/pages/CRM"),
   "/app/agenda": () => import("@/kenia/pages/Agenda"),
