@@ -3,6 +3,21 @@ import { requireUser } from "../_shared/auth.ts";
 
 const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+const MIN_AUDIO_BYTES = 1024;
+const ALLOWED_AUDIO_MIME = new Set([
+  "audio/webm",
+  "audio/wav",
+  "audio/wave",
+  "audio/x-wav",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/aac",
+  "audio/ogg",
+  "audio/opus",
+]);
 
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -53,34 +68,28 @@ async function transcribeWithElevenLabs(bytes: Uint8Array, mime: string): Promis
   return text;
 }
 
-async function transcribeWithLovableAI(audio_base64: string, mime: string): Promise<string> {
+async function transcribeWithLovableAI(bytes: Uint8Array, mime: string): Promise<string> {
   if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY ausente");
-  const format = pickExtension(mime);
-  const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const cleaned = cleanMime(mime);
+  const ext = pickExtension(cleaned);
+  const blob = new Blob([bytes], { type: cleaned });
+  const form = new FormData();
+  form.append("model", "openai/gpt-4o-transcribe");
+  form.append("file", blob, `recording.${ext}`);
+
+  const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": LOVABLE_API_KEY,
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
     },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "Transcreva fielmente o áudio em português do Brasil. Retorne APENAS o texto transcrito." },
-            { type: "input_audio", input_audio: { data: audio_base64, format } },
-          ],
-        },
-      ],
-    }),
+    body: form,
   });
   if (!aiResp.ok) {
     const detail = await aiResp.text();
-    throw new Error(`Lovable AI ${aiResp.status}: ${detail.slice(0, 200)}`);
+    throw new Error(`Lovable AI STT ${aiResp.status}: ${detail.slice(0, 300)}`);
   }
   const data = await aiResp.json();
-  return (data?.choices?.[0]?.message?.content || "").trim();
+  return (data?.text || data?.transcript || "").trim();
 }
 
 Deno.serve(async (req) => {
@@ -107,6 +116,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    const bytes = base64ToBytes(audio_base64);
+    const cleanedMime = cleanMime(mt);
+    if (!ALLOWED_AUDIO_MIME.has(cleanedMime)) {
+      return new Response(JSON.stringify({ error: `Formato de áudio não suportado: ${cleanedMime}` }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (bytes.byteLength < MIN_AUDIO_BYTES) {
+      return new Response(JSON.stringify({ error: "Gravação vazia ou curta demais. Grave novamente." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (bytes.byteLength > MAX_AUDIO_BYTES) {
+      return new Response(JSON.stringify({ error: "Áudio maior que 25 MB. Grave um trecho menor." }), {
+        status: 413,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     let text = "";
     let provider = "";
     let lastError: string | null = null;
@@ -114,7 +144,6 @@ Deno.serve(async (req) => {
     // Primary: ElevenLabs Scribe (reliable for short audio in PT-BR)
     if (ELEVENLABS_API_KEY) {
       try {
-        const bytes = base64ToBytes(audio_base64);
         text = await transcribeWithElevenLabs(bytes, mt);
         provider = "elevenlabs";
       } catch (err) {
@@ -126,7 +155,7 @@ Deno.serve(async (req) => {
     // Fallback: Lovable AI Gateway
     if (!text && LOVABLE_API_KEY) {
       try {
-        text = await transcribeWithLovableAI(audio_base64, mt);
+        text = await transcribeWithLovableAI(bytes, mt);
         provider = "lovable-ai";
       } catch (err) {
         lastError = String((err as Error)?.message || err);
