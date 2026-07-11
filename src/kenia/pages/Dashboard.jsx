@@ -45,6 +45,19 @@ export default function Dashboard() {
     return [AI_WELCOME];
   });
   const [aiThinking, setAiThinking] = useState(false);
+  const AI_AGENTS = [
+    { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
+    { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
+    { id: "gpt-4o", label: "ChatGPT 4o" },
+    { id: "gpt-4o-mini", label: "ChatGPT 4o mini" },
+  ];
+  const [aiAgent, setAiAgent] = useState(() => {
+    try { return localStorage.getItem("kenia:dashboard-ai-agent") || "claude-3-5-sonnet-20241022"; } catch { return "claude-3-5-sonnet-20241022"; }
+  });
+  const changeAiAgent = (m) => {
+    setAiAgent(m);
+    try { localStorage.setItem("kenia:dashboard-ai-agent", m); } catch {}
+  };
 
   useEffect(() => {
     try { localStorage.setItem("kenia:dashboard-ai-messages", JSON.stringify(aiMessages)); } catch {}
