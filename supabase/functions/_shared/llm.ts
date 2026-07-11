@@ -420,19 +420,37 @@ async function chatGemini(opts: ChatOptions) {
 
 async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
+  const normalizeEmergentChatModel = (model?: string) => {
+    const raw = String(model || "").trim();
+    if (!raw) return "gpt-4o-mini";
+    if (/^anthropic\/claude/i.test(raw)) return raw;
+    if (/^claude/i.test(raw)) return `anthropic/${raw}`;
+    if (raw.startsWith("openai/") || raw.startsWith("google/") || /^gpt-4o(-mini)?$/i.test(raw)) return raw;
+    return "gpt-4o-mini";
+  };
+  const buildBody = (model: string) => JSON.stringify({
+    model,
+    messages: opts.messages,
+    ...(opts.response_format ? { response_format: opts.response_format } : {}),
+    ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+  });
+  const requestedModel = String(opts.model || "").trim();
+  const primaryModel = normalizeEmergentChatModel(requestedModel);
   try {
-    const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
+    let resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
-      body: JSON.stringify({
-        model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/") || /^claude/i.test(opts.model || "")
-          ? opts.model
-          : "gpt-4o-mini",
-        messages: opts.messages,
-        ...(opts.response_format ? { response_format: opts.response_format } : {}),
-        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
-      }),
+      body: buildBody(primaryModel),
     }, opts.timeoutMs || 20000);
+    if (!resp.ok && resp.status === 404 && /claude/i.test(requestedModel)) {
+      const firstError = await resp.text().catch(() => "");
+      console.warn("⚠️ Emergent Claude indisponível, usando fallback:", firstError.slice(0, 200));
+      resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
+        body: buildBody("gpt-4o-mini"),
+      }, opts.timeoutMs || 20000);
+    }
     if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
     return { ok: true as const, data: await resp.json(), provider: "emergent" };
   } catch (error) {
