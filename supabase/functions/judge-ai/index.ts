@@ -3,6 +3,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY");
 
 const SYSTEM_PROMPT = `Você é o **Juiz Virtual**, um agente jurídico imparcial da plataforma da Dra. Kênia Garcia.
 
