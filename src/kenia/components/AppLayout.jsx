@@ -23,6 +23,8 @@ const NAV = [
   { to: "/app/admin", label: "Painel Admin · Casos", icon: ShieldCheck, testid: "nav-admin" },
   { to: "/app/secretary-tasks", label: "Tarefas Secretária", icon: MessageSquare, testid: "nav-secretary-tasks" },
   { to: "/app/juiz-virtual", label: "Juiz Virtual", icon: Gavel, testid: "nav-juiz-virtual" },
+  { to: "/app/agents", label: "Agentes IA", icon: Bot, testid: "nav-agents" },
+  
   
   { to: "/app/crm", label: "CRM Pipeline", icon: KanbanSquare, testid: "nav-crm" },
   { to: "/app/agenda", label: "Agenda", icon: CalendarDays, testid: "nav-agenda" },
