@@ -113,9 +113,27 @@ export default function JuizVirtual() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        Motor: ChatGPT (Emergent)
+      <div>
+        <div className="text-xs font-medium text-muted-foreground mb-2">Agentes Virtuais</div>
+        <div className="flex flex-wrap gap-2">
+          {AGENTS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => changeModel(a.id)}
+              className={`px-3 py-2 rounded-lg border text-left text-xs transition ${
+                model === a.id
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card border-border hover:bg-muted"
+              }`}
+            >
+              <div className="font-semibold">{a.label}</div>
+              <div className={model === a.id ? "opacity-80" : "text-muted-foreground"}>{a.desc}</div>
+            </button>
+          ))}
+        </div>
       </div>
+
 
 
       <Card
