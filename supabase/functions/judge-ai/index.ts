@@ -43,10 +43,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    if (!EMERGENT_API_KEY) {
+      return new Response(JSON.stringify({ error: "EMERGENT_API_KEY não configurada" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json().catch(() => ({}));
     const messages = Array.isArray(body?.messages) ? body.messages : null;
     const caseText = typeof body?.case === "string" ? body.case.trim() : "";
-    const provider = body?.provider === "emergent" ? "emergent" : "lovable";
 
     if (!messages && !caseText) {
       return new Response(JSON.stringify({ error: "Envie 'case' (texto do caso) ou 'messages' (histórico)." }), {
@@ -58,57 +63,26 @@ Deno.serve(async (req) => {
     const chatMessages = messages ?? [{ role: "user", content: caseText }];
     const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...chatMessages];
 
-    type Target = { name: "lovable" | "emergent"; url: string; apiKey: string; model: string };
-    const targets: Target[] = [];
-    const pushLovable = () => LOVABLE_API_KEY && targets.push({
-      name: "lovable",
-      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      apiKey: LOVABLE_API_KEY,
-      model: "google/gemini-2.5-flash",
+    const upstream = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${EMERGENT_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-4o-mini", messages: fullMessages, stream: true }),
     });
-    const pushEmergent = () => EMERGENT_API_KEY && targets.push({
-      name: "emergent",
-      url: "https://integrations.emergentagent.com/llm/chat/completions",
-      apiKey: EMERGENT_API_KEY,
-      model: "gpt-4o-mini",
-    });
-    if (provider === "emergent") { pushEmergent(); pushLovable(); }
-    else { pushLovable(); pushEmergent(); }
 
-    if (targets.length === 0) {
-      return new Response(JSON.stringify({ error: "Nenhum provedor de IA configurado" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (upstream.ok) {
+      return new Response(upstream.body, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Judge-Provider": "emergent", "X-Judge-Model": "gpt-4o-mini" },
       });
     }
 
-    let lastStatus = 500;
-    let lastText = "";
-    let lastProvider = targets[0].name;
-    for (const t of targets) {
-      const upstream = await fetch(t.url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${t.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: t.model, messages: fullMessages, stream: true }),
-      });
-      if (upstream.ok) {
-        return new Response(upstream.body, {
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Judge-Provider": t.name, "X-Judge-Model": t.model },
-        });
-      }
-      lastStatus = upstream.status;
-      lastText = await upstream.text().catch(() => "");
-      lastProvider = t.name;
-      console.error(`judge-ai provider ${t.name} failed: ${upstream.status} ${lastText}`);
-      // Only fallback on credit/rate errors
-      if (upstream.status !== 402 && upstream.status !== 429) break;
-    }
-
-    const friendly = lastStatus === 402
-      ? "Créditos de IA esgotados. Alterne o motor ou adicione créditos."
-      : lastStatus === 429
+    const errText = await upstream.text().catch(() => "");
+    console.error(`judge-ai emergent failed: ${upstream.status} ${errText}`);
+    const friendly = upstream.status === 402
+      ? "Créditos da chave Emergent esgotados."
+      : upstream.status === 429
       ? "Limite de requisições atingido. Tente novamente em instantes."
       : "Falha no gateway de IA.";
-    return new Response(JSON.stringify({ error: friendly, provider: lastProvider, status: lastStatus, details: lastText }), {
+    return new Response(JSON.stringify({ error: friendly, provider: "emergent", status: upstream.status, details: errText }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
