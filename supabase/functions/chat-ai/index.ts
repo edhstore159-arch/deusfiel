@@ -924,7 +924,8 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     if (aiResult.ok && !fastMode && isNearDuplicateReply(rawReply, history)) {
       const retryResult = await chatCompletion({
-        model: "google/gemini-3-flash-preview",
+        model: "claude-3-5-sonnet-20241022",
+        preferProvider: "emergent",
         messages: [
           {
             role: "system",
