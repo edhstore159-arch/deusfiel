@@ -11,11 +11,21 @@ const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+type Provider = "lovable" | "emergent";
+
 export default function JuizVirtual() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [provider, setProvider] = useState<Provider>(
+    () => (localStorage.getItem("juiz_provider") as Provider) || "lovable",
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const changeProvider = (p: Provider) => {
+    setProvider(p);
+    localStorage.setItem("juiz_provider", p);
+  };
 
   const send = async () => {
     const text = input.trim();
@@ -33,7 +43,7 @@ export default function JuizVirtual() {
           Authorization: `Bearer ${ANON}`,
           apikey: ANON,
         },
-        body: JSON.stringify({ messages: next.slice(0, -1) }),
+        body: JSON.stringify({ messages: next.slice(0, -1), provider }),
       });
       if (!res.ok || !res.body) {
         const body = await res.text().catch(() => "");
@@ -94,6 +104,24 @@ export default function JuizVirtual() {
             Descreva o caso. O agente emite um parecer imparcial fundamentado no direito brasileiro.
           </p>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-muted-foreground">Motor:</span>
+        <button
+          type="button"
+          onClick={() => changeProvider("lovable")}
+          className={`px-3 py-1 rounded-full border ${provider === "lovable" ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border"}`}
+        >
+          Lovable AI (Gemini)
+        </button>
+        <button
+          type="button"
+          onClick={() => changeProvider("emergent")}
+          className={`px-3 py-1 rounded-full border ${provider === "emergent" ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border"}`}
+        >
+          ChatGPT (Emergent)
+        </button>
       </div>
 
       <Card
