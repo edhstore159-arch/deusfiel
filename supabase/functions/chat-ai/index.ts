@@ -639,6 +639,16 @@ Deno.serve(async (req) => {
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
     const history: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
     const fastMode = body.fast_mode === true;
+    const ALLOWED_AGENT_MODELS = new Set([
+      "claude-3-5-sonnet-20241022",
+      "claude-3-5-haiku-20241022",
+      "gpt-4o",
+      "gpt-4o-mini",
+    ]);
+    const requestedAgentModel = typeof body.model === "string" ? body.model : "";
+    const agentModel = ALLOWED_AGENT_MODELS.has(requestedAgentModel)
+      ? requestedAgentModel
+      : "claude-3-5-sonnet-20241022";
     const creativeMode = body.creative_mode === true || /\b(conta|conte|contar|narra|narre|narrar|inventa|invente|cria|crie|escreve|escreva)\b[\s\S]*\b(hist[oó]ria|conto|f[aá]bula|poema|roteiro|personagem|di[aá]logo|chapeuzinho|chap[eé]uzinho)\b/i.test(userMessage.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase());
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
