@@ -345,12 +345,13 @@ function handInstructionFor(prompt: string) {
 
 async function chatLovable(opts: ChatOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, status: 0, error: "LOVABLE_API_KEY ausente" };
+  const model = toLovableChatModel(opts.model);
   try {
     const resp = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
       body: JSON.stringify({
-        model: opts.model || "google/gemini-3-flash-preview",
+        model,
         messages: opts.messages,
         ...(opts.response_format ? { response_format: opts.response_format } : {}),
         ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
@@ -358,10 +359,42 @@ async function chatLovable(opts: ChatOptions) {
       }),
     }, opts.timeoutMs || 20000);
     if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-    return { ok: true as const, data: await resp.json(), provider: "lovable" };
+    return { ok: true as const, data: await resp.json(), provider: "lovable", model };
   } catch (error) {
     return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
   }
+}
+
+const LOVABLE_CHAT_MODELS = new Set([
+  "google/gemini-3-flash-preview",
+  "google/gemini-3.1-flash-lite",
+  "google/gemini-3.5-flash",
+  "google/gemini-3.1-pro-preview",
+  "google/gemini-2.5-pro",
+  "google/gemini-2.5-flash",
+  "google/gemini-2.5-flash-lite",
+  "openai/gpt-5",
+  "openai/gpt-5-mini",
+  "openai/gpt-5-nano",
+  "openai/gpt-5.2",
+  "openai/gpt-5.4",
+  "openai/gpt-5.4-mini",
+  "openai/gpt-5.4-nano",
+  "openai/gpt-5.5",
+]);
+
+function isClaudeModel(model = "") {
+  return /(^|\/)claude/i.test(model.trim());
+}
+
+function toLovableChatModel(model = "") {
+  const requested = model.trim();
+  if (LOVABLE_CHAT_MODELS.has(requested)) return requested;
+  // Claude não existe no Lovable AI Gateway deste projeto; quando o usuário
+  // escolhe Claude e a chave Emergent não aceita o modelo, o fallback real é Gemini.
+  if (isClaudeModel(requested)) return "google/gemini-2.5-flash";
+  if (/^gpt-4o(?:-mini)?$/i.test(requested)) return "openai/gpt-5-mini";
+  return "google/gemini-2.5-flash";
 }
 
 function messagesToGeminiContents(messages: ChatMessage[]) {
@@ -411,6 +444,7 @@ async function chatGemini(opts: ChatOptions) {
     return {
       ok: true as const,
       provider: "gemini",
+      model,
       data: { choices: [{ message: { role: "assistant", content: text } }] },
     };
   } catch (error) {
@@ -420,47 +454,73 @@ async function chatGemini(opts: ChatOptions) {
 
 async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
-  const normalizeEmergentChatModel = (model?: string) => {
-    const raw = String(model || "").trim();
-    if (!raw) return "gpt-4o-mini";
-    if (/^anthropic\/claude/i.test(raw)) return raw.replace(/^anthropic\//i, "");
-    if (/^claude/i.test(raw)) return raw;
-    if (raw.startsWith("openai/") || raw.startsWith("google/") || /^gpt-4o(-mini)?$/i.test(raw)) return raw;
-    return "gpt-4o-mini";
-  };
-  const emergentCandidates = (model?: string) => {
-    const primary = normalizeEmergentChatModel(model);
-    if (!/claude/i.test(String(model || ""))) return [primary];
-    const base = primary.toLowerCase().includes("haiku") ? "claude-3-5-haiku" : "claude-3-5-sonnet";
-    return Array.from(new Set([primary, `${base}-latest`, base, "gpt-4o-mini"]));
-  };
-  const buildBody = (model: string) => JSON.stringify({
-    model,
-    messages: opts.messages,
-    ...(opts.response_format ? { response_format: opts.response_format } : {}),
-    ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
-  });
-  const requestedModel = String(opts.model || "").trim();
-  const candidates = emergentCandidates(requestedModel);
-  try {
-    let lastError = "";
-    let lastStatus = 502;
-    for (const candidate of candidates) {
-      const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
-        body: buildBody(candidate),
-      }, opts.timeoutMs || 20000);
-      if (resp.ok) return { ok: true as const, data: await resp.json(), provider: "emergent" };
+  let lastError = "";
+  let lastStatus = 0;
+  for (const model of emergentCandidates(opts.model)) try {
+    const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
+      body: JSON.stringify({
+        model,
+        messages: opts.messages,
+        ...(opts.response_format ? { response_format: opts.response_format } : {}),
+        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+        ...(typeof opts.maxTokens === "number" ? { max_tokens: opts.maxTokens } : {}),
+      }),
+    }, opts.timeoutMs || 20000);
+    if (!resp.ok) {
       lastStatus = resp.status;
       lastError = await resp.text();
-      if (!/claude/i.test(requestedModel) || ![400, 404].includes(resp.status)) break;
-      console.warn("⚠️ Emergent recusou modelo, tentando fallback:", candidate, resp.status, lastError.slice(0, 160));
+      if (resp.status === 400 || resp.status === 404) {
+        console.warn(`⚠️ Emergent rejeitou o modelo ${model}, tentando próximo:`, resp.status, lastError.slice(0, 180));
+        continue;
+      }
+      return { ok: false as const, status: resp.status, error: lastError, model };
     }
-    return { ok: false as const, status: lastStatus, error: lastError };
+    return { ok: true as const, data: await resp.json(), provider: "emergent", model };
   } catch (error) {
-    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
+    lastStatus = 0;
+    lastError = String(error instanceof Error ? error.message : error);
   }
+  return { ok: false as const, status: lastStatus, error: lastError || "Nenhum modelo Emergent aceito" };
+}
+
+function emergentCandidates(model = "") {
+  const requested = model.trim();
+  const base = requested.replace(/^(anthropic|openai|google)\//i, "");
+  const candidates = isClaudeModel(requested)
+    ? [
+        requested,
+        base,
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-sonnet-latest",
+        "claude-3-5-sonnet",
+      ]
+    : /^gpt-4o(?:-mini)?$/i.test(base)
+      ? [base]
+      : requested
+        ? [requested, base, "gpt-4o-mini"]
+        : ["gpt-4o-mini"];
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+async function chatGeminiFallbackForClaude(opts: ChatOptions) {
+  const fallbackOpts = {
+    ...opts,
+    model: "google/gemini-2.5-flash",
+    timeoutMs: Math.max(opts.timeoutMs || 20000, 20000),
+  };
+  if (GEMINI_KEY) {
+    const direct = await chatGemini(fallbackOpts);
+    if (direct.ok) return direct;
+    console.warn("⚠️ Claude via Emergent falhou; Gemini direto também falhou:", direct.status, direct.error?.slice?.(0, 200));
+  }
+  if (LOVABLE_KEY) {
+    const gateway = await chatLovable(fallbackOpts);
+    if (gateway.ok) return gateway;
+    console.warn("⚠️ Claude via Emergent falhou; Lovable/Gemini também falhou:", gateway.status, gateway.error?.slice?.(0, 200));
+  }
+  return null;
 }
 
 function isUnsupportedOllamaHost(rawUrl: string) {
@@ -523,6 +583,10 @@ export async function chatCompletion(opts: ChatOptions) {
       const r = await chatEmergent(opts);
       if (r.ok) return r;
       console.warn("⚠️ Emergent (forçado) falhou, caindo para fallback:", r.status, r.error?.slice?.(0, 200));
+      if (isClaudeModel(opts.model || "")) {
+        const geminiFallback = await chatGeminiFallbackForClaude(opts);
+        if (geminiFallback?.ok) return geminiFallback;
+      }
     } else if (opts.preferProvider === "lovable" && LOVABLE_KEY) {
       const r = await chatLovable(opts); if (r.ok) return r;
     } else if (opts.preferProvider === "gemini" && GEMINI_KEY) {
