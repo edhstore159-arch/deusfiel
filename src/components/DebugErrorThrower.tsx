@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 /**
  * DebugErrorThrower
@@ -11,22 +11,20 @@ import { useEffect, useState } from "react";
  * NÃO substituir o throw por toast, log ou console.error.
  */
 export const DebugErrorThrower = () => {
-  const [message, setMessage] = useState<string | null>(null);
-
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
       if (typeof detail !== "string" || !detail.trim()) return;
-      setMessage(detail);
+
+      // Lança fora do ciclo de render do React: o overlay global de erro ainda
+      // recebe o erro, mas a árvore do app não desmonta nem fica em tela branca.
+      window.setTimeout(() => {
+        throw new Error(detail);
+      }, 0);
     };
     window.addEventListener("lovable-debug-error", handler);
     return () => window.removeEventListener("lovable-debug-error", handler);
   }, []);
-
-  if (message) {
-    // Intencional: erro fatal durante o render para o overlay/"Try to Fix" da Lovable.
-    throw new Error(message);
-  }
 
   return null;
 };
