@@ -425,7 +425,7 @@ async function chatEmergent(opts: ChatOptions) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
       body: JSON.stringify({
-        model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/")
+        model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/") || /^claude/i.test(opts.model || "")
           ? opts.model
           : "gpt-4o-mini",
         messages: opts.messages,
