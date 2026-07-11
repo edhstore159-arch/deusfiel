@@ -102,6 +102,7 @@ function App() {
                 <Route path="/app/admin" element={<AdminCases />} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
                 <Route path="/app/juiz-virtual" element={<JuizVirtual />} />
+                <Route path="/app/agents" element={<Agents />} />
                 
                 
                 <Route path="/app/onboarding" element={<Onboarding />} />
