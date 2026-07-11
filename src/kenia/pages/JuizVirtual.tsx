@@ -11,21 +11,12 @@ const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-type Provider = "lovable" | "emergent";
-
 export default function JuizVirtual() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState<Provider>(
-    () => (localStorage.getItem("juiz_provider") as Provider) || "lovable",
-  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const changeProvider = (p: Provider) => {
-    setProvider(p);
-    localStorage.setItem("juiz_provider", p);
-  };
 
   const send = async () => {
     const text = input.trim();
