@@ -43,16 +43,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const body = await req.json().catch(() => ({}));
     const messages = Array.isArray(body?.messages) ? body.messages : null;
     const caseText = typeof body?.case === "string" ? body.case.trim() : "";
+    const provider = body?.provider === "emergent" ? "emergent" : "lovable";
 
     if (!messages && !caseText) {
       return new Response(JSON.stringify({ error: "Envie 'case' (texto do caso) ou 'messages' (histórico)." }), {
@@ -61,34 +55,55 @@ Deno.serve(async (req) => {
       });
     }
 
-    const chatMessages = messages ?? [
-      { role: "user", content: caseText },
-    ];
+    const chatMessages = messages ?? [{ role: "user", content: caseText }];
+    const fullMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...chatMessages];
 
-    const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    let url: string;
+    let apiKey: string | undefined;
+    let model: string;
+
+    if (provider === "emergent") {
+      if (!EMERGENT_API_KEY) {
+        return new Response(JSON.stringify({ error: "EMERGENT_API_KEY não configurada" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      url = "https://integrations.emergentagent.com/llm/chat/completions";
+      apiKey = EMERGENT_API_KEY;
+      model = "openai/gpt-4o-mini";
+    } else {
+      if (!LOVABLE_API_KEY) {
+        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      url = "https://ai.gateway.lovable.dev/v1/chat/completions";
+      apiKey = LOVABLE_API_KEY;
+      model = "google/gemini-2.5-flash";
+    }
+
+    const upstream = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...chatMessages],
-        stream: true,
-      }),
+      body: JSON.stringify({ model, messages: fullMessages, stream: true }),
     });
 
     if (!upstream.ok) {
       const txt = await upstream.text().catch(() => "");
       const status = upstream.status === 429 || upstream.status === 402 ? upstream.status : 500;
-      return new Response(JSON.stringify({ error: "Falha no gateway de IA", status: upstream.status, details: txt }), {
+      return new Response(JSON.stringify({ error: "Falha no gateway de IA", provider, status: upstream.status, details: txt }), {
         status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     return new Response(upstream.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Judge-Provider": provider, "X-Judge-Model": model },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
