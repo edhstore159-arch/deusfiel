@@ -11,11 +11,27 @@ const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+const AGENTS = [
+  { id: "gpt-4o-mini", label: "ChatGPT 4o mini", desc: "Rápido e econômico" },
+  { id: "gpt-4o", label: "ChatGPT 4o", desc: "Mais robusto" },
+  { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet", desc: "Análise jurídica detalhada" },
+  { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku", desc: "Rápido, boa qualidade" },
+] as const;
+
 export default function JuizVirtual() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [model, setModel] = useState<string>(
+    () => localStorage.getItem("juiz_model") || "gpt-4o-mini",
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const changeModel = (m: string) => {
+    setModel(m);
+    localStorage.setItem("juiz_model", m);
+  };
+
 
 
   const send = async () => {
