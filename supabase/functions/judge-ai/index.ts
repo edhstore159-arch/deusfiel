@@ -4,58 +4,37 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY");
 
-const SYSTEM_PROMPT = `# ASSISTENTE JURÍDICO ESPECIALISTA (VERSÃO AVANÇADA)
+const SYSTEM_PROMPT = `Você é o **Juiz Virtual**, um agente jurídico imparcial da plataforma da Dra. Kênia Garcia.
 
-## PAPEL
-Você é um advogado brasileiro sênior, especialista em Direito Previdenciário, Direito do Trabalho, Direito Civil, Direito do Consumidor, Direito Processual Civil e Constitucional. Produza pareceres jurídicos extremamente precisos, atualizados, fundamentados na legislação vigente e na jurisprudência mais recente. Aja como advogado experiente elaborando parecer para outro advogado. Jamais invente artigos, processos, precedentes, súmulas ou decisões. Se algo não puder ser confirmado, diga isso expressamente.
+Sua função é emitir um PARECER técnico, fundamentado e didático, como se fosse uma decisão judicial preliminar (não vinculante), analisando o caso apresentado pelo usuário.
 
-## REGRA MAIS IMPORTANTE
-Antes de responder: (1) identifique o ramo do Direito; (2) identifique a dúvida jurídica; (3) confirme se a legislação citada continua vigente; (4) considere alterações por Emendas Constitucionais, Leis Complementares, Leis Ordinárias, MPs convertidas e Decretos; (5) considere jurisprudência consolidada dos tribunais superiores; (6) se houver divergência, apresente as posições e indique a predominante. Nunca use legislação revogada, dispositivos desatualizados ou entendimento superado.
+## COMO RESPONDER (obrigatório)
 
-## FONTES (nesta ordem de prioridade)
-Constituição Federal → Emendas → Leis Complementares → Leis Ordinárias → Códigos → Decretos → Instruções Normativas → Súmulas Vinculantes do STF → STF → STJ → TST (trabalhista) → TNU → TRFs → TJs. Nunca baseie a resposta apenas em doutrina.
+Estruture SEMPRE a resposta nas seções abaixo, nesta ordem e com estes títulos em markdown:
 
-## ANÁLISE OBRIGATÓRIA (interna, antes de responder)
-Existe alteração legislativa recente? Reforma constitucional aplicável? Decisão do STF com repercussão geral? Tema Repetitivo do STJ? Súmula Vinculante? Modulação de efeitos? Entendimento dominante?
+### 1. Relatório
+Resuma os fatos apresentados pelo usuário de forma objetiva e neutra.
 
-## FORMATO DA RESPOSTA (obrigatório, nesta ordem)
+### 2. Questões controvertidas
+Liste os pontos jurídicos em disputa.
 
-# 1. Relatório
-Resumo objetivo dos fatos. Liste informações relevantes e o que estiver faltando.
+### 3. Fundamentação
+Analise cada questão à luz do direito brasileiro aplicável. Cite artigos de lei, súmulas e jurisprudência relevante (STF, STJ, TST, TJs) quando pertinente.
 
-# 2. Questões Jurídicas
-Liste todas as questões envolvidas (ex.: existe direito? qual regra aplicável? há regra de transição? há direito adquirido?).
+### 4. Dispositivo (parecer)
+Apresente sua conclusão fundamentada.
 
-# 3. Fundamentação Jurídica
-Divida em tópicos. Para cada afirmação: cite o dispositivo legal e o artigo, explique o motivo da aplicação e se houve alteração legislativa. Sempre escreva "Base legal:" indicando CF, Lei, Código, Decreto, EC ou IN, e, quando possível, "Redação vigente em (mês/ano)."
+### 5. Recomendações práticas
+Próximos passos concretos.
 
-## Jurisprudência
-Quando houver: Tribunal, Tema, Tese fixada, Aplicação ao caso. Se não houver jurisprudência relevante, diga isso expressamente.
+### 6. Aviso legal
+Deixe claro que é um parecer orientativo produzido por IA.
 
-## Divergências
-Se existirem: Corrente A, Corrente B, qual prevalece.
-
-# 4. Conclusão
-Responda objetivamente: existe direito? existe risco? quais requisitos faltam? quais documentos seriam necessários?
-
-# 5. Recomendações Práticas
-Providências, órgão a procurar, documentação, prazos e riscos.
-
-# 6. Grau de Confiança
-Alta / Média / Baixa — explique por quê.
-
-# 7. Aviso
-Se a resposta depender de fatos não informados: "As conclusões podem ser alteradas caso existam fatos não informados."
-
-## REGRAS ABSOLUTAS
-Nunca invente leis, artigos, jurisprudência, números de processos ou decisões. Sem fundamento legal, não afirme. Em dúvida, escreva: "Não foi possível confirmar essa informação com segurança." Diferencie sempre lei vigente, lei revogada, regra de transição e direito adquirido — nunca misture.
-
-## DIREITO PREVIDENCIÁRIO
-Sempre verificar: EC 103/2019, Lei 8.213/1991, Lei 8.212/1991, Decreto 3.048/1999, regulamentos do INSS, INs e portarias vigentes. Jamais aplique regras anteriores à Reforma da Previdência sem informar que se trata de direito adquirido ou regra de transição.
-
-## MODO DE ESCRITA
-Linguagem técnica, objetiva e clara. Sem opiniões pessoais nem frases vagas. Toda afirmação com fundamento jurídico e aplicação prática ao caso. Se faltarem dados, faça perguntas específicas antes de concluir. Português do Brasil.`;
-
+## REGRAS
+- Português do Brasil, tom profissional e didático.
+- Sempre concluir o raciocínio.
+- No máximo UMA pergunta objetiva antes de emitir o parecer, se faltarem dados essenciais.
+- Nunca invente jurisprudência.`;
 
 function jsonError(message: string, status = 200, extra: Record<string, unknown> = {}) {
   return new Response(JSON.stringify({ error: message, ...extra }), {
@@ -68,19 +47,65 @@ async function callLovable(messages: unknown[], model: string) {
   return fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Lovable-API-Key": LOVABLE_API_KEY ?? "",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model, messages, stream: true }),
   });
 }
 
+const EMERGENT_FALLBACK_MODEL = "gpt-4o-mini";
+
+function isClaudeModel(model: string) {
+  return /claude/i.test(model);
+}
+
+function normalizeEmergentModel(model: string) {
+  const raw = String(model || "").trim();
+  if (!raw) return EMERGENT_FALLBACK_MODEL;
+  if (/^anthropic\/claude/i.test(raw)) return raw.replace(/^anthropic\//i, "");
+  if (/^claude/i.test(raw)) return raw;
+  if (/^(openai\/)?gpt-4o(-mini)?$/i.test(raw)) return raw;
+  if (/^google\//i.test(raw)) return raw;
+  return EMERGENT_FALLBACK_MODEL;
+}
+
+function emergentCandidateModels(model: string) {
+  const primary = normalizeEmergentModel(model);
+  if (!isClaudeModel(model)) return [primary];
+  const lower = primary.toLowerCase();
+  const base = lower.includes("haiku") ? "claude-3-5-haiku" : "claude-3-5-sonnet";
+  return Array.from(new Set([
+    primary,
+    `${base}-latest`,
+    base,
+    EMERGENT_FALLBACK_MODEL,
+  ]));
+}
+
 async function callEmergent(messages: unknown[], model: string) {
+  const emergentModel = normalizeEmergentModel(model);
   return fetch("https://integrations.emergentagent.com/llm/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${EMERGENT_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true }),
+    body: JSON.stringify({ model: emergentModel, messages, stream: true }),
   });
+}
+
+async function callEmergentWithFallback(messages: unknown[], requestedModel: string) {
+  const candidates = emergentCandidateModels(requestedModel);
+  let last: Response | null = null;
+
+  for (const candidate of candidates) {
+    const upstream = await callEmergent(messages, candidate);
+    if (upstream.ok) return { upstream, model: candidate };
+    const errText = await upstream.text().catch(() => "");
+    console.error(`judge-ai emergent failed (${candidate}): ${upstream.status} ${errText}`);
+    last = new Response(errText, { status: upstream.status, headers: upstream.headers });
+    if (!isClaudeModel(requestedModel) || ![400, 404].includes(upstream.status)) break;
+  }
+
+  return { upstream: last ?? jsonError("Falha no gateway de IA.", 502), model: candidates[candidates.length - 1] ?? EMERGENT_FALLBACK_MODEL };
 }
 
 Deno.serve(async (req) => {
@@ -119,16 +144,14 @@ Deno.serve(async (req) => {
       console.error(`judge-ai lovable failed: ${upstream.status} ${errText}`);
       // Se for 402/429 e houver Emergent, tenta fallback
       if ((upstream.status === 402 || upstream.status === 429) && EMERGENT_API_KEY) {
-        const EMERGENT_ALLOWED = new Set(["gpt-4o-mini", "gpt-4o", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]);
-        const emergentModel = EMERGENT_ALLOWED.has(requestedModel) ? requestedModel : "gpt-4o-mini";
-        const up2 = await callEmergent(fullMessages, emergentModel);
+        const { upstream: up2, model: emergentModel } = await callEmergentWithFallback(fullMessages, requestedModel);
         if (up2.ok) {
           return new Response(up2.body, {
             headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Judge-Provider": "emergent", "X-Judge-Model": emergentModel },
           });
         }
         const errText2 = await up2.text().catch(() => "");
-        console.error(`judge-ai emergent fallback failed: ${up2.status} ${errText2}`);
+        console.error(`judge-ai emergent fallback failed (${emergentModel}): ${up2.status} ${errText2}`);
       }
       const friendly = upstream.status === 402
         ? "Créditos da IA esgotados. Adicione créditos no workspace da Lovable para continuar usando o Juiz Virtual."
@@ -140,16 +163,14 @@ Deno.serve(async (req) => {
 
     // Provider 2 (sem Lovable): Emergent
     if (EMERGENT_API_KEY) {
-      const EMERGENT_ALLOWED = new Set(["gpt-4o-mini", "gpt-4o", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]);
-      const emergentModel = EMERGENT_ALLOWED.has(requestedModel) ? requestedModel : "gpt-4o-mini";
-      const upstream = await callEmergent(fullMessages, emergentModel);
+      const { upstream, model: emergentModel } = await callEmergentWithFallback(fullMessages, requestedModel);
       if (upstream.ok) {
         return new Response(upstream.body, {
           headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Judge-Provider": "emergent", "X-Judge-Model": emergentModel },
         });
       }
       const errText = await upstream.text().catch(() => "");
-      console.error(`judge-ai emergent failed: ${upstream.status} ${errText}`);
+      console.error(`judge-ai emergent final failed (${emergentModel}): ${upstream.status} ${errText}`);
       const friendly = upstream.status === 402
         ? "Créditos da chave Emergent esgotados."
         : upstream.status === 429
