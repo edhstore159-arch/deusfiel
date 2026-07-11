@@ -920,7 +920,7 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
 
     // Copiloto jurídico: responde com Claude (via Emergent gateway).
     let aiResult = await chatCompletion({
-      model: "claude-3-5-sonnet-20241022",
+      model: agentModel,
       preferProvider: "emergent",
       messages,
       temperature: 0.72,
