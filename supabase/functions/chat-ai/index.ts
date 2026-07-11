@@ -908,12 +908,13 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       { role: "user", content: userMessage },
     ];
 
+    // Copiloto jurídico: responde com Claude (via Emergent gateway).
     let aiResult = await chatCompletion({
-      model: "google/gemini-3-flash-preview",
+      model: "claude-3-5-sonnet-20241022",
+      preferProvider: "emergent",
       messages,
       temperature: 0.72,
-      preferFastProvider: fastMode,
-      timeoutMs: fastMode && !creativeMode ? 9000 : undefined,
+      timeoutMs: fastMode && !creativeMode ? 12000 : undefined,
       maxTokens: fastMode ? (creativeMode ? 900 : 260) : (creativeMode ? 1200 : undefined),
     });
 
@@ -923,7 +924,8 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       : buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     if (aiResult.ok && !fastMode && isNearDuplicateReply(rawReply, history)) {
       const retryResult = await chatCompletion({
-        model: "google/gemini-3-flash-preview",
+        model: "claude-3-5-sonnet-20241022",
+        preferProvider: "emergent",
         messages: [
           {
             role: "system",
