@@ -1217,6 +1217,11 @@ Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cu
   const toggleListen = () => {
     unlockSpeech();
     if (!supported) {
+      if (listening || fallbackModeRef.current) {
+        stopFallbackRecording(true);
+        setListening(false);
+        return;
+      }
       setTranscript("");
       void startFallbackRecording().then((ok) => {
         if (!ok) toast.error("Reconhecimento de voz não suportado neste navegador.");
