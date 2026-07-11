@@ -644,6 +644,9 @@ Deno.serve(async (req) => {
       "claude-3-5-haiku-20241022",
       "gpt-4o",
       "gpt-4o-mini",
+      "openai/gpt-5-mini",
+      "openai/gpt-5.5",
+      "google/gemini-2.5-flash",
     ]);
     const requestedAgentModel = typeof body.model === "string" ? body.model : "";
     const agentModel = ALLOWED_AGENT_MODELS.has(requestedAgentModel)
@@ -920,10 +923,16 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       { role: "user", content: userMessage },
     ];
 
-    // Copiloto jurídico: responde com Claude (via Emergent gateway).
+    const providerPreference = /^claude/i.test(agentModel)
+      ? "emergent"
+      : agentModel.startsWith("openai/") || agentModel.startsWith("google/")
+        ? "lovable"
+        : "emergent";
+
+    // Copiloto jurídico: tenta o provedor escolhido e cai para Gemini quando o modelo externo não responde.
     let aiResult = await chatCompletion({
       model: agentModel,
-      preferProvider: "emergent",
+      preferProvider: providerPreference,
       messages,
       temperature: 0.72,
       timeoutMs: fastMode && !creativeMode ? 12000 : undefined,
@@ -1146,6 +1155,8 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
         handoff,
         speaker: handoff ? "Dra. Kênia Garcia" : "Secretária",
         analysis,
+        ai_provider: aiResult.ok ? aiResult.provider : "fallback",
+        ai_model: aiResult.ok ? aiResult.model : agentModel,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

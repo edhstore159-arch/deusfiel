@@ -68,8 +68,8 @@ export default function Dashboard() {
   const AI_AGENTS = [
     { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
     { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
-    { id: "gpt-4o", label: "ChatGPT 4o" },
-    { id: "gpt-4o-mini", label: "ChatGPT 4o mini" },
+    { id: "openai/gpt-5-mini", label: "ChatGPT" },
+    { id: "openai/gpt-5.5", label: "ChatGPT Pro" },
   ];
   const [aiAgent, setAiAgent] = useState(() => {
     try { return localStorage.getItem("kenia:dashboard-ai-agent") || "claude-3-5-sonnet-20241022"; } catch { return "claude-3-5-sonnet-20241022"; }
@@ -482,7 +482,7 @@ export default function Dashboard() {
         user_id: user?.id || null,
         visitor_name: activeContact?.name || null,
         visitor_phone: activeContact?.phone || null,
-        want_audio: true,
+        want_audio: false,
         model: aiAgent,
         return_analysis: true,
         system_prompt: COPILOTO_JURIDICO_PROMPT,
@@ -493,6 +493,8 @@ export default function Dashboard() {
         content: data.response,
         audio_base64: data.audio_base64,
         analysis: data.analysis,
+        ai_provider: data.ai_provider,
+        ai_model: data.ai_model,
       }]);
       // Aplica a análise da IA aos dados do cliente (leadForContact)
       if (data.analysis && activeContact) {
@@ -755,6 +757,11 @@ export default function Dashboard() {
                               {m.analysis && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gold-100 text-gold-800 font-semibold">
                                   Acertividade {m.analysis.acertividade}% · {m.analysis.qualificacao === "qualificado" ? "✓ Qualificado" : m.analysis.qualificacao === "nao_qualificado" ? "✗ Não Qualif." : "+ info"}
+                                </span>
+                              )}
+                              {m.ai_provider && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-nude-100 text-nude-700 font-semibold">
+                                  {m.ai_provider}{m.ai_model ? ` · ${m.ai_model}` : ""}
                                 </span>
                               )}
                             </div>
