@@ -63,11 +63,24 @@ function isClaudeModel(model: string) {
 function normalizeEmergentModel(model: string) {
   const raw = String(model || "").trim();
   if (!raw) return EMERGENT_FALLBACK_MODEL;
-  if (/^anthropic\/claude/i.test(raw)) return raw;
-  if (/^claude/i.test(raw)) return `anthropic/${raw}`;
+  if (/^anthropic\/claude/i.test(raw)) return raw.replace(/^anthropic\//i, "");
+  if (/^claude/i.test(raw)) return raw;
   if (/^(openai\/)?gpt-4o(-mini)?$/i.test(raw)) return raw;
   if (/^google\//i.test(raw)) return raw;
   return EMERGENT_FALLBACK_MODEL;
+}
+
+function emergentCandidateModels(model: string) {
+  const primary = normalizeEmergentModel(model);
+  if (!isClaudeModel(model)) return [primary];
+  const lower = primary.toLowerCase();
+  const base = lower.includes("haiku") ? "claude-3-5-haiku" : "claude-3-5-sonnet";
+  return Array.from(new Set([
+    primary,
+    `${base}-latest`,
+    base,
+    EMERGENT_FALLBACK_MODEL,
+  ]));
 }
 
 async function callEmergent(messages: unknown[], model: string) {
@@ -80,16 +93,19 @@ async function callEmergent(messages: unknown[], model: string) {
 }
 
 async function callEmergentWithFallback(messages: unknown[], requestedModel: string) {
-  const primaryModel = normalizeEmergentModel(requestedModel);
-  const primary = await callEmergent(messages, primaryModel);
-  if (primary.ok || !isClaudeModel(requestedModel) || primary.status !== 404) {
-    return { upstream: primary, model: primaryModel };
+  const candidates = emergentCandidateModels(requestedModel);
+  let last: Response | null = null;
+
+  for (const candidate of candidates) {
+    const upstream = await callEmergent(messages, candidate);
+    if (upstream.ok) return { upstream, model: candidate };
+    const errText = await upstream.text().catch(() => "");
+    console.error(`judge-ai emergent failed (${candidate}): ${upstream.status} ${errText}`);
+    last = new Response(errText, { status: upstream.status, headers: upstream.headers });
+    if (!isClaudeModel(requestedModel) || ![400, 404].includes(upstream.status)) break;
   }
 
-  const errText = await primary.text().catch(() => "");
-  console.error(`judge-ai emergent claude failed: ${primary.status} ${errText}`);
-  const fallback = await callEmergent(messages, EMERGENT_FALLBACK_MODEL);
-  return { upstream: fallback, model: EMERGENT_FALLBACK_MODEL };
+  return { upstream: last ?? jsonError("Falha no gateway de IA.", 502), model: candidates[candidates.length - 1] ?? EMERGENT_FALLBACK_MODEL };
 }
 
 Deno.serve(async (req) => {
@@ -135,7 +151,7 @@ Deno.serve(async (req) => {
           });
         }
         const errText2 = await up2.text().catch(() => "");
-        console.error(`judge-ai emergent fallback failed: ${up2.status} ${errText2}`);
+        console.error(`judge-ai emergent fallback failed (${emergentModel}): ${up2.status} ${errText2}`);
       }
       const friendly = upstream.status === 402
         ? "Créditos da IA esgotados. Adicione créditos no workspace da Lovable para continuar usando o Juiz Virtual."
@@ -154,7 +170,7 @@ Deno.serve(async (req) => {
         });
       }
       const errText = await upstream.text().catch(() => "");
-      console.error(`judge-ai emergent failed: ${upstream.status} ${errText}`);
+      console.error(`judge-ai emergent final failed (${emergentModel}): ${upstream.status} ${errText}`);
       const friendly = upstream.status === 402
         ? "Créditos da chave Emergent esgotados."
         : upstream.status === 429
