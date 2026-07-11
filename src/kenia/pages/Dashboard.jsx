@@ -750,6 +750,23 @@ export default function Dashboard() {
                     )}
                   </div>
                 </ScrollArea>
+                <div className="flex flex-wrap gap-1.5 mb-1">
+                  <span className="text-[10px] text-nude-500 self-center mr-1">Agente IA:</span>
+                  {AI_AGENTS.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => changeAiAgent(a.id)}
+                      className={`px-2 py-1 rounded-md text-[10px] font-medium border transition ${
+                        aiAgent === a.id
+                          ? "bg-nude-900 text-white border-nude-900"
+                          : "bg-white text-nude-700 border-nude-200 hover:bg-nude-50"
+                      }`}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
                 <div className="flex gap-2">
                   <Input
                     placeholder="Pergunte ao copiloto..."
