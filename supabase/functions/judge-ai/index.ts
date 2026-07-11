@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       }
       url = "https://integrations.emergentagent.com/llm/chat/completions";
       apiKey = EMERGENT_API_KEY;
-      model = "openai/gpt-4o-mini";
+      model = "gpt-4o-mini";
     } else {
       if (!LOVABLE_API_KEY) {
         return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
