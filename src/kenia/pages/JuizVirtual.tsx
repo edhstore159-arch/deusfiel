@@ -11,11 +11,27 @@ const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+const AGENTS = [
+  { id: "gpt-4o-mini", label: "ChatGPT 4o mini", desc: "Rápido e econômico" },
+  { id: "gpt-4o", label: "ChatGPT 4o", desc: "Mais robusto" },
+  { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet", desc: "Análise jurídica detalhada" },
+  { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku", desc: "Rápido, boa qualidade" },
+] as const;
+
 export default function JuizVirtual() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [model, setModel] = useState<string>(
+    () => localStorage.getItem("juiz_model") || "gpt-4o-mini",
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const changeModel = (m: string) => {
+    setModel(m);
+    localStorage.setItem("juiz_model", m);
+  };
+
 
 
   const send = async () => {
@@ -34,7 +50,7 @@ export default function JuizVirtual() {
           Authorization: `Bearer ${ANON}`,
           apikey: ANON,
         },
-        body: JSON.stringify({ messages: next.slice(0, -1) }),
+        body: JSON.stringify({ messages: next.slice(0, -1), model }),
       });
       if (!res.ok || !res.body) {
         const body = await res.text().catch(() => "");
@@ -97,9 +113,27 @@ export default function JuizVirtual() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        Motor: ChatGPT (Emergent)
+      <div>
+        <div className="text-xs font-medium text-muted-foreground mb-2">Agentes Virtuais</div>
+        <div className="flex flex-wrap gap-2">
+          {AGENTS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => changeModel(a.id)}
+              className={`px-3 py-2 rounded-lg border text-left text-xs transition ${
+                model === a.id
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card border-border hover:bg-muted"
+              }`}
+            >
+              <div className="font-semibold">{a.label}</div>
+              <div className={model === a.id ? "opacity-80" : "text-muted-foreground"}>{a.desc}</div>
+            </button>
+          ))}
+        </div>
       </div>
+
 
 
       <Card

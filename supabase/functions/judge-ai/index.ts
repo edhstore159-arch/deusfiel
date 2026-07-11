@@ -52,6 +52,9 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const messages = Array.isArray(body?.messages) ? body.messages : null;
     const caseText = typeof body?.case === "string" ? body.case.trim() : "";
+    const requestedModel = typeof body?.model === "string" ? body.model : "gpt-4o-mini";
+    const ALLOWED = new Set(["gpt-4o-mini", "gpt-4o", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]);
+    const model = ALLOWED.has(requestedModel) ? requestedModel : "gpt-4o-mini";
 
     if (!messages && !caseText) {
       return new Response(JSON.stringify({ error: "Envie 'case' (texto do caso) ou 'messages' (histórico)." }), {
@@ -66,12 +69,12 @@ Deno.serve(async (req) => {
     const upstream = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${EMERGENT_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-4o-mini", messages: fullMessages, stream: true }),
+      body: JSON.stringify({ model, messages: fullMessages, stream: true }),
     });
 
     if (upstream.ok) {
       return new Response(upstream.body, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Judge-Provider": "emergent", "X-Judge-Model": "gpt-4o-mini" },
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "X-Judge-Provider": "emergent", "X-Judge-Model": model },
       });
     }
 
