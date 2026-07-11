@@ -3,7 +3,6 @@ import { requireUser } from "../_shared/auth.ts";
 
 const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -54,52 +53,34 @@ async function transcribeWithElevenLabs(bytes: Uint8Array, mime: string): Promis
   return text;
 }
 
-async function transcribeWithOpenAI(bytes: Uint8Array, mime: string): Promise<string> {
-  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY ausente");
-  const cleaned = cleanMime(mime);
-  const ext = pickExtension(cleaned);
-  const blob = new Blob([bytes], { type: cleaned });
-  const form = new FormData();
-  form.append("file", blob, `audio.${ext}`);
-  form.append("model", "gpt-4o-mini-transcribe");
-  form.append("language", "pt");
-
-  const resp = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: form,
-  });
-
-  if (!resp.ok) {
-    const detail = await resp.text();
-    console.error("❌ OpenAI STT error", { status: resp.status, detail: detail.slice(0, 300) });
-    throw new Error(`OpenAI STT ${resp.status}: ${detail.slice(0, 200)}`);
-  }
-
-  const data = await resp.json();
-  return (data?.text || "").trim();
-}
-
-async function transcribeWithLovableAI(bytes: Uint8Array, mime: string): Promise<string> {
+async function transcribeWithLovableAI(audio_base64: string, mime: string): Promise<string> {
   if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY ausente");
-  const cleaned = cleanMime(mime);
-  const ext = pickExtension(cleaned);
-  const blob = new Blob([bytes], { type: cleaned });
-  const form = new FormData();
-  form.append("file", blob, `audio.${ext}`);
-  form.append("model", "openai/gpt-4o-transcribe");
-
-  const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/audio/transcriptions", {
+  const format = pickExtension(mime);
+  const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}` },
-    body: form,
+    headers: {
+      "Content-Type": "application/json",
+      "Lovable-API-Key": LOVABLE_API_KEY,
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Transcreva fielmente o áudio em português do Brasil. Retorne APENAS o texto transcrito." },
+            { type: "input_audio", input_audio: { data: audio_base64, format } },
+          ],
+        },
+      ],
+    }),
   });
   if (!aiResp.ok) {
     const detail = await aiResp.text();
-    throw new Error(`Lovable AI STT ${aiResp.status}: ${detail.slice(0, 200)}`);
+    throw new Error(`Lovable AI ${aiResp.status}: ${detail.slice(0, 200)}`);
   }
   const data = await aiResp.json();
-  return (data?.text || "").trim();
+  return (data?.choices?.[0]?.message?.content || "").trim();
 }
 
 Deno.serve(async (req) => {
@@ -116,7 +97,6 @@ Deno.serve(async (req) => {
       audio_size: audio_base64?.length || 0,
       mime_type: mt,
       hasElevenLabs: !!ELEVENLABS_API_KEY,
-      hasOpenAI: !!OPENAI_API_KEY,
       hasLovableAI: !!LOVABLE_API_KEY,
     });
 
@@ -130,11 +110,11 @@ Deno.serve(async (req) => {
     let text = "";
     let provider = "";
     let lastError: string | null = null;
-    const bytes = base64ToBytes(audio_base64);
 
     // Primary: ElevenLabs Scribe (reliable for short audio in PT-BR)
     if (ELEVENLABS_API_KEY) {
       try {
+        const bytes = base64ToBytes(audio_base64);
         text = await transcribeWithElevenLabs(bytes, mt);
         provider = "elevenlabs";
       } catch (err) {
@@ -143,21 +123,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fallback estável para Chrome quando o SpeechRecognition não entrega resultado.
-    if (!text && OPENAI_API_KEY) {
-      try {
-        text = await transcribeWithOpenAI(bytes, mt);
-        provider = "openai";
-      } catch (err) {
-        lastError = String((err as Error)?.message || err);
-        console.warn("⚠️ OpenAI STT falhou, tentando Lovable AI:", lastError);
-      }
-    }
-
     // Fallback: Lovable AI Gateway
     if (!text && LOVABLE_API_KEY) {
       try {
-        text = await transcribeWithLovableAI(bytes, mt);
+        text = await transcribeWithLovableAI(audio_base64, mt);
         provider = "lovable-ai";
       } catch (err) {
         lastError = String((err as Error)?.message || err);
