@@ -463,6 +463,7 @@ export default function Dashboard() {
         visitor_name: activeContact?.name || null,
         visitor_phone: activeContact?.phone || null,
         want_audio: true,
+        model: aiAgent,
         return_analysis: true,
       });
       setAiSession(data.session_id);
