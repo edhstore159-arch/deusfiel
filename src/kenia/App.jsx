@@ -52,6 +52,7 @@ const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
 const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
 const JuizVirtual = lazyWithReload(() => import("@/kenia/pages/JuizVirtual"));
+const Agents = lazyWithReload(() => import("@/kenia/pages/Agents"));
 
 
 const ResetPassword = lazy(() => import("@/kenia/pages/ResetPassword"));
