@@ -665,7 +665,7 @@ export default function FloatingVoiceOrb() {
           session_id: "kenia-voice-orb",
           system_prompt: enrichedSystem,
           context: ctxSummary,
-          want_audio: false,
+          want_audio: true,
           fast_mode: !creativeVoiceRequest,
           creative_mode: creativeVoiceRequest,
           user_id: authUserId,
