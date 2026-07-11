@@ -97,23 +97,10 @@ export default function JuizVirtual() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 text-xs">
-        <span className="text-muted-foreground">Motor:</span>
-        <button
-          type="button"
-          onClick={() => changeProvider("lovable")}
-          className={`px-3 py-1 rounded-full border ${provider === "lovable" ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border"}`}
-        >
-          Lovable AI (Gemini)
-        </button>
-        <button
-          type="button"
-          onClick={() => changeProvider("emergent")}
-          className={`px-3 py-1 rounded-full border ${provider === "emergent" ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border"}`}
-        >
-          ChatGPT (Emergent)
-        </button>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        Motor: ChatGPT (Emergent)
       </div>
+
 
       <Card
         ref={scrollRef}
