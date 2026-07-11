@@ -346,6 +346,7 @@ function handInstructionFor(prompt: string) {
 async function chatLovable(opts: ChatOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, status: 0, error: "LOVABLE_API_KEY ausente" };
   const model = toLovableChatModel(opts.model);
+  if (model.startsWith("openai/")) return chatLovableOpenAIResponses(opts, model);
   try {
     const resp = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -363,6 +364,66 @@ async function chatLovable(opts: ChatOptions) {
   } catch (error) {
     return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
   }
+}
+
+async function chatLovableOpenAIResponses(opts: ChatOptions, model: string) {
+  const systemMessages: string[] = [];
+  const input = opts.messages.map((message) => {
+    const content = messageToText(message.content);
+    if (message.role === "system") {
+      systemMessages.push(content);
+      return null;
+    }
+    return {
+      role: message.role === "assistant" ? "assistant" : "user",
+      content,
+    };
+  }).filter(Boolean);
+
+  try {
+    const resp = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
+      body: JSON.stringify({
+        model,
+        input,
+        ...(systemMessages.length ? { instructions: systemMessages.join("\n\n") } : {}),
+        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+        ...(typeof opts.maxTokens === "number" ? { max_output_tokens: opts.maxTokens } : {}),
+      }),
+    }, opts.timeoutMs || 20000);
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text(), model };
+    const data = await resp.json();
+    const content = extractResponsesText(data);
+    return {
+      ok: true as const,
+      data: { choices: [{ message: { role: "assistant", content } }] },
+      provider: "lovable",
+      model,
+    };
+  } catch (error) {
+    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error), model };
+  }
+}
+
+function messageToText(content: any) {
+  return typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content.map((p: any) => p?.text || p?.content || "").filter(Boolean).join("\n")
+      : String(content || "");
+}
+
+function extractResponsesText(data: any) {
+  if (typeof data?.output_text === "string") return data.output_text;
+  const parts: string[] = [];
+  for (const item of data?.output || []) {
+    for (const content of item?.content || []) {
+      if (typeof content?.text === "string") parts.push(content.text);
+      else if (typeof content?.content === "string") parts.push(content.content);
+    }
+  }
+  return parts.join("").trim();
 }
 
 const LOVABLE_CHAT_MODELS = new Set([
@@ -401,11 +462,7 @@ function messagesToGeminiContents(messages: ChatMessage[]) {
   const system: string[] = [];
   const contents: any[] = [];
   for (const m of messages) {
-    const text = typeof m.content === "string"
-      ? m.content
-      : Array.isArray(m.content)
-        ? m.content.map((p: any) => p?.text || "").filter(Boolean).join("\n")
-        : String(m.content || "");
+    const text = messageToText(m.content);
     if (m.role === "system") { system.push(text); continue; }
     contents.push({
       role: m.role === "assistant" ? "model" : "user",
