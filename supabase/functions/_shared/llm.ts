@@ -346,7 +346,6 @@ function handInstructionFor(prompt: string) {
 async function chatLovable(opts: ChatOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, status: 0, error: "LOVABLE_API_KEY ausente" };
   const model = toLovableChatModel(opts.model);
-  if (model.startsWith("openai/")) return chatLovableOpenAIResponses(opts, model);
   try {
     const resp = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
