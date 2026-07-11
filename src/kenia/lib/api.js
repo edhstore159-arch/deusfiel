@@ -912,6 +912,8 @@ const staticPost = (url, body = {}) => {
             handoff: Boolean(data.handoff),
             speaker: data.speaker || null,
             analysis: finalAnalysis,
+            ai_provider: data.ai_provider || null,
+            ai_model: data.ai_model || null,
             server_time: null,
           });
         }

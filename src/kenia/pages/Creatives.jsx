@@ -412,13 +412,13 @@ export default function Creatives() {
               <Wand2 className="w-4 h-4 mr-2" /> Criar com IA
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="w-[calc(100vw-1.5rem)] max-w-lg max-h-[88dvh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle>Gerar Criativo com IA</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div><Label>Título do Post</Label><Input placeholder="Ex: 5 direitos do trabalhador demitido" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} data-testid="creative-title" /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Rede Social</Label>
                   <Select value={form.network} onValueChange={v => setForm({ ...form, network: v })}>
@@ -442,7 +442,7 @@ export default function Creatives() {
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Tipo de Caso</Label>
                   <Select value={form.case_type} onValueChange={v => setForm({ ...form, case_type: v })}>
@@ -542,8 +542,8 @@ export default function Creatives() {
               </div>
 
             </div>
-            <DialogFooter>
-              <Button onClick={generate} disabled={generating} className="bg-nude-900 hover:bg-nude-800" data-testid="creative-generate">
+            <DialogFooter className="sm:justify-end">
+              <Button onClick={generate} disabled={generating} className="w-full sm:w-auto bg-nude-900 hover:bg-nude-800" data-testid="creative-generate">
                 {generating ? <><span className="animate-pulse-soft">Gerando arte e legenda...</span></> : <><Sparkles className="w-4 h-4 mr-2" /> Gerar com IA</>}
               </Button>
             </DialogFooter>
@@ -552,11 +552,11 @@ export default function Creatives() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6 space-y-4">
+      <div className="flex-1 overflow-auto p-3 sm:p-6 space-y-4">
         <CreativeAssetsLibrary onPick={(dataUrl) => { setRefImage(dataUrl); setOpen(true); }} />
 
         <Card className="p-4 sm:p-6 border-nude-200">
-          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
             <div>
               <div className="font-display font-semibold text-base flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-gold-600" /> Modelos prontos
@@ -565,7 +565,7 @@ export default function Creatives() {
                 Clique em "Usar modelo" para preencher o gerador, ou copie a legenda.
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {igAccount ? (
                 <>
                   <Badge className="bg-gradient-to-r from-pink-500 to-purple-500 text-white border-0">
@@ -667,7 +667,7 @@ export default function Creatives() {
 
 
 
-        <Card className="p-6 border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <Card className="p-4 sm:p-6 border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="font-display font-semibold text-base">Seus criativos gerados</div>
             <div className="text-sm text-nude-500">
@@ -676,7 +676,7 @@ export default function Creatives() {
                 : "Nenhum criativo ainda. Gere o primeiro acima."}
             </div>
           </div>
-          <Button asChild className="bg-nude-900 hover:bg-nude-800">
+          <Button asChild className="w-full sm:w-auto bg-nude-900 hover:bg-nude-800">
             <Link to="/app/creatives/gallery">
               <Sparkles className="w-4 h-4 mr-2" /> Abrir galeria de criativos
             </Link>

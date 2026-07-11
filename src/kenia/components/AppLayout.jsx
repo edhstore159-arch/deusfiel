@@ -225,9 +225,30 @@ export default function AppLayout() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          {/* Logo centralizado oculto no mobile — o orb da Kênia já ocupa o topo */}
-          <div className="w-9" />
-          <div className="w-9" />
+          <NavLink
+            to="/app/creatives"
+            className={({ isActive }) =>
+              `inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-xs font-semibold border transition-colors ${
+                isActive
+                  ? "bg-gold-50 text-gold-700 border-gold-200"
+                  : "bg-white text-nude-800 border-nude-200 hover:bg-gold-50"
+              }`
+            }
+            data-testid="mobile-nav-creatives"
+            onMouseEnter={() => prefetch("/app/creatives")}
+            onFocus={() => prefetch("/app/creatives")}
+            onTouchStart={() => prefetch("/app/creatives")}
+          >
+            <Sparkles className="w-4 h-4" />
+            Criativos
+          </NavLink>
+          <button
+            className="p-2 rounded-md text-nude-700 hover:bg-nude-100"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Abrir navegação"
+          >
+            <Bot className="w-5 h-5" />
+          </button>
         </header>
 
         <div className="flex-1 overflow-auto">
