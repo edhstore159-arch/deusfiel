@@ -42,8 +42,14 @@ export default function FloatingVoiceOrb() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  const [transcribingVoice, setTranscribingVoice] = useState(false);
   const [transcript, setTranscript] = useState("");
   const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordingStreamRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const fallbackFinalRef = useRef(false);
+  const fallbackModeRef = useRef(false);
   const supported =
     typeof window !== "undefined" &&
     (window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -65,6 +71,101 @@ export default function FloatingVoiceOrb() {
     alwaysOnRef.current = alwaysOn;
     try { localStorage.setItem("kenia:voice-always-on", alwaysOn ? "1" : "0"); } catch {}
   }, [alwaysOn]);
+
+  const blobToBase64 = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(reader.error || new Error("Falha ao ler áudio"));
+    reader.readAsDataURL(blob);
+  });
+
+  const transcribeRecordedBlob = async (blob) => {
+    if (!blob || blob.size < 2048) {
+      toast.error("Não captei áudio suficiente. Tente falar mais perto do microfone.");
+      return;
+    }
+    setTranscribingVoice(true);
+    try {
+      setTranscript("Transcrevendo áudio…");
+      const audio_base64 = await blobToBase64(blob);
+      const { data, error } = await supabase.functions.invoke("transcribe-audio", {
+        body: { audio_base64, mime_type: blob.type || "audio/webm" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.detail || data.error);
+      const text = String(data?.text || data?.transcript || "").trim();
+      if (!text) throw new Error("Transcrição vazia");
+      fallbackFinalRef.current = true;
+      setTranscript(text);
+      handleCommandRef.current?.(text);
+    } catch (e) {
+      setTranscript("");
+      toast.error("Falha ao transcrever áudio: " + (e?.message || e));
+    } finally {
+      setTranscribingVoice(false);
+      fallbackModeRef.current = false;
+    }
+  };
+
+  const stopFallbackRecording = (shouldTranscribe = false) => {
+    const rec = mediaRecorderRef.current;
+    const stream = recordingStreamRef.current;
+    if (!rec) {
+      try { stream?.getTracks?.().forEach((track) => track.stop()); } catch {}
+      recordingStreamRef.current = null;
+      fallbackModeRef.current = false;
+      return;
+    }
+
+    const finish = async () => {
+      const type = rec.mimeType || "audio/webm";
+      const blob = new Blob(audioChunksRef.current, { type });
+      audioChunksRef.current = [];
+      mediaRecorderRef.current = null;
+      try { stream?.getTracks?.().forEach((track) => track.stop()); } catch {}
+      recordingStreamRef.current = null;
+      if (shouldTranscribe && !fallbackFinalRef.current) await transcribeRecordedBlob(blob);
+      else fallbackModeRef.current = false;
+    };
+
+    rec.onstop = finish;
+    try {
+      if (rec.state !== "inactive") rec.stop();
+      else void finish();
+    } catch {
+      void finish();
+    }
+  };
+
+  const startFallbackRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") return false;
+    try {
+      stopFallbackRecording(false);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
+        .find((type) => MediaRecorder.isTypeSupported(type)) || "";
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      audioChunksRef.current = [];
+      recordingStreamRef.current = stream;
+      mediaRecorderRef.current = rec;
+      fallbackModeRef.current = true;
+      fallbackFinalRef.current = false;
+      rec.ondataavailable = (event) => {
+        if (event.data?.size > 0) audioChunksRef.current.push(event.data);
+      };
+      rec.start();
+      return true;
+    } catch (e) {
+      fallbackModeRef.current = false;
+      try { recordingStreamRef.current?.getTracks?.().forEach((track) => track.stop()); } catch {}
+      recordingStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      if (e?.name === "NotAllowedError") toast.error("Permita o uso do microfone no Chrome.");
+      return false;
+    }
+  };
 
   // ===== Multi-aba: apenas UMA aba pode rodar a secretária de voz por vez =====
   // Usa Web Locks API (com fallback BroadcastChannel) para eleger uma "aba líder".
@@ -203,6 +304,8 @@ export default function FloatingVoiceOrb() {
         const now = Date.now();
         if (lastFinalRef.current.text === finalText && now - lastFinalRef.current.at < 1500) continue;
         lastFinalRef.current = { text: finalText, at: now };
+        fallbackFinalRef.current = true;
+        stopFallbackRecording(false);
 
         if (alwaysOnRef.current) {
           const woke = hasWakeWord(finalText);
@@ -246,6 +349,9 @@ export default function FloatingVoiceOrb() {
     rec.onend = () => {
       recognitionActiveRef.current = false;
       setListening(false);
+      if (fallbackModeRef.current && !alwaysOnRef.current && !fallbackFinalRef.current) {
+        stopFallbackRecording(true);
+      }
       if (!shouldRestartRef.current || !alwaysOnRef.current) return;
       restartContinuousRecognition(speakingRef.current ? 700 : 300);
     };
@@ -255,6 +361,7 @@ export default function FloatingVoiceOrb() {
       commandSessionActiveRef.current = false;
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       if (speechResumeTimerRef.current) clearTimeout(speechResumeTimerRef.current);
+      stopFallbackRecording(false);
       recognitionRef.current = null;
       rec.onend = null;
       try { rec.abort?.(); } catch {}
@@ -1110,7 +1217,14 @@ Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cu
   const toggleListen = () => {
     unlockSpeech();
     if (!supported) {
-      toast.error("Reconhecimento de voz não suportado neste navegador.");
+      setTranscript("");
+      void startFallbackRecording().then((ok) => {
+        if (!ok) toast.error("Reconhecimento de voz não suportado neste navegador.");
+        else {
+          setListening(true);
+          toast.message("Gravando áudio para transcrição… toque novamente para finalizar.");
+        }
+      });
       return;
     }
     const rec = recognitionRef.current;
@@ -1122,6 +1236,7 @@ Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cu
       setAlwaysOn(false);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       try { rec.abort?.(); } catch {}
+      stopFallbackRecording(true);
       setListening(false);
     } else {
       shouldRestartRef.current = false;
@@ -1129,10 +1244,13 @@ Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cu
       commandSessionActiveRef.current = false;
       setAlwaysOn(false);
       setTranscript("");
+      fallbackFinalRef.current = false;
+      fallbackModeRef.current = true;
       try {
         rec.continuous = false;
         rec.interimResults = true;
         rec.start();
+        void startFallbackRecording();
         recognitionActiveRef.current = true;
         setListening(true);
       } catch (err) {
@@ -1142,6 +1260,7 @@ Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cu
           return;
         }
         recognitionActiveRef.current = false;
+        fallbackModeRef.current = false;
         setListening(false);
         toast.error("Não consegui ativar o microfone. Verifique a permissão do navegador.");
       }
@@ -1190,14 +1309,14 @@ Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cu
           </button>
           <button
             onClick={toggleListen}
-            disabled={thinking}
+            disabled={thinking || transcribingVoice}
             className={`w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
               listening ? "bg-rose-600 text-white hover:bg-rose-700" : "bg-gold-600 text-white hover:bg-gold-700"
             }`}
             data-testid="voice-orb-mic"
           >
-            {thinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
-            {thinking ? "Pensando…" : listening ? "Ouvindo… toque para parar" : "Falar comando"}
+            {thinking || transcribingVoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+            {transcribingVoice ? "Transcrevendo…" : thinking ? "Pensando…" : listening ? "Ouvindo… toque para parar" : "Falar comando"}
           </button>
           {transcript && (
             <div className="mt-3 p-2 rounded bg-nude-50 text-xs text-nude-700 break-words">
