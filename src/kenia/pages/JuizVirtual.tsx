@@ -43,7 +43,7 @@ export default function JuizVirtual() {
           Authorization: `Bearer ${ANON}`,
           apikey: ANON,
         },
-        body: JSON.stringify({ messages: next.slice(0, -1) }),
+        body: JSON.stringify({ messages: next.slice(0, -1), provider }),
       });
       if (!res.ok || !res.body) {
         const body = await res.text().catch(() => "");
