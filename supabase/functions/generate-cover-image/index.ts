@@ -149,7 +149,7 @@ function detectQuantity(prompt: string): number {
   const p = prompt.toLowerCase();
   const digit = p.match(/\b(\d{1,3})\s+(p[áa]ssaro|passarinho|ave|bird|sabi[áa]|beija[- ]?flor|hummingbird|arara|macaw|tucano|toucan|can[áa]rio|canary|coruja|owl|[áa]guia|eagle|papagaio|parrot|pinguim|penguin|flamingo|cisne|swan|pato|duck)s?\b/);
   if (digit) return Math.min(20, parseInt(digit[1], 10) || 1);
-  const words: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, tr[eê]s: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, "a pair of": 2, "pair of": 2, two: 2, three: 3, four: 4, five: 5 };
+  const words: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, "tr[eê]s": 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, two: 2, three: 3, four: 4, five: 5 };
   for (const k of Object.keys(words)) {
     if (new RegExp(`\\b${k}\\b`, "i").test(p)) return words[k];
   }
