@@ -991,10 +991,24 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
-    const appointment =
-      parseAppointmentBlock(rawReply) ||
-      extractAppointmentFromText(userMessage, history) ||
-      extractAppointmentFromText(rawReply, [...history, { role: "user", content: userMessage }]);
+    const userAppointment = extractAppointmentFromText(userMessage, history);
+    const replyAppointment = extractAppointmentFromText(rawReply, [...history, { role: "user", content: userMessage }]);
+    const blockAppointment = parseAppointmentBlock(rawReply);
+    const rescheduleIntentHere = /(reagend|remarc|adiar|alterar|mudar|trocar|nova\s+data|novo\s+hor[aá]rio)/i.test(
+      `${userMessage} ${rawReply} ${history.map((m) => String(m.content || "")).join(" ")}`,
+    );
+    const appointment = rescheduleIntentHere
+      ? (userAppointment || replyAppointment || blockAppointment)
+      : (blockAppointment || userAppointment || replyAppointment);
+    const explicitUserTime = extractExplicitTime(userMessage);
+    if (appointment && explicitUserTime && rescheduleIntentHere) {
+      appointment.appointment_time = explicitUserTime;
+      appointment.raw_payload = {
+        ...(appointment.raw_payload || {}),
+        user_confirmed_time: explicitUserTime,
+        time_source: "latest_user_message",
+      };
+    }
     console.log("[chat-ai] appointment detectado?", !!appointment, appointment ? { date: appointment.appointment_date, time: appointment.appointment_time, name: appointment.client_name } : null);
     let reply = cleanRepeatedText(removeRepeatedQuestion(removeUserEcho(removeRoleLabels(removeTemporalLeaks(stripPromptLeaks(stripAppointmentBlock(rawReply)), userMessage)), userMessage), history));
     if (!reply || reply.length < 2) {
