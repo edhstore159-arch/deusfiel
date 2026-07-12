@@ -118,24 +118,18 @@ async function buildClientFusionFallback(personSrc, sceneSrc) {
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#0b0907";
   ctx.fillRect(0, 0, 1024, 1024);
+  // Fundo NÍTIDO (sem blur) preservando cores e detalhes reais do cenário
+  drawCover(ctx, scene, 1024, 1024, 0, 0, 1024, 1024);
+  // Sombra suave sob a pessoa para integrar sem escurecer o cenário
   ctx.save();
-  ctx.filter = "blur(14px) saturate(1.08) brightness(0.86)";
-  drawCover(ctx, scene, 1024, 1024, -34, -34, 1092, 1092);
-  ctx.restore();
-  const grad = ctx.createRadialGradient(512, 440, 80, 512, 512, 720);
-  grad.addColorStop(0, "rgba(255, 232, 170, 0.08)");
-  grad.addColorStop(0.56, "rgba(16, 13, 10, 0.08)");
-  grad.addColorStop(1, "rgba(0, 0, 0, 0.42)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 1024, 1024);
-  ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
-  ctx.shadowBlur = 52;
-  ctx.shadowOffsetY = 28;
-  drawContain(ctx, person, 840, 900, 512, 540);
+  ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 24;
+  drawContain(ctx, person, 860, 940, 512, 540);
   ctx.restore();
   return canvas.toDataURL("image/png", 0.95);
 }
+
 
 async function normalizeImageForStorage(sourceUrl) {
   const response = await fetch(sourceUrl);
