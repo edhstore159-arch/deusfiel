@@ -300,6 +300,13 @@ export default function CreativesGallery() {
       let restored = 0;
       for (const f of orphans) {
         const storage_path = `${userId}/${f.name}`;
+        // Evita duplicar: se já existe uma linha para este storage_path, pula.
+        const { data: existing } = await supabase
+          .from("generated_images")
+          .select("id")
+          .eq("storage_path", storage_path)
+          .limit(1);
+        if (existing && existing.length) continue;
         const { data: signed } = await supabase.storage.from("creative-assets").createSignedUrl(storage_path, 60 * 60 * 24 * 7);
         const payload = {
           user_id: userId,
