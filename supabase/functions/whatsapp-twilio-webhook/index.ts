@@ -138,6 +138,38 @@ async function sendTwilioMessage(from: string, to: string, body: string, mediaUr
   }
 }
 
+async function logWhatsappMessage(opts: {
+  contactId: string;
+  contactPhone: string;
+  contactName?: string;
+  text: string;
+  fromMe: boolean;
+  providerMessageId?: string;
+}) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        contact_id: opts.contactId,
+        contact_phone: opts.contactPhone,
+        contact_name: opts.contactName || null,
+        text: opts.text,
+        from_me: opts.fromMe,
+        provider_message_id: opts.providerMessageId || null,
+      }),
+    });
+    if (!r.ok) console.error("[whatsapp] log msg falhou", r.status, await r.text());
+  } catch (e) {
+    console.error("[whatsapp] log msg exceção", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
