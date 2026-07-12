@@ -1144,9 +1144,7 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
               .insert(appointmentPayload)
               .select("id")
               .maybeSingle();
-        const { data: inserted, error: apptErr } = await appointmentWrite
-          .select("id")
-          .maybeSingle();
+        const { data: inserted, error: apptErr } = await appointmentWrite;
         if (apptErr) {
           console.error("[chat-ai] falha ao inserir appointment:", apptErr);
         } else {
