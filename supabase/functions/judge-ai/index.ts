@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       console.error(`judge-ai lovable failed: ${upstream.status} ${errText}`);
       // Se for 402/429 e houver Emergent, tenta fallback
       if ((upstream.status === 402 || upstream.status === 429) && EMERGENT_API_KEY) {
-        const EMERGENT_ALLOWED = new Set(["gpt-4o-mini", "gpt-4o", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]);
+        const EMERGENT_ALLOWED = new Set(["gpt-4o-mini", "gpt-4o", "gpt-5-mini", "gpt-5", "claude-sonnet-4-5", "claude-haiku-4-5", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]);
         const emergentModel = EMERGENT_ALLOWED.has(requestedModel) ? requestedModel : "gpt-4o-mini";
         const up2 = await callEmergent(fullMessages, emergentModel);
         if (up2.ok) {
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
 
     // Provider 2 (sem Lovable): Emergent
     if (EMERGENT_API_KEY) {
-      const EMERGENT_ALLOWED = new Set(["gpt-4o-mini", "gpt-4o", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]);
+      const EMERGENT_ALLOWED = new Set(["gpt-4o-mini", "gpt-4o", "gpt-5-mini", "gpt-5", "claude-sonnet-4-5", "claude-haiku-4-5", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]);
       const emergentModel = EMERGENT_ALLOWED.has(requestedModel) ? requestedModel : "gpt-4o-mini";
       const upstream = await callEmergent(fullMessages, emergentModel);
       if (upstream.ok) {
