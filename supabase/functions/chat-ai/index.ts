@@ -564,23 +564,141 @@ function normalizeAppointmentTime(hour: number, minute = 0): string | null {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-function extractExplicitTime(text: string): string | null {
+function extractExplicitTime(text: string, preferLast = false): string | null {
   const value = String(text || "");
   const patterns: RegExp[] = [
-    /\b(?:[aà]s|as)\s*(\d{1,2})(?:[:h](\d{1,2}))?\s*(?:h|hs|horas)?\b(?!\s*[\/\-])/i,
-    /\bhor[aá]rio\s*(?:de|para)?\s*(?:[aà]s|as)?\s*(\d{1,2})(?:[:h](\d{1,2}))?\s*(?:h|hs|horas)?\b(?!\s*[\/\-])/i,
-    /(?<![\/\-])\b(\d{1,2})(?:[:h](\d{1,2}))\s*(?:h|hs|horas)?\b(?!\s*[\/\-])/i,
-    /(?<![\/\-])\b(\d{1,2})\s*(?:h|hs|horas)\b(?!\s*[\/\-])/i,
+    /\b(?:[aà]s|as)\s*(\d{1,2})(?:[:h](\d{1,2}))?\s*(?:h|hs|horas)?\b(?!\s*[\/\-])/gi,
+    /\bhor[aá]rio\s*(?:de|para)?\s*(?:[aà]s|as)?\s*(\d{1,2})(?:[:h](\d{1,2}))?\s*(?:h|hs|horas)?\b(?!\s*[\/\-])/gi,
+    /(?<![\/\-])\b(\d{1,2})(?:[:h](\d{1,2}))\s*(?:h|hs|horas)?\b(?!\s*[\/\-])/gi,
+    /(?<![\/\-])\b(\d{1,2})\s*(?:h|hs|horas)\b(?!\s*[\/\-])/gi,
   ];
+  const matches: Array<{ index: number; time: string }> = [];
   for (const pattern of patterns) {
-    const match = value.match(pattern);
-    if (!match) continue;
+    for (const match of value.matchAll(pattern)) {
     const hour = Number(match[1]);
     const minute = Number(match[2] || "0");
     const normalized = normalizeAppointmentTime(hour, minute);
-    if (normalized) return normalized;
+      if (normalized) matches.push({ index: match.index ?? 0, time: normalized });
+    }
   }
-  return null;
+  if (!matches.length) return null;
+  matches.sort((a, b) => a.index - b.index);
+  return preferLast ? matches[matches.length - 1].time : matches[0].time;
+}
+
+function getSaoPauloDateParts() {
+  const spParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  return {
+    year: Number(spParts.find(p => p.type === "year")!.value),
+    month: Number(spParts.find(p => p.type === "month")!.value),
+    day: Number(spParts.find(p => p.type === "day")!.value),
+  };
+}
+
+function toIsoDate(year: number, month: number, day: number): string | null {
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  if (dt.getUTCFullYear() !== year || dt.getUTCMonth() + 1 !== month || dt.getUTCDate() !== day) return null;
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function extractExplicitDate(text: string, preferLast = false): string | null {
+  const value = String(text || "");
+  const today = getSaoPauloDateParts();
+  const candidates: Array<{ index: number; date: string }> = [];
+
+  for (const match of value.matchAll(/\bhoje\b/gi)) {
+    const date = toIsoDate(today.year, today.month, today.day);
+    if (date) candidates.push({ index: match.index ?? 0, date });
+  }
+  for (const match of value.matchAll(/\bamanh[aã]\b/gi)) {
+    const dt = new Date(Date.UTC(today.year, today.month - 1, today.day + 1));
+    const date = toIsoDate(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+    if (date) candidates.push({ index: match.index ?? 0, date });
+  }
+  for (const match of value.matchAll(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/g)) {
+    let year = match[3] ? Number(match[3]) : today.year;
+    if (year < 100) year += 2000;
+    const date = toIsoDate(year, Number(match[2]), Number(match[1]));
+    if (date) candidates.push({ index: match.index ?? 0, date });
+  }
+  for (const match of value.matchAll(/\bdia\s+(\d{1,2})\b/gi)) {
+    let year = today.year;
+    let month = today.month;
+    const day = Number(match[1]);
+    let date = toIsoDate(year, month, day);
+    if (date && date < toIsoDate(today.year, today.month, today.day)!) {
+      const dt = new Date(Date.UTC(year, month, day));
+      year = dt.getUTCFullYear();
+      month = dt.getUTCMonth() + 1;
+      date = toIsoDate(year, month, dt.getUTCDate());
+    }
+    if (date) candidates.push({ index: match.index ?? 0, date });
+  }
+  const weekdayMap: Record<string, number> = {
+    domingo: 0,
+    segunda: 1,
+    terca: 2,
+    terça: 2,
+    quarta: 3,
+    quinta: 4,
+    sexta: 5,
+    sabado: 6,
+    sábado: 6,
+  };
+  for (const match of value.matchAll(/\b(domingo|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado)\b/gi)) {
+    const normalizedWeekday = match[1].toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+    const target = weekdayMap[normalizedWeekday];
+    if (target === undefined) continue;
+    const current = new Date(Date.UTC(today.year, today.month - 1, today.day)).getUTCDay();
+    let daysAhead = (target - current + 7) % 7;
+    if (daysAhead === 0) daysAhead = 7;
+    const dt = new Date(Date.UTC(today.year, today.month - 1, today.day + daysAhead));
+    const date = toIsoDate(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+    if (date) candidates.push({ index: match.index ?? 0, date });
+  }
+
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.index - b.index);
+  return preferLast ? candidates[candidates.length - 1].date : candidates[0].date;
+}
+
+function extractAppointmentFromConversation(text: string, history: Array<{ role: string; content: string }> = []) {
+  const userMessages = [
+    ...history.filter((h) => h.role === "user").map((h) => String(h.content || "")),
+    String(text || ""),
+  ].filter(Boolean).slice(-8);
+  const rescheduleRe = /(reagend|remarc|adiar|alterar|mudar|trocar|nova\s+data|novo\s+hor[aá]rio)/i;
+  const keywordRe = /\b(agendar|agendamento|marcar|marca[cç][aã]o|consulta|reuni[aã]o|atendimento|hor[aá]rio|confirmad[ao]|agendad[ao]|remarcar|reagendar)\b/i;
+  const lastIntentIndex = Math.max(
+    userMessages.map((message, index) => (rescheduleRe.test(message) || keywordRe.test(message) ? index : -1)).reduce((a, b) => Math.max(a, b), -1),
+    0,
+  );
+  const segment = userMessages.slice(lastIntentIndex).join("\n");
+  if (!rescheduleRe.test(segment) && !keywordRe.test(segment)) return null;
+
+  const date = extractExplicitDate(String(text || ""), true) || extractExplicitDate(segment, true);
+  const time = extractExplicitTime(String(text || ""), true) || extractExplicitTime(segment, true);
+  if (!date || !time) return null;
+
+  const all = [...history.map(h => h.content), text].join("\n");
+  const phone = (all.match(/\+?\d{2}\s?\(?\d{2}\)?\s?\d{4,5}-?\d{4}/) || [])[0] || null;
+  const email = (all.match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || [])[0] || null;
+  const nameMatch = all.match(/(?:meu nome [eé]|me chamo|sou [oa]?)\s+([A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÀ-ÿ]+){0,3})/);
+  return {
+    client_name: nameMatch?.[1]?.trim() || "Cliente do WhatsApp",
+    phone,
+    email,
+    city: null,
+    legal_area: "Atendimento jurídico",
+    case_summary: String(text || segment).slice(0, 240),
+    appointment_date: date,
+    appointment_time: time,
+    raw_payload: { source: "conversation_fallback", original: text, context_window: segment },
+  };
 }
 
 // Extrai um agendamento direto do texto do cliente (sem depender da IA).
@@ -595,34 +713,9 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
 
   // Hora: 14:30, 14h, 14h30, às 14. Nunca usa números soltos de datas (ex.: 24/07) como horário.
   const time = extractExplicitTime(t);
-  // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
-  const todayMatch = /\bhoje\b/i.test(t);
-  const tomorrowMatch = /\bamanh[aã]\b/i.test(t);
-  const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
-  const dayOnlyMatch = t.match(/\bdia\s+(\d{1,2})\b/i);
+  const date = extractExplicitDate(t);
 
-  if (!time || (!todayMatch && !tomorrowMatch && !dateMatch && !dayOnlyMatch)) return null;
-
-  // Monta YYYY-MM-DD em SP
-  const spParts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(new Date());
-  const y0 = Number(spParts.find(p => p.type === "year")!.value);
-  const m0 = Number(spParts.find(p => p.type === "month")!.value);
-  const d0 = Number(spParts.find(p => p.type === "day")!.value);
-
-  let y = y0, m = m0, d = d0;
-  if (tomorrowMatch) {
-    const dt = new Date(Date.UTC(y0, m0 - 1, d0 + 1));
-    y = dt.getUTCFullYear(); m = dt.getUTCMonth() + 1; d = dt.getUTCDate();
-  } else if (dateMatch) {
-    d = Number(dateMatch[1]); m = Number(dateMatch[2]);
-    if (dateMatch[3]) { y = Number(dateMatch[3]); if (y < 100) y += 2000; }
-  } else if (dayOnlyMatch) {
-    d = Number(dayOnlyMatch[1]);
-  }
-
-  const date = `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  if (!time || !date) return null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
 
   // Tenta achar nome/telefone/email no histórico+mensagem
