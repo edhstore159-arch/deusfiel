@@ -97,6 +97,9 @@ export default function Settings() {
           </div>
         </Card>
 
+        {/* Relatório completo do sistema (restrito) */}
+        <SystemReportCard />
+
         {/* Secrets do backend — gated by password */}
         <SecretsDebugCard secrets={secrets} loadingStatus={loadingStatus} totalWorking={totalWorking} />
 
