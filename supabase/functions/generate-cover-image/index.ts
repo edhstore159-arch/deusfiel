@@ -356,7 +356,28 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
 
 
 
+// Mapeia formato/rede social para dimensões nativas do criativo,
+// evitando distorção e melhorando o realismo por conta do enquadramento correto.
+function pickSize(network?: string, format?: string): string {
+  const key = `${(network || "").toLowerCase()}|${(format || "").toLowerCase()}`;
+  // formatos explícitos
+  if (/1080x1920|9x16|story|reels?|tiktok|shorts/.test(key)) return "1024x1792";
+  if (/1080x1350|4x5|portrait|feed/.test(key)) return "1024x1280";
+  if (/1200x628|1200x630|16x9|1920x1080|landscape|banner|linkedin|youtube|facebook_cover/.test(key)) return "1792x1024";
+  if (/square|1x1|1080x1080|instagram(?!.*story)/.test(key)) return "1024x1024";
+  return "1024x1024";
+}
 
+// Reforço de fidelidade a objetos/animais reais — evita "genérico".
+const OBJECT_FIDELITY_LOCK =
+  "OBJECT & SPECIES FIDELITY LOCK (CRITICAL): render every named object, animal, plant, landmark or product with 100% accurate real-world reference. " +
+  "Match the exact species/model/variant: correct silhouette, proportions, color palette, texture, materials, markings, patterns and anatomical details as they appear in reality (as if photographed from a real specimen). " +
+  "Birds: correct beak shape/size/color, correct eye ring, correct plumage pattern and colors per species, correct feet, correct body proportions and posture — no chimeric or generic 'bird'. " +
+  "Animals: correct fur/scale pattern, correct body proportions and limb count, no mutations. " +
+  "Objects/products: correct scale relative to environment, correct materials/reflectivity, correct proportions, no fantasy variations. " +
+  "Landmarks/architecture: correct real-world geometry, correct number of towers/floors/arches, correct materials. " +
+  "Scale coherence: every object in the frame must have plausible real-world size relative to nearby objects and people. " +
+  "If the model is uncertain about a specific species/model, prefer the most iconic real-world reference and never invent hybrid or made-up variants.";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
