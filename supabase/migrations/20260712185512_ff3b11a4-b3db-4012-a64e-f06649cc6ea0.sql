@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS trg_whatsapp_appointment ON public.whatsapp_messages;
