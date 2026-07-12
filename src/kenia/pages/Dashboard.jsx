@@ -574,6 +574,23 @@ export default function Dashboard() {
 
   const initials = (name) => name.split(" ").map(s => s[0]).slice(0, 2).join("").toUpperCase();
   const centerPhoneLabel = whatsAppCenter.phone ? formatWhatsAppPhone(whatsAppCenter.phone) : "Número não identificado";
+  const visibleAppointments = (() => {
+    const phoneTail = extractWhatsAppDigits(activeContact?.phone || activeContact?.id || "").slice(-8);
+    const sameContact = phoneTail
+      ? appointments.filter((a) => {
+          const sessionDigits = extractWhatsAppDigits(a.session_id || "");
+          const apptPhoneDigits = extractWhatsAppDigits(a.phone || "");
+          return sessionDigits.endsWith(phoneTail) || apptPhoneDigits.endsWith(phoneTail);
+        })
+      : [];
+    const seen = new Set();
+    return [...sameContact, ...appointments].filter((a) => {
+      const key = a.id || `${a.session_id || ""}-${a.starts_at || ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  })();
 
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="dashboard-page">
@@ -844,11 +861,11 @@ export default function Dashboard() {
                   <div className="text-xs tracking-widest uppercase font-semibold text-nude-500 mb-2 flex items-center gap-1.5">
                     <Calendar className="w-3 h-3 text-gold-600" /> Próximas reuniões (Meet)
                   </div>
-                  {appointments.length === 0 ? (
+                  {visibleAppointments.length === 0 ? (
                     <div className="text-xs text-nude-400">Nenhum agendamento futuro.</div>
                   ) : (
                     <div className="space-y-1.5">
-                      {appointments.slice(0, 6).map((a) => {
+                      {visibleAppointments.slice(0, 6).map((a) => {
                         const link = a.meeting_link || a.meet_url;
                         const when = new Date(a.starts_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
                         return (
@@ -887,13 +904,13 @@ export default function Dashboard() {
                   <div className="text-xs text-nude-500 mt-0.5">{formatWhatsAppPhone(activeContact.phone)}</div>
                 </div>
 
-                {appointments.length > 0 && (
+                {visibleAppointments.length > 0 && (
                   <div>
                     <div className="text-xs tracking-widest uppercase font-semibold text-nude-500 mb-2 flex items-center gap-1.5">
                       <Calendar className="w-3 h-3 text-gold-600" /> Próximas reuniões (Meet)
                     </div>
                     <div className="space-y-1.5">
-                      {appointments.slice(0, 4).map((a) => {
+                      {visibleAppointments.slice(0, 4).map((a) => {
                         const link = a.meeting_link || a.meet_url;
                         const when = new Date(a.starts_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
                         return (
