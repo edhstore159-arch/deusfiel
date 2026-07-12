@@ -42,7 +42,21 @@ export default function Agenda() {
     location: "Google Meet", notes: "", status: "confirmado",
   });
 
-  useEffect(() => { load(); loadDeadlines(); }, []);
+  useEffect(() => {
+    load();
+    loadDeadlines();
+    // Auto-sync: poll every 30s to pick up WhatsApp-created/rescheduled appointments
+    const interval = setInterval(() => {
+      load();
+    }, 30000);
+    // Refresh when tab regains focus
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
   const load = async () => {
     try {
       const { data } = await api.get("/appointments");
