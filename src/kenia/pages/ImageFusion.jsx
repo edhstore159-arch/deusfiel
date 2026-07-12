@@ -7,7 +7,7 @@ import { Button } from "@/kenia/components/ui/button";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
-import { Combine, Upload, Loader2, Download, X, Sparkles, ImageIcon, Package, Info, Wand2, Trash2, CreditCard, Lock, Camera } from "lucide-react";
+import { Combine, Upload, Loader2, Download, X, Sparkles, ImageIcon, Package, Info, Wand2, Trash2, CreditCard, Camera } from "lucide-react";
 import SocialConnections from "@/kenia/components/SocialConnections";
 
 // Preset de rejuvenescimento facial preservando identidade
@@ -42,6 +42,34 @@ const SOCIAL_PRESETS = [
 ];
 
 const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const GALLERY_LIMIT = 36;
+const GALLERY_SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
+const GALLERY_CACHE_TTL_MS = 1000 * 60 * 60 * 23;
+const GALLERY_THUMB_TRANSFORM = { width: 520, height: 520, resize: "cover", quality: 72 };
+const EMPTY_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
+const galleryCacheKey = (path) => `kenia-gallery-thumb:${path}`;
+
+const getCachedGalleryUrl = (path) => {
+  try {
+    const raw = sessionStorage.getItem(galleryCacheKey(path));
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (!cached?.url || !cached?.expiresAt || Date.now() > cached.expiresAt) return null;
+    return cached.url;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedGalleryUrl = (path, url) => {
+  if (!path || !url) return;
+  try {
+    sessionStorage.setItem(galleryCacheKey(path), JSON.stringify({ url, expiresAt: Date.now() + GALLERY_CACHE_TTL_MS }));
+  } catch {
+    // Sem cache quando o navegador bloquear sessionStorage.
+  }
+};
 
 // Cobre o canvas com a imagem original (cover/crop centralizado).
 function renderPresetToCanvas(img, w, h) {
@@ -351,28 +379,75 @@ export default function ImageFusion() {
   const [variants, setVariants] = useState([]); // {preset, dataUrl, blob}
   const [generatingVariants, setGeneratingVariants] = useState(false);
   const [saved, setSaved] = useState([]); // {id, url, prompt, paid, storage_path}
-  const [paying, setPaying] = useState(null);
+  const [savedLoading, setSavedLoading] = useState(false);
 
   useEffect(() => { loadSaved(); }, []);
 
   const loadSaved = async () => {
+    setSavedLoading(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      if (!auth?.user) return;
+      if (!auth?.user) { setSaved([]); return; }
       const { data } = await supabase
         .from("generated_images")
-        .select("*")
+        .select("id, storage_path, prompt, kind, paid, created_at")
         .order("created_at", { ascending: false })
-        .limit(60);
-      const items = await Promise.all((data || []).map(async (r) => {
-        const { data: signed } = await supabase.storage
-          .from("creative-assets")
-          .createSignedUrl(r.storage_path, 60 * 60 * 24);
-        return { ...r, url: signed?.signedUrl || null };
-      }));
+        .limit(GALLERY_LIMIT);
+
+      const rows = (data || []).filter((r) => r.storage_path);
+      const signedByPath = new Map();
+      const missingPaths = [];
+
+      rows.forEach((row) => {
+        const cached = getCachedGalleryUrl(row.storage_path);
+        if (cached) signedByPath.set(row.storage_path, cached);
+        else missingPaths.push(row.storage_path);
+      });
+
+      if (missingPaths.length > 0) {
+        const storage = supabase.storage.from("creative-assets");
+        const { data: signedList, error } = await storage.createSignedUrls(
+          missingPaths,
+          GALLERY_SIGNED_URL_TTL_SECONDS,
+          { transform: GALLERY_THUMB_TRANSFORM }
+        );
+
+        if (!error && Array.isArray(signedList)) {
+          signedList.forEach((signed, index) => {
+            const path = signed?.path || missingPaths[index];
+            if (path && signed?.signedUrl) {
+              signedByPath.set(path, signed.signedUrl);
+              setCachedGalleryUrl(path, signed.signedUrl);
+            }
+          });
+        } else {
+          await Promise.all(missingPaths.map(async (path) => {
+            const { data: signed } = await storage.createSignedUrl(
+              path,
+              GALLERY_SIGNED_URL_TTL_SECONDS,
+              { transform: GALLERY_THUMB_TRANSFORM }
+            );
+            if (signed?.signedUrl) {
+              signedByPath.set(path, signed.signedUrl);
+              setCachedGalleryUrl(path, signed.signedUrl);
+            }
+          }));
+        }
+      }
+
+      const items = rows.map((r) => ({ ...r, url: signedByPath.get(r.storage_path) || null }));
       setSaved(items.filter((x) => x.url));
+
+      items.slice(0, 8).forEach((item) => {
+        if (!item.url) return;
+        const img = new Image();
+        img.decoding = "async";
+        img.src = item.url;
+      });
     } catch (e) {
       console.warn("loadSaved", e);
+    } finally {
+      setSavedLoading(false);
     }
   };
 
@@ -402,21 +477,25 @@ export default function ImageFusion() {
     if (!confirm("Excluir esta imagem salva?")) return;
     await supabase.storage.from("creative-assets").remove([item.storage_path]);
     await supabase.from("generated_images").delete().eq("id", item.id);
+    try { sessionStorage.removeItem(galleryCacheKey(item.storage_path)); } catch {}
     loadSaved();
   };
 
-  const payForImage = async (item) => {
-    setPaying(item.id);
+  const downloadSaved = async (item) => {
     try {
-      // Placeholder de pagamento: marca como pago localmente.
-      // Para cobrança real, ative o Stripe e troque por uma edge function `create-checkout`.
-      await supabase.from("generated_images").update({ paid: true }).eq("id", item.id);
-      toast.success("Pagamento confirmado · download HD liberado");
-      loadSaved();
+      const { data, error } = await supabase.storage
+        .from("creative-assets")
+        .createSignedUrl(item.storage_path, GALLERY_SIGNED_URL_TTL_SECONDS);
+      if (error) throw error;
+      if (!data?.signedUrl) throw new Error("link indisponível");
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = `imagem-salva-${item.id || Date.now()}.png`;
+      a.target = "_blank";
+      a.rel = "noreferrer";
+      a.click();
     } catch (e) {
-      toast.error("Falha no pagamento: " + (e.message || e));
-    } finally {
-      setPaying(null);
+      toast.error("Não foi possível baixar: " + (e.message || e));
     }
   };
 
@@ -701,32 +780,43 @@ export default function ImageFusion() {
               <Label className="text-gold-200 text-base">Galeria salva ({saved.length})</Label>
               <p className="text-xs text-nude-400 mt-0.5">Imagens guardadas permanentemente. Download HD liberado.</p>
             </div>
-            <Button variant="outline" size="sm" onClick={loadSaved}
+            <Button variant="outline" size="sm" onClick={loadSaved} disabled={savedLoading}
               className="border-gold-700/50 text-gold-200 hover:bg-gold-500/10 hover:text-gold-100">
-              Atualizar
+              {savedLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Atualizar"}
             </Button>
           </div>
-          {saved.length === 0 ? (
+          {savedLoading && saved.length === 0 ? (
+            <div className="py-8 text-center text-gold-200 text-sm">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" /> Carregando galeria...
+            </div>
+          ) : saved.length === 0 ? (
             <div className="py-8 text-center text-nude-500 text-sm">Nenhuma imagem salva ainda. Gere uma fusão acima.</div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {saved.map((s) => (
+              {saved.map((s, index) => (
                 <div key={s.id} className="bg-nude-950 border border-gold-900/40 rounded-md overflow-hidden flex flex-col">
-                  <div className="relative aspect-square bg-black/40">
+                  <div className="relative aspect-square bg-black/40 grid place-items-center overflow-hidden">
                     <img
                       src={s.url}
-                      alt=""
-                      loading="lazy"
+                      alt="Imagem salva na galeria"
+                      loading={index < 8 ? "eager" : "lazy"}
                       decoding="async"
+                      fetchPriority={index < 4 ? "high" : "auto"}
+                      sizes="(min-width: 1024px) 240px, (min-width: 640px) 33vw, 50vw"
                       className="w-full h-full object-cover"
-                      onError={(e) => { e.currentTarget.style.opacity = "0.4"; }}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = EMPTY_IMAGE;
+                        e.currentTarget.className = "w-full h-full object-cover opacity-0";
+                      }}
                     />
+                    <ImageIcon className="absolute w-8 h-8 text-gold-400/30 pointer-events-none" />
                   </div>
                   <div className="p-2 flex flex-col gap-1.5">
                     <div className="text-[10px] text-nude-500 truncate">{new Date(s.created_at).toLocaleString()}</div>
-                    <a href={s.url} download target="_blank" rel="noreferrer" className="text-[11px] py-1 rounded bg-gold-600/30 hover:bg-gold-500/40 text-gold-100 flex items-center justify-center gap-1">
+                    <button onClick={() => downloadSaved(s)} className="text-[11px] py-1 rounded bg-gold-600/30 hover:bg-gold-500/40 text-gold-100 flex items-center justify-center gap-1">
                       <Download className="w-3 h-3" /> Baixar HD
-                    </a>
+                    </button>
                     <button
                       onClick={() => removeSaved(s)}
                       className="text-[10px] py-1 rounded bg-rose-600/20 hover:bg-rose-500/30 text-rose-200 flex items-center justify-center gap-1"
