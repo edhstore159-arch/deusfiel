@@ -212,7 +212,7 @@ export default function AppLayout() {
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <ErrorDebugPopup />
         <FloatingVoiceOrb />
-        <VirtualSecretaryAvatar />
+        {/* VirtualSecretaryAvatar removido a pedido: sem rosto sorridente. */}
         {/* Topbar mobile com botão de menu */}
         {/* Espaçador no mobile para que o orb fixo no topo não cubra a topbar/conteúdo */}
         <div aria-hidden="true" className="lg:hidden h-24 shrink-0" />
