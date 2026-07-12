@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     const fullMessages = [{ role: "system", content: sysPrompt }, ...chatMessages];
 
     // Roteamento por família: Claude sempre vai pela chave Emergent.
-    const isClaude = /^claude/i.test(requestedModel);
+    const isClaude = isClaudeReq;
 
     // Provider 1: Lovable AI Gateway (para modelos não-Claude)
     if (LOVABLE_API_KEY && !isClaude) {
