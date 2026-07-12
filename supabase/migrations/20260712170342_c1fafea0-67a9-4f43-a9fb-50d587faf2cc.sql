@@ -2,21 +2,19 @@ CREATE OR REPLACE FUNCTION public.create_appointment_from_whatsapp()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
-AS $$
+SET search_path TO 'public'
+AS $function$
 DECLARE
   t text;
   context_text text;
   source_text text;
   hh int; mm int; d int; mo int; y int;
   appt_date date; appt_time time;
-  ref_today date := (NEW.created_at AT TIME ZONE 'America/Sao_Paulo')::date;
+  ref_today date := (now() AT TIME ZONE 'America/Sao_Paulo')::date;
   m text[]; assignee uuid;
   weekday_target int;
   weekday_current int;
   days_ahead int;
-  is_reschedule boolean;
-  updated_id uuid;
 BEGIN
   t := lower(coalesce(NEW.text, ''));
   IF t = '' THEN RETURN NEW; END IF;
@@ -35,13 +33,12 @@ BEGIN
   ) x;
 
   context_text := trim(coalesce(context_text, '') || ' ' || t);
-  is_reschedule := context_text ~ '(reagend|remarc|adiar|alterar|mudar|trocar|nova\s+data|novo\s+hor[aá]rio)';
 
-  IF context_text !~ '(agend|reagend|remarc|marc|consulta|reuni[aã]o|atendimento|hor[aá]rio|confirmad|adiar|alterar|mudar|trocar)' THEN
+  IF context_text !~ '(agend|reagend|marc|consulta|reuni[aã]o|atendimento|hor[aá]rio|confirmad)' THEN
     RETURN NEW;
   END IF;
 
-  m := regexp_match(context_text, '(?:[aà]s|as|hor[aá]rio(?:\s*(?:de|para))?)\s*(\d{1,2})(?:[:h](\d{1,2}))?\s*(?:h|hs|horas)?');
+  m := regexp_match(context_text, '(?:[aà]s|as|das|hor[aá]rio\s*)\s*(\d{1,2})(?:[:h](\d{1,2}))?\s*(?:h|hs|horas)?');
   IF m IS NULL THEN
     m := regexp_match(context_text, '(^|\s)(\d{1,2})(?:[:h](\d{1,2}))\s*(?:h|hs|horas)?');
     IF m IS NOT NULL THEN
@@ -49,12 +46,6 @@ BEGIN
     END IF;
   ELSE
     hh := m[1]::int; mm := coalesce(m[2], '0')::int;
-  END IF;
-  IF hh IS NULL THEN
-    m := regexp_match(context_text, '(^|\s)(\d{1,2})\s*(?:h|hs|horas)');
-    IF m IS NOT NULL THEN
-      hh := m[2]::int; mm := 0;
-    END IF;
   END IF;
 
   IF hh IS NULL OR hh < 0 OR hh > 23 OR mm < 0 OR mm > 59 THEN
@@ -80,18 +71,18 @@ BEGIN
       IF m IS NOT NULL THEN
         d := m[1]::int;
         mo := CASE
-          WHEN coalesce(m[2], '') ~ 'janeiro' THEN 1
-          WHEN coalesce(m[2], '') ~ 'fevereiro' THEN 2
-          WHEN coalesce(m[2], '') ~ 'mar' THEN 3
-          WHEN coalesce(m[2], '') ~ 'abril' THEN 4
-          WHEN coalesce(m[2], '') ~ 'maio' THEN 5
-          WHEN coalesce(m[2], '') ~ 'junho' THEN 6
-          WHEN coalesce(m[2], '') ~ 'julho' THEN 7
-          WHEN coalesce(m[2], '') ~ 'agosto' THEN 8
-          WHEN coalesce(m[2], '') ~ 'setembro' THEN 9
-          WHEN coalesce(m[2], '') ~ 'outubro' THEN 10
-          WHEN coalesce(m[2], '') ~ 'novembro' THEN 11
-          WHEN coalesce(m[2], '') ~ 'dezembro' THEN 12
+          WHEN m[2] ~ 'janeiro' THEN 1
+          WHEN m[2] ~ 'fevereiro' THEN 2
+          WHEN m[2] ~ 'mar' THEN 3
+          WHEN m[2] ~ 'abril' THEN 4
+          WHEN m[2] ~ 'maio' THEN 5
+          WHEN m[2] ~ 'junho' THEN 6
+          WHEN m[2] ~ 'julho' THEN 7
+          WHEN m[2] ~ 'agosto' THEN 8
+          WHEN m[2] ~ 'setembro' THEN 9
+          WHEN m[2] ~ 'outubro' THEN 10
+          WHEN m[2] ~ 'novembro' THEN 11
+          WHEN m[2] ~ 'dezembro' THEN 12
           ELSE extract(month from ref_today)::int
         END;
         IF m[3] IS NOT NULL THEN
@@ -122,12 +113,10 @@ BEGIN
     IF appt_date IS NULL THEN
       BEGIN
         appt_date := make_date(y, mo, d);
-        IF appt_date < ref_today THEN
-          IF m IS NOT NULL AND m[3] IS NULL THEN
-            appt_date := (appt_date + interval '1 month')::date;
-          ELSE
-            appt_date := make_date(y + 1, mo, d);
-          END IF;
+        IF m IS NOT NULL AND m[2] IS NULL AND appt_date < ref_today THEN
+          appt_date := (appt_date + interval '1 month')::date;
+        ELSIF appt_date < ref_today THEN
+          appt_date := make_date(y + 1, mo, d);
         END IF;
       EXCEPTION WHEN OTHERS THEN
         RETURN NEW;
@@ -136,41 +125,6 @@ BEGIN
   END IF;
 
   appt_time := make_time(hh, mm, 0);
-  assignee := NEW.user_id;
-  IF assignee IS NULL THEN
-    SELECT user_id INTO assignee FROM public.user_roles WHERE role = 'admin' ORDER BY user_id LIMIT 1;
-  END IF;
-  source_text := left(coalesce(NEW.text, context_text), 240);
-
-  IF is_reschedule THEN
-    WITH target AS (
-      SELECT id
-      FROM public.appointments
-      WHERE coalesce(session_id, '') = coalesce(NEW.contact_id, '')
-        AND status NOT IN ('cancelado', 'recusado', 'cancelled', 'canceled')
-      ORDER BY appointment_date DESC, appointment_time DESC, created_at DESC
-      LIMIT 1
-    )
-    UPDATE public.appointments a
-       SET user_id = coalesce(a.user_id, assignee),
-           client_name = coalesce(nullif(NEW.contact_name, ''), a.client_name, 'Cliente do WhatsApp'),
-           phone = coalesce(NEW.contact_phone, a.phone),
-           legal_area = coalesce(a.legal_area, 'Atendimento jurídico'),
-           case_summary = source_text,
-           appointment_date = appt_date,
-           appointment_time = appt_time,
-           source = 'whatsapp_reschedule',
-           status = 'scheduled',
-           raw_payload = coalesce(a.raw_payload, '{}'::jsonb) || jsonb_build_object('source','whatsapp_reschedule','message_id', NEW.id, 'from_me', NEW.from_me, 'context_window', left(context_text, 1000), 'rescheduled_at', now()),
-           updated_at = now()
-      FROM target
-     WHERE a.id = target.id
-     RETURNING a.id INTO updated_id;
-
-    IF updated_id IS NOT NULL THEN
-      RETURN NEW;
-    END IF;
-  END IF;
 
   IF EXISTS (
     SELECT 1 FROM public.appointments
@@ -180,6 +134,13 @@ BEGIN
   ) THEN
     RETURN NEW;
   END IF;
+
+  assignee := NEW.user_id;
+  IF assignee IS NULL THEN
+    SELECT user_id INTO assignee FROM public.user_roles WHERE role = 'admin' ORDER BY user_id LIMIT 1;
+  END IF;
+
+  source_text := left(coalesce(NEW.text, context_text), 240);
 
   INSERT INTO public.appointments (
     user_id, session_id, client_name, phone, legal_area, case_summary,
@@ -193,11 +154,11 @@ BEGIN
     source_text,
     appt_date,
     appt_time,
-    CASE WHEN is_reschedule THEN 'whatsapp_reschedule' ELSE 'whatsapp_trigger' END,
+    'whatsapp_trigger',
     'scheduled',
-    jsonb_build_object('source', CASE WHEN is_reschedule THEN 'whatsapp_reschedule' ELSE 'whatsapp_trigger' END, 'message_id', NEW.id, 'from_me', NEW.from_me, 'context_window', left(context_text, 1000))
+    jsonb_build_object('source','whatsapp_trigger','message_id', NEW.id, 'from_me', NEW.from_me, 'context_window', left(context_text, 1000))
   );
 
   RETURN NEW;
 END;
-$$;
+$function$;
