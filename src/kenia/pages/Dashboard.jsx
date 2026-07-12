@@ -254,22 +254,6 @@ export default function Dashboard() {
     return () => clearInterval(t);
   }, [activeContact]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel("dashboard-live-updates")
-      .on("postgres_changes", { event: "*", schema: "public", table: "appointments" }, () => {
-        loadAppointments();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_messages" }, () => {
-        loadContacts();
-        if (activeContact) loadMessages(activeContact);
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeContact]);
-
 
   const loadContacts = async () => {
     try {
