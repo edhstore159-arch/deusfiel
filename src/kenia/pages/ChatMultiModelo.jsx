@@ -147,6 +147,14 @@ export default function ChatMultiModelo() {
     });
     if (!res.ok || !res.body) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 402) {
+        throw new Error(
+          "Créditos de IA esgotados no workspace. Adicione créditos em Settings → Plans & credits ou selecione o modelo Ollama (local) para continuar."
+        );
+      }
+      if (res.status === 429) {
+        throw new Error("Limite de requisições atingido. Aguarde alguns segundos e tente novamente.");
+      }
       throw new Error(err.error || `HTTP ${res.status}`);
     }
     const reader = res.body.getReader();
