@@ -68,8 +68,42 @@ const TEMPLATE_CLONE_SYSTEM =
   "Keep fonts and font weights visually equivalent to the reference. Keep alignment, hierarchy and spacing identical. Render all new text as crisp, legible, professionally typeset graphics inside the same text blocks of the original. " +
   "Output ONLY the filled prompt as a single line. End with: 'Negative: blurry text, garbled text, misspelled words, distorted letters, different layout, different color palette, different style, watermark, logo of unrelated brand, " + NEGATIVE + "'.";
 
+const BACKGROUND_RE = /\b(fundo|cen[aá]rio|paisagem|ambiente|local|localiza[cç][aã]o|pa[ií]s|cidade|background|scene|scenery|location|country|city|behind|atras|atr[aá]s|paris|torre\s+eiffel|nova\s+york|new\s+york|times\s+square|t[oó]quio|tokyo|shibuya|rio|copacabana|londres|london|roma|rome|deserto|desert|praia|beach|montanha|mountain|floresta|forest|neve|snow)\b/i;
+
+function isBackgroundChange(userTheme: string): boolean {
+  const t = normalizeText(userTheme);
+  return BACKGROUND_RE.test(t);
+}
+
+const EDIT_BACKGROUND_SYSTEM =
+  "You are a photorealistic image EDITOR specialized in BACKGROUND / SCENE REPLACEMENT. You receive ONE reference image and a user instruction naming a NEW background/location. " +
+  "Produce ONE single-line English prompt that KEEPS the person from the reference (face, hair, skin, clothing, pose, body proportions — 1:1 identity) but REPLACES the background/scene with the new one described by the user. " +
+  "Relight the subject to match the new scene's lighting direction, temperature and shadows so it looks like a single seamless photograph. " +
+  `CRITICAL: ${FACE_LOCK} ` +
+  "DO NOT change the person, DO NOT swap the face, DO NOT modify clothing or pose. DO NOT keep the old background. " +
+  "Output ONLY the filled prompt as a single line. End with: 'Negative: same background as reference, unchanged background, kept old scenery, different face, altered face, beautified face, different clothing, different pose, collage, split-screen, " + NEGATIVE + "'.";
+
+async function elaborateBackgroundEditPrompt(userPrompt: string): Promise<string> {
+  const userTheme = (userPrompt || "").trim();
+  try {
+    const r = await chatCompletion({
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: EDIT_BACKGROUND_SYSTEM },
+        { role: "user", content: `USER BACKGROUND REPLACEMENT INSTRUCTION (change background/scene, keep person identity 1:1):\n"""${userTheme}"""` },
+      ],
+    });
+    if (r.ok) {
+      const txt = r.data?.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 20) return txt;
+    }
+  } catch (_e) { /* fallback */ }
+  return `Use the reference image as the person source. Keep the exact same person (face, hair, skin, clothing, pose, body proportions — pixel-faithful identity from the reference). REPLACE the background/scene entirely with: ${userTheme}. Relight the subject to match the new scene's lighting and shadows so it looks like a single seamless photograph, not a cutout. ${FACE_LOCK} ${REALISM}. Negative: same background as reference, unchanged background, kept old scenery, different face, altered face, different clothing, different pose, collage, ${NEGATIVE}`;
+}
+
 async function elaborateEditPrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || "").trim() || "Re-render the same image preserving identity.";
+  if (isBackgroundChange(userTheme)) return elaborateBackgroundEditPrompt(userTheme);
   const localizedColor = buildLocalizedColorEditPrompt(userTheme);
   if (localizedColor) return localizedColor;
   try {
