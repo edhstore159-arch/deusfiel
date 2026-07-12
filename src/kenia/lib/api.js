@@ -687,24 +687,6 @@ const normalizeAppointment = (item) => {
   };
 };
 
-const buildAppointmentMutation = (body = {}) => {
-  const payload = {};
-  if ("client_name" in body) payload.client_name = body.client_name || "Cliente";
-  if ("phone" in body) payload.phone = body.phone || null;
-  if ("email" in body) payload.email = body.email || null;
-  if ("area" in body || "legal_area" in body || "title" in body) payload.legal_area = body.area || body.legal_area || body.title || "Atendimento jurídico";
-  if ("notes" in body || "case_summary" in body) payload.case_summary = body.notes || body.case_summary || null;
-  if ("source" in body) payload.source = body.source || "panel";
-  if ("status" in body) payload.status = body.status === "confirmado" ? "scheduled" : body.status || "scheduled";
-  if (body.starts_at) {
-    const start = new Date(body.starts_at);
-    payload.appointment_date = start.toISOString().slice(0, 10);
-    payload.appointment_time = start.toTimeString().slice(0, 5);
-  }
-  if (Object.keys(body).length) payload.raw_payload = body.raw_payload || body;
-  return payload;
-};
-
 const getMetrics = () => {
   const leads = read("leads", seedLeads);
   const processes = read("processes", seedProcesses);
@@ -956,20 +938,19 @@ const staticPost = (url, body = {}) => {
       try {
         const start = body.starts_at ? new Date(body.starts_at) : new Date();
         const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: null }));
-        const payload = buildAppointmentMutation(body);
         const { data, error } = await supabase
           .from("appointments")
           .insert({
             user_id: authData?.user?.id || null,
-            client_name: payload.client_name || body.client_name || "Cliente",
-            phone: payload.phone ?? body.phone ?? null,
-            email: payload.email ?? body.email ?? null,
-            legal_area: payload.legal_area || "Atendimento jurídico",
-            case_summary: payload.case_summary ?? null,
+            client_name: body.client_name || "Cliente",
+            phone: body.phone || null,
+            email: body.email || null,
+            legal_area: body.area || body.legal_area || body.title || "Atendimento jurídico",
+            case_summary: body.notes || null,
             appointment_date: start.toISOString().slice(0, 10),
             appointment_time: start.toTimeString().slice(0, 5),
-            source: payload.source || "panel",
-            status: payload.status || "scheduled",
+            source: body.source || "panel",
+            status: body.status === "confirmado" ? "scheduled" : body.status || "scheduled",
             raw_payload: body,
           })
           .select("*")
@@ -1182,20 +1163,6 @@ const staticPut = (url, body = {}) => {
 
 const staticPatch = async (url, body = {}) => {
   const [path] = String(url).split("?");
-  if (path.startsWith("/appointments/")) {
-    const id = path.split("/").pop();
-    try {
-      const payload = buildAppointmentMutation(body);
-      const { data, error } = await supabase
-        .from("appointments")
-        .update(payload)
-        .eq("id", id)
-        .select("*")
-        .maybeSingle();
-      if (error) throw error;
-      return response(normalizeAppointment({ ...body, ...data }));
-    } catch {}
-  }
   const updateCollection = (key, fallback) => {
     const id = path.split("/").pop();
     const items = read(key, fallback).map((item) => (item.id === id ? { ...item, ...body } : item));
@@ -1220,16 +1187,8 @@ const staticPatch = async (url, body = {}) => {
   return response({ ok: true, fallback: true });
 };
 
-const staticDelete = async (url) => {
+const staticDelete = (url) => {
   const [path] = String(url).split("?");
-  if (path.startsWith("/appointments/")) {
-    const id = path.split("/").pop();
-    try {
-      const { error } = await supabase.from("appointments").delete().eq("id", id);
-      if (error) throw error;
-      return response({ ok: true });
-    } catch {}
-  }
   const removeFrom = (key, fallback) => {
     const id = path.split("/").pop();
     write(key, read(key, fallback).filter((item) => item.id !== id));
@@ -1344,14 +1303,14 @@ export const api = HAS_BACKEND
       put: liveApi.put.bind(liveApi),
       patch: (url, body, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/appointments/") || p.startsWith("/admin/case-analyses/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+        if (p.startsWith("/admin/case-analyses/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticPatch(url, body);
         }
         return liveApi.patch(url, body, config);
       },
       delete: (url, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/appointments/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+        if (p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticDelete(url);
         }
         return liveApi.delete(url, config);

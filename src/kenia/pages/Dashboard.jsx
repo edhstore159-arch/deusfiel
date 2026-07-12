@@ -323,14 +323,11 @@ export default function Dashboard() {
     try {
       const { data } = await api.get("/appointments");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-      const active = list.filter((a) => !["recusado", "cancelado"].includes(a?.status));
       const now = Date.now();
-      const future = active
+      const upcoming = list
         .filter((a) => a?.starts_at && new Date(a.starts_at).getTime() >= now - 60 * 60 * 1000)
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-      const recent = active
-        .sort((a, b) => new Date(b.starts_at || b.created_at || 0) - new Date(a.starts_at || a.created_at || 0));
-      setAppointments(future.length ? future : recent);
+      setAppointments(upcoming);
     } catch {}
   };
 

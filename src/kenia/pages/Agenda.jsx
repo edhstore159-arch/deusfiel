@@ -131,8 +131,6 @@ export default function Agenda() {
   };
 
   const today = new Date();
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
   const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
   const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
   const daysInMonth = monthEnd.getDate();
@@ -154,15 +152,8 @@ export default function Agenda() {
   const upcoming = appointments
     .filter(i => listFilter === "recusados"
       ? isRejected(i)
-      : !isRejected(i))
-    .sort((a, b) => {
-      const aTime = new Date(a.starts_at || a.created_at || 0).getTime();
-      const bTime = new Date(b.starts_at || b.created_at || 0).getTime();
-      const aFuture = aTime >= todayStart.getTime();
-      const bFuture = bTime >= todayStart.getTime();
-      if (aFuture !== bFuture) return aFuture ? -1 : 1;
-      return aFuture ? aTime - bTime : bTime - aTime;
-    })
+      : !isRejected(i) && new Date(i.starts_at) >= new Date(today.setHours(0, 0, 0, 0)))
+    .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
     .slice(0, 50);
 
   return (
@@ -328,7 +319,7 @@ export default function Agenda() {
             </div>
             {upcoming.length === 0 ? (
               <Card className="p-10 border-dashed border-nude-300 text-center text-nude-400">
-                {listFilter === "recusados" ? "Nenhum agendamento recusado." : 'Nenhuma reunião registrada. Clique em "Nova reunião" para começar.'}
+                {listFilter === "recusados" ? "Nenhum agendamento recusado." : 'Nenhuma reunião agendada. Clique em "Nova reunião" para começar.'}
               </Card>
             ) : upcoming.map(it => {
               const d = new Date(it.starts_at);
