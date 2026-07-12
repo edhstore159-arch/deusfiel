@@ -453,6 +453,8 @@ Deno.serve(async (req) => {
       "",
       `REALISM REQUIREMENTS: ${REALISM}`,
       "",
+      isPublicFigure ? PUBLIC_FIGURE_REALISM : "",
+      "",
       FACE_LOCK,
       "",
       FACE_REPAIR_LOCK,
