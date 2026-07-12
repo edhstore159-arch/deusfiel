@@ -1114,22 +1114,60 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
             .maybeSingle();
           assigneeId = adminRow?.user_id ?? null;
         }
-        const { data: inserted, error: apptErr } = await supabase
-          .from("appointments")
-          .insert({
-            user_id: assigneeId,
-            session_id: sessionId,
-            ...appointment,
-            raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente" },
-            source: "chat_ai",
-            status: "scheduled",
-          })
-          .select("id")
-          .maybeSingle();
-        if (apptErr) {
-          console.error("[chat-ai] falha ao inserir appointment:", apptErr);
+        // Detecta intenção de reagendamento no texto do cliente/assistente
+        const rescheduleRe = /(reagend|remarc|adiar|alterar|mudar|trocar|nova\s+data|novo\s+hor[aá]rio)/i;
+        const historyText = history.map((m) => String(m.content || "")).join(" ");
+        const isReschedule = rescheduleRe.test(userMessage) || rescheduleRe.test(reply) || rescheduleRe.test(historyText);
+        const phoneDigits = String(appointment.phone || sessionId || "").replace(/\D/g, "");
+
+        let existingId: string | null = null;
+        if (isReschedule) {
+          const { data: existingRows } = await supabase
+            .from("appointments")
+            .select("id, session_id, phone, appointment_date, appointment_time, created_at, status")
+            .or([
+              sessionId ? `session_id.eq.${sessionId}` : "",
+              phoneDigits ? `phone.ilike.%${phoneDigits.slice(-8)}%` : "",
+            ].filter(Boolean).join(","))
+            .not("status", "in", "(cancelado,cancelled,canceled,recusado)")
+            .order("appointment_date", { ascending: false })
+            .order("appointment_time", { ascending: false })
+            .limit(1);
+          existingId = existingRows?.[0]?.id ?? null;
+        }
+
+        if (existingId) {
+          const { error: updErr } = await supabase
+            .from("appointments")
+            .update({
+              ...appointment,
+              user_id: assigneeId,
+              session_id: sessionId,
+              raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente", rescheduled_at: new Date().toISOString() },
+              source: "chat_ai_reschedule",
+              status: "scheduled",
+            })
+            .eq("id", existingId);
+          if (updErr) console.error("[chat-ai] falha ao reagendar:", updErr);
+          else console.log("[chat-ai] appointment reagendado id=", existingId, "user_id=", assigneeId);
         } else {
-          console.log("[chat-ai] appointment salvo id=", inserted?.id, "user_id=", assigneeId);
+          const { data: inserted, error: apptErr } = await supabase
+            .from("appointments")
+            .insert({
+              user_id: assigneeId,
+              session_id: sessionId,
+              ...appointment,
+              raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente" },
+              source: "chat_ai",
+              status: "scheduled",
+            })
+            .select("id")
+            .maybeSingle();
+          if (apptErr) {
+            console.error("[chat-ai] falha ao inserir appointment:", apptErr);
+          } else {
+            console.log("[chat-ai] appointment salvo id=", inserted?.id, "user_id=", assigneeId);
+          }
         }
         (appointment as any).meeting_link = finalMeetUrl;
         (appointment as any).meet_url = finalMeetUrl;
