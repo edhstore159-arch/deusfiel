@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { shouldSuppressLovableDebugInstruction } from "@/components/debugInstruction";
 
 /**
  * DebugErrorThrower
@@ -18,6 +19,7 @@ export const DebugErrorThrower = () => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
       if (typeof detail !== "string" || !detail.trim()) return;
+      if (shouldSuppressLovableDebugInstruction(detail)) return;
       setMessage(detail);
     };
     window.addEventListener("lovable-debug-error", handler);
