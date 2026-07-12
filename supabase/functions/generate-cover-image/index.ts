@@ -447,10 +447,10 @@ Deno.serve(async (req) => {
       "--style raw --photorealism high --no human --no face --no eyes --no portrait --no hands --no fingers --no skin --no body_parts --no anthropomorphic --no object_anatomy_fusion",
     ].join("\n");
 
+    // Reforça fidelidade de objeto/espécie em TODOS os caminhos.
+    const fullPromptWithFidelity = `${fullPrompt}\n\n${OBJECT_FIDELITY_LOCK}`;
 
-
-    const toDataUrl = (b64: string) =>
-      b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
+    const targetSize = pickSize(network, format);
 
     // With reference image and/or logo: Gemini Nano Banana (edit-mode preserving identity)
     if (reference_image_base64 || logo_base64) {
