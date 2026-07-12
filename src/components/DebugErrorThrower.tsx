@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { shouldSuppressLovableDebugInstruction } from "./debugInstruction";
 
 /**
  * DebugErrorThrower
@@ -10,6 +9,7 @@ import { shouldSuppressLovableDebugInstruction } from "./debugInstruction";
  *
  * DEVE ficar FORA de qualquer ErrorBoundary / Suspense / try-catch.
  * NÃO substituir o throw por toast, log ou console.error.
+ * NÃO suprimir mensagens — o throw é intencional e é a feature.
  */
 export const DebugErrorThrower = () => {
   const [message, setMessage] = useState<string | null>(null);
@@ -23,12 +23,6 @@ export const DebugErrorThrower = () => {
     window.addEventListener("lovable-debug-error", handler);
     return () => window.removeEventListener("lovable-debug-error", handler);
   }, []);
-
-  const normalizedMessage = String(message || "").replace(/^\s*(?:Uncaught\s+)?Error:\s*/i, "");
-
-  if (message && shouldSuppressLovableDebugInstruction(normalizedMessage)) {
-    return null;
-  }
 
   if (message) {
     // Intencional: erro fatal durante o render para o overlay/"Try to Fix" da Lovable.
