@@ -482,7 +482,7 @@ Deno.serve(async (req) => {
       b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
 
     // Reforça fidelidade de objeto/espécie em TODOS os caminhos.
-    const fullPromptWithFidelity = `${fullPrompt}\n\n${OBJECT_FIDELITY_LOCK}`;
+    const fullPromptWithFidelity = `${fullPrompt}\n\n${OBJECT_FIDELITY_LOCK}${ultraRealismBoost ? `\n\n${ultraRealismBoost}` : ""}`;
 
     const targetSize = pickSize(network, format);
 
