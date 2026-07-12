@@ -11,6 +11,7 @@ import {
   Sparkles, Save, Info, Mic, RotateCcw, RefreshCcw, KeyRound,
 } from "lucide-react";
 import { loadKeniaPrompt, saveKeniaPrompt, DEFAULT_KENIA_PROMPT } from "@/kenia/lib/keniaPrompt";
+import SystemReportCard from "@/kenia/components/SystemReportCard";
 
 type SecretMap = { lovable: boolean; openai: boolean; emergent: boolean; gemini: boolean };
 type TestResult = { ok: boolean; error?: string; model?: string; reply?: string } | null;
