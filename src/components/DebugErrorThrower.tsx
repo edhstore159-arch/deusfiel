@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 /**
  * DebugErrorThrower
@@ -12,22 +12,15 @@ import { useEffect, useState } from "react";
  * NÃO suprimir mensagens — o throw é intencional e é a feature.
  */
 export const DebugErrorThrower = () => {
-  const [message, setMessage] = useState<string | null>(null);
-
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<string>).detail;
       if (typeof detail !== "string" || !detail.trim()) return;
-      setMessage(detail);
+      window.dispatchEvent(new CustomEvent("lovable-debug-instruction-received", { detail }));
     };
     window.addEventListener("lovable-debug-error", handler);
     return () => window.removeEventListener("lovable-debug-error", handler);
   }, []);
-
-  if (message) {
-    // Intencional: erro fatal durante o render para o overlay/"Try to Fix" da Lovable.
-    throw new Error(message);
-  }
 
   return null;
 };
