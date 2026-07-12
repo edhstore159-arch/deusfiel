@@ -558,6 +558,31 @@ function parseAppointmentBlock(text: string) {
   }
 }
 
+function normalizeAppointmentTime(hour: number, minute = 0): string | null {
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function extractExplicitTime(text: string): string | null {
+  const value = String(text || "");
+  const patterns: RegExp[] = [
+    /\b(?:[aà]s|as)\s*(\d{1,2})(?:[:h](\d{1,2}))?\s*(?:h|hs|horas)?\b(?!\s*[\/\-])/i,
+    /\bhor[aá]rio\s*(?:de|para)?\s*(?:[aà]s|as)?\s*(\d{1,2})(?:[:h](\d{1,2}))?\s*(?:h|hs|horas)?\b(?!\s*[\/\-])/i,
+    /(?<![\/\-])\b(\d{1,2})(?:[:h](\d{1,2}))\s*(?:h|hs|horas)?\b(?!\s*[\/\-])/i,
+    /(?<![\/\-])\b(\d{1,2})\s*(?:h|hs|horas)\b(?!\s*[\/\-])/i,
+  ];
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (!match) continue;
+    const hour = Number(match[1]);
+    const minute = Number(match[2] || "0");
+    const normalized = normalizeAppointmentTime(hour, minute);
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
 // Extrai um agendamento direto do texto do cliente (sem depender da IA).
 // Procura uma intenção de agendamento + data + hora explícitos.
 function extractAppointmentFromText(text: string, history: Array<{ role: string; content: string }> = []) {
@@ -568,14 +593,15 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   const intentInHistory = KEYWORD_RE.test(recentHistoryText);
   if (!intentHere && !intentInHistory) return null;
 
-  // Hora: 14:30, 14h, 14h30, às 14
-  const timeMatch = t.match(/\b(?:[aà]s\s*)?(\d{1,2})(?:[:h](\d{2}))?\s*(h|hs|horas)?\b/i);
+  // Hora: 14:30, 14h, 14h30, às 14. Nunca usa números soltos de datas (ex.: 24/07) como horário.
+  const time = extractExplicitTime(t);
   // Data: DD/MM, DD/MM/YYYY, "hoje", "amanhã"
   const todayMatch = /\bhoje\b/i.test(t);
   const tomorrowMatch = /\bamanh[aã]\b/i.test(t);
   const dateMatch = t.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+  const dayOnlyMatch = t.match(/\bdia\s+(\d{1,2})\b/i);
 
-  if (!timeMatch || (!todayMatch && !tomorrowMatch && !dateMatch)) return null;
+  if (!time || (!todayMatch && !tomorrowMatch && !dateMatch && !dayOnlyMatch)) return null;
 
   // Monta YYYY-MM-DD em SP
   const spParts = new Intl.DateTimeFormat("en-CA", {
@@ -592,13 +618,11 @@ function extractAppointmentFromText(text: string, history: Array<{ role: string;
   } else if (dateMatch) {
     d = Number(dateMatch[1]); m = Number(dateMatch[2]);
     if (dateMatch[3]) { y = Number(dateMatch[3]); if (y < 100) y += 2000; }
+  } else if (dayOnlyMatch) {
+    d = Number(dayOnlyMatch[1]);
   }
-  const hh = Math.max(0, Math.min(23, Number(timeMatch[1])));
-  const mm = Math.max(0, Math.min(59, Number(timeMatch[2] || "0")));
-  if (!Number.isFinite(hh)) return null;
 
   const date = `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  const time = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
 
   // Tenta achar nome/telefone/email no histórico+mensagem
@@ -967,10 +991,24 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
       if (isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
     }
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
-    const appointment =
-      parseAppointmentBlock(rawReply) ||
-      extractAppointmentFromText(userMessage, history) ||
-      extractAppointmentFromText(rawReply, [...history, { role: "user", content: userMessage }]);
+    const userAppointment = extractAppointmentFromText(userMessage, history);
+    const replyAppointment = extractAppointmentFromText(rawReply, [...history, { role: "user", content: userMessage }]);
+    const blockAppointment = parseAppointmentBlock(rawReply);
+    const rescheduleIntentHere = /(reagend|remarc|adiar|alterar|mudar|trocar|nova\s+data|novo\s+hor[aá]rio)/i.test(
+      `${userMessage} ${rawReply} ${history.map((m) => String(m.content || "")).join(" ")}`,
+    );
+    const appointment = rescheduleIntentHere
+      ? (userAppointment || replyAppointment || blockAppointment)
+      : (blockAppointment || userAppointment || replyAppointment);
+    const explicitUserTime = extractExplicitTime(userMessage);
+    if (appointment && explicitUserTime && rescheduleIntentHere) {
+      appointment.appointment_time = explicitUserTime;
+      appointment.raw_payload = {
+        ...(appointment.raw_payload || {}),
+        user_confirmed_time: explicitUserTime,
+        time_source: "latest_user_message",
+      };
+    }
     console.log("[chat-ai] appointment detectado?", !!appointment, appointment ? { date: appointment.appointment_date, time: appointment.appointment_time, name: appointment.client_name } : null);
     let reply = cleanRepeatedText(removeRepeatedQuestion(removeUserEcho(removeRoleLabels(removeTemporalLeaks(stripPromptLeaks(stripAppointmentBlock(rawReply)), userMessage)), userMessage), history));
     if (!reply || reply.length < 2) {
