@@ -16,10 +16,10 @@ type SecretMap = { lovable: boolean; openai: boolean; emergent: boolean; gemini:
 type TestResult = { ok: boolean; error?: string; model?: string; reply?: string } | null;
 
 const SECRET_LABELS: Array<{ key: keyof SecretMap; label: string; role: string }> = [
-  { key: "lovable", label: "LOVABLE_API_KEY", role: "Gateway universal (chat + imagens)" },
-  { key: "openai", label: "OPENAI_API_KEY", role: "Fallback OpenAI direto" },
-  { key: "emergent", label: "EMERGENT_API_KEY", role: "Fallback Claude/GPT via Emergent" },
-  { key: "gemini", label: "GEMINI_API_KEY", role: "Fallback Google Gemini" },
+  { key: "lovable", label: "LAK", role: "Gateway universal (chat + imagens)" },
+  { key: "openai", label: "OAK", role: "Fallback OpenAI direto" },
+  { key: "emergent", label: "EAK", role: "Fallback Claude/GPT via Emergent" },
+  { key: "gemini", label: "GAK", role: "Fallback Google Gemini" },
 ];
 
 export default function Settings() {
