@@ -214,3 +214,77 @@ export default function Settings() {
     </div>
   );
 }
+
+function SecretsDebugCard({ secrets, loadingStatus, totalWorking }: { secrets: SecretMap | null; loadingStatus: boolean; totalWorking: number }) {
+  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem("secrets_debug_unlocked") === "1");
+  const [pwd, setPwd] = useState("");
+  const [err, setErr] = useState("");
+
+  const tryUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pwd === "DeuseFiel,08") {
+      sessionStorage.setItem("secrets_debug_unlocked", "1");
+      setUnlocked(true);
+      setErr("");
+      setPwd("");
+    } else {
+      setErr("Senha incorreta.");
+    }
+  };
+
+  if (!unlocked) {
+    return (
+      <Card className="border-nude-200 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <KeyRound className="w-4 h-4 text-gold-600" />
+          <h3 className="font-display font-semibold text-base">Debug de secrets (restrito)</h3>
+        </div>
+        <p className="text-xs text-nude-500 mb-3">Área restrita. Informe a senha para visualizar o status das chaves.</p>
+        <form onSubmit={tryUnlock} className="flex items-center gap-2">
+          <input
+            type="password"
+            value={pwd}
+            onChange={(e) => setPwd(e.target.value)}
+            placeholder="Senha"
+            className="flex-1 border border-nude-300 rounded px-3 py-2 text-sm"
+            autoComplete="off"
+          />
+          <Button type="submit" size="sm">Acessar</Button>
+        </form>
+        {err && <div className="text-xs text-rose-600 mt-2">{err}</div>}
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border-nude-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <KeyRound className="w-4 h-4 text-gold-600" />
+          <h3 className="font-display font-semibold text-base">Debug de secrets</h3>
+        </div>
+        <Badge className="bg-nude-900 text-white hover:bg-nude-900">
+          {loadingStatus ? "…" : `${totalWorking}/${SECRET_LABELS.length} configuradas`}
+        </Badge>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-2">
+        {SECRET_LABELS.map(({ key, label, role }) => {
+          const ok = !!secrets?.[key];
+          return (
+            <div key={key} className={`flex items-center gap-3 rounded-md border px-3 py-2 ${ok ? "border-emerald-200 bg-emerald-50/50" : "border-rose-200 bg-rose-50/50"}`}>
+              {ok ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-rose-600" />}
+              <div className="flex-1 min-w-0">
+                <div className="font-mono text-xs text-nude-900 truncate">{label}</div>
+                <div className="text-[11px] text-nude-500 truncate">{role}</div>
+              </div>
+              <Badge variant="outline" className={ok ? "border-emerald-300 text-emerald-700" : "border-rose-300 text-rose-700"}>
+                {ok ? "Ativa" : "Ausente"}
+              </Badge>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
