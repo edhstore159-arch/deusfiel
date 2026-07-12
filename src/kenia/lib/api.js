@@ -1278,7 +1278,7 @@ liveApi.interceptors.response.use(
 
 const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today", "/admin/case-analyses"]);
 const cloudFirstPostPaths = new Set(["/chat/message", "/creatives/generate", "/creatives/fuse-images", "/creatives/edit", "/appointments", "/legal-deadlines", "/legal-deadlines/sync", "/leads", "/public/leads"]);
-const staticOnlyMutationPrefixes = ["/leads/", "/appointments/"];
+const staticOnlyMutationPrefixes = ["/leads/"];
 const liveFirstWithStaticFallbackPostPaths = new Set([]);
 const fallbackToStaticPostPaths = new Set(["/debug/instruction"]);
 
@@ -1354,7 +1354,7 @@ export const api = HAS_BACKEND
       put: liveApi.put.bind(liveApi),
       patch: (url, body, config) => {
         const p = String(url).split("?")[0];
-        if (p.startsWith("/admin/case-analyses/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
+        if (p.startsWith("/appointments/") || p.startsWith("/admin/case-analyses/") || p.startsWith("/legal-deadlines/") || staticOnlyMutationPrefixes.some((pre) => p.startsWith(pre))) {
           return staticPatch(url, body);
         }
         return liveApi.patch(url, body, config);
