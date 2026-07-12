@@ -1,273 +1,225 @@
 import { useEffect, useState } from "react";
-import { api } from "@/kenia/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
-import { Input } from "@/kenia/components/ui/input";
-import { Label } from "@/kenia/components/ui/label";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Badge } from "@/kenia/components/ui/badge";
 import { Separator } from "@/kenia/components/ui/separator";
 import { toast } from "sonner";
 import {
-  Key, MessageSquare, Image, Loader2, CheckCircle2,
-  XCircle, Sparkles, Save, Info, Eye, EyeOff, Mic, RotateCcw,
+  MessageSquare, Image, Loader2, CheckCircle2, XCircle,
+  Sparkles, Save, Info, Mic, RotateCcw, RefreshCcw, KeyRound,
 } from "lucide-react";
 import { loadKeniaPrompt, saveKeniaPrompt, DEFAULT_KENIA_PROMPT } from "@/kenia/lib/keniaPrompt";
 
+type SecretMap = { lovable: boolean; openai: boolean; emergent: boolean; gemini: boolean };
+type TestResult = { ok: boolean; error?: string; model?: string; reply?: string } | null;
+
+const SECRET_LABELS: Array<{ key: keyof SecretMap; label: string; role: string }> = [
+  { key: "lovable", label: "LOVABLE_API_KEY", role: "Gateway universal (chat + imagens)" },
+  { key: "openai", label: "OPENAI_API_KEY", role: "Fallback OpenAI direto" },
+  { key: "emergent", label: "EMERGENT_API_KEY", role: "Fallback Claude/GPT via Emergent" },
+  { key: "gemini", label: "GEMINI_API_KEY", role: "Fallback Google Gemini" },
+];
+
 export default function Settings() {
-  const [settings, setSettings] = useState(null);
-  const [textKey, setTextKey] = useState("");
-  const [imageKey, setImageKey] = useState("");
-  const [showText, setShowText] = useState(false);
-  const [showImage, setShowImage] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [secrets, setSecrets] = useState<SecretMap | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(true);
   const [testingText, setTestingText] = useState(false);
   const [testingImage, setTestingImage] = useState(false);
-  const [textResult, setTextResult] = useState(null);
-  const [imageResult, setImageResult] = useState(null);
+  const [textResult, setTextResult] = useState<TestResult>(null);
+  const [imageResult, setImageResult] = useState<TestResult>(null);
   const [keniaPrompt, setKeniaPrompt] = useState("");
 
-  useEffect(() => { load(); setKeniaPrompt(loadKeniaPrompt()); }, []);
-
-  const load = async () => {
-    const fallback = {
-      using_default_text: true,
-      using_default_image: true,
-      llm_text_key_masked: "Modelo padrão",
-      llm_image_key_masked: "Modelo padrão",
-    };
+  const loadStatus = async () => {
+    setLoadingStatus(true);
     try {
-      const { data } = await api.get("/settings");
-      setSettings(data || fallback);
-    } catch {
-      // Em modo estático ou backend offline, mostra a tela com valores padrão
-      setSettings(fallback);
-    }
-  };
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const payload = {};
-      if (textKey.trim()) payload.llm_text_key = textKey.trim();
-      if (imageKey.trim()) payload.llm_image_key = imageKey.trim();
-      await api.put("/settings", payload);
-      toast.success("Chaves salvas");
-      setTextKey("");
-      setImageKey("");
-      await load();
-    } catch {
-      toast.error("Erro ao salvar");
+      const { data, error } = await supabase.functions.invoke("settings-test", { body: { action: "status" } });
+      if (error) throw error;
+      setSecrets(data?.secrets || null);
+    } catch (e: any) {
+      toast.error("Falha ao consultar status das chaves: " + (e?.message || e));
     } finally {
-      setSaving(false);
+      setLoadingStatus(false);
     }
   };
 
-  const resetToDefault = async (kind) => {
-    try {
-      const payload = kind === "text" ? { llm_text_key: "" } : { llm_image_key: "" };
-      await api.put("/settings", payload);
-      toast.success("Usando chave padrão (Emergent)");
-      await load();
-    } catch {
-      toast.error("Erro");
-    }
-  };
+  useEffect(() => {
+    setKeniaPrompt(loadKeniaPrompt());
+    loadStatus();
+  }, []);
 
-  const testText = async () => {
-    setTestingText(true);
-    setTextResult(null);
+  const runTest = async (kind: "text" | "image") => {
+    if (kind === "text") { setTestingText(true); setTextResult(null); }
+    else { setTestingImage(true); setImageResult(null); }
     try {
-      const { data } = await api.post("/settings/test-text");
-      setTextResult(data);
-      if (data.ok) toast.success("Chat funcionando");
-      else toast.error("Chave não funcional");
-    } catch {
+      const { data, error } = await supabase.functions.invoke("settings-test", { body: { action: kind } });
+      if (error) throw error;
+      if (data?.secrets) setSecrets(data.secrets);
+      if (kind === "text") { setTextResult(data); data?.ok ? toast.success("Chat funcionando") : toast.error("Chat falhou"); }
+      else { setImageResult(data); data?.ok ? toast.success("Geração de imagem funcionando") : toast.error("Imagem falhou"); }
+    } catch (e: any) {
+      const err = { ok: false, error: e?.message || String(e) };
+      if (kind === "text") setTextResult(err); else setImageResult(err);
       toast.error("Erro no teste");
     } finally {
-      setTestingText(false);
+      if (kind === "text") setTestingText(false); else setTestingImage(false);
     }
   };
 
-  const testImage = async () => {
-    setTestingImage(true);
-    setImageResult(null);
-    try {
-      const { data } = await api.post("/settings/test-image");
-      setImageResult(data);
-      if (data.ok) toast.success("Geração de imagem funcionando");
-      else toast.error("Chave não funcional");
-    } catch {
-      toast.error("Erro no teste");
-    } finally {
-      setTestingImage(false);
-    }
-  };
-
-  if (!settings) return <div className="p-12 text-nude-400">Carregando...</div>;
+  const totalWorking = secrets ? Object.values(secrets).filter(Boolean).length : 0;
 
   return (
     <div className="h-screen flex flex-col bg-nude-50 overflow-hidden">
       <div className="px-6 py-4 bg-white border-b border-nude-200 flex items-center justify-between">
         <div>
           <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold">Configurações</div>
-          <h1 className="font-display font-bold text-2xl">API Keys & Integrações</h1>
+          <h1 className="font-display font-bold text-2xl">Backend, Chaves & Persona</h1>
         </div>
-        <Button onClick={save} disabled={saving || (!textKey.trim() && !imageKey.trim())} className="bg-nude-900 hover:bg-nude-800" data-testid="settings-save">
-          {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</> : <><Save className="w-4 h-4 mr-2" />Salvar chaves</>}
+        <Button variant="outline" onClick={loadStatus} disabled={loadingStatus}>
+          {loadingStatus ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCcw className="w-4 h-4 mr-2" />}
+          Recarregar status
         </Button>
       </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-4 max-w-4xl">
-        <Card className="p-5 border-gold-300">
-          <div className="flex items-start gap-3 mb-3">
-            <Mic className="w-5 h-5 text-gold-700 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-display font-semibold text-lg">Prompt da atendente virtual de voz (Kênia)</div>
-              <div className="text-xs text-nude-600">
-                Edite como a Kênia responde. Placeholders: <code>{"{dateContext}"}</code>, <code>{"{ctxSummary}"}</code>, <code>{"{jusContext}"}</code>.
-              </div>
-            </div>
-          </div>
-          <Textarea
-            value={keniaPrompt}
-            onChange={(e) => setKeniaPrompt(e.target.value)}
-            rows={14}
-            className="font-mono text-xs"
-          />
-          <div className="flex gap-2 mt-3">
-            <Button
-              onClick={() => { saveKeniaPrompt(keniaPrompt); toast.success("Prompt da Kênia salvo"); }}
-              className="bg-nude-900 hover:bg-nude-800"
-            >
-              <Save className="w-4 h-4 mr-2" /> Salvar prompt
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => { setKeniaPrompt(DEFAULT_KENIA_PROMPT); saveKeniaPrompt(DEFAULT_KENIA_PROMPT); toast.success("Prompt restaurado para o padrão"); }}
-            >
-              <RotateCcw className="w-4 h-4 mr-2" /> Restaurar padrão
-            </Button>
-          </div>
-        </Card>
-
         <Card className="p-4 bg-blue-50 border-blue-200">
           <div className="flex items-start gap-3">
             <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
             <div className="text-sm text-nude-700">
-              <div className="font-medium mb-1">Sobre as chaves</div>
+              <div className="font-medium mb-1">Como funcionam as chaves neste projeto</div>
               <div className="text-xs">
-                Por padrão, usamos a <strong>Chave Universal do Modelo</strong> que já vem configurada e funciona para chat (GPT-4o-mini) e imagens (gpt-image-1). Se você tiver uma chave OpenAI própria, pode substituir aqui para usar créditos próprios.
+                As chaves de IA vivem em <strong>Secrets do backend</strong> (Lovable Cloud) e são lidas
+                automaticamente pelas edge functions — <strong>não precisam ser digitadas aqui</strong>.
+                Use os botões de teste abaixo para validar que o gateway está respondendo.
               </div>
             </div>
           </div>
         </Card>
 
-
+        {/* Status das chaves */}
         <Card className="border-nude-200 p-5">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-gold-600" />
+              <h3 className="font-display font-semibold text-base">Secrets do backend</h3>
+            </div>
+            <Badge className="bg-nude-900 text-white hover:bg-nude-900">
+              {loadingStatus ? "…" : `${totalWorking}/${SECRET_LABELS.length} configuradas`}
+            </Badge>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {SECRET_LABELS.map(({ key, label, role }) => {
+              const ok = !!secrets?.[key];
+              return (
+                <div key={key} className={`flex items-center gap-3 rounded-md border px-3 py-2 ${ok ? "border-emerald-200 bg-emerald-50/50" : "border-rose-200 bg-rose-50/50"}`}>
+                  {ok ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-rose-600" />}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono text-xs text-nude-900 truncate">{label}</div>
+                    <div className="text-[11px] text-nude-500 truncate">{role}</div>
+                  </div>
+                  <Badge variant="outline" className={ok ? "border-emerald-300 text-emerald-700" : "border-rose-300 text-rose-700"}>
+                    {ok ? "Ativa" : "Ausente"}
+                  </Badge>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* Teste Chat */}
+        <Card className="border-nude-200 p-5">
+          <div className="flex items-start justify-between mb-3">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <MessageSquare className="w-4 h-4 text-gold-600" />
-                <h3 className="font-display font-semibold text-base">Chat & Robô Kênia</h3>
+                <h3 className="font-display font-semibold text-base">Chat & Copiloto Jurídico</h3>
               </div>
               <p className="text-sm text-nude-500">
-                Chave usada para: atendente Kênia Garcia no WhatsApp, copiloto jurídico, classificação automática de leads.
+                Testa uma chamada real no gateway (<code className="text-xs bg-nude-100 px-1 rounded">google/gemini-2.5-flash-lite</code>).
               </p>
             </div>
-            <Badge className={settings.using_default_text ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-gold-100 text-gold-800 hover:bg-gold-100"}>
-              {settings.using_default_text ? "Modelo padrão" : "Chave personalizada"}
-            </Badge>
-          </div>
-          {!settings.using_default_text && (
-            <div className="text-xs text-nude-500 mb-3 font-mono bg-nude-50 px-3 py-2 rounded-md inline-block">
-              {settings.llm_text_key_masked}
-              <Button variant="ghost" size="sm" className="ml-2 h-6 text-xs" onClick={() => resetToDefault("text")}>Voltar ao padrão</Button>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Input
-                type={showText ? "text" : "password"}
-                placeholder="Cole aqui sua chave do modelo (sk-...) (sk-...)"
-                value={textKey}
-                onChange={(e) => setTextKey(e.target.value)}
-                className="pr-10 font-mono text-xs h-10"
-                data-testid="text-key-input"
-              />
-              <button type="button" onClick={() => setShowText(!showText)} className="absolute right-3 top-1/2 -translate-y-1/2 text-nude-400 hover:text-nude-600">
-                {showText ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-            <Button variant="outline" onClick={testText} disabled={testingText} data-testid="test-text-btn">
-              {testingText ? <Loader2 className="w-4 h-4 animate-spin" /> : "Testar"}
+            <Button variant="outline" onClick={() => runTest("text")} disabled={testingText}>
+              {testingText ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Testar agora
             </Button>
           </div>
           {textResult && (
-            <div className={`mt-3 text-sm flex items-center gap-2 ${textResult.ok ? "text-gold-700" : "text-rose-700"}`}>
-              {textResult.ok ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-              {textResult.ok ? (
-                <>Funcionando! {textResult.using_custom_key ? "Chave personalizada" : "Modelo padrão"}.</>
-              ) : (
-                <>Erro: {textResult.error}</>
+            <div className={`mt-2 text-sm ${textResult.ok ? "text-emerald-700" : "text-rose-700"}`}>
+              <div className="flex items-center gap-2">
+                {textResult.ok ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                {textResult.ok ? <>Funcionando — modelo <code className="text-xs">{textResult.model}</code></> : <>Erro: {textResult.error}</>}
+              </div>
+              {textResult.ok && textResult.reply && (
+                <div className="mt-1 text-xs text-nude-600 bg-nude-50 border border-nude-200 rounded p-2 font-mono">
+                  {textResult.reply}
+                </div>
               )}
             </div>
           )}
         </Card>
 
+        {/* Teste Imagem */}
         <Card className="border-nude-200 p-5">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start justify-between mb-3">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Image className="w-4 h-4 text-purple-600" />
                 <h3 className="font-display font-semibold text-base">Geração de Imagens (Criativos)</h3>
               </div>
               <p className="text-sm text-nude-500">
-                Chave usada para gerar imagens no módulo <strong>Criativos</strong> usando OpenAI <code className="text-xs bg-nude-100 px-1 rounded">gpt-image-1</code>.
+                Testa geração no gateway (<code className="text-xs bg-nude-100 px-1 rounded">google/gemini-2.5-flash-image</code>).
               </p>
             </div>
-            <Badge className={settings.using_default_image ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-gold-100 text-gold-800 hover:bg-gold-100"}>
-              {settings.using_default_image ? "Modelo padrão" : "Chave personalizada"}
-            </Badge>
-          </div>
-          {!settings.using_default_image && (
-            <div className="text-xs text-nude-500 mb-3 font-mono bg-nude-50 px-3 py-2 rounded-md inline-block">
-              {settings.llm_image_key_masked}
-              <Button variant="ghost" size="sm" className="ml-2 h-6 text-xs" onClick={() => resetToDefault("image")}>Voltar ao padrão</Button>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <Input
-                type={showImage ? "text" : "password"}
-                placeholder="Cole aqui sua chave do modelo (sk-...) (sk-...)"
-                value={imageKey}
-                onChange={(e) => setImageKey(e.target.value)}
-                className="pr-10 font-mono text-xs h-10"
-                data-testid="image-key-input"
-              />
-              <button type="button" onClick={() => setShowImage(!showImage)} className="absolute right-3 top-1/2 -translate-y-1/2 text-nude-400 hover:text-nude-600">
-                {showImage ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-            <Button variant="outline" onClick={testImage} disabled={testingImage} data-testid="test-image-btn">
-              {testingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : "Testar"}
+            <Button variant="outline" onClick={() => runTest("image")} disabled={testingImage}>
+              {testingImage ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Testar agora
             </Button>
           </div>
           {imageResult && (
-            <div className={`mt-3 text-sm flex items-center gap-2 ${imageResult.ok ? "text-gold-700" : "text-rose-700"}`}>
+            <div className={`mt-2 text-sm flex items-center gap-2 ${imageResult.ok ? "text-emerald-700" : "text-rose-700"}`}>
               {imageResult.ok ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-              {imageResult.ok ? (
-                <>Funcionando! Modelo {imageResult.model}. {imageResult.using_custom_key ? "Chave personalizada" : "Modelo padrão"}.</>
-              ) : (
-                <>Erro: {imageResult.error}</>
-              )}
+              {imageResult.ok ? <>Funcionando — modelo <code className="text-xs">{imageResult.model}</code></> : <>Erro: {imageResult.error}</>}
             </div>
           )}
         </Card>
 
         <Separator />
 
+        {/* Prompt da Kênia */}
+        <Card className="p-5 border-gold-300">
+          <div className="flex items-start gap-3 mb-3">
+            <Mic className="w-5 h-5 text-gold-700 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-display font-semibold text-lg">Prompt da atendente virtual (Kênia)</div>
+              <div className="text-xs text-nude-600">
+                Persistido no navegador. Placeholders: <code>{"{dateContext}"}</code>, <code>{"{ctxSummary}"}</code>, <code>{"{jusContext}"}</code>.
+              </div>
+            </div>
+          </div>
+          <Textarea
+            value={keniaPrompt}
+            onChange={(e) => setKeniaPrompt(e.target.value)}
+            rows={12}
+            className="font-mono text-xs"
+          />
+          <div className="flex gap-2 mt-3">
+            <Button
+              onClick={() => { saveKeniaPrompt(keniaPrompt); toast.success("Prompt salvo"); }}
+              className="bg-nude-900 hover:bg-nude-800"
+            >
+              <Save className="w-4 h-4 mr-2" /> Salvar prompt
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { setKeniaPrompt(DEFAULT_KENIA_PROMPT); saveKeniaPrompt(DEFAULT_KENIA_PROMPT); toast.success("Prompt restaurado"); }}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" /> Restaurar padrão
+            </Button>
+          </div>
+        </Card>
+
+        {/* Persona WhatsApp */}
         <Card className="border-nude-200 p-5">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="w-4 h-4 text-gold-600" />
