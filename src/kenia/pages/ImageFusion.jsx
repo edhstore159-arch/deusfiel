@@ -796,6 +796,7 @@ export default function ImageFusion() {
               {saved.map((s, index) => (
                 <div key={s.id} className="bg-nude-950 border border-gold-900/40 rounded-md overflow-hidden flex flex-col">
                   <div className="relative aspect-square bg-black/40 grid place-items-center overflow-hidden">
+                    <ImageIcon className="absolute w-8 h-8 text-gold-400/30 pointer-events-none" />
                     <img
                       src={s.url}
                       alt="Imagem salva na galeria"
@@ -810,7 +811,6 @@ export default function ImageFusion() {
                         e.currentTarget.className = "w-full h-full object-cover opacity-0";
                       }}
                     />
-                    <ImageIcon className="absolute w-8 h-8 text-gold-400/30 pointer-events-none" />
                   </div>
                   <div className="p-2 flex flex-col gap-1.5">
                     <div className="text-[10px] text-nude-500 truncate">{new Date(s.created_at).toLocaleString()}</div>
