@@ -25,8 +25,8 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
-    // Intencional: erro fatal durante o render para o overlay/"Try to Fix" da Lovable.
-    throw new Error(message);
+    // Log-only: evita blank screen quebrando o app inteiro.
+    console.error("[lovable-debug-error]", message);
   }
 
   return null;
