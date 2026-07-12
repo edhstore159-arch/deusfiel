@@ -394,6 +394,14 @@ const OBJECT_FIDELITY_LOCK =
   "Scale coherence: every object in the frame must have plausible real-world size relative to nearby objects and people. " +
   "If the model is uncertain about a specific species/model, prefer the most iconic real-world reference and never invent hybrid or made-up variants.";
 
+// Reforço fotográfico para naturezas/animais (National Geographic).
+const ULTRA_REALISM_NATURE =
+  "Ultra-realistic nature photography, authentic subject with scientifically accurate anatomy and proportions, natural colors, realistic textures, high-detail feathers/fur/skin/materials, subtle imperfections, physically accurate lighting, soft natural sunlight, shallow depth of field, professional wildlife photography, DSLR, 400mm telephoto lens, f/4, RAW photo, ultra-sharp focus on the subject, realistic background bokeh, no CGI, no illustration, no painting, no 3D render, no fantasy, no oversaturation, no artificial colors, documentary photography, National Geographic style, extremely photorealistic.";
+
+// Reforço fotográfico genérico para objetos/produtos/cenários.
+const ULTRA_REALISM_OBJECT =
+  "Photorealistic product and nature photography, physically based rendering (PBR), realistic materials, accurate proportions, authentic textures, natural wear and imperfections, true-to-life colors, realistic reflections and shadows, global illumination, soft natural lighting, high dynamic range, ultra-high resolution, sharp focus, professional photography, RAW image, no CGI, no illustration, no cartoon, no painting, no artificial details, extremely realistic.";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const _auth_res = await requireUser(req);
