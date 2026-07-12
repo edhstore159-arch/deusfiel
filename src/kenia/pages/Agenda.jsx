@@ -100,7 +100,7 @@ export default function Agenda() {
   const create = async () => {
     if (!form.title || !form.starts_at) { toast.error("Título e data obrigatórios"); return; }
     try {
-      await api.post("/appointments", { ...form, starts_at: new Date(form.starts_at).toISOString() });
+      await api.post("/appointments", { ...form, starts_at: form.starts_at });
       toast.success("Reunião agendada");
       setOpen(false);
       setForm({ title: "", client_name: "", starts_at: "", duration_min: 60, location: "Google Meet", notes: "", status: "confirmado" });
