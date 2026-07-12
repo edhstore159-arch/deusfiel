@@ -12,10 +12,10 @@ const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 type Msg = { role: "user" | "assistant"; content: string };
 
 const AGENTS = [
-  { id: "gpt-4o-mini", label: "ChatGPT 4o mini", desc: "Rápido e econômico" },
-  { id: "gpt-4o", label: "ChatGPT 4o", desc: "Mais robusto" },
-  { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet", desc: "Análise jurídica detalhada" },
-  { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku", desc: "Rápido, boa qualidade" },
+  { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "Rápido e econômico" },
+  { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", desc: "Análise jurídica detalhada" },
+  { id: "openai/gpt-5-mini", label: "GPT-5 mini", desc: "Equilibrado" },
+  { id: "openai/gpt-5", label: "GPT-5", desc: "Máxima qualidade" },
 ] as const;
 
 export default function JuizVirtual() {
