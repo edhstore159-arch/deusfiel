@@ -3,13 +3,9 @@ import { useEffect } from "react";
 /**
  * DebugErrorThrower
  *
- * Escuta o CustomEvent "lovable-debug-error", guarda a mensagem em state e,
- * durante o render, lança um erro real para acionar o overlay global da
- * Lovable e o botão "Try to Fix".
- *
- * DEVE ficar FORA de qualquer ErrorBoundary / Suspense / try-catch.
- * NÃO substituir o throw por toast, log ou console.error.
- * NÃO suprimir mensagens — o throw é intencional e é a feature.
+ * Escuta o CustomEvent "lovable-debug-error" sem derrubar a interface.
+ * A instrução é repassada como evento interno para preservar o fluxo de debug
+ * sem provocar tela branca em produção/preview.
  */
 export const DebugErrorThrower = () => {
   useEffect(() => {
