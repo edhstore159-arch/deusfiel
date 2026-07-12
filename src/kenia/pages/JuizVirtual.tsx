@@ -22,9 +22,11 @@ export default function JuizVirtual() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState<string>(
-    () => localStorage.getItem("juiz_model") || "gpt-4o-mini",
-  );
+  const [model, setModel] = useState<string>(() => {
+    const stored = localStorage.getItem("juiz_model") || "";
+    const valid = AGENTS.some((a) => a.id === stored);
+    return valid ? stored : "google/gemini-2.5-flash";
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const changeModel = (m: string) => {
