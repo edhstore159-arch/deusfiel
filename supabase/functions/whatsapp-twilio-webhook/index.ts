@@ -188,6 +188,11 @@ Deno.serve(async (req) => {
       mediaType0: form.get("MediaContentType0"),
     });
 
+    const contactPhone = from.replace(/^whatsapp:/i, "").trim();
+    const contactId = contactPhone.replace(/[^\d+]/g, "");
+    const contactName = String(form.get("ProfileName") || "").trim() || undefined;
+    const providerMessageId = String(form.get("MessageSid") || "") || undefined;
+
     let userText = body;
     let audioFailed = false;
     let inboundWasAudio = false;
