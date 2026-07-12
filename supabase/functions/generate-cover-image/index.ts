@@ -470,6 +470,14 @@ Deno.serve(async (req) => {
       "--style raw --photorealism high --no human --no face --no eyes --no portrait --no hands --no fingers --no skin --no body_parts --no anthropomorphic --no object_anatomy_fusion",
     ].join("\n");
 
+    // Detecta se o assunto é animal/natureza vs objeto/produto para escolher o preset foto-realista.
+    const isAnimalSubject = !humanSubject && !hybridSubject && (
+      ANIMAL_RE.test(prompt) || !!detectBird(prompt) || !!detectMammal(prompt)
+    );
+    const ultraRealismBoost = humanSubject || hybridSubject
+      ? ""
+      : (isAnimalSubject || scenerySubject ? ULTRA_REALISM_NATURE : ULTRA_REALISM_OBJECT);
+
     const toDataUrl = (b64: string) =>
       b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
 
