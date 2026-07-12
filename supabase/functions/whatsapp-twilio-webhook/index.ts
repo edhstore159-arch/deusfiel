@@ -138,6 +138,38 @@ async function sendTwilioMessage(from: string, to: string, body: string, mediaUr
   }
 }
 
+async function logWhatsappMessage(opts: {
+  contactId: string;
+  contactPhone: string;
+  contactName?: string;
+  text: string;
+  fromMe: boolean;
+  providerMessageId?: string;
+}) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/whatsapp_messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        contact_id: opts.contactId,
+        contact_phone: opts.contactPhone,
+        contact_name: opts.contactName || null,
+        text: opts.text,
+        from_me: opts.fromMe,
+        provider_message_id: opts.providerMessageId || null,
+      }),
+    });
+    if (!r.ok) console.error("[whatsapp] log msg falhou", r.status, await r.text());
+  } catch (e) {
+    console.error("[whatsapp] log msg exceção", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -155,6 +187,11 @@ Deno.serve(async (req) => {
       numMedia,
       mediaType0: form.get("MediaContentType0"),
     });
+
+    const contactPhone = from.replace(/^whatsapp:/i, "").trim();
+    const contactId = contactPhone.replace(/[^\d+]/g, "");
+    const contactName = String(form.get("ProfileName") || "").trim() || undefined;
+    const providerMessageId = String(form.get("MessageSid") || "") || undefined;
 
     let userText = body;
     let audioFailed = false;
@@ -205,7 +242,17 @@ Deno.serve(async (req) => {
       return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
     }
 
-    const { reply, audio_base64 } = await callChatAI(userText, from.replace(/[^\d+]/g, ""), inboundWasAudio);
+    // Loga a mensagem recebida do cliente (dispara trigger de agendamento/reagendamento)
+    await logWhatsappMessage({
+      contactId,
+      contactPhone,
+      contactName,
+      text: userText,
+      fromMe: false,
+      providerMessageId,
+    });
+
+    const { reply, audio_base64 } = await callChatAI(userText, contactId, inboundWasAudio);
     await sleep(1000 + Math.floor(Math.random() * 2000));
     let mediaUrl: string | null = null;
     if (inboundWasAudio && audio_base64) {
@@ -214,6 +261,15 @@ Deno.serve(async (req) => {
     }
     // From e To invertidos para responder
     await sendTwilioMessage(to, from, reply, mediaUrl);
+
+    // Loga a resposta enviada
+    await logWhatsappMessage({
+      contactId,
+      contactPhone,
+      contactName,
+      text: reply,
+      fromMe: true,
+    });
 
     return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
   } catch (e) {
