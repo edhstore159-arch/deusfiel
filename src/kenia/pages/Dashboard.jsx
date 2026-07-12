@@ -13,6 +13,7 @@ import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, Mess
 import { toast } from "sonner";
 import { useAuth } from "@/kenia/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import SystemReportCard from "@/kenia/components/SystemReportCard";
 
 const URG_COLORS = {
   baixa: "bg-nude-100 text-nude-700",
