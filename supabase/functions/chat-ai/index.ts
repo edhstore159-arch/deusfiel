@@ -651,9 +651,10 @@ Deno.serve(async (req) => {
       "google/gemini-2.5-flash",
     ]);
     const requestedAgentModel = typeof body.model === "string" ? body.model : "";
+    // Copiloto jurídico usa Claude por padrão (Ollama é reservado para a secretária do WhatsApp).
     const agentModel = ALLOWED_AGENT_MODELS.has(requestedAgentModel)
       ? requestedAgentModel
-      : "google/gemini-2.5-flash";
+      : "claude-sonnet-4-5";
     const creativeMode = body.creative_mode === true || /\b(conta|conte|contar|narra|narre|narrar|inventa|invente|cria|crie|escreve|escreva)\b[\s\S]*\b(hist[oó]ria|conto|f[aá]bula|poema|roteiro|personagem|di[aá]logo|chapeuzinho|chap[eé]uzinho)\b/i.test(userMessage.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase());
     // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
     const extraPrompt: string = DEFAULT_PROMPT;
