@@ -548,9 +548,9 @@ function emergentCandidates(model = "") {
     ? [
         requested,
         base,
-        "claude-3-5-sonnet-20241022",
-        "claude-3-5-sonnet-latest",
-        "claude-3-5-sonnet",
+        "claude-sonnet-4-5",
+        "claude-sonnet-4-5-20250929",
+        "claude-haiku-4-5",
       ]
     : /^gpt-4o(?:-mini)?$/i.test(base)
       ? [base]
