@@ -15,7 +15,9 @@ const AGENTS = [
   { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "Rápido e econômico" },
   { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", desc: "Análise jurídica detalhada" },
   { id: "openai/gpt-5-mini", label: "GPT-5 mini", desc: "Equilibrado" },
-  { id: "openai/gpt-5", label: "GPT-5", desc: "Máxima qualidade" },
+  { id: "openai/gpt-5", label: "GPT-5", desc: "Máxima qualidade OpenAI" },
+  { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5", desc: "Raciocínio jurídico premium" },
+  { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", desc: "Claude rápido e barato" },
 ] as const;
 
 export default function JuizVirtual() {
