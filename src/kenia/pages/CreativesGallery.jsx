@@ -56,11 +56,23 @@ export default function CreativesGallery() {
     try {
       const { data } = await api.get("/creatives");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.creatives) ? data.creatives : [];
-      const seen = new Set();
+      // Dedupe robusto: mesmo item pode chegar via /creatives e via generated_images.
+      // Consideramos duplicado quando id, storage_path OU a própria imagem coincidem.
+      const seenIds = new Set();
+      const seenPaths = new Set();
+      const seenImages = new Set();
       const unique = list.filter((it) => {
-        const key = it?.id ?? `${it?.created_at}-${it?.title}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
+        if (!it) return false;
+        const id = it.id ?? null;
+        const path = it.storage_path ?? null;
+        const img = it.image_b64 ?? it.image_url ?? it.url ?? it.image ?? null;
+        const imgKey = typeof img === "string" ? img.slice(0, 256) : null;
+        if (id && seenIds.has(id)) return false;
+        if (path && seenPaths.has(path)) return false;
+        if (imgKey && seenImages.has(imgKey)) return false;
+        if (id) seenIds.add(id);
+        if (path) seenPaths.add(path);
+        if (imgKey) seenImages.add(imgKey);
         return true;
       });
       setItems(unique);
@@ -288,6 +300,13 @@ export default function CreativesGallery() {
       let restored = 0;
       for (const f of orphans) {
         const storage_path = `${userId}/${f.name}`;
+        // Evita duplicar: se já existe uma linha para este storage_path, pula.
+        const { data: existing } = await supabase
+          .from("generated_images")
+          .select("id")
+          .eq("storage_path", storage_path)
+          .limit(1);
+        if (existing && existing.length) continue;
         const { data: signed } = await supabase.storage.from("creative-assets").createSignedUrl(storage_path, 60 * 60 * 24 * 7);
         const payload = {
           user_id: userId,
