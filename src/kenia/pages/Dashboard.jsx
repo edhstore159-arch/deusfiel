@@ -586,6 +586,9 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <SystemReportCard />
+
+
       {/* 3-column layout */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4 p-4 overflow-hidden">
         {/* LEFT - WhatsApp Contacts */}
