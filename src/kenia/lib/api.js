@@ -1166,6 +1166,36 @@ const staticPut = (url, body = {}) => {
   return response({ ok: true, fallback: true });
 };
 
+const buildAppointmentDateTimePayload = (body = {}) => {
+  const next = {};
+  if (body.starts_at) {
+    const start = new Date(body.starts_at);
+    if (!Number.isNaN(start.getTime())) {
+      const pad = (n) => String(n).padStart(2, "0");
+      next.appointment_date = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
+      next.appointment_time = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+    }
+  }
+  if (body.appointment_date) next.appointment_date = String(body.appointment_date).slice(0, 10);
+  if (body.appointment_time) next.appointment_time = String(body.appointment_time).slice(0, 5);
+  return next;
+};
+
+const buildAppointmentUpdatePayload = (body = {}) => {
+  const payload = { ...buildAppointmentDateTimePayload(body) };
+  if (body.client_name !== undefined) payload.client_name = body.client_name || "Cliente";
+  if (body.phone !== undefined) payload.phone = body.phone || null;
+  if (body.email !== undefined) payload.email = body.email || null;
+  if (body.legal_area !== undefined || body.area !== undefined || body.title !== undefined) {
+    payload.legal_area = body.legal_area || body.area || body.title || "Atendimento jurídico";
+  }
+  if (body.case_summary !== undefined || body.notes !== undefined) payload.case_summary = body.case_summary || body.notes || null;
+  if (body.status !== undefined) payload.status = body.status === "confirmado" ? "scheduled" : body.status;
+  if (body.source !== undefined) payload.source = body.source;
+  payload.updated_at = nowIso();
+  return payload;
+};
+
 const staticPatch = async (url, body = {}) => {
   const [path] = String(url).split("?");
   const updateCollection = (key, fallback) => {
@@ -1176,7 +1206,23 @@ const staticPatch = async (url, body = {}) => {
   };
   if (path.startsWith("/leads/")) return updateCollection("leads", seedLeads);
   if (path.startsWith("/finance/transactions/")) return updateCollection("transactions", seedTransactions);
-  if (path.startsWith("/appointments/")) return updateCollection("appointments", seedAppointments);
+  if (path.startsWith("/appointments/")) {
+    const id = path.split("/").pop();
+    try {
+      const payload = buildAppointmentUpdatePayload(body);
+      const { data, error } = await supabase
+        .from("appointments")
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .maybeSingle();
+      if (error) throw error;
+      if (data) return response(normalizeAppointment(data));
+    } catch (err) {
+      console.warn("Falha ao atualizar agendamento no banco; usando fallback local", err);
+    }
+    return updateCollection("appointments", seedAppointments);
+  }
   if (path.startsWith("/legal-deadlines/")) return updateCollection("legal_deadlines", seedLegalDeadlines);
   if (path.startsWith("/admin/case-analyses/")) {
     const id = path.split("/").pop();
@@ -1232,7 +1278,7 @@ liveApi.interceptors.response.use(
 
 const cloudFirstGetPaths = new Set(["/appointments", "/legal-deadlines", "/creatives", "/whatsapp/default-prompt", "/legislation/today", "/admin/case-analyses"]);
 const cloudFirstPostPaths = new Set(["/chat/message", "/creatives/generate", "/creatives/fuse-images", "/creatives/edit", "/appointments", "/legal-deadlines", "/legal-deadlines/sync", "/leads", "/public/leads"]);
-const staticOnlyMutationPrefixes = ["/leads/"];
+const staticOnlyMutationPrefixes = ["/leads/", "/appointments/"];
 const liveFirstWithStaticFallbackPostPaths = new Set([]);
 const fallbackToStaticPostPaths = new Set(["/debug/instruction"]);
 
