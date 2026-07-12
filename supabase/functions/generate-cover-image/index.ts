@@ -145,10 +145,24 @@ function detectMammal(prompt: string) {
 const ANIMAL_RE = /\b(p[áa]ssaro|passarinho|ave|bird|sabi[áa]|beija[- ]?flor|hummingbird|arara|macaw|papagaio|parrot|tucano|toucan|can[áa]rio|canary|coruja|owl|[áa]guia|eagle|gavi[ãa]o|hawk|urubu|vulture|bem[- ]?te[- ]?vi|kiskadee|jo[ãa]o[- ]?de[- ]?barro|hornero|andorinha|swallow|pomba|pombo|dove|pigeon|pardal|sparrow|periquito|parakeet|budgie|calopsita|cockatiel|pav[ãa]o|peacock|flamingo|cisne|swan|pato|duck|ganso|goose|pinguim|penguin|avestruz|ostrich|galo|rooster|galinha|hen|chicken|c[ãa]o|cachorro|dog|gato|cat|cavalo|horse|le[ãa]o|lion|tigre|tiger|on[çc]a|jaguar|pantera|leopardo|leopard|puma|cougar|elefante|elephant|girafa|giraffe|macaco|monkey|lobo|wolf|raposa|fox|urso|bear|coelho|rabbit|veado|deer|peixe|fish|tubar[ãa]o|shark|baleia|whale|golfinho|dolphin|tartaruga|turtle|cobra|snake|lagarto|lizard|sapo|frog|borboleta|butterfly|abelha|bee)\b/i;
 
 
+function detectQuantity(prompt: string): number {
+  const p = prompt.toLowerCase();
+  const digit = p.match(/\b(\d{1,3})\s+(p[áa]ssaro|passarinho|ave|bird|sabi[áa]|beija[- ]?flor|hummingbird|arara|macaw|tucano|toucan|can[áa]rio|canary|coruja|owl|[áa]guia|eagle|papagaio|parrot|pinguim|penguin|flamingo|cisne|swan|pato|duck)s?\b/);
+  if (digit) return Math.min(20, parseInt(digit[1], 10) || 1);
+  const words: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, "tr[eê]s": 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, two: 2, three: 3, four: 4, five: 5 };
+  for (const k of Object.keys(words)) {
+    if (new RegExp(`\\b${k}\\b`, "i").test(p)) return words[k];
+  }
+  return 1;
+}
+
 function objectLockFor(prompt: string) {
   const bird = detectBird(prompt);
   if (bird) {
-    return `SUBJECT LOCK (CRITICAL): the subject is a ${bird.en} — in Portuguese "${bird.pt}". Render EXACTLY this species, faithful to its real-world appearance: ${bird.traits}. Do NOT render a generic bird, do NOT substitute for a different species, do NOT mix traits of other birds. Photorealistic wildlife photography, anatomically correct beak, eyes, feathers, wings and feet. Do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
+    const qty = detectQuantity(prompt);
+    // Template: [quantidade] + [nome em inglês OU científico] + [descrição visual detalhada] + [estilo]
+    const template = `${qty} ${bird.en}, ${bird.traits}, photorealistic wildlife photography, natural lighting, sharp focus, high detail, anatomically correct plumage and beak`;
+    return `SUBJECT LOCK (CRITICAL): render EXACTLY this composition using the template [quantity]+[English/scientific name]+[detailed visual description]+[style] → "${template}". Portuguese reference: "${bird.pt}". Show exactly ${qty} individual${qty > 1 ? "s" : ""} of this species — no more, no fewer. Do NOT render a generic bird, do NOT substitute for a different species, do NOT mix traits of other birds. Do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
   }
   const mammal = detectMammal(prompt);
   if (mammal) {
