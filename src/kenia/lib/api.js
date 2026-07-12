@@ -937,6 +937,11 @@ const staticPost = (url, body = {}) => {
     return (async () => {
       try {
         const start = body.starts_at ? new Date(body.starts_at) : new Date();
+        // Usa componentes LOCAIS para evitar que UTC empurre a data para o dia
+        // seguinte (ex.: agendamento às 22h em São Paulo virava dia +1).
+        const pad = (n) => String(n).padStart(2, "0");
+        const localDate = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
+        const localTime = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
         const { data: authData } = await supabase.auth.getUser().catch(() => ({ data: null }));
         const { data, error } = await supabase
           .from("appointments")
@@ -947,8 +952,8 @@ const staticPost = (url, body = {}) => {
             email: body.email || null,
             legal_area: body.area || body.legal_area || body.title || "Atendimento jurídico",
             case_summary: body.notes || null,
-            appointment_date: start.toISOString().slice(0, 10),
-            appointment_time: start.toTimeString().slice(0, 5),
+            appointment_date: localDate,
+            appointment_time: localTime,
             source: body.source || "panel",
             status: body.status === "confirmado" ? "scheduled" : body.status || "scheduled",
             raw_payload: body,
