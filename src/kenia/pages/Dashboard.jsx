@@ -13,6 +13,7 @@ import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, Mess
 import { toast } from "sonner";
 import { useAuth } from "@/kenia/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import SystemReportCard from "@/kenia/components/SystemReportCard";
 
 const URG_COLORS = {
   baixa: "bg-nude-100 text-nude-700",
@@ -584,6 +585,9 @@ export default function Dashboard() {
           </Badge>
         </div>
       </div>
+
+      <SystemReportCard />
+
 
       {/* 3-column layout */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4 p-4 overflow-hidden">
