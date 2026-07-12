@@ -402,6 +402,16 @@ const ULTRA_REALISM_NATURE =
 const ULTRA_REALISM_OBJECT =
   "Photorealistic product and nature photography, physically based rendering (PBR), realistic materials, accurate proportions, authentic textures, natural wear and imperfections, true-to-life colors, realistic reflections and shadows, global illumination, soft natural lighting, high dynamic range, ultra-high resolution, sharp focus, professional photography, RAW image, no CGI, no illustration, no cartoon, no painting, no artificial details, extremely realistic.";
 
+// Detecta pedido de figura pública real (presidente, papa, celebridade nomeada etc.)
+const PUBLIC_FIGURE_RE = /\b(presidente|president|primeiro[- ]ministro|prime minister|papa|pope|rei\b|king\b|rainha|queen|governador|governor|senador|senator|deputad[oa]|prefeit[oa]|ministr[oa]|chanceler|chancellor|c[oô]nsul|ditador|dictator|celebridade|celebrity|ator famoso|atriz famosa|cantor famoso|cantora famosa|jogador famoso|lula|bolsonaro|trump|biden|obama|putin|zelensky|macron|xi jinping|kim jong|modi|erdogan|netanyahu|milei|maduro|papa francisco|elon musk|messi|neymar|ronaldo|cristiano ronaldo|beyonc[eé]|taylor swift)\b/i;
+
+// Reforço fotojornalístico para figuras públicas reais — likeness fiel à pessoa real.
+const PUBLIC_FIGURE_REALISM =
+  "REAL-PERSON LIKENESS LOCK (CRITICAL): the requested person is a REAL public figure. Render an accurate photojournalistic likeness matching the person's real-world appearance as seen in press photos and official portraits — correct age, ethnicity, skin tone, hair color/style, facial hair, eye color, face shape, nose shape, jawline, ears, characteristic wrinkles, marks and expressions. " +
+  "Correct real-world wardrobe consistent with the role (e.g., a president in a real dark suit, dress shirt, tie, presidential sash when applicable — NOT costume, NOT superhero outfit, NOT fantasy attire). " +
+  "Style: unedited RAW press photograph, 35mm/50mm/85mm lens, natural available light, Reuters/AP/AFP/Getty photojournalism aesthetic, candid real-world moment, authentic environment (podium, office, press conference, motorcade, official ceremony as appropriate), 16K micro-detail on skin (pores, wrinkles, stubble where real), realistic eyes with the person's actual iris color. " +
+  "Absolutely no cartoon, no anime, no 3D render, no CGI, no illustration, no caricature, no stylization, no fantasy costume, no age alteration, no ethnicity alteration, no gender alteration — the output must be indistinguishable from a real photograph taken by a professional photojournalist.";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const _auth_res = await requireUser(req);
@@ -423,7 +433,8 @@ Deno.serve(async (req) => {
     const isolatedOnly = isIsolatedObjectOnly(prompt);
     const eventSubject = !isolatedOnly && EVENT_RE.test(prompt) && !hybridSubject;
     const scenerySubject = !hybridSubject && isScenerySubject(prompt);
-    const humanSubject = !isolatedOnly && (hasHumanSubject(prompt) || eventSubject) && !hybridSubject;
+    const isPublicFigure = PUBLIC_FIGURE_RE.test(prompt);
+    const humanSubject = !isolatedOnly && (hasHumanSubject(prompt) || eventSubject || isPublicFigure) && !hybridSubject;
     const handGuard = handCompositionGuard(prompt);
     const cakeEating = EATING_CAKE_RE.test(prompt);
     const fullPrompt = hybridSubject ? [
@@ -441,6 +452,8 @@ Deno.serve(async (req) => {
       userElaborated,
       "",
       `REALISM REQUIREMENTS: ${REALISM}`,
+      "",
+      isPublicFigure ? PUBLIC_FIGURE_REALISM : "",
       "",
       FACE_LOCK,
       "",
