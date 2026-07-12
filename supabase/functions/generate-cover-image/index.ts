@@ -477,7 +477,7 @@ Deno.serve(async (req) => {
           `Output must look like a direct edited/clone version of the uploaded poster with the requested changes applied. Text must be crisp, legible and correctly spelled in Brazilian Portuguese.`,
         );
       } else {
-        promptParts.push(fullPrompt);
+        promptParts.push(fullPromptWithFidelity);
       }
       if (logo_base64) {
         imageUrls.push(toDataUrl(logo_base64));
