@@ -56,11 +56,23 @@ export default function CreativesGallery() {
     try {
       const { data } = await api.get("/creatives");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.creatives) ? data.creatives : [];
-      const seen = new Set();
+      // Dedupe robusto: mesmo item pode chegar via /creatives e via generated_images.
+      // Consideramos duplicado quando id, storage_path OU a própria imagem coincidem.
+      const seenIds = new Set();
+      const seenPaths = new Set();
+      const seenImages = new Set();
       const unique = list.filter((it) => {
-        const key = it?.id ?? `${it?.created_at}-${it?.title}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
+        if (!it) return false;
+        const id = it.id ?? null;
+        const path = it.storage_path ?? null;
+        const img = it.image_b64 ?? it.image_url ?? it.url ?? it.image ?? null;
+        const imgKey = typeof img === "string" ? img.slice(0, 256) : null;
+        if (id && seenIds.has(id)) return false;
+        if (path && seenPaths.has(path)) return false;
+        if (imgKey && seenImages.has(imgKey)) return false;
+        if (id) seenIds.add(id);
+        if (path) seenPaths.add(path);
+        if (imgKey) seenImages.add(imgKey);
         return true;
       });
       setItems(unique);
