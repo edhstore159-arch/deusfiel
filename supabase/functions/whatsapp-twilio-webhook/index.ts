@@ -242,7 +242,17 @@ Deno.serve(async (req) => {
       return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
     }
 
-    const { reply, audio_base64 } = await callChatAI(userText, from.replace(/[^\d+]/g, ""), inboundWasAudio);
+    // Loga a mensagem recebida do cliente (dispara trigger de agendamento/reagendamento)
+    await logWhatsappMessage({
+      contactId,
+      contactPhone,
+      contactName,
+      text: userText,
+      fromMe: false,
+      providerMessageId,
+    });
+
+    const { reply, audio_base64 } = await callChatAI(userText, contactId, inboundWasAudio);
     await sleep(1000 + Math.floor(Math.random() * 2000));
     let mediaUrl: string | null = null;
     if (inboundWasAudio && audio_base64) {
@@ -251,6 +261,15 @@ Deno.serve(async (req) => {
     }
     // From e To invertidos para responder
     await sendTwilioMessage(to, from, reply, mediaUrl);
+
+    // Loga a resposta enviada
+    await logWhatsappMessage({
+      contactId,
+      contactPhone,
+      contactName,
+      text: reply,
+      fromMe: true,
+    });
 
     return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
   } catch (e) {
