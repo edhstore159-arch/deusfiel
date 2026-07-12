@@ -20,6 +20,7 @@ const LOGO_IMG = "https://customer-assets.emergentagent.com/job_nude-gold-dashbo
 const NAV = [
   { to: "/app", label: "Atendimento", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
   { to: "/app/chat-ia", label: "Chat IA · Análise", icon: Bot, testid: "nav-chat-ia" },
+  { to: "/app/chat-multi-modelo", label: "Chat Multi-Modelo", icon: Sparkles, testid: "nav-chat-multi" },
   { to: "/app/admin", label: "Painel Admin · Casos", icon: ShieldCheck, testid: "nav-admin" },
   { to: "/app/secretary-tasks", label: "Tarefas Secretária", icon: MessageSquare, testid: "nav-secretary-tasks" },
   { to: "/app/juiz-virtual", label: "Juiz Virtual", icon: Gavel, testid: "nav-juiz-virtual" },
@@ -45,6 +46,7 @@ const NAV = [
 const PREFETCH = {
   "/app": () => import("@/kenia/pages/Dashboard"),
   "/app/chat-ia": () => import("@/kenia/pages/ChatIA"),
+  "/app/chat-multi-modelo": () => import("@/kenia/pages/ChatMultiModelo"),
   "/app/admin": () => import("@/kenia/pages/AdminCases"),
   "/app/secretary-tasks": () => import("@/kenia/pages/SecretaryTasks"),
   "/app/juiz-virtual": () => import("@/kenia/pages/JuizVirtual"),

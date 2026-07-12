@@ -49,6 +49,7 @@ const Settings = lazyWithReload(() => import("@/kenia/pages/Settings"));
 const DebugTool = lazyWithReload(() => import("@/kenia/pages/DebugTool"));
 const EmergentLogin = lazyWithReload(() => import("@/kenia/pages/EmergentLogin"));
 const ChatIA = lazyWithReload(() => import("@/kenia/pages/ChatIA"));
+const ChatMultiModelo = lazyWithReload(() => import("@/kenia/pages/ChatMultiModelo"));
 const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
 const JuizVirtual = lazyWithReload(() => import("@/kenia/pages/JuizVirtual"));
@@ -99,6 +100,7 @@ function App() {
               >
                 <Route path="/app" element={<Dashboard />} />
                 <Route path="/app/chat-ia" element={<ChatIA />} />
+                <Route path="/app/chat-multi-modelo" element={<ChatMultiModelo />} />
                 <Route path="/app/admin" element={<AdminCases />} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
                 <Route path="/app/juiz-virtual" element={<JuizVirtual />} />
