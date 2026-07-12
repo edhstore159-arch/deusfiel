@@ -97,35 +97,9 @@ export default function Settings() {
           </div>
         </Card>
 
-        {/* Status das chaves */}
-        <Card className="border-nude-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <KeyRound className="w-4 h-4 text-gold-600" />
-              <h3 className="font-display font-semibold text-base">Secrets do backend</h3>
-            </div>
-            <Badge className="bg-nude-900 text-white hover:bg-nude-900">
-              {loadingStatus ? "…" : `${totalWorking}/${SECRET_LABELS.length} configuradas`}
-            </Badge>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-2">
-            {SECRET_LABELS.map(({ key, label, role }) => {
-              const ok = !!secrets?.[key];
-              return (
-                <div key={key} className={`flex items-center gap-3 rounded-md border px-3 py-2 ${ok ? "border-emerald-200 bg-emerald-50/50" : "border-rose-200 bg-rose-50/50"}`}>
-                  {ok ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-rose-600" />}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-mono text-xs text-nude-900 truncate">{label}</div>
-                    <div className="text-[11px] text-nude-500 truncate">{role}</div>
-                  </div>
-                  <Badge variant="outline" className={ok ? "border-emerald-300 text-emerald-700" : "border-rose-300 text-rose-700"}>
-                    {ok ? "Ativa" : "Ausente"}
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+        {/* Secrets do backend — gated by password */}
+        <SecretsDebugCard secrets={secrets} loadingStatus={loadingStatus} totalWorking={totalWorking} />
+
 
         {/* Teste Chat */}
         <Card className="border-nude-200 p-5">
