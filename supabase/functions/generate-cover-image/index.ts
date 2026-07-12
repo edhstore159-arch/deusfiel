@@ -153,6 +153,7 @@ function objectLockFor(prompt: string) {
   const mammal = detectMammal(prompt);
   if (mammal) {
     return `SUBJECT LOCK (CRITICAL): the subject is a ${mammal.en} — in Portuguese "${mammal.pt}". Render EXACTLY this species, faithful to its real-world appearance: ${mammal.traits}. Do NOT substitute for a different species, do NOT mix traits with other big cats/canids/mammals. Photorealistic wildlife photography, anatomically correct head, eyes, fur/coat pattern, paws and tail. Do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
+  }
   if (ANIMAL_RE.test(prompt)) {
     return `SUBJECT LOCK (CRITICAL): the subject is the specific animal literally named by the user. Render ONLY that exact species with correct real-world anatomy, proportions, coloration and natural habitat. Do not substitute species, do not add people, faces, hands, fingers, fruit, food, or anthropomorphic traits.`;
   }
@@ -356,7 +357,28 @@ async function elaboratePrompt(userPrompt: string, style?: string): Promise<stri
 
 
 
+// Mapeia formato/rede social para dimensões nativas do criativo,
+// evitando distorção e melhorando o realismo por conta do enquadramento correto.
+function pickSize(network?: string, format?: string): string {
+  const key = `${(network || "").toLowerCase()}|${(format || "").toLowerCase()}`;
+  // formatos explícitos
+  if (/1080x1920|9x16|story|reels?|tiktok|shorts/.test(key)) return "1024x1792";
+  if (/1080x1350|4x5|portrait|feed/.test(key)) return "1024x1280";
+  if (/1200x628|1200x630|16x9|1920x1080|landscape|banner|linkedin|youtube|facebook_cover/.test(key)) return "1792x1024";
+  if (/square|1x1|1080x1080|instagram(?!.*story)/.test(key)) return "1024x1024";
+  return "1024x1024";
+}
 
+// Reforço de fidelidade a objetos/animais reais — evita "genérico".
+const OBJECT_FIDELITY_LOCK =
+  "OBJECT & SPECIES FIDELITY LOCK (CRITICAL): render every named object, animal, plant, landmark or product with 100% accurate real-world reference. " +
+  "Match the exact species/model/variant: correct silhouette, proportions, color palette, texture, materials, markings, patterns and anatomical details as they appear in reality (as if photographed from a real specimen). " +
+  "Birds: correct beak shape/size/color, correct eye ring, correct plumage pattern and colors per species, correct feet, correct body proportions and posture — no chimeric or generic 'bird'. " +
+  "Animals: correct fur/scale pattern, correct body proportions and limb count, no mutations. " +
+  "Objects/products: correct scale relative to environment, correct materials/reflectivity, correct proportions, no fantasy variations. " +
+  "Landmarks/architecture: correct real-world geometry, correct number of towers/floors/arches, correct materials. " +
+  "Scale coherence: every object in the frame must have plausible real-world size relative to nearby objects and people. " +
+  "If the model is uncertain about a specific species/model, prefer the most iconic real-world reference and never invent hybrid or made-up variants.";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -426,10 +448,14 @@ Deno.serve(async (req) => {
       "--style raw --photorealism high --no human --no face --no eyes --no portrait --no hands --no fingers --no skin --no body_parts --no anthropomorphic --no object_anatomy_fusion",
     ].join("\n");
 
-
-
     const toDataUrl = (b64: string) =>
       b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
+
+    // Reforça fidelidade de objeto/espécie em TODOS os caminhos.
+    const fullPromptWithFidelity = `${fullPrompt}\n\n${OBJECT_FIDELITY_LOCK}`;
+
+    const targetSize = pickSize(network, format);
+
 
     // With reference image and/or logo: Gemini Nano Banana (edit-mode preserving identity)
     if (reference_image_base64 || logo_base64) {
@@ -452,7 +478,7 @@ Deno.serve(async (req) => {
           `Output must look like a direct edited/clone version of the uploaded poster with the requested changes applied. Text must be crisp, legible and correctly spelled in Brazilian Portuguese.`,
         );
       } else {
-        promptParts.push(fullPrompt);
+        promptParts.push(fullPromptWithFidelity);
       }
       if (logo_base64) {
         imageUrls.push(toDataUrl(logo_base64));
@@ -478,7 +504,7 @@ Deno.serve(async (req) => {
 
 
     // Text-to-image: try Lovable Gateway gpt-image-2, fallback to Emergent (gpt-image-1).
-    const img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "high", preferProvider });
+    const img = await generateImage({ prompt: fullPromptWithFidelity, size: targetSize, quality: "high", preferProvider });
     if (!img.ok) {
       // Local SVG fallback so the client never sees a 502 / blank screen.
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#g)"/><circle cx="512" cy="420" r="160" fill="rgba(255,255,255,0.08)"/><rect x="312" y="640" width="400" height="14" rx="7" fill="rgba(255,255,255,0.35)"/><rect x="372" y="680" width="280" height="10" rx="5" fill="rgba(255,255,255,0.22)"/></svg>`;
