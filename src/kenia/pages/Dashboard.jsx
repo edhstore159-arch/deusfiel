@@ -325,10 +325,17 @@ export default function Dashboard() {
       const { data } = await api.get("/appointments");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
       const now = Date.now();
-      const upcoming = list
-        .filter((a) => a?.starts_at && new Date(a.starts_at).getTime() >= now - 60 * 60 * 1000)
+      const withDate = list.filter((a) => a?.starts_at);
+      const upcoming = withDate
+        .filter((a) => new Date(a.starts_at).getTime() >= now - 60 * 60 * 1000)
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-      setAppointments(upcoming);
+      // Fallback: se não houver futuros, mostra os agendamentos mais recentes
+      // (inclui os criados via WhatsApp que estejam no passado) para que o
+      // dashboard nunca fique vazio quando existirem registros.
+      const recent = withDate
+        .slice()
+        .sort((a, b) => new Date(b.starts_at) - new Date(a.starts_at));
+      setAppointments(upcoming.length ? upcoming : recent);
     } catch {}
   };
 
