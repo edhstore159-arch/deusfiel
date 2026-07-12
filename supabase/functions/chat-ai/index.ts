@@ -1086,20 +1086,30 @@ CONTEXTO TEMPORAL: ${fmtDate}, ${fmtTime} (horário de Brasília). Saudação co
     const handoff = /HANDOFF[_\s-]*K[EÊ]NIA/i.test(rawReply);
     const userAppointment = extractAppointmentFromText(userMessage, history);
     const replyAppointment = extractAppointmentFromText(rawReply, [...history, { role: "user", content: userMessage }]);
+    const conversationAppointment = extractAppointmentFromConversation(userMessage, history);
     const blockAppointment = parseAppointmentBlock(rawReply);
     const rescheduleIntentHere = /(reagend|remarc|adiar|alterar|mudar|trocar|nova\s+data|novo\s+hor[aá]rio)/i.test(
       `${userMessage} ${rawReply} ${history.map((m) => String(m.content || "")).join(" ")}`,
     );
     const appointment = rescheduleIntentHere
-      ? (userAppointment || replyAppointment || blockAppointment)
-      : (blockAppointment || userAppointment || replyAppointment);
-    const explicitUserTime = extractExplicitTime(userMessage);
+      ? (conversationAppointment || userAppointment || replyAppointment || blockAppointment)
+      : (blockAppointment || userAppointment || conversationAppointment || replyAppointment);
+    const explicitUserTime = extractExplicitTime(userMessage, true);
+    const explicitUserDate = extractExplicitDate(userMessage, true);
     if (appointment && explicitUserTime && rescheduleIntentHere) {
       appointment.appointment_time = explicitUserTime;
       appointment.raw_payload = {
         ...(appointment.raw_payload || {}),
         user_confirmed_time: explicitUserTime,
         time_source: "latest_user_message",
+      };
+    }
+    if (appointment && explicitUserDate && rescheduleIntentHere) {
+      appointment.appointment_date = explicitUserDate;
+      appointment.raw_payload = {
+        ...(appointment.raw_payload || {}),
+        user_confirmed_date: explicitUserDate,
+        date_source: "latest_user_message",
       };
     }
     console.log("[chat-ai] appointment detectado?", !!appointment, appointment ? { date: appointment.appointment_date, time: appointment.appointment_time, name: appointment.client_name } : null);
