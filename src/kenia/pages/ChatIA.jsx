@@ -665,11 +665,20 @@ export default function ChatIA() {
   };
 
   const openScheduler = (area) => {
-    const slot = nextBusinessSlot();
-    setScheduler({ date: slot.date, time: slot.time, duration: 60, area: area || analysis?.area || "" });
-    // No mobile, garante que o painel do chat (onde o scheduler é renderizado) fique visível
-    setShowAnalysisPanel(false);
+    try {
+      const slot = nextBusinessSlot();
+      setScheduler({ date: slot.date, time: slot.time, duration: 60, area: area || analysis?.area || "" });
+      setShowAnalysisPanel(false);
+      toast.success("Escolha data e horário");
+      setTimeout(() => {
+        document.querySelector('[data-testid="scheduler-panel"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    } catch (err) {
+      console.error("Falha ao abrir agendador:", err);
+      toast.error("Não consegui abrir o agendador.");
+    }
   };
+
 
   const createAppointment = async ({ date, time, duration = 60, area = "" }) => {
     const starts_at = getAppointmentDateTime(date, time);
