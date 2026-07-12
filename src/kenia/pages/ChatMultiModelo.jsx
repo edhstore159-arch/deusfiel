@@ -175,20 +175,34 @@ export default function ChatMultiModelo() {
 
   const streamOllama = async (allMessages) => {
     const base = ollamaUrl.replace(/\/+$/, "");
-    const res = await fetch(`${base}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: ollamaModel,
-        stream: true,
-        messages: [
-          ...(system ? [{ role: "system", content: system }] : []),
-          ...allMessages,
-        ],
-      }),
-      signal: abortRef.current?.signal,
-    });
-    if (!res.ok || !res.body) throw new Error(`Ollama HTTP ${res.status}`);
+    let res;
+    try {
+      res = await fetch(`${base}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: ollamaModel,
+          stream: true,
+          messages: [
+            ...(system ? [{ role: "system", content: system }] : []),
+            ...allMessages,
+          ],
+        }),
+        signal: abortRef.current?.signal,
+      });
+    } catch (e) {
+      if (e.name === "AbortError") throw e;
+      throw new Error(
+        `Não consegui conectar ao Ollama em ${base}. ` +
+        `Verifique: (1) o Ollama está rodando na sua máquina (ollama serve); ` +
+        `(2) libere CORS iniciando com OLLAMA_ORIGINS="*" ollama serve; ` +
+        `(3) se o preview estiver em HTTPS, o navegador bloqueia http://localhost — abra a app em http://localhost ou use um túnel https (ngrok).`
+      );
+    }
+    if (!res.ok || !res.body) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`Ollama HTTP ${res.status}: ${t || "sem corpo"}`);
+    }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
