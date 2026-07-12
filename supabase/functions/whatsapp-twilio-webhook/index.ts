@@ -5,6 +5,8 @@
 // Recebe form-urlencoded da Twilio, transcreve áudio (se houver),
 // chama chat-ai e responde via Twilio.
 
+import { createClient } from "npm:@supabase/supabase-js@2";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -17,6 +19,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const TWILIO_API_KEY = Deno.env.get("TWILIO_API_KEY")!;
 const AUDIO_BUCKET = "debug-uploads"; // bucket público
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -138,6 +141,43 @@ async function sendTwilioMessage(from: string, to: string, body: string, mediaUr
   }
 }
 
+async function resolveDefaultAssignee() {
+  const { data } = await supabaseAdmin
+    .from("user_roles")
+    .select("user_id")
+    .eq("role", "admin")
+    .order("user_id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data?.user_id || null;
+}
+
+async function saveWhatsAppMessage(args: {
+  from: string;
+  to: string;
+  text: string;
+  fromMe: boolean;
+  providerMessageId?: string | null;
+}) {
+  const text = String(args.text || "").trim();
+  if (!text) return;
+  const contactRaw = args.fromMe ? args.to : args.from;
+  const contactId = contactRaw.replace(/[^\d+]/g, "");
+  const contactPhone = contactId || contactRaw;
+  const userId = await resolveDefaultAssignee();
+  const providerMessageId = args.providerMessageId || `${args.fromMe ? "out" : "in"}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const { error } = await supabaseAdmin.from("whatsapp_messages").upsert({
+    user_id: userId,
+    contact_id: contactId || contactRaw,
+    contact_name: contactPhone ? `WhatsApp ${contactPhone}` : "Cliente WhatsApp",
+    contact_phone: contactPhone,
+    text,
+    from_me: args.fromMe,
+    provider_message_id: providerMessageId,
+  }, { onConflict: "user_id,contact_id,provider_message_id" });
+  if (error) console.error("[whatsapp] falha ao salvar mensagem:", error.message);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -196,12 +236,17 @@ Deno.serve(async (req) => {
     }
 
     if (isOptOut(userText)) {
+      await saveWhatsAppMessage({ from, to, text: userText, fromMe: false, providerMessageId: String(form.get("MessageSid") || "") || null });
       await sendTwilioMessage(to, from, "Tudo bem, atendimento automático pausado. Se precisar falar conosco novamente, envie uma nova mensagem. ✨");
       return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
     }
 
+    await saveWhatsAppMessage({ from, to, text: userText, fromMe: false, providerMessageId: String(form.get("MessageSid") || "") || null });
+
     if (!isBusinessHours()) {
-      await sendTwilioMessage(to, from, "Recebi sua mensagem. Nosso atendimento funciona das 8h às 20h, e retornaremos no próximo horário útil. ✨");
+      const awayReply = "Recebi sua mensagem. Nosso atendimento funciona das 8h às 20h, e retornaremos no próximo horário útil. ✨";
+      await sendTwilioMessage(to, from, awayReply);
+      await saveWhatsAppMessage({ from: to, to: from, text: awayReply, fromMe: true });
       return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
     }
 
@@ -214,6 +259,7 @@ Deno.serve(async (req) => {
     }
     // From e To invertidos para responder
     await sendTwilioMessage(to, from, reply, mediaUrl);
+    await saveWhatsAppMessage({ from: to, to: from, text: reply, fromMe: true });
 
     return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
   } catch (e) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { shouldSuppressLovableDebugInstruction } from "./debugInstruction";
 
 /**
  * DebugErrorThrower
@@ -25,6 +26,9 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
+    if (shouldSuppressLovableDebugInstruction(message)) {
+      return null;
+    }
     // Intencional: erro fatal durante o render para o overlay/"Try to Fix" da Lovable.
     throw new Error(message);
   }

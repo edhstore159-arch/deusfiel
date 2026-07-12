@@ -1114,16 +1114,37 @@ Responda APENAS um JSON válido (sem markdown) com EXATAMENTE estes campos:
             .maybeSingle();
           assigneeId = adminRow?.user_id ?? null;
         }
-        const { data: inserted, error: apptErr } = await supabase
+        const { data: existingAppointment } = await supabase
           .from("appointments")
-          .insert({
+          .select("id")
+          .eq("session_id", sessionId)
+          .eq("appointment_date", appointment.appointment_date)
+          .eq("appointment_time", appointment.appointment_time)
+          .not("status", "in", '(cancelado,recusado,cancelled,canceled)')
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const appointmentPayload = {
             user_id: assigneeId,
             session_id: sessionId,
             ...appointment,
             raw_payload: { ...enrichedPayload, assigned_to: assigneeId, assigned_role: "atendente" },
             source: "chat_ai",
             status: "scheduled",
-          })
+          };
+        const appointmentWrite = existingAppointment?.id
+          ? supabase
+              .from("appointments")
+              .update(appointmentPayload)
+              .eq("id", existingAppointment.id)
+              .select("id")
+              .maybeSingle()
+          : supabase
+              .from("appointments")
+              .insert(appointmentPayload)
+              .select("id")
+              .maybeSingle();
+        const { data: inserted, error: apptErr } = await appointmentWrite
           .select("id")
           .maybeSingle();
         if (apptErr) {
