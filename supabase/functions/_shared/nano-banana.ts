@@ -43,7 +43,7 @@ const PERSON_REPLACE_LOCK =
 
 function userExplicitlyRequestsFaceChange(prompt: string): boolean {
   const p = (prompt || "").toLowerCase();
-  return /(trocar|troca|mudar|muda|alterar|altera|modificar|modifica|substituir|substitui|refazer|refaz|redesenhar|redesenha|editar|edita)\s+([oa]s?\s+)?(rosto|face|cara|olhos?|nariz|boca|l[aá]bios?|queixo|mand[ií]bula|sobrancelhas?|pele|feature|identidade|homem|mulher|pessoa|modelo|personagem|retrato|foto)|face\s*swap|trocar\s+de\s+pessoa|nova\s+pessoa|mudar\s+a\s+identidade|change\s+(the\s+)?face|swap\s+face|replace\s+(the\s+)?(person|man|woman|model|portrait|photo)/i.test(p);
+  return /(trocar|troca|mudar|muda|alterar|altera|modificar|modifica|substituir|substitui|refazer|refaz|redesenhar|redesenha|editar|edita)\s+([oa]s?\s+)?(rosto|face|cara|olhos?|nariz|boca|l[aá]bios?|queixo|mand[ií]bula|sobrancelhas?|pele|feature|identidade|homem|homen|mulher|pessoa|modelo|personagem|retrato|foto)|face\s*swap|trocar\s+de\s+pessoa|nova\s+pessoa|mudar\s+a\s+identidade|change\s+(the\s+)?face|swap\s+face|replace\s+(the\s+)?(person|man|woman|model|portrait|photo)/i.test(p);
 }
 
 function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) {
