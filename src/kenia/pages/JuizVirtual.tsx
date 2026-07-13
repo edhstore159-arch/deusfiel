@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Gavel, Loader2, Send } from "lucide-react";
+import { Gavel, Loader2, Paperclip, Send, X, FileText, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Card } from "@/kenia/components/ui/card";
@@ -9,7 +9,19 @@ import { toast } from "sonner";
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/judge-ai`;
 const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Attachment = { name: string; mime: string; dataUrl: string; kind: "image" | "pdf" };
+type Msg = { role: "user" | "assistant"; content: string; attachments?: Attachment[] };
+
+const MAX_FILE_MB = 15;
+
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result || ""));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+
 
 const AGENTS = [
   { id: "openai/gpt-5.5", label: "GPT-5.5", desc: "Máximo rigor técnico" },
@@ -34,6 +46,8 @@ export default function JuizVirtual() {
     const valid = AGENTS.some((a) => a.id === stored);
     return valid ? stored : "openai/gpt-5.5";
   });
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const changeModel = (m: string) => {
@@ -41,17 +55,67 @@ export default function JuizVirtual() {
     localStorage.setItem("juiz_model", m);
   };
 
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const added: Attachment[] = [];
+    for (const file of Array.from(files)) {
+      const isImage = file.type.startsWith("image/");
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      if (!isImage && !isPdf) {
+        toast.error(`${file.name}: apenas imagens ou PDF são aceitos.`);
+        continue;
+      }
+      if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        toast.error(`${file.name}: excede ${MAX_FILE_MB}MB.`);
+        continue;
+      }
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        added.push({
+          name: file.name,
+          mime: isPdf ? "application/pdf" : file.type,
+          dataUrl,
+          kind: isPdf ? "pdf" : "image",
+        });
+      } catch {
+        toast.error(`Falha ao ler ${file.name}.`);
+      }
+    }
+    if (added.length) setAttachments((prev) => [...prev, ...added]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
+  const removeAttachment = (idx: number) =>
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+
+  const buildOutgoingMessages = (history: Msg[]) =>
+    history.map((m) => {
+      if (m.role !== "user" || !m.attachments?.length) {
+        return { role: m.role, content: m.content };
+      }
+      const parts: any[] = [{ type: "text", text: m.content || "Analise os documentos anexados." }];
+      for (const a of m.attachments) {
+        if (a.kind === "image") {
+          parts.push({ type: "image_url", image_url: { url: a.dataUrl } });
+        } else {
+          parts.push({ type: "file", file: { filename: a.name, file_data: a.dataUrl } });
+        }
+      }
+      return { role: "user", content: parts };
+    });
 
   const send = async () => {
     const text = input.trim();
-    if (!text || loading) return;
-    const next: Msg[] = [...messages, { role: "user", content: text }, { role: "assistant", content: "" }];
+    if ((!text && attachments.length === 0) || loading) return;
+    const userMsg: Msg = { role: "user", content: text, attachments: attachments.length ? attachments : undefined };
+    const next: Msg[] = [...messages, userMsg, { role: "assistant", content: "" }];
     setMessages(next);
     setInput("");
+    setAttachments([]);
     setLoading(true);
 
     try {
+      const outgoing = buildOutgoingMessages(next.slice(0, -1));
       const res = await fetch(FN_URL, {
         method: "POST",
         headers: {
@@ -59,8 +123,9 @@ export default function JuizVirtual() {
           Authorization: `Bearer ${ANON}`,
           apikey: ANON,
         },
-        body: JSON.stringify({ messages: next.slice(0, -1), model }),
+        body: JSON.stringify({ messages: outgoing, model }),
       });
+
       const contentType = res.headers.get("content-type") || "";
       if (!res.ok || !res.body) {
         const body = await res.text().catch(() => "");
@@ -174,14 +239,62 @@ export default function JuizVirtual() {
                   <ReactMarkdown>{m.content || "…"}</ReactMarkdown>
                 </div>
               ) : (
-                <div className="whitespace-pre-wrap">{m.content}</div>
+                <div className="space-y-2">
+                  {m.content && <div className="whitespace-pre-wrap">{m.content}</div>}
+                  {m.attachments?.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {m.attachments.map((a, k) =>
+                        a.kind === "image" ? (
+                          <img key={k} src={a.dataUrl} alt={a.name} className="max-h-32 rounded border border-primary-foreground/20" />
+                        ) : (
+                          <div key={k} className="flex items-center gap-1 rounded bg-primary-foreground/10 px-2 py-1 text-xs">
+                            <FileText className="h-3 w-3" /> {a.name}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               )}
             </div>
           </div>
         ))}
       </Card>
 
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {attachments.map((a, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-muted px-2 py-1 text-xs">
+              {a.kind === "image" ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+              <span className="max-w-[160px] truncate">{a.name}</span>
+              <button type="button" onClick={() => removeAttachment(i)} className="opacity-60 hover:opacity-100">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+
       <div className="flex gap-2 items-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={loading}
+          className="h-[90px] px-4"
+          title="Anexar PDF ou imagem"
+        >
+          <Paperclip className="h-5 w-5" />
+        </Button>
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -191,14 +304,15 @@ export default function JuizVirtual() {
               send();
             }
           }}
-          placeholder="Descreva os fatos, provas e o que se pretende (Ctrl/Cmd+Enter envia)"
+          placeholder="Descreva os fatos, provas e anexe PDF/imagens (Ctrl/Cmd+Enter envia)"
           className="min-h-[90px]"
           disabled={loading}
         />
-        <Button onClick={send} disabled={loading || !input.trim()} className="h-[90px] px-5">
+        <Button onClick={send} disabled={loading || (!input.trim() && attachments.length === 0)} className="h-[90px] px-5">
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
         </Button>
       </div>
+
     </div>
   );
 }
