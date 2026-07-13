@@ -56,17 +56,6 @@ function extractAppointmentFromText(text: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  // Shared-secret auth so only the scheduled cron (or an operator with the secret)
-  // can trigger the sweep. Without this the endpoint could be spammed publicly.
-  const sweepSecret = Deno.env.get("SWEEP_SECRET");
-  const provided = req.headers.get("x-sweep-secret") ||
-    (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!sweepSecret || !provided || provided !== sweepSecret) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
-      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,

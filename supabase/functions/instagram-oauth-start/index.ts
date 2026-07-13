@@ -21,18 +21,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const redirectUri = `https://wfycqufqdheluvzhgvfw.supabase.co/functions/v1/instagram-oauth-callback`;
     const returnTo = url.searchParams.get("return_to") || "";
-    // SECURITY: HMAC-sign the state so the callback can't be tricked into
-    // linking an attacker's Instagram to a victim's uid.
-    const stateSecret = Deno.env.get("INSTAGRAM_STATE_SECRET");
-    if (!stateSecret) throw new Error("INSTAGRAM_STATE_SECRET not set");
-    const payload = JSON.stringify({ uid: u.user.id, ts: Date.now(), return_to: returnTo });
-    const key = await crypto.subtle.importKey(
-      "raw", new TextEncoder().encode(stateSecret),
-      { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-    );
-    const sigBuf = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
-    const sig = btoa(String.fromCharCode(...sigBuf));
-    const state = btoa(JSON.stringify({ p: payload, s: sig }));
+    const state = btoa(JSON.stringify({ uid: u.user.id, ts: Date.now(), return_to: returnTo }));
     const scope = [
       "instagram_basic",
       "instagram_content_publish",

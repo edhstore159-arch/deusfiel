@@ -24,33 +24,8 @@ Deno.serve(async (req) => {
   const code = url.searchParams.get("code");
   const stateRaw = url.searchParams.get("state") || "";
   let state: any = {};
-  let returnTo = "/";
-  // SECURITY: verify HMAC signature on state before trusting uid.
-  try {
-    const outer = JSON.parse(atob(stateRaw));
-    const payload = String(outer?.p || "");
-    const sig = String(outer?.s || "");
-    const stateSecret = Deno.env.get("INSTAGRAM_STATE_SECRET");
-    if (!payload || !sig || !stateSecret) throw new Error("invalid state envelope");
-    const key = await crypto.subtle.importKey(
-      "raw", new TextEncoder().encode(stateSecret),
-      { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
-    );
-    const expectBuf = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
-    const expect = btoa(String.fromCharCode(...expectBuf));
-    if (expect.length !== sig.length) throw new Error("bad signature");
-    let diff = 0;
-    for (let i = 0; i < expect.length; i++) diff |= expect.charCodeAt(i) ^ sig.charCodeAt(i);
-    if (diff !== 0) throw new Error("bad signature");
-    state = JSON.parse(payload);
-    returnTo = state.return_to || "/";
-    // Reject stale state (>15 min)
-    if (!state.ts || Date.now() - Number(state.ts) > 15 * 60 * 1000) throw new Error("state expired");
-  } catch (verifyErr) {
-    return htmlResponse("Erro Instagram",
-      `<h2 class="err">Falha ao conectar</h2><pre style="white-space:pre-wrap;font-size:12px">state inválido: ${String((verifyErr as Error)?.message || verifyErr)}</pre>`,
-      "/");
-  }
+  try { state = JSON.parse(atob(stateRaw)); } catch {}
+  const returnTo = state.return_to || "/";
 
   try {
     if (!code) throw new Error("missing code");
