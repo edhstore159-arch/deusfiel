@@ -50,8 +50,10 @@ Deno.test("400 when no case/messages", async () => {
 
 Deno.test("streams SSE with report sections and forwards system prompt", async () => {
   let capturedBody: any = null;
+  let capturedHeaders: HeadersInit | undefined;
   mockFetch(async (_url, init) => {
     capturedBody = JSON.parse(String(init?.body ?? "{}"));
+    capturedHeaders = init?.headers;
     const parts = [
       "data: {\"choices\":[{\"delta\":{\"content\":\"### 1. Relatório\\n\"}}]}\n\n",
       "data: {\"choices\":[{\"delta\":{\"content\":\"### 4. Conclusão\\n\"}}]}\n\n",
@@ -72,6 +74,8 @@ Deno.test("streams SSE with report sections and forwards system prompt", async (
     // system prompt forwarded
     assertEquals(capturedBody.messages[0].role, "system");
     assertStringIncludes(capturedBody.messages[0].content, "Juiz Virtual");
+    assertStringIncludes(capturedBody.messages[0].content, "MECANISMO ANTI-ERRO");
+    assertEquals(new Headers(capturedHeaders).has("Lovable-API-Key"), true);
     assertEquals(capturedBody.stream, true);
   } finally {
     restoreFetch();

@@ -150,15 +150,17 @@ Deno.serve(async (req) => {
     const fullMessages = [{ role: "system", content: sysPrompt }, ...chatMessages];
 
     // Roteamento por família: Claude sempre vai pela chave Emergent.
+    const isClaudeReq = /^claude/i.test(requestedModel);
     const isClaude = isClaudeReq;
 
     // Provider 1: Lovable AI Gateway (para modelos não-Claude)
     if (LOVABLE_API_KEY && !isClaude) {
       const LOVABLE_ALLOWED = new Set([
+        "google/gemini-3-flash-preview", "google/gemini-3.1-flash-lite", "google/gemini-3.5-flash", "google/gemini-3.1-pro-preview",
         "google/gemini-2.5-flash", "google/gemini-2.5-flash-lite", "google/gemini-2.5-pro",
-        "openai/gpt-5-mini", "openai/gpt-5-nano", "openai/gpt-5",
+        "openai/gpt-5-mini", "openai/gpt-5-nano", "openai/gpt-5", "openai/gpt-5.2", "openai/gpt-5.4", "openai/gpt-5.4-mini", "openai/gpt-5.4-nano", "openai/gpt-5.5",
       ]);
-      const lovableModel = LOVABLE_ALLOWED.has(requestedModel) ? requestedModel : "google/gemini-2.5-flash";
+      const lovableModel = LOVABLE_ALLOWED.has(requestedModel) ? requestedModel : "openai/gpt-5.5";
       const upstream = await callLovable(fullMessages, lovableModel);
       if (upstream.ok) {
         return new Response(upstream.body, {
