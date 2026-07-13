@@ -204,11 +204,16 @@ export default function Login() {
               <TabsContent value="login" className="mt-6">
                 <form onSubmit={handleLogin} className="space-y-5" data-testid="login-form">
                   <div>
-                    <Label className="text-nude-700 font-medium text-xs tracking-wider uppercase">
+                    <Label htmlFor="login-email" className="text-nude-700 font-medium text-xs tracking-wider uppercase">
                       E-mail
                     </Label>
                     <Input
+                      id="login-email"
+                      name="email"
                       type="email"
+                      autoComplete="email"
+                      aria-label="E-mail"
+                      placeholder="Digite seu e-mail"
                       value={loginData.email}
                       onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                       data-testid="login-email"
@@ -216,17 +221,23 @@ export default function Login() {
                     />
                   </div>
                   <div>
-                    <Label className="text-nude-700 font-medium text-xs tracking-wider uppercase">
+                    <Label htmlFor="login-password" className="text-nude-700 font-medium text-xs tracking-wider uppercase">
                       Senha
                     </Label>
                     <Input
+                      id="login-password"
+                      name="password"
                       type="password"
+                      autoComplete="current-password"
+                      aria-label="Senha"
+                      placeholder="Digite sua senha"
                       value={loginData.password}
                       onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                       data-testid="login-password"
                       className="mt-1.5 h-11 bg-card border-nude-200 focus-visible:ring-gold-400"
                     />
                   </div>
+
                   <Button
                     type="submit"
                     disabled={loading}
