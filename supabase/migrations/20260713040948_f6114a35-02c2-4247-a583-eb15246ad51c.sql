@@ -1,0 +1,1 @@
+ALTER TABLE public.cloud_sites ALTER COLUMN is_public SET DEFAULT false;
