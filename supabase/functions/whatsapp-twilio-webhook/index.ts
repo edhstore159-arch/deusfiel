@@ -170,8 +170,39 @@ async function logWhatsappMessage(opts: {
   }
 }
 
+// SECURITY: validate Twilio's X-Twilio-Signature so only Twilio (holder of
+// TWILIO_AUTH_TOKEN) can trigger this webhook. Without this any attacker
+// could POST fake payloads and drive AI/DB writes via the service role key.
+async function validateTwilioSignature(req: Request, params: URLSearchParams): Promise<boolean> {
+  const token = Deno.env.get("TWILIO_AUTH_TOKEN");
+  if (!token) {
+    console.error("[whatsapp] TWILIO_AUTH_TOKEN não configurada — rejeitando webhook");
+    return false;
+  }
+  const signature = req.headers.get("x-twilio-signature") || "";
+  if (!signature) return false;
+  // Twilio signs: url + concat(sorted(key + value))
+  // The URL must match what Twilio called (public https URL configured in Twilio Console).
+  const url = req.url;
+  const sortedKeys = [...params.keys()].sort();
+  let data = url;
+  for (const k of sortedKeys) data += k + params.get(k);
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(token), { name: "HMAC", hash: "SHA-1" }, false, ["sign"],
+  );
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(data)));
+  const expected = btoa(String.fromCharCode(...mac));
+  // constant-time-ish compare
+  if (expected.length !== signature.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
 
   try {
     const form = await req.formData();
