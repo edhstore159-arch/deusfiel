@@ -205,11 +205,19 @@ Deno.serve(async (req) => {
 
 
   try {
-    const form = await req.formData();
+    // Read the raw form once, validate signature against it, then re-parse.
+    const rawBody = await req.text();
+    const params = new URLSearchParams(rawBody);
+    const valid = await validateTwilioSignature(req, params);
+    if (!valid) {
+      return new Response("forbidden", { status: 403, headers: corsHeaders });
+    }
+    const form = params;
     const from = String(form.get("From") || "");      // ex: whatsapp:+5511...
     const to = String(form.get("To") || "");          // seu número Twilio
     const body = String(form.get("Body") || "").trim();
     const numMedia = Number(form.get("NumMedia") || "0");
+
 
     console.log("[whatsapp] inbound", {
       from,
