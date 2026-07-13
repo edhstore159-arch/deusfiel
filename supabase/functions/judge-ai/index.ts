@@ -117,7 +117,7 @@ async function callLovable(messages: unknown[], model: string) {
   return fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Lovable-API-Key": LOVABLE_API_KEY ?? "",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model, messages, stream: true }),
