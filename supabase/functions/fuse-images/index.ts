@@ -19,7 +19,7 @@ const DETAIL_TRANSFER_LOCK =
   "DETAIL TRANSFER LOCK: IMAGE 1 is the ORIGINAL CREATIVE and must remain the base canvas. Preserve IMAGE 1 composition, crop, layout, text, background, lighting, pose, body, hair, clothing and especially every face/identity exactly 1:1. IMAGE 2 is ONLY a reference source for the specific non-facial detail(s) requested by the user (accessory, object, texture, color, prop, logo, material, small style element). Copy ONLY those requested details from IMAGE 2 onto IMAGE 1. Do NOT replace the whole creative, do NOT copy IMAGE 2's face/person/body/background, do NOT blend identities, do NOT modify the original face. If adding or removing accessories, they must sit above the face as removable layers; the original face underneath remains unchanged and returns exactly when the accessory is removed.";
 
 const PERSON_REPLACE_LOCK =
-  "PERSON / PHOTO REPLACEMENT LOCK: IMAGE 1 is the ORIGINAL CREATIVE / DESIGN BASE. Preserve IMAGE 1 layout, crop, text, typography, colors, graphics, background, composition, camera angle and all non-requested elements exactly. IMAGE 2 is the REPLACEMENT PERSON / SUBJECT. Replace only the person/photo/portrait/man/woman/model area requested by the user in IMAGE 1 with the person from IMAGE 2. The replaced person must clearly be IMAGE 2's identity/face/body/clothing when visible. Do NOT keep the old person from IMAGE 1 in that area, do NOT average faces, do NOT create a similar new person, do NOT change unrelated faces or design elements.";
+  "PERSON / PHOTO REPLACEMENT LOCK: IMAGE 1 is the ORIGINAL CREATIVE / DESIGN BASE and remains the final canvas. Preserve IMAGE 1 layout, crop, text, typography, colors, graphics, background, composition, camera angle and all non-requested elements exactly. IMAGE 2 is the REPLACEMENT PERSON / SUBJECT. Replace the entire requested person/photo/portrait/man/woman/model area in IMAGE 1 with the person from IMAGE 2. The replaced area must clearly show IMAGE 2's identity/face/head/body/clothing when visible. Remove the old IMAGE 1 person from that area completely. Do NOT keep the old face/body, do NOT average faces, do NOT create a similar new person, do NOT treat this as detail transfer, do NOT change unrelated faces or design elements.";
 
 const TEMPLATE_SYSTEM =
   "You are a photorealistic image generator prompt engineer that must STRICTLY preserve the original visual identity of the two reference images. " +
@@ -93,20 +93,19 @@ const PERSON_REPLACE_SYSTEM =
 
 async function elaboratePersonReplacePrompt(userPrompt: string): Promise<string> {
   const userTheme = (userPrompt || '').trim() || 'Replace the person/photo in IMAGE 1 with the person from IMAGE 2 while preserving the creative design.';
-  try {
-    const r = await chatCompletion({
-      temperature: 0.25,
-      messages: [
-        { role: "system", content: PERSON_REPLACE_SYSTEM },
-        { role: "user", content: `USER PERSON REPLACEMENT INSTRUCTION (IMAGE 1 design stays; IMAGE 2 supplies the replacement person):\n"""${userTheme}"""` },
-      ],
-    });
-    if (r.ok) {
-      const txt = r.data?.choices?.[0]?.message?.content?.trim();
-      if (txt && txt.length > 20) return txt;
-    }
-  } catch (_e) { /* fallback */ }
-  return `Use IMAGE 1 as the exact original creative/design base. Preserve IMAGE 1 layout, crop, text, typography, colors, graphics, background, composition and camera angle. Replace the requested person/photo/portrait area in IMAGE 1 according to this instruction: ${userTheme}. Use IMAGE 2 as the replacement person identity: the final replaced person must clearly match IMAGE 2's face, identity, skin tone, hair, body and visible clothing. Blend naturally into IMAGE 1 lighting and framing. ${PERSON_REPLACE_LOCK} ${REALISM}. Negative: old person from IMAGE 1 still visible, unchanged person, face not matching IMAGE 2, mixed identity, averaged face, different layout, changed text, changed background unless required by the photo slot, collage, split screen, ${NEGATIVE}`;
+  return [
+    'STRICT PERSON / PHOTO REPLACEMENT EDIT. Do not create a new creative and do not transfer only small details.',
+    'REFERENCE ORDER IS MANDATORY: IMAGE 1 = ORIGINAL CREATIVE / DESIGN BASE / FINAL CANVAS. IMAGE 2 = REPLACEMENT PERSON / SUBJECT.',
+    'Use IMAGE 1 as the exact base canvas. Preserve its layout, crop, text, typography, colors, graphics, background, composition, product areas, camera angle, frames and masks exactly.',
+    'Find the person/photo/portrait/man/woman/model area in IMAGE 1 requested by the user. Remove that original IMAGE 1 person from that area completely.',
+    "Insert or repaint the person from IMAGE 2 into the same area/slot. The final visible person MUST be recognized as IMAGE 2: same face identity, head shape, eyes, eyebrows, nose, mouth, jawline, skin tone, hair, body proportions, expression and visible clothing.",
+    "If the user says 'trocar de pessoa', 'trocar o homem', 'mudar a foto do homem', 'outro homem', 'outra pessoa', 'replace/swap/change person/man/photo', treat it as FULL person/photo replacement, not detail transfer.",
+    'Blend naturally into IMAGE 1 lighting, perspective, mask/frame and crop while keeping all unrelated IMAGE 1 elements unchanged. Do not alter other people/faces in IMAGE 1.',
+    `USER INSTRUCTION: ${userTheme}.`,
+    PERSON_REPLACE_LOCK,
+    REALISM,
+    `Negative: old person from IMAGE 1 still visible, unchanged person, face not matching IMAGE 2, body not matching IMAGE 2, mixed identity, averaged face, generated similar person, detail-only transfer, different layout, changed text, changed typography, changed background unless required by the photo slot, changed unrelated face, collage, split screen, ${NEGATIVE}`,
+  ].join(' ');
 }
 
 const EDIT_SINGLE_SYSTEM =
@@ -248,11 +247,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const normalizedPrompt = String(prompt || '').toLowerCase();
+    const normalizedPrompt = normalizeText(String(prompt || ''));
     const garmentKeywords = /(roupa|look|outfit|camiseta|camisa|blusa|vestido|jaqueta|casaco|paleto|terno|calca|short|uniforme|figurino|shirt|t-?shirt|dress|jacket|clothing|garment|ensaio)/i;
     const transferKeywords = /(mesma|igual|ingual|transfer|vestir|veste|coloc\w+\s+a\s+roupa|use\s+the\s+clothing|wear|swap|troc\w+\s+roupa|ensaio|fotograf|photoshoot)/i;
     const sceneCloneKeywords = /(clon\w+|replic\w+|reproduz\w+|mesma\s+cena|mesmo\s+cenario|mesmo\s+fundo|copia\w*\s+(a\s+)?cena|copiar\s+(o\s+)?look|look\s+e\s+(a\s+)?cena|cena\s+e\s+(o\s+)?look|same\s+scene|clone\s+the\s+scene)/i;
-    const personReplaceKeywords = /(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|replace|swap|change)\s+([ao]s?\s+)?(foto\s+d[ao]|retrato\s+d[ao]|homem|homen|mulher|pessoa|modelo|personagem|sujeito|portrait|photo|man|woman|person|model)|\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person)\b/i;
+    const personReplaceKeywords = /(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|replace|swap|change)\s+([ao]s?\s+)?(foto\s+d[ao]|retrato\s+d[ao]|homem|homen|mulher|pessoa|modelo|personagem|sujeito|criativo\s+para\s+outr[ao]|portrait|photo|man|woman|person|model)|\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|mudar\s+de\s+pessoa|trocar\s+o\s+criativo\s+de\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person|swap\s+the\s+person)\b/i;
     const isSceneClone = mode === 'scene-clone' || sceneCloneKeywords.test(normalizedPrompt);
     const isPersonReplace = !isSceneClone && !!image2_base64 && (mode === 'person-replace' || personReplaceKeywords.test(normalizedPrompt));
     const isDetailTransfer = !isSceneClone && !isPersonReplace && !!image2_base64 && mode === 'detail-transfer';
@@ -325,7 +324,7 @@ Deno.serve(async (req) => {
     if (result.provider === 'local-fallback') {
       return new Response(JSON.stringify({
         ok: false,
-        error: 'A IA de imagem está sem créditos/cota em todos os provedores (Lovable, Gemini, OpenAI, Ollama). Não é possível preservar o rosto com uma colagem local — recarregue os créditos do Lovable AI ou configure outra chave (GEMINI_API_KEY / OPENAI_API_KEY / OLLAMA_URL) e tente novamente.',
+        error: 'A IA de imagem está sem créditos/cota em todos os provedores configurados (Lovable, Gemini, OpenAI, Emergent/Ollama). Não é possível preservar/substituir rosto com uma colagem local — recarregue créditos ou configure uma chave com cota disponível e tente novamente.',
         provider: result.provider,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

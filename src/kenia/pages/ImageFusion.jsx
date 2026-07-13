@@ -45,7 +45,7 @@ const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,
 
 function isPersonReplacementPrompt(text = "") {
   const t = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return /(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|replace|swap|change)\s+([ao]s?\s+)?(foto\s+d[ao]|retrato\s+d[ao]|homem|homen|mulher|pessoa|modelo|personagem|sujeito|portrait|photo|man|woman|person|model)|\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person)\b/i.test(t);
+  return /(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|replace|swap|change)\s+([ao]s?\s+)?(foto\s+d[ao]|retrato\s+d[ao]|homem|homen|mulher|pessoa|modelo|personagem|sujeito|criativo\s+para\s+outr[ao]|portrait|photo|man|woman|person|model)|\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|mudar\s+de\s+pessoa|trocar\s+o\s+criativo\s+de\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person|swap\s+the\s+person)\b/i.test(t);
 }
 
 // Cobre o canvas com a imagem original (cover/crop centralizado).
