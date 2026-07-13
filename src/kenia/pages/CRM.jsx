@@ -176,7 +176,15 @@ export default function CRM() {
         <div>
           <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold">CRM</div>
           <h1 className="font-display font-bold text-2xl">Pipeline Kanban</h1>
+          <div className="text-xs text-nude-500 mt-0.5 flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3 text-gold-500" />
+            {autoLeads.length} caso(s) auto-conectados · atualiza a cada 60s
+          </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => autoImport({ toast: true })} disabled={syncing} data-testid="crm-sync-btn">
+            <RefreshCcw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} /> Sincronizar casos
+          </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="bg-nude-900 hover:bg-nude-800" data-testid="new-lead-btn">
