@@ -46,6 +46,8 @@ export default function JuizVirtual() {
     const valid = AGENTS.some((a) => a.id === stored);
     return valid ? stored : "openai/gpt-5.5";
   });
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const changeModel = (m: string) => {
@@ -53,17 +55,67 @@ export default function JuizVirtual() {
     localStorage.setItem("juiz_model", m);
   };
 
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const added: Attachment[] = [];
+    for (const file of Array.from(files)) {
+      const isImage = file.type.startsWith("image/");
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+      if (!isImage && !isPdf) {
+        toast.error(`${file.name}: apenas imagens ou PDF são aceitos.`);
+        continue;
+      }
+      if (file.size > MAX_FILE_MB * 1024 * 1024) {
+        toast.error(`${file.name}: excede ${MAX_FILE_MB}MB.`);
+        continue;
+      }
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        added.push({
+          name: file.name,
+          mime: isPdf ? "application/pdf" : file.type,
+          dataUrl,
+          kind: isPdf ? "pdf" : "image",
+        });
+      } catch {
+        toast.error(`Falha ao ler ${file.name}.`);
+      }
+    }
+    if (added.length) setAttachments((prev) => [...prev, ...added]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
+  const removeAttachment = (idx: number) =>
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+
+  const buildOutgoingMessages = (history: Msg[]) =>
+    history.map((m) => {
+      if (m.role !== "user" || !m.attachments?.length) {
+        return { role: m.role, content: m.content };
+      }
+      const parts: any[] = [{ type: "text", text: m.content || "Analise os documentos anexados." }];
+      for (const a of m.attachments) {
+        if (a.kind === "image") {
+          parts.push({ type: "image_url", image_url: { url: a.dataUrl } });
+        } else {
+          parts.push({ type: "file", file: { filename: a.name, file_data: a.dataUrl } });
+        }
+      }
+      return { role: "user", content: parts };
+    });
 
   const send = async () => {
     const text = input.trim();
-    if (!text || loading) return;
-    const next: Msg[] = [...messages, { role: "user", content: text }, { role: "assistant", content: "" }];
+    if ((!text && attachments.length === 0) || loading) return;
+    const userMsg: Msg = { role: "user", content: text, attachments: attachments.length ? attachments : undefined };
+    const next: Msg[] = [...messages, userMsg, { role: "assistant", content: "" }];
     setMessages(next);
     setInput("");
+    setAttachments([]);
     setLoading(true);
 
     try {
+      const outgoing = buildOutgoingMessages(next.slice(0, -1));
       const res = await fetch(FN_URL, {
         method: "POST",
         headers: {
@@ -71,8 +123,9 @@ export default function JuizVirtual() {
           Authorization: `Bearer ${ANON}`,
           apikey: ANON,
         },
-        body: JSON.stringify({ messages: next.slice(0, -1), model }),
+        body: JSON.stringify({ messages: outgoing, model }),
       });
+
       const contentType = res.headers.get("content-type") || "";
       if (!res.ok || !res.body) {
         const body = await res.text().catch(() => "");
