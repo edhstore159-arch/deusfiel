@@ -239,14 +239,62 @@ export default function JuizVirtual() {
                   <ReactMarkdown>{m.content || "…"}</ReactMarkdown>
                 </div>
               ) : (
-                <div className="whitespace-pre-wrap">{m.content}</div>
+                <div className="space-y-2">
+                  {m.content && <div className="whitespace-pre-wrap">{m.content}</div>}
+                  {m.attachments?.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {m.attachments.map((a, k) =>
+                        a.kind === "image" ? (
+                          <img key={k} src={a.dataUrl} alt={a.name} className="max-h-32 rounded border border-primary-foreground/20" />
+                        ) : (
+                          <div key={k} className="flex items-center gap-1 rounded bg-primary-foreground/10 px-2 py-1 text-xs">
+                            <FileText className="h-3 w-3" /> {a.name}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               )}
             </div>
           </div>
         ))}
       </Card>
 
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {attachments.map((a, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-lg border border-border bg-muted px-2 py-1 text-xs">
+              {a.kind === "image" ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+              <span className="max-w-[160px] truncate">{a.name}</span>
+              <button type="button" onClick={() => removeAttachment(i)} className="opacity-60 hover:opacity-100">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+
       <div className="flex gap-2 items-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={loading}
+          className="h-[90px] px-4"
+          title="Anexar PDF ou imagem"
+        >
+          <Paperclip className="h-5 w-5" />
+        </Button>
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -256,14 +304,15 @@ export default function JuizVirtual() {
               send();
             }
           }}
-          placeholder="Descreva os fatos, provas e o que se pretende (Ctrl/Cmd+Enter envia)"
+          placeholder="Descreva os fatos, provas e anexe PDF/imagens (Ctrl/Cmd+Enter envia)"
           className="min-h-[90px]"
           disabled={loading}
         />
-        <Button onClick={send} disabled={loading || !input.trim()} className="h-[90px] px-5">
+        <Button onClick={send} disabled={loading || (!input.trim() && attachments.length === 0)} className="h-[90px] px-5">
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
         </Button>
       </div>
+
     </div>
   );
 }
