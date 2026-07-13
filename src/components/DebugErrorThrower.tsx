@@ -1,5 +1,3 @@
-export function DebugErrorThrower() {
+export default function DebugErrorThrower() {
   return null;
 }
-
-export default DebugErrorThrower;
