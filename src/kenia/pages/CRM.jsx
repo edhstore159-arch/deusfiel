@@ -212,7 +212,7 @@ export default function CRM() {
       <div className="flex-1 overflow-x-auto p-4">
         <div className="flex gap-4 min-w-max h-full">
           {stages.map(stage => {
-            const stageLeads = leads.filter(l => l.stage === stage.id);
+            const stageLeads = allLeads.filter(l => l.stage === stage.id);
             const c = COLOR_MAP[stage.color] || COLOR_MAP.blue;
             return (
               <div
