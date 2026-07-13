@@ -282,11 +282,6 @@ export default function Login() {
                     <svg className="mr-2 w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.04c-.03-2.96 2.42-4.39 2.53-4.46-1.38-2.02-3.53-2.3-4.29-2.32-1.82-.18-3.56 1.07-4.49 1.07-.94 0-2.36-1.05-3.88-1.02-2 .03-3.84 1.16-4.87 2.95-2.08 3.6-.53 8.93 1.49 11.85.99 1.43 2.16 3.03 3.69 2.97 1.49-.06 2.05-.96 3.85-.96 1.8 0 2.3.96 3.87.93 1.6-.03 2.61-1.45 3.59-2.89 1.13-1.66 1.6-3.27 1.62-3.36-.04-.02-3.11-1.19-3.14-4.72zM14.31 3.5c.83-1 1.39-2.4 1.23-3.78-1.19.05-2.62.79-3.48 1.79-.77.89-1.44 2.31-1.26 3.66 1.32.1 2.68-.67 3.51-1.67z"/></svg>
                     Entrar com Apple
                   </Button>
-                  <p className="text-xs text-nude-500 text-center font-sans-body">
-                    Admin: <span className="text-gold-700 font-medium">admin@kenia-garcia.com.br</span>
-                    {" / "}
-                    <span className="text-gold-700 font-medium">Kenia@Admin2026</span>
-                  </p>
 
                 </form>
               </TabsContent>
