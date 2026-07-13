@@ -43,6 +43,11 @@ const SOCIAL_PRESETS = [
 
 const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+function isPersonReplacementPrompt(text = "") {
+  const t = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return /(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|replace|swap|change)\s+([ao]s?\s+)?(foto\s+d[ao]|retrato\s+d[ao]|homem|homen|mulher|pessoa|modelo|personagem|sujeito|portrait|photo|man|woman|person|model)|\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person)\b/i.test(t);
+}
+
 // Cobre o canvas com a imagem original (cover/crop centralizado).
 function renderPresetToCanvas(img, w, h) {
   const canvas = document.createElement("canvas");
@@ -437,25 +442,27 @@ export default function ImageFusion() {
       await generateVariants(imageUrl);
     };
     try {
-      const detailTransferMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode;
-      const canUseFusionFallback = !singleMode && !sceneCloneMode && !detailTransferMode;
-      const mode = sceneCloneMode ? "scene-clone" : (templateMode ? "template" : (singleMode ? "edit" : (detailTransferMode ? "detail-transfer" : "fusion")));
+      const personReplaceMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode && isPersonReplacementPrompt(prompt);
+      const detailTransferMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode && !personReplaceMode;
+      const canUseFusionFallback = !singleMode && !sceneCloneMode && !detailTransferMode && !personReplaceMode;
+      const mode = sceneCloneMode ? "scene-clone" : (templateMode ? "template" : (singleMode ? "edit" : (personReplaceMode ? "person-replace" : (detailTransferMode ? "detail-transfer" : "fusion"))));
       const { data } = await api.post(
         "/creatives/fuse-images",
         { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt, mode },
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
-        await finishWithImage(data.image, sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : (detailTransferMode ? "Detalhes aplicados mantendo o criativo original! Salvando..." : "Imagem gerada! Salvando e criando variações..."))));
+        await finishWithImage(data.image, sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : (personReplaceMode ? "Pessoa substituída mantendo o criativo original! Salvando..." : (detailTransferMode ? "Detalhes aplicados mantendo o criativo original! Salvando..." : "Imagem gerada! Salvando e criando variações...")))));
       } else if (canUseFusionFallback) {
         const fallback = await buildClientFusionFallback(img1, img2);
         await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
       } else {
-        toast.error(data.error || (detailTransferMode ? "Não foi possível aplicar os detalhes mantendo o rosto original. Tente nomear exatamente o detalhe da Imagem 2." : (sceneCloneMode ? "Não foi possível clonar com o rosto da Imagem 2 agora. Tente novamente com fotos mais nítidas." : "Falha ao gerar a imagem")));
+        toast.error(data.error || (personReplaceMode ? "Não foi possível substituir a pessoa pela Imagem 2 agora. Tente escrever: trocar o homem da Imagem 1 pelo homem da Imagem 2." : (detailTransferMode ? "Não foi possível aplicar os detalhes mantendo o rosto original. Tente nomear exatamente o detalhe da Imagem 2." : (sceneCloneMode ? "Não foi possível clonar com o rosto da Imagem 2 agora. Tente novamente com fotos mais nítidas." : "Falha ao gerar a imagem"))));
       }
     } catch (e) {
-      const detailTransferMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode;
-      const canUseFusionFallback = !singleMode && !sceneCloneMode && !detailTransferMode;
+      const personReplaceMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode && isPersonReplacementPrompt(prompt);
+      const detailTransferMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode && !personReplaceMode;
+      const canUseFusionFallback = !singleMode && !sceneCloneMode && !detailTransferMode && !personReplaceMode;
       if (canUseFusionFallback) {
         try {
           const fallback = await buildClientFusionFallback(img1, img2);
@@ -464,7 +471,7 @@ export default function ImageFusion() {
           toast.error(e.response?.data?.detail || fallbackError?.message || "Erro ao gerar imagem");
         }
       } else {
-        toast.error(e.response?.data?.error || e.message || (detailTransferMode ? "Erro ao aplicar detalhes preservando o criativo original" : (sceneCloneMode ? "Erro ao clonar cena com rosto da Imagem 2" : "Erro ao gerar imagem")));
+        toast.error(e.response?.data?.error || e.message || (personReplaceMode ? "Erro ao substituir a pessoa usando a Imagem 2" : (detailTransferMode ? "Erro ao aplicar detalhes preservando o criativo original" : (sceneCloneMode ? "Erro ao clonar cena com rosto da Imagem 2" : "Erro ao gerar imagem"))));
       }
     } finally {
       setLoading(false);
@@ -541,7 +548,7 @@ export default function ImageFusion() {
           Edição de Imagens com IA · Pack Redes Sociais
         </h1>
         <p className="text-sm text-nude-400 mt-1">
-          Envie a Imagem 1 como criativo original e use a Imagem 2 apenas como referência de detalhes, mantendo o rosto original preservado.
+          Envie a Imagem 1 como criativo original. A Imagem 2 pode servir como referência de detalhes ou como a pessoa substituta quando você pedir troca de homem/mulher/pessoa.
         </p>
       </div>
 
@@ -554,7 +561,7 @@ export default function ImageFusion() {
             <ImagePicker value={img1} onChange={setImg1} label="Imagem 1 · criativo original" testidPrefix="img1" />
           </Card>
           <Card className="p-4 bg-nude-900/60 border-gold-900/40">
-            <ImagePicker value={img2} onChange={setImg2} label="Imagem 2 · referência de detalhes" testidPrefix="img2" />
+            <ImagePicker value={img2} onChange={setImg2} label="Imagem 2 · detalhes ou pessoa substituta" testidPrefix="img2" />
           </Card>
           <Card className="p-4 bg-nude-900/60 border-gold-900/40 flex flex-col">
             <Label className="text-gold-200">Resultado base</Label>
@@ -615,7 +622,7 @@ export default function ImageFusion() {
             ))}
           </div>
           <Textarea rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Ex: usar apenas os óculos da Imagem 2, remover o colar, aplicar a textura da roupa da Imagem 2, trocar só o fundo."
+            placeholder="Ex: trocar o homem da Imagem 1 pelo homem da Imagem 2; usar apenas os óculos da Imagem 2; remover o colar; trocar só o fundo."
             data-testid="fusion-prompt"
             className="bg-nude-950 border-gold-900/40 text-gold-100 placeholder:text-nude-600 mt-2" />
           <div className="flex justify-end mt-4 gap-2 flex-wrap">
@@ -633,7 +640,7 @@ export default function ImageFusion() {
               data-testid="fusion-generate">
               {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Gerando...</>) :
                (img1 && img2
-                   ? (<><Sparkles className="w-4 h-4 mr-2" />Aplicar detalhes da Imagem 2 + pack</>)
+                    ? (<><Sparkles className="w-4 h-4 mr-2" />Aplicar Imagem 2 no criativo + pack</>)
                   : (<><Wand2 className="w-4 h-4 mr-2" />Editar imagem (1 foto · use o prompt)</>))}
             </Button>
           </div>
