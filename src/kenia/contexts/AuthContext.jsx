@@ -30,22 +30,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
-    let { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    // Bootstrap conta admin se ainda não existir
-    if (error && /invalid login credentials/i.test(error.message) && email === "admin@kenia-garcia.com.br") {
-      const { error: signUpErr } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/app`,
-          data: { name: "Kênia Garcia", role: "admin" },
-        },
-      });
-      if (signUpErr && !/already registered/i.test(signUpErr.message)) throw signUpErr;
-      const retry = await supabase.auth.signInWithPassword({ email, password });
-      data = retry.data;
-      error = retry.error;
-    }
+    // SECURITY: no client-side admin bootstrap. Admin accounts must be
+    // provisioned server-side; never sign up on behalf of the user with
+    // hardcoded credentials from the browser.
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     const built = buildUser(data.user);
     setUser(built);
