@@ -263,29 +263,62 @@ Deno.serve(async (req) => {
     let audioFailed = false;
     let inboundWasAudio = false;
 
-    // Processa áudio sempre que houver mídia de áudio (mesmo se também vier Body)
-    if (numMedia > 0) {
-      const mediaUrl = String(form.get("MediaUrl0") || "");
-      const mediaTypeRaw = String(form.get("MediaContentType0") || "audio/ogg");
+    // Percorre todas as mídias: áudio → transcreve, restante → arquiva como documento
+    const docSummaries: string[] = [];
+    for (let i = 0; i < numMedia; i++) {
+      const mediaUrl = String(form.get(`MediaUrl${i}`) || "");
+      const mediaTypeRaw = String(form.get(`MediaContentType${i}`) || "");
       const mediaType = mediaTypeRaw.split(";")[0].trim().toLowerCase();
+      if (!mediaUrl) continue;
       const isAudio = mediaType.startsWith("audio") || mediaType.includes("ogg") || mediaType.includes("opus");
-      if (mediaUrl && isAudio) {
+
+      if (isAudio) {
         inboundWasAudio = true;
         try {
           console.log("[whatsapp] baixando áudio", { mediaUrl, mediaType });
           const { buffer, contentType } = await fetchTwilioMedia(mediaUrl);
           const cleanCt = (contentType || mediaType).split(";")[0].trim().toLowerCase();
-          console.log("[whatsapp] áudio baixado", { bytes: buffer.byteLength, cleanCt });
           const transcribed = await transcribe(buffer, cleanCt);
           console.log("[whatsapp] transcrição", { chars: transcribed.length, preview: transcribed.slice(0, 80) });
-          if (transcribed) userText = transcribed;
+          if (transcribed) userText = (userText ? userText + "\n" : "") + transcribed;
           else audioFailed = true;
         } catch (audioErr) {
           console.error("[whatsapp] erro no áudio:", audioErr);
           audioFailed = true;
         }
+        continue;
+      }
+
+      // Documento / imagem / vídeo → armazena no bucket privado
+      try {
+        console.log("[whatsapp] baixando documento", { mediaUrl, mediaType });
+        const { buffer, contentType } = await fetchTwilioMedia(mediaUrl);
+        const cleanCt = (contentType || mediaType).split(";")[0].trim().toLowerCase() || "application/octet-stream";
+        const uploaded = await uploadWhatsappDocument(new Uint8Array(buffer), cleanCt, contactId);
+        const kind = cleanCt.startsWith("image/") ? "🖼️ Imagem" : cleanCt === "application/pdf" ? "📄 PDF" : cleanCt.startsWith("video/") ? "🎥 Vídeo" : "📎 Documento";
+        const line = uploaded?.signedUrl
+          ? `${kind} recebido: ${uploaded.signedUrl}`
+          : `${kind} recebido (falha ao gerar link)`;
+        docSummaries.push(line);
+        // Registra cada arquivo como uma mensagem própria para aparecer no chat do dashboard
+        await logWhatsappMessage({
+          contactId,
+          contactPhone,
+          contactName,
+          text: line,
+          fromMe: false,
+          providerMessageId: providerMessageId ? `${providerMessageId}-media${i}` : undefined,
+        });
+      } catch (docErr) {
+        console.error("[whatsapp] erro ao armazenar documento:", docErr);
       }
     }
+
+    // Se veio só documento sem texto, cria um userText descritivo para o chat-ai responder
+    if (!userText && docSummaries.length > 0) {
+      userText = `O cliente enviou ${docSummaries.length} arquivo(s) por WhatsApp: ${docSummaries.map((s) => s.split(":")[0]).join(", ")}. Confirme o recebimento educadamente, avise que a Dra. Kênia analisará os documentos e retornará.`;
+    }
+
 
     if (!userText) {
       if (audioFailed) {
