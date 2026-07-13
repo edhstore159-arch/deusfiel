@@ -55,8 +55,10 @@ const FALLBACK_STAGES = [
 
 export default function CRM() {
   const [leads, setLeads] = useState([]);
+  const [autoLeads, setAutoLeads] = useState([]);
   const [stages, setStages] = useState([]);
   const [open, setOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", case_type: "", description: "" });
 
   useEffect(() => {
@@ -72,6 +74,9 @@ export default function CRM() {
       })
       .catch(() => setStages(FALLBACK_STAGES));
     load();
+    autoImport();
+    const t = setInterval(autoImport, 60000);
+    return () => clearInterval(t);
   }, []);
 
   const load = async () => {
@@ -80,6 +85,42 @@ export default function CRM() {
       setLeads(Array.isArray(data) ? data : Array.isArray(data?.leads) ? data.leads : []);
     } catch {
       setLeads([]);
+    }
+  };
+
+  const autoImport = async (opts = {}) => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase
+        .from("case_analyses")
+        .select("id, session_id, visitor_name, visitor_phone, area, resumo, qualificacao, acertividade, urgencia, tags, created_at, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      const overrides = readJSON(STAGE_OVERRIDE_KEY, {});
+      const hidden = new Set(readJSON(HIDDEN_KEY, []));
+      const items = (data || [])
+        .filter((r) => !hidden.has(String(r.id)))
+        .map((r) => ({
+          id: `case-${r.id}`,
+          _auto: true,
+          _caseId: String(r.id),
+          name: r.visitor_name || "Cliente (auto)",
+          phone: r.visitor_phone || "—",
+          email: "",
+          case_type: r.area || null,
+          description: r.resumo || "",
+          score: Number(r.acertividade || 0),
+          urgency: r.urgencia || "media",
+          tags: Array.isArray(r.tags) ? r.tags : [],
+          stage: overrides[String(r.id)] || mapQualifToStage(r.qualificacao),
+        }));
+      setAutoLeads(items);
+      if (opts.toast) toast.success(`${items.length} caso(s) sincronizado(s) no pipeline`);
+    } catch (e) {
+      if (opts.toast) toast.error("Falha ao sincronizar casos");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -100,15 +141,34 @@ export default function CRM() {
   };
 
   const moveStage = async (id, stage) => {
+    if (String(id).startsWith("case-")) {
+      const caseId = id.slice(5);
+      const overrides = readJSON(STAGE_OVERRIDE_KEY, {});
+      overrides[caseId] = stage;
+      writeJSON(STAGE_OVERRIDE_KEY, overrides);
+      setAutoLeads((prev) => prev.map((l) => (l.id === id ? { ...l, stage } : l)));
+      return;
+    }
     await api.patch(`/leads/${id}`, { stage });
     load();
   };
 
   const removeLead = async (id) => {
     if (!confirm("Excluir este lead?")) return;
+    if (String(id).startsWith("case-")) {
+      const caseId = id.slice(5);
+      const hidden = new Set(readJSON(HIDDEN_KEY, []));
+      hidden.add(caseId);
+      writeJSON(HIDDEN_KEY, Array.from(hidden));
+      setAutoLeads((prev) => prev.filter((l) => l.id !== id));
+      return;
+    }
     await api.delete(`/leads/${id}`);
     load();
   };
+
+  const allLeads = [...leads, ...autoLeads];
+
 
   return (
     <div className="h-screen flex flex-col bg-nude-50">
