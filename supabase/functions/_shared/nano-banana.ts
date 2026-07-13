@@ -12,6 +12,7 @@ export interface NanoBananaOptions {
   mode?: "edit" | "fusion" | "template" | "generate" | "scene-clone" | "garment" | "detail-transfer" | "person-replace";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
   preferProvider?: "auto" | "pollinations" | "emergent";
+  outputPreset?: { group?: string; name?: string; w: number; h: number } | null;
 }
 
 const FACE_PRESERVATION_LOCK =
@@ -128,6 +129,31 @@ function buildContent({ prompt, imageUrls, mode }: NanoBananaOptions): Content[]
     parts.push({ type: "image_url", image_url: { url: images[i] } });
   }
   return parts;
+}
+
+function outputAspect(opts: NanoBananaOptions): { w: number; h: number } | null {
+  const preset = opts.outputPreset;
+  if (!preset) return null;
+  const w = Number(preset.w);
+  const h = Number(preset.h);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 256 || h < 256) return null;
+  return { w, h };
+}
+
+function openAiImageSize(opts: NanoBananaOptions): "1024x1024" | "1024x1536" | "1536x1024" {
+  const aspect = outputAspect(opts);
+  if (!aspect) return "1024x1024";
+  if (aspect.h / aspect.w >= 1.2) return "1024x1536";
+  if (aspect.w / aspect.h >= 1.2) return "1536x1024";
+  return "1024x1024";
+}
+
+function pollinationsSize(opts: NanoBananaOptions): { width: number; height: number } {
+  const aspect = outputAspect(opts);
+  if (!aspect) return { width: 1280, height: 1280 };
+  if (aspect.h / aspect.w >= 1.2) return { width: 1080, height: 1920 };
+  if (aspect.w / aspect.h >= 1.2) return { width: 1600, height: 900 };
+  return { width: 1280, height: 1280 };
 }
 
 function escapeXml(value: string) {
@@ -332,7 +358,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
       const form = new FormData();
       form.append("model", "gpt-image-1");
       form.append("prompt", prompt);
-      form.append("size", "1024x1024");
+      form.append("size", openAiImageSize(opts));
       form.append("quality", "high");
       for (const u of imageUrls.slice(0, 4)) {
         const converted = dataUrlToBlob(u);
@@ -359,7 +385,7 @@ async function callOpenAIImages(opts: NanoBananaOptions): Promise<{ url: string 
     const resp = await fetchWithTimeout("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", quality: "high", n: 1 }),
+      body: JSON.stringify({ model: "gpt-image-1", prompt, size: openAiImageSize(opts), quality: "high", n: 1 }),
     }, 25000);
     const text = await resp.text();
     if (!resp.ok) return { url: null, error: `OpenAI imagem ${resp.status}: ${text.slice(0, 240)}` };
@@ -435,7 +461,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
       const files = imageUrls.slice(0, 4).map((u) => dataUrlToBytes(u)).filter(Boolean) as Array<{ bytes: Uint8Array; mime: string; filename: string }>;
       if (files.length) {
         const multipart = buildMultipartBody(
-          { model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024" },
+          { model: "gpt-image-1", prompt: safeOpts.prompt, size: openAiImageSize(safeOpts) },
           files.map((file) => ({ name: files.length > 1 ? "image[]" : "image", ...file })),
         );
         const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/edits", {
@@ -460,7 +486,7 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
       const resp = await fetchWithTimeout("https://integrations.emergentagent.com/llm/images/generations", {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "gpt-image-1", prompt: safeOpts.prompt, size: "1024x1024", n: 1 }),
+        body: JSON.stringify({ model: "gpt-image-1", prompt: safeOpts.prompt, size: openAiImageSize(safeOpts), n: 1 }),
       }, 12000);
       const text = await resp.text();
       if (resp.ok) {
@@ -488,13 +514,14 @@ async function callPollinations(opts: NanoBananaOptions): Promise<{ url: string 
   try {
     const prompt = withFacePreservation(opts.prompt, opts.mode).slice(0, 1800);
     const seed = Math.floor(Math.random() * 1e9);
+    const size = pollinationsSize(opts);
     // Try highest quality models first (flux-pro, flux-realism), fall back to flux.
     const candidates = ["flux-pro", "flux-realism", "flux"];
     let resp: Response | null = null;
     for (const model of candidates) {
       const u =
         `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
-        `?width=1280&height=1280&nologo=true&enhance=true&model=${model}&seed=${seed}`;
+        `?width=${size.width}&height=${size.height}&nologo=true&enhance=true&model=${model}&seed=${seed}`;
       const r = await fetch(u);
       if (r.ok) { resp = r; break; }
     }
