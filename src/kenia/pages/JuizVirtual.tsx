@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { Gavel, Loader2, Send } from "lucide-react";
+import { Gavel, Loader2, Paperclip, Send, X, FileText, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Card } from "@/kenia/components/ui/card";
@@ -9,7 +9,19 @@ import { toast } from "sonner";
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/judge-ai`;
 const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Attachment = { name: string; mime: string; dataUrl: string; kind: "image" | "pdf" };
+type Msg = { role: "user" | "assistant"; content: string; attachments?: Attachment[] };
+
+const MAX_FILE_MB = 15;
+
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result || ""));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+
 
 const AGENTS = [
   { id: "openai/gpt-5.5", label: "GPT-5.5", desc: "Máximo rigor técnico" },
