@@ -15,6 +15,9 @@ const NEGATIVE =
 const FACE_LOCK =
   "FACE LOCK (1:1 identity copy): the face, head shape, hairline, hair color and texture, skin tone, freckles, marks, eye color and spacing, eyebrows, nose, lips, teeth, jawline, ears, neck and expression MUST be a pixel-faithful copy of IMAGE 1. Treat IMAGE 1 as a reference photograph of a real specific person — do NOT generate a similar-looking person, copy the SAME person. Do not beautify, redraw, smooth, stretch, warp, replace, age, de-age or stylize the face. Copy clothing, accessories and body proportions exactly from IMAGE 1.";
 
+const DETAIL_TRANSFER_LOCK =
+  "DETAIL TRANSFER LOCK: IMAGE 1 is the ORIGINAL CREATIVE and must remain the base canvas. Preserve IMAGE 1 composition, crop, layout, text, background, lighting, pose, body, hair, clothing and especially every face/identity exactly 1:1. IMAGE 2 is ONLY a reference source for the specific non-facial detail(s) requested by the user (accessory, object, texture, color, prop, logo, material, small style element). Copy ONLY those requested details from IMAGE 2 onto IMAGE 1. Do NOT replace the whole creative, do NOT copy IMAGE 2's face/person/body/background, do NOT blend identities, do NOT modify the original face. If adding or removing accessories, they must sit above the face as removable layers; the original face underneath remains unchanged and returns exactly when the accessory is removed.";
+
 const TEMPLATE_SYSTEM =
   "You are a photorealistic image generator prompt engineer that must STRICTLY preserve the original visual identity of the two reference images. " +
   "You will receive TWO reference images: IMAGE 1 = the PERSON (subject), IMAGE 2 = the ENVIRONMENT (scene). " +
@@ -51,6 +54,32 @@ async function elaborateFusionPrompt(userPrompt: string): Promise<string> {
   } catch (_e) { /* fallback below */ }
 
   return `Place the person from IMAGE 1 (preserve exact identity, face, skin, hair, clothing, accessories) inside the environment from IMAGE 2 (preserve its lighting, palette, time of day, mood). ${FACE_LOCK} Single seamless photorealistic composition, match perspective and shadows, no collage, no split-screen. ${userTheme ? `User direction: ${userTheme}.` : ""} ${REALISM}. Negative: ${NEGATIVE}`;
+}
+
+const DETAIL_TRANSFER_SYSTEM =
+  "You are a photorealistic image EDITOR for two-reference edits. You receive TWO images: IMAGE 1 = ORIGINAL CREATIVE / BASE CANVAS, IMAGE 2 = DETAIL REFERENCE ONLY. " +
+  "Produce ONE single-line English prompt that edits IMAGE 1 while keeping it as the final base. " +
+  `CRITICAL: ${DETAIL_TRANSFER_LOCK} ` +
+  "Apply the user's instruction literally: transfer only the named detail(s) from IMAGE 2 into IMAGE 1. If the instruction is vague, preserve IMAGE 1 and copy only small non-facial style/accessory details from IMAGE 2, never the face or full person. " +
+  "Preserve all faces from IMAGE 1 pixel-faithfully. Do NOT use IMAGE 2 as a new scene unless the user explicitly asks to change the background; even then keep IMAGE 1's people/faces/pose exactly. " +
+  "Output ONLY the filled prompt as a single line. End with: 'Negative: face from IMAGE 2, copied identity from IMAGE 2, changed face, altered face, replaced person, mixed identity, new creative, different layout, different crop, different pose, different background unless requested, accessory fused into skin, accessory imprint on face, " + NEGATIVE + "'.";
+
+async function elaborateDetailTransferPrompt(userPrompt: string): Promise<string> {
+  const userTheme = (userPrompt || "").trim() || "Use IMAGE 2 only as a detail reference and apply the relevant small details to IMAGE 1 while preserving IMAGE 1 exactly.";
+  try {
+    const r = await chatCompletion({
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: DETAIL_TRANSFER_SYSTEM },
+        { role: "user", content: `USER TWO-IMAGE EDIT INSTRUCTION (IMAGE 1 stays original/base; IMAGE 2 supplies only requested details):\n"""${userTheme}"""` },
+      ],
+    });
+    if (r.ok) {
+      const txt = r.data?.choices?.[0]?.message?.content?.trim();
+      if (txt && txt.length > 20) return txt;
+    }
+  } catch (_e) { /* fallback */ }
+  return `Use IMAGE 1 as the exact original creative/base canvas. Preserve IMAGE 1 composition, layout, crop, text, background, lighting, pose, body, hair, clothing and every face/identity 1:1. Use IMAGE 2 ONLY as a detail reference and transfer ONLY this requested detail from IMAGE 2: ${userTheme}. Do not copy IMAGE 2's face/person/body/pose/background. Keep the original face from IMAGE 1 unchanged; accessories must sit on top as removable layers without altering the underlying face. ${DETAIL_TRANSFER_LOCK} ${REALISM}. Negative: face from IMAGE 2, copied identity from IMAGE 2, changed face, altered face, replaced person, mixed identity, new creative, different layout, different crop, accessory fused into skin, ${NEGATIVE}`;
 }
 
 const EDIT_SINGLE_SYSTEM =
@@ -197,14 +226,15 @@ Deno.serve(async (req) => {
     const transferKeywords = /(mesma|igual|ingual|transfer|vestir|veste|coloc\w+\s+a\s+roupa|use\s+the\s+clothing|wear|swap|troc\w+\s+roupa|ensaio|fotograf|photoshoot)/i;
     const sceneCloneKeywords = /(clon\w+|replic\w+|reproduz\w+|mesma\s+cena|mesmo\s+cenario|mesmo\s+fundo|copia\w*\s+(a\s+)?cena|copiar\s+(o\s+)?look|look\s+e\s+(a\s+)?cena|cena\s+e\s+(o\s+)?look|same\s+scene|clone\s+the\s+scene)/i;
     const isSceneClone = mode === 'scene-clone' || sceneCloneKeywords.test(normalizedPrompt);
+    const isDetailTransfer = !isSceneClone && !!image2_base64 && mode === 'detail-transfer';
     const isGarmentTransfer = !isSceneClone && !!image2_base64
       && (mode === 'garment' || (garmentKeywords.test(normalizedPrompt) && transferKeywords.test(normalizedPrompt)));
 
     // If the user is asking for a garment color change, treat as a single-image EDIT
     // even when a second image was provided — this preserves face/hair identity 1:1.
     const localizedColor = buildLocalizedColorEditPrompt(prompt || '');
-    const forceEdit = !!localizedColor && !isGarmentTransfer && !isSceneClone;
-    const isSingle = !isSceneClone && (!image2_base64 || forceEdit) && !isGarmentTransfer;
+    const forceEdit = !!localizedColor && !isGarmentTransfer && !isSceneClone && !isDetailTransfer;
+    const isSingle = !isSceneClone && !isDetailTransfer && (!image2_base64 || forceEdit) && !isGarmentTransfer;
     const isTemplate = isSingle && mode === 'template' && !forceEdit;
 
     let fullPrompt: string;
@@ -226,6 +256,8 @@ Deno.serve(async (req) => {
         `STYLE: ${REALISM}.`,
         `Negative: face from IMAGE 1, unchanged face, mixed identity, averaged face, new invented face, different face than IMAGE 2, different scene, different background, different location, different lighting, different outfit, different pose, redesigned garment, altered prints, altered logos, missing accessories, ${NEGATIVE}`,
       ].filter(Boolean).join(' ');
+    } else if (isDetailTransfer) {
+      fullPrompt = await elaborateDetailTransferPrompt(prompt);
     } else if (isGarmentTransfer) {
       const userTheme = (prompt || '').trim();
       fullPrompt = [
@@ -249,7 +281,7 @@ Deno.serve(async (req) => {
     }
 
     const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64].filter(Boolean);
-    const runMode = isSceneClone ? 'scene-clone' : (isGarmentTransfer ? 'garment' : (isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion')));
+    const runMode = isSceneClone ? 'scene-clone' : (isDetailTransfer ? 'detail-transfer' : (isGarmentTransfer ? 'garment' : (isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion'))));
 
     const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
 

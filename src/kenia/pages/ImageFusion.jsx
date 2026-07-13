@@ -437,22 +437,26 @@ export default function ImageFusion() {
       await generateVariants(imageUrl);
     };
     try {
-      const mode = sceneCloneMode ? "scene-clone" : (templateMode ? "template" : (singleMode ? "edit" : "fusion"));
+      const detailTransferMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode;
+      const canUseFusionFallback = !singleMode && !sceneCloneMode && !detailTransferMode;
+      const mode = sceneCloneMode ? "scene-clone" : (templateMode ? "template" : (singleMode ? "edit" : (detailTransferMode ? "detail-transfer" : "fusion")));
       const { data } = await api.post(
         "/creatives/fuse-images",
         { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt, mode },
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
-        await finishWithImage(data.image, sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : "Imagem gerada! Salvando e criando variações...")));
-      } else if (!singleMode && !sceneCloneMode) {
+        await finishWithImage(data.image, sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : (detailTransferMode ? "Detalhes aplicados mantendo o criativo original! Salvando..." : "Imagem gerada! Salvando e criando variações..."))));
+      } else if (canUseFusionFallback) {
         const fallback = await buildClientFusionFallback(img1, img2);
         await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
       } else {
-        toast.error(data.error || (sceneCloneMode ? "Não foi possível clonar com o rosto da Imagem 2 agora. Tente novamente com fotos mais nítidas." : "Falha ao gerar a imagem"));
+        toast.error(data.error || (detailTransferMode ? "Não foi possível aplicar os detalhes mantendo o rosto original. Tente nomear exatamente o detalhe da Imagem 2." : (sceneCloneMode ? "Não foi possível clonar com o rosto da Imagem 2 agora. Tente novamente com fotos mais nítidas." : "Falha ao gerar a imagem")));
       }
     } catch (e) {
-      if (!singleMode && !sceneCloneMode) {
+      const detailTransferMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode;
+      const canUseFusionFallback = !singleMode && !sceneCloneMode && !detailTransferMode;
+      if (canUseFusionFallback) {
         try {
           const fallback = await buildClientFusionFallback(img1, img2);
           await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
@@ -460,7 +464,7 @@ export default function ImageFusion() {
           toast.error(e.response?.data?.detail || fallbackError?.message || "Erro ao gerar imagem");
         }
       } else {
-        toast.error(e.response?.data?.error || e.message || (sceneCloneMode ? "Erro ao clonar cena com rosto da Imagem 2" : "Erro ao gerar imagem"));
+        toast.error(e.response?.data?.error || e.message || (detailTransferMode ? "Erro ao aplicar detalhes preservando o criativo original" : (sceneCloneMode ? "Erro ao clonar cena com rosto da Imagem 2" : "Erro ao gerar imagem")));
       }
     } finally {
       setLoading(false);
@@ -534,10 +538,10 @@ export default function ImageFusion() {
         </div>
         <h1 className="font-display font-bold text-2xl mt-1 text-gold-100 flex items-center gap-2">
           <Combine className="w-6 h-6 text-gold-400" />
-          Fusão de Imagens com IA · Pack Redes Sociais
+          Edição de Imagens com IA · Pack Redes Sociais
         </h1>
         <p className="text-sm text-nude-400 mt-1">
-          Envie duas imagens, gere a fusão e baixe automaticamente todas as variações (Instagram, Facebook, TikTok, LinkedIn, X, YouTube, Pinterest, WhatsApp).
+          Envie a Imagem 1 como criativo original e use a Imagem 2 apenas como referência de detalhes, mantendo o rosto original preservado.
         </p>
       </div>
 
@@ -547,10 +551,10 @@ export default function ImageFusion() {
         </div>
         <div className="max-w-5xl mx-auto grid lg:grid-cols-[1fr_1fr_1.2fr] gap-5">
           <Card className="p-4 bg-nude-900/60 border-gold-900/40">
-            <ImagePicker value={img1} onChange={setImg1} label="Imagem 1" testidPrefix="img1" />
+            <ImagePicker value={img1} onChange={setImg1} label="Imagem 1 · criativo original" testidPrefix="img1" />
           </Card>
           <Card className="p-4 bg-nude-900/60 border-gold-900/40">
-            <ImagePicker value={img2} onChange={setImg2} label="Imagem 2" testidPrefix="img2" />
+            <ImagePicker value={img2} onChange={setImg2} label="Imagem 2 · referência de detalhes" testidPrefix="img2" />
           </Card>
           <Card className="p-4 bg-nude-900/60 border-gold-900/40 flex flex-col">
             <Label className="text-gold-200">Resultado base</Label>
@@ -611,7 +615,7 @@ export default function ImageFusion() {
             ))}
           </div>
           <Textarea rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Ex: trocar o cenário para Paris ao fundo, mudar cor do cabelo para loiro, mudar olhos para azul."
+            placeholder="Ex: usar apenas os óculos da Imagem 2, remover o colar, aplicar a textura da roupa da Imagem 2, trocar só o fundo."
             data-testid="fusion-prompt"
             className="bg-nude-950 border-gold-900/40 text-gold-100 placeholder:text-nude-600 mt-2" />
           <div className="flex justify-end mt-4 gap-2 flex-wrap">
@@ -629,7 +633,7 @@ export default function ImageFusion() {
               data-testid="fusion-generate">
               {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Gerando...</>) :
                (img1 && img2
-                  ? (<><Sparkles className="w-4 h-4 mr-2" />Gerar fusão + pack redes sociais</>)
+                   ? (<><Sparkles className="w-4 h-4 mr-2" />Aplicar detalhes da Imagem 2 + pack</>)
                   : (<><Wand2 className="w-4 h-4 mr-2" />Editar imagem (1 foto · use o prompt)</>))}
             </Button>
           </div>
