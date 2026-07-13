@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { isLovableNativeDebugRuntime, shouldSuppressLovableDebugInstruction } from "@/components/debugInstruction";
 
 /**
  * DebugErrorThrower
@@ -26,10 +25,7 @@ export const DebugErrorThrower = () => {
   }, []);
 
   if (message) {
-    if (!isLovableNativeDebugRuntime() || shouldSuppressLovableDebugInstruction(message)) {
-      console.warn("Instrução de debug recebida sem derrubar a tela.");
-      return null;
-    }
+    // Intencional: erro fatal durante o render para o overlay/"Try to Fix" da Lovable.
     throw new Error(message);
   }
 

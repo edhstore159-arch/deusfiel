@@ -22,7 +22,6 @@ export const dispatchLovableDebugError = (message: string) => {
 };
 
 export const deliverLovableDebugInstruction = (message: string) => {
-  if (!isLovableNativeDebugRuntime()) return "skipped" as const;
   return dispatchLovableDebugError(message) ? ("dispatched" as const) : ("skipped" as const);
 };
 
