@@ -39,7 +39,7 @@ const DETAIL_TRANSFER_LOCK =
   "Detail-transfer edit lock: IMAGE 1 is the ORIGINAL CREATIVE and the exact base canvas. Preserve IMAGE 1's composition, layout, crop, camera angle, background, text, subject, clothing, body, pose, hair, and especially every face/identity 1:1. IMAGE 2 is ONLY a secondary visual reference for the specific detail(s) requested by the user (for example an accessory, texture, color, small object, logo, prop, or style detail). Transfer ONLY those requested non-facial details from IMAGE 2 onto IMAGE 1. Do NOT replace the whole creative, do NOT copy IMAGE 2's face/person/body/pose/background unless the user explicitly asks for that non-facial area, do NOT average or blend identities. If the requested detail is an accessory on a face, place it as a removable surface layer while keeping the original IMAGE 1 face underneath unchanged.";
 
 const PERSON_REPLACE_LOCK =
-  "Person/photo replacement lock: IMAGE 1 is the ORIGINAL CREATIVE / design base. Preserve IMAGE 1's full layout, composition, crop, text, typography, colors, background, graphic elements, camera perspective, product/object placement and overall creative design. IMAGE 2 is ONLY the replacement person/subject identity. Replace the person/photo/portrait area requested by the user in IMAGE 1 with the person from IMAGE 2. The final replaced person MUST be recognized as IMAGE 2: preserve IMAGE 2's face, identity, skin tone, hair, body proportions, clothing if visible and natural expression. Do NOT keep the old person from IMAGE 1 in the replaced area. Do NOT alter unrelated faces in IMAGE 1, do NOT change text/layout/background unless required to blend the replacement naturally. Make it one seamless photorealistic edit, not a collage.";
+  "Person/photo replacement lock: IMAGE 1 is the ORIGINAL CREATIVE / design base and final canvas. Preserve IMAGE 1's full layout, composition, crop, text, typography, colors, background, graphic elements, camera perspective, product/object placement and overall creative design. IMAGE 2 is ONLY the replacement person/subject identity. Replace the entire requested person/photo/portrait/man/woman/model area in IMAGE 1 with the person from IMAGE 2. The final replaced person MUST be recognized as IMAGE 2: preserve IMAGE 2's face, identity, skin tone, hair, head shape, body proportions, clothing if visible and natural expression. Remove the old IMAGE 1 person/face/body from that area completely. Do NOT keep the old person, do NOT average/blend identities, do NOT create a similar new person, do NOT treat this as detail transfer. Do NOT alter unrelated faces in IMAGE 1, do NOT change text/layout/background unless required to blend the replacement naturally. Make it one seamless photorealistic edit, not a collage.";
 
 function userExplicitlyRequestsFaceChange(prompt: string): boolean {
   const p = (prompt || "").toLowerCase();
@@ -381,9 +381,11 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
     ? "STRICT IMAGE EDIT MODE: the uploaded image is the exact base canvas. Do not generate a new photo. Preserve all pixels/details except the specifically requested edit. The requested edit must be visibly applied.\n\n"
     : (opts.mode === "scene-clone"
       ? "STRICT TWO-IMAGE EDIT MODE: use IMAGE 1 as the base scene/look/body and replace the visible facial identity with IMAGE 2. Do not ignore IMAGE 2.\n\n"
-      : (opts.mode === "detail-transfer"
-        ? "STRICT DETAIL TRANSFER MODE: IMAGE 1 is the original creative and final base canvas. IMAGE 2 is only a detail reference. Transfer only requested non-facial details from IMAGE 2; never copy IMAGE 2 face/person/body/background. Keep every IMAGE 1 face and identity pixel-faithful.\n\n"
-        : ""));
+      : (opts.mode === "person-replace"
+        ? "STRICT PERSON REPLACEMENT MODE: IMAGE 1 is the original creative/design and final base canvas. IMAGE 2 is the replacement person. Replace the requested person/photo area in IMAGE 1 with IMAGE 2's person/face/body; remove the old IMAGE 1 person from that area; preserve IMAGE 1 text/layout/background and all unrelated faces. Do not treat this as detail transfer.\n\n"
+        : (opts.mode === "detail-transfer"
+          ? "STRICT DETAIL TRANSFER MODE: IMAGE 1 is the original creative and final base canvas. IMAGE 2 is only a detail reference. Transfer only requested non-facial details from IMAGE 2; never copy IMAGE 2 face/person/body/background. Keep every IMAGE 1 face and identity pixel-faithful.\n\n"
+          : "")));
   const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt, opts.mode) };
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
 
@@ -511,6 +513,8 @@ export async function generateWithNanoBanana(
   const errs: string[] = [];
   const hasRefs = Boolean(opts.imageUrls?.length);
   const pref = opts.preferProvider || "auto";
+  const refEditModes = ["edit", "fusion", "template", "scene-clone", "garment", "detail-transfer", "person-replace"];
+  let triedEmergent = false;
 
   // Modo Pollinations puro (gratuito, sem refinar com Emergent).
   if (pref === "pollinations" && !hasRefs) {
@@ -544,6 +548,20 @@ export async function generateWithNanoBanana(
 
 
 
+  const shouldTryEmergentFirst = Boolean(
+    Deno.env.get("EMERGENT_API_KEY") &&
+    hasRefs &&
+    (pref === "emergent" || refEditModes.includes(String(opts.mode || "")))
+  );
+
+  if (shouldTryEmergentFirst) {
+    triedEmergent = true;
+    const r = await callEmergent(opts);
+    if (r.url) return { url: r.url, provider: "emergent" };
+    errs.push(r.error || "Emergent falhou");
+    console.warn("⚠️ Emergent prioritário falhou:", r.error);
+  }
+
   if (Deno.env.get("LOVABLE_API_KEY")) {
     const r = await callLovableGateway(opts);
     if (r.url) return { url: r.url, provider: "lovable" };
@@ -565,9 +583,11 @@ export async function generateWithNanoBanana(
     console.warn("⚠️ OpenAI falhou:", r.error);
   }
 
-  const r3 = await callEmergent(opts);
-  if (r3.url) return { url: r3.url, provider: "emergent" };
-  errs.push(r3.error || "Emergent falhou");
+  if (!triedEmergent) {
+    const r3 = await callEmergent(opts);
+    if (r3.url) return { url: r3.url, provider: "emergent" };
+    errs.push(r3.error || "Emergent falhou");
+  }
 
   const hasReferenceImages = Boolean(opts.imageUrls?.length);
 
@@ -586,7 +606,7 @@ export async function generateWithNanoBanana(
     errs.push("Fallback Pollinations ignorado porque não preserva imagem de referência");
   }
 
-  const canUseLocalFallback = opts.mode !== "scene-clone" && opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit" && opts.mode !== "detail-transfer";
+  const canUseLocalFallback = opts.mode !== "scene-clone" && opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit" && opts.mode !== "detail-transfer" && opts.mode !== "person-replace";
   const localFallback = canUseLocalFallback ? buildLocalFusionFallback(opts) : null;
   if (localFallback) {
     console.warn("⚠️ Todos os provedores falharam; usando composição local:", errs.join(" | "));
