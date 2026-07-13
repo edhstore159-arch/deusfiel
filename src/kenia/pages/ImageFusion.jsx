@@ -42,22 +42,61 @@ const SOCIAL_PRESETS = [
 ];
 
 const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const normalizeText = (s = "") => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const INSTAGRAM_STORIES_PRESET = SOCIAL_PRESETS.find((p) => p.group === "Instagram" && p.name === "Stories") || SOCIAL_PRESETS[2];
+
+function detectRequestedPreset(text = "") {
+  const t = normalizeText(text);
+  if (/\b(1080\s*[x×]\s*1920|9\s*:\s*16|instagram\s*(story|stories|storie|storys|stores)|insta\s*(story|stories|storie|storys|stores)|ig\s*(story|stories|storie|storys|stores)|story|stories|storie|storys|stores|status|reels?)\b/i.test(t)) {
+    return INSTAGRAM_STORIES_PRESET;
+  }
+  if (/\b(1080\s*[x×]\s*1350|4\s*:\s*5|feed\s+vertical|carrossel|carousel)\b/i.test(t)) {
+    return SOCIAL_PRESETS.find((p) => p.group === "Instagram" && p.name === "Feed Vertical");
+  }
+  if (/\b(1080\s*[x×]\s*1080|1\s*:\s*1|feed\s+quadrado|quadrado|square)\b/i.test(t)) {
+    return SOCIAL_PRESETS.find((p) => p.group === "Instagram" && p.name === "Feed Quadrado");
+  }
+  return null;
+}
 
 function isPersonReplacementPrompt(text = "") {
   const t = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   return /(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|replace|swap|change)\s+([ao]s?\s+)?(foto\s+d[ao]|retrato\s+d[ao]|homem|homen|mulher|pessoa|modelo|personagem|sujeito|criativo\s+para\s+outr[ao]|portrait|photo|man|woman|person|model)|\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|mudar\s+de\s+pessoa|trocar\s+o\s+criativo\s+de\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person|swap\s+the\s+person)\b/i.test(t);
 }
 
-// Cobre o canvas com a imagem original (cover/crop centralizado).
-function renderPresetToCanvas(img, w, h) {
+// Renderiza no tamanho final oficial. O modo "safe" preserva o criativo inteiro
+// e usa um fundo ampliado/desfocado para adaptar sem cortar rosto/texto.
+function renderPresetToCanvas(img, w, h, fitMode = "cover") {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, w, h);
   const ir = img.width / img.height;
   const tr = w / h;
+
+  if (fitMode === "safe" && Math.abs(ir - tr) > 0.02) {
+    ctx.save();
+    ctx.filter = "blur(28px)";
+    drawCover(ctx, img, w, h, -42, -42, w + 84, h + 84);
+    ctx.restore();
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillRect(0, 0, w, h);
+    const scale = Math.min(w / img.width, h / img.height);
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    const dx = (w - dw) / 2;
+    const dy = (h - dh) / 2;
+    ctx.shadowColor = "rgba(0,0,0,0.38)";
+    ctx.shadowBlur = Math.max(18, Math.round(Math.min(w, h) * 0.018));
+    ctx.shadowOffsetY = Math.max(8, Math.round(h * 0.006));
+    ctx.drawImage(img, dx, dy, dw, dh);
+    return canvas;
+  }
+
   let sx, sy, sw, sh;
   if (ir > tr) {
     // imagem mais larga -> recorta laterais
@@ -73,6 +112,12 @@ function renderPresetToCanvas(img, w, h) {
   }
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
   return canvas;
+}
+
+async function adaptImageToPreset(sourceUrl, preset) {
+  const img = await loadImage(sourceUrl);
+  const canvas = renderPresetToCanvas(img, preset.w, preset.h, "safe");
+  return canvas.toDataURL("image/png");
 }
 
 function loadImage(src) {
