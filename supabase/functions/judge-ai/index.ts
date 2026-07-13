@@ -54,7 +54,7 @@ CNIS, CTPS, PPP/LTCAT, carnês/guias, CTC, extrato Meu INSS, laudos, processos a
 ### 9. Resumo Simplificado
 Linguagem leiga, clara, até 5 linhas.
 
-### 9. Alerta Legal
+### 10. Alerta Legal
 Parecer informativo produzido por IA; não substitui advogado(a) previdenciário(a) habilitado(a), análise documental completa e simulação individualizada.
 
 ━━━━━━━━━━━━━━━━━━━━━━━
