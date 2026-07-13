@@ -362,7 +362,10 @@ Deno.serve(async (req) => {
     });
 
     const { reply, audio_base64 } = await callChatAI(userText, contactId, inboundWasAudio);
-    await sleep(1000 + Math.floor(Math.random() * 2000));
+    // Delay humanizado: simula tempo de leitura + digitação para não parecer bot
+    // 4s base + 30ms/caractere + jitter aleatório de 2s (mínimo ~5s, máximo ~15s)
+    const typingMs = Math.min(15000, 4000 + reply.length * 30 + Math.floor(Math.random() * 2000));
+    await sleep(typingMs);
     let mediaUrl: string | null = null;
     if (inboundWasAudio && audio_base64) {
       mediaUrl = await uploadAudioPublic(audio_base64);
