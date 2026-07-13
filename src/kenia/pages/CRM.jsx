@@ -93,7 +93,7 @@ export default function CRM() {
     try {
       const { data, error } = await supabase
         .from("case_analyses")
-        .select("id, session_id, visitor_name, visitor_phone, area, resumo, qualificacao, acertividade, urgencia, tags, created_at, updated_at")
+        .select("id, session_id, visitor_name, visitor_phone, area, resumo, qualificacao, acertividade, created_at, updated_at")
         .order("updated_at", { ascending: false })
         .limit(200);
       if (error) throw error;
@@ -111,8 +111,8 @@ export default function CRM() {
           case_type: r.area || null,
           description: r.resumo || "",
           score: Number(r.acertividade || 0),
-          urgency: r.urgencia || "media",
-          tags: Array.isArray(r.tags) ? r.tags : [],
+          urgency: "media",
+          tags: [],
           stage: overrides[String(r.id)] || mapQualifToStage(r.qualificacao),
         }));
       setAutoLeads(items);
