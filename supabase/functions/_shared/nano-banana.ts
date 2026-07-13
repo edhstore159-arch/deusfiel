@@ -74,7 +74,23 @@ function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) 
   return `${prompt}${explicitFaceNote}\n\n${HYPERREAL_LOCK}\n${SCENE_REALISM_LOCK}\n${REAL_SCALE_LOCK}\n${modeLock}\n${ACCESSORY_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, ${identityNegative} accessory fused into skin, accessory imprint left on face after removal, invented features under removed accessory, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, mismatched lighting between subject and background, cutout halo, composite edge, blurry, low quality, watermark.`;
 }
 
-function extractImageFromMessage(msg: any): string | null {
+type ProviderMessagePart = {
+  type?: string;
+  text?: string;
+  image_url?: { url?: string };
+};
+
+type ProviderMessage = {
+  images?: Array<{ image_url?: { url?: string }; url?: string }>;
+  content?: string | ProviderMessagePart[];
+};
+
+type GeminiPart = {
+  inlineData?: { data?: string; mimeType?: string };
+  inline_data?: { data?: string; mime_type?: string };
+};
+
+function extractImageFromMessage(msg: ProviderMessage | null | undefined): string | null {
   if (!msg) return null;
   const images = msg.images;
   if (Array.isArray(images) && images.length > 0) {
@@ -265,8 +281,8 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
       return { url: null, error: `Gemini direto ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
     }
     const data = await resp.json();
-    const out = data?.candidates?.[0]?.content?.parts || [];
-    const inline = out.find((p: any) => p?.inlineData?.data || p?.inline_data?.data);
+      const out = (data?.candidates?.[0]?.content?.parts || []) as GeminiPart[];
+      const inline = out.find((p) => p?.inlineData?.data || p?.inline_data?.data);
     const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
     const mime = inline?.inlineData?.mimeType || inline?.inline_data?.mime_type || "image/png";
     if (!b64) return { url: null, error: "Gemini direto não retornou imagem" };
