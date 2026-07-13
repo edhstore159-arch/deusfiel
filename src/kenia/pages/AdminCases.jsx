@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/kenia/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Badge } from "@/kenia/components/ui/badge";
 import { Button } from "@/kenia/components/ui/button";
@@ -11,8 +12,34 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import {
   ShieldCheck, AlertTriangle, Gauge, Search, BookOpen,
   Sparkles, ChevronRight, RefreshCcw, Filter, FileText,
+  Scale, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+
+function buildJudgeCaseText(item, messages) {
+  const lines = [];
+  if (item?.visitor_name) lines.push(`Cliente: ${item.visitor_name}`);
+  if (item?.visitor_phone) lines.push(`Telefone: ${item.visitor_phone}`);
+  if (item?.area) lines.push(`Área jurídica: ${item.area}`);
+  if (typeof item?.acertividade === "number") lines.push(`Acertividade da IA triagem: ${item.acertividade}%`);
+  if (typeof item?.chance_exito === "number") lines.push(`Chance de êxito estimada: ${item.chance_exito}%`);
+  if (item?.qualificacao) lines.push(`Qualificação prévia: ${item.qualificacao}`);
+  if (item?.resumo) lines.push(`\nResumo técnico:\n${item.resumo}`);
+  if (item?.motivo) lines.push(`\nJustificativa da IA:\n${item.motivo}`);
+  if (Array.isArray(item?.fundamentos) && item.fundamentos.length) {
+    lines.push(`\nFundamentos indicados:\n- ${item.fundamentos.join("\n- ")}`);
+  }
+  if (Array.isArray(messages) && messages.length) {
+    lines.push(`\nTranscrição da conversa:`);
+    for (const m of messages) {
+      const who = m.role === "user" ? "Cliente" : "Atendimento";
+      lines.push(`${who}: ${String(m.content || "").trim()}`);
+    }
+  }
+  lines.push(`\nProduza o PARECER TÉCNICO completo do Juiz Virtual sobre este caso, seguindo integralmente a estrutura obrigatória.`);
+  return lines.join("\n");
+}
+
 
 const QUAL_META = {
   qualificado: { label: "Qualificado", cls: "bg-gold-600 text-white", icon: ShieldCheck },
