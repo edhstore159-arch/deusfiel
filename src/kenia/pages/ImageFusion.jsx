@@ -392,6 +392,7 @@ export default function ImageFusion() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [resultPreset, setResultPreset] = useState(null);
   const [variants, setVariants] = useState([]); // {preset, dataUrl, blob}
   const [generatingVariants, setGeneratingVariants] = useState(false);
   const [saved, setSaved] = useState([]); // {id, url, prompt, paid, storage_path}
@@ -479,12 +480,16 @@ export default function ImageFusion() {
     }
     setLoading(true);
     setResult(null);
+    setResultPreset(null);
     setVariants([]);
+    const requestedPreset = detectRequestedPreset(prompt);
     const finishWithImage = async (imageUrl, successMessage = "Imagem gerada! Salvando e criando variações...") => {
-      setResult(imageUrl);
+      const finalImageUrl = requestedPreset ? await adaptImageToPreset(imageUrl, requestedPreset) : imageUrl;
+      setResult(finalImageUrl);
+      setResultPreset(requestedPreset || null);
       toast.success(successMessage);
-      persistImage(imageUrl, prompt);
-      await generateVariants(imageUrl);
+      persistImage(finalImageUrl, prompt);
+      await generateVariants(finalImageUrl);
     };
     try {
       const personReplaceMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode && isPersonReplacementPrompt(prompt);
@@ -493,7 +498,13 @@ export default function ImageFusion() {
       const mode = sceneCloneMode ? "scene-clone" : (templateMode ? "template" : (singleMode ? "edit" : (personReplaceMode ? "person-replace" : (detailTransferMode ? "detail-transfer" : "fusion"))));
       const { data } = await api.post(
         "/creatives/fuse-images",
-        { image1_base64: img1 || img2, image2_base64: singleMode ? null : img2, prompt, mode },
+        {
+          image1_base64: img1 || img2,
+          image2_base64: singleMode ? null : img2,
+          prompt,
+          mode,
+          output_preset: requestedPreset ? { group: requestedPreset.group, name: requestedPreset.name, w: requestedPreset.w, h: requestedPreset.h } : null,
+        },
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
@@ -532,7 +543,7 @@ export default function ImageFusion() {
       const img = await loadImage(sourceUrl);
       const out = [];
       for (const preset of SOCIAL_PRESETS) {
-        const canvas = renderPresetToCanvas(img, preset.w, preset.h);
+        const canvas = renderPresetToCanvas(img, preset.w, preset.h, "safe");
         const blob = await canvasToBlob(canvas, "image/png");
         const dataUrl = canvas.toDataURL("image/png");
         out.push({ preset, dataUrl, blob });
@@ -557,7 +568,9 @@ export default function ImageFusion() {
     if (!result) return;
     const a = document.createElement("a");
     a.href = result;
-    a.download = `fusao-original-${Date.now()}.png`;
+    a.download = resultPreset
+      ? `fusao-${slug(resultPreset.group)}-${slug(resultPreset.name)}-${resultPreset.w}x${resultPreset.h}-${Date.now()}.png`
+      : `fusao-original-${Date.now()}.png`;
     a.click();
   };
 
@@ -610,11 +623,11 @@ export default function ImageFusion() {
           </Card>
           <Card className="p-4 bg-nude-900/60 border-gold-900/40 flex flex-col">
             <Label className="text-gold-200">Resultado base</Label>
-            <div className="mt-2 aspect-square rounded-lg bg-nude-950 border border-gold-900/40 grid place-items-center overflow-hidden">
+            <div className="mt-2 rounded-lg bg-nude-950 border border-gold-900/40 grid place-items-center overflow-hidden" style={{ aspectRatio: resultPreset ? `${resultPreset.w} / ${resultPreset.h}` : "1 / 1" }}>
               {loading ? (
                 <div className="text-center">
                   <Loader2 className="w-8 h-8 text-gold-400 animate-spin mx-auto mb-2" />
-                  <div className="text-sm text-gold-200">Gerando fusão... 20-40s</div>
+                  <div className="text-sm text-gold-200">Gerando fusão em alta resolução... 20-40s</div>
                 </div>
               ) : result ? (
                 <img src={result} alt="resultado" className="w-full h-full object-cover" data-testid="fusion-result-img" />
@@ -628,7 +641,7 @@ export default function ImageFusion() {
             {result && (
               <Button onClick={downloadOriginal} variant="outline" size="sm"
                 className="mt-3 border-gold-700/50 text-gold-200 hover:bg-gold-500/10 hover:text-gold-100">
-                <Download className="w-4 h-4 mr-2" /> Baixar original
+                  <Download className="w-4 h-4 mr-2" /> {resultPreset ? `Baixar ${resultPreset.name} HD` : "Baixar original"}
               </Button>
             )}
           </Card>
@@ -698,7 +711,7 @@ export default function ImageFusion() {
                 <Label className="text-gold-200 text-base">
                   Variações ({variants.length}/{SOCIAL_PRESETS.length})
                 </Label>
-                <p className="text-xs text-nude-400 mt-0.5">Recorte centralizado (cover) em cada formato oficial.</p>
+                <p className="text-xs text-nude-400 mt-0.5">Adaptação em alta resolução para cada formato oficial, preservando o criativo sem cortar rosto/texto.</p>
               </div>
               {variants.length > 0 && (
                 <Button onClick={downloadAllZip}
