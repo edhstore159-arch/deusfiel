@@ -354,7 +354,9 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
     ? "STRICT IMAGE EDIT MODE: the uploaded image is the exact base canvas. Do not generate a new photo. Preserve all pixels/details except the specifically requested edit. The requested edit must be visibly applied.\n\n"
     : (opts.mode === "scene-clone"
       ? "STRICT TWO-IMAGE EDIT MODE: use IMAGE 1 as the base scene/look/body and replace the visible facial identity with IMAGE 2. Do not ignore IMAGE 2.\n\n"
-      : "");
+      : (opts.mode === "detail-transfer"
+        ? "STRICT DETAIL TRANSFER MODE: IMAGE 1 is the original creative and final base canvas. IMAGE 2 is only a detail reference. Transfer only requested non-facial details from IMAGE 2; never copy IMAGE 2 face/person/body/background. Keep every IMAGE 1 face and identity pixel-faithful.\n\n"
+        : ""));
   const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt, opts.mode) };
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
 
