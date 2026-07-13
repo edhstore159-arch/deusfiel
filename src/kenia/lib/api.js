@@ -1,9 +1,18 @@
 import axios from "axios";
 import { supabase } from "@/integrations/supabase/client";
 
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "https://minimal-arch-muse-384-bak.onrender.com").replace(/\/$/, "");
+const readBackendOverride = () => {
+  try { return (localStorage.getItem("kenia:baileys-backend-url") || "").trim().replace(/\/$/, ""); } catch { return ""; }
+};
+const readBaileysInstance = () => {
+  try { return (localStorage.getItem("kenia:baileys-instance") || "").trim(); } catch { return ""; }
+};
+const DEFAULT_BACKEND = "https://minimal-arch-muse-384-bak.onrender.com";
+const BACKEND_URL = (readBackendOverride() || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND).replace(/\/$/, "");
+export { BACKEND_URL };
 export const HAS_BACKEND = Boolean(BACKEND_URL);
 export const API = HAS_BACKEND ? `${BACKEND_URL}/api` : "";
+
 
 
 const nowIso = () => new Date().toISOString();
