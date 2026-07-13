@@ -16,7 +16,73 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const TWILIO_API_KEY = Deno.env.get("TWILIO_API_KEY")!;
-const AUDIO_BUCKET = "debug-uploads"; // bucket público
+const AUDIO_BUCKET = "debug-uploads"; // bucket público (TTS respostas)
+const DOCS_BUCKET = "whatsapp-documents"; // bucket privado (docs recebidos)
+const DOC_URL_TTL = 60 * 60 * 24 * 7; // 7 dias
+
+function extFromMime(mime: string): string {
+  const map: Record<string, string> = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/heic": "heic",
+    "video/mp4": "mp4",
+    "video/3gpp": "3gp",
+    "video/quicktime": "mov",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "text/plain": "txt",
+  };
+  return map[mime.toLowerCase()] || (mime.split("/")[1] || "bin").split(";")[0];
+}
+
+async function uploadWhatsappDocument(
+  bytes: Uint8Array,
+  mime: string,
+  contactId: string,
+  originalName?: string,
+): Promise<{ signedUrl: string | null; path: string } | null> {
+  try {
+    const ext = extFromMime(mime);
+    const safeContact = (contactId || "unknown").replace(/[^\d]/g, "") || "unknown";
+    const filename = (originalName || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`).replace(/[^\w.\-]/g, "_");
+    const path = `${safeContact}/${Date.now()}-${filename}`;
+    const up = await fetch(`${SUPABASE_URL}/storage/v1/object/${DOCS_BUCKET}/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": mime || "application/octet-stream",
+        "x-upsert": "true",
+      },
+      body: bytes,
+    });
+    if (!up.ok) {
+      console.error("[whatsapp] upload doc falhou", up.status, await up.text());
+      return null;
+    }
+    const sign = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${DOCS_BUCKET}/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ expiresIn: DOC_URL_TTL }),
+    });
+    const s = await sign.json().catch(() => ({}));
+    const signedPath = s.signedURL || s.signedUrl;
+    return { signedUrl: signedPath ? `${SUPABASE_URL}/storage/v1${signedPath}` : null, path };
+  } catch (e) {
+    console.error("[whatsapp] upload doc exceção", e);
+    return null;
+  }
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
