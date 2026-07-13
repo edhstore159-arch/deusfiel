@@ -9,7 +9,7 @@ type Content =
 export interface NanoBananaOptions {
   prompt: string;
   imageUrls?: string[]; // data URLs or http(s) URLs
-  mode?: "edit" | "fusion" | "template" | "generate" | "scene-clone" | "garment" | "detail-transfer";
+  mode?: "edit" | "fusion" | "template" | "generate" | "scene-clone" | "garment" | "detail-transfer" | "person-replace";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
   preferProvider?: "auto" | "pollinations" | "emergent";
 }
@@ -38,9 +38,12 @@ const GARMENT_TRANSFER_LOCK =
 const DETAIL_TRANSFER_LOCK =
   "Detail-transfer edit lock: IMAGE 1 is the ORIGINAL CREATIVE and the exact base canvas. Preserve IMAGE 1's composition, layout, crop, camera angle, background, text, subject, clothing, body, pose, hair, and especially every face/identity 1:1. IMAGE 2 is ONLY a secondary visual reference for the specific detail(s) requested by the user (for example an accessory, texture, color, small object, logo, prop, or style detail). Transfer ONLY those requested non-facial details from IMAGE 2 onto IMAGE 1. Do NOT replace the whole creative, do NOT copy IMAGE 2's face/person/body/pose/background unless the user explicitly asks for that non-facial area, do NOT average or blend identities. If the requested detail is an accessory on a face, place it as a removable surface layer while keeping the original IMAGE 1 face underneath unchanged.";
 
+const PERSON_REPLACE_LOCK =
+  "Person/photo replacement lock: IMAGE 1 is the ORIGINAL CREATIVE / design base. Preserve IMAGE 1's full layout, composition, crop, text, typography, colors, background, graphic elements, camera perspective, product/object placement and overall creative design. IMAGE 2 is ONLY the replacement person/subject identity. Replace the person/photo/portrait area requested by the user in IMAGE 1 with the person from IMAGE 2. The final replaced person MUST be recognized as IMAGE 2: preserve IMAGE 2's face, identity, skin tone, hair, body proportions, clothing if visible and natural expression. Do NOT keep the old person from IMAGE 1 in the replaced area. Do NOT alter unrelated faces in IMAGE 1, do NOT change text/layout/background unless required to blend the replacement naturally. Make it one seamless photorealistic edit, not a collage.";
+
 function userExplicitlyRequestsFaceChange(prompt: string): boolean {
   const p = (prompt || "").toLowerCase();
-  return /(trocar|troca|mudar|muda|alterar|altera|modificar|modifica|substituir|substitui|refazer|refaz|redesenhar|redesenha|editar|edita)\s+([oa]s?\s+)?(rosto|face|cara|olhos?|nariz|boca|l[aá]bios?|queixo|mand[ií]bula|sobrancelhas?|pele|feature|identidade)|face\s*swap|trocar\s+de\s+pessoa|nova\s+pessoa|mudar\s+a\s+identidade|change\s+(the\s+)?face|swap\s+face/i.test(p);
+  return /(trocar|troca|mudar|muda|alterar|altera|modificar|modifica|substituir|substitui|refazer|refaz|redesenhar|redesenha|editar|edita)\s+([oa]s?\s+)?(rosto|face|cara|olhos?|nariz|boca|l[aá]bios?|queixo|mand[ií]bula|sobrancelhas?|pele|feature|identidade|homem|mulher|pessoa|modelo|personagem|retrato|foto)|face\s*swap|trocar\s+de\s+pessoa|nova\s+pessoa|mudar\s+a\s+identidade|change\s+(the\s+)?face|swap\s+face|replace\s+(the\s+)?(person|man|woman|model|portrait|photo)/i.test(p);
 }
 
 function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) {
@@ -49,16 +52,20 @@ function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) 
     ? SCENE_CLONE_FACE_SWAP_LOCK
     : (mode === "garment"
       ? GARMENT_TRANSFER_LOCK
-      : (mode === "detail-transfer"
-        ? DETAIL_TRANSFER_LOCK
-        : (userWantsFaceEdit ? "" : FACE_PRESERVATION_LOCK)));
+      : (mode === "person-replace"
+        ? PERSON_REPLACE_LOCK
+        : (mode === "detail-transfer"
+          ? DETAIL_TRANSFER_LOCK
+          : (userWantsFaceEdit ? "" : FACE_PRESERVATION_LOCK))));
   const identityNegative = mode === "scene-clone"
     ? "face from IMAGE 1, unchanged original face, mixed identity, averaged face, new invented face, face not matching IMAGE 2,"
-    : (mode === "detail-transfer"
-      ? "face from IMAGE 2, copied identity from IMAGE 2, replaced face, mixed identity, averaged identity, changed IMAGE 1 face, modified original creative face,"
-      : (userWantsFaceEdit
-        ? ""
-        : "changed identity, different person, modified face, redrawn face, beautified face, smoothed face, slimmed face, altered eye shape, altered nose, altered mouth, altered jawline, symmetrized face, aged face, de-aged face, face-lift, plastic surgery look,"));
+    : (mode === "person-replace"
+      ? "old person from IMAGE 1 kept in the replaced area, face not matching IMAGE 2, mixed identity, averaged identity, duplicate person, collage person,"
+      : (mode === "detail-transfer"
+        ? "face from IMAGE 2, copied identity from IMAGE 2, replaced face, mixed identity, averaged identity, changed IMAGE 1 face, modified original creative face,"
+        : (userWantsFaceEdit
+          ? ""
+          : "changed identity, different person, modified face, redrawn face, beautified face, smoothed face, slimmed face, altered eye shape, altered nose, altered mouth, altered jawline, symmetrized face, aged face, de-aged face, face-lift, plastic surgery look,")));
   const explicitFaceNote = userWantsFaceEdit
     ? "\nUser explicitly requested a face/identity change — apply ONLY the face change the user described; keep every other element (scene, pose, outfit, background, lighting) untouched."
     : "";
@@ -104,6 +111,11 @@ function referenceLabel(mode: NanoBananaOptions["mode"] | undefined, index: numb
     return index === 0
       ? "REFERENCE IMAGE 1: ORIGINAL CREATIVE / base canvas. Preserve this image 1:1 except the requested detail edit."
       : "REFERENCE IMAGE 2: secondary detail reference only. Copy only the user-requested non-facial detail(s), never the face/identity/person.";
+  }
+  if (mode === "person-replace") {
+    return index === 0
+      ? "REFERENCE IMAGE 1: ORIGINAL CREATIVE / design base. Preserve layout, text, background and composition. Replace only the requested person/photo area."
+      : "REFERENCE IMAGE 2: replacement person/subject identity. The replaced person in IMAGE 1 must become this person.";
   }
   return `REFERENCE IMAGE ${index + 1}`;
 }
