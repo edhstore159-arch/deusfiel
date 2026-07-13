@@ -9,6 +9,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/kenia/components/ui/tabs";
 import { Card } from "@/kenia/components/ui/card";
+import BibleVerseBox from "@/kenia/components/BibleVerseBox";
 import { Gem, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
