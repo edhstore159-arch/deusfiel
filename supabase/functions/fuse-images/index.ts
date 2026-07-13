@@ -19,7 +19,7 @@ const DETAIL_TRANSFER_LOCK =
   "DETAIL TRANSFER LOCK: IMAGE 1 is the ORIGINAL CREATIVE and must remain the base canvas. Preserve IMAGE 1 composition, crop, layout, text, background, lighting, pose, body, hair, clothing and especially every face/identity exactly 1:1. IMAGE 2 is ONLY a reference source for the specific non-facial detail(s) requested by the user (accessory, object, texture, color, prop, logo, material, small style element). Copy ONLY those requested details from IMAGE 2 onto IMAGE 1. Do NOT replace the whole creative, do NOT copy IMAGE 2's face/person/body/background, do NOT blend identities, do NOT modify the original face. If adding or removing accessories, they must sit above the face as removable layers; the original face underneath remains unchanged and returns exactly when the accessory is removed.";
 
 const PERSON_REPLACE_LOCK =
-  "PERSON / PHOTO REPLACEMENT LOCK: IMAGE 1 is the ORIGINAL CREATIVE / DESIGN BASE. Preserve IMAGE 1 layout, crop, text, typography, colors, graphics, background, composition, camera angle and all non-requested elements exactly. IMAGE 2 is the REPLACEMENT PERSON / SUBJECT. Replace only the person/photo/portrait/man/woman/model area requested by the user in IMAGE 1 with the person from IMAGE 2. The replaced person must clearly be IMAGE 2's identity/face/body/clothing when visible. Do NOT keep the old person from IMAGE 1 in that area, do NOT average faces, do NOT create a similar new person, do NOT change unrelated faces or design elements.";
+  "PERSON / PHOTO REPLACEMENT LOCK: IMAGE 1 is the ORIGINAL CREATIVE / DESIGN BASE. Preserve IMAGE 1 layout, crop, text, typography, colors, graphics, background, composition, camera angle, personalization and all non-requested design elements exactly. IMAGE 2 is the REPLACEMENT PERSON / SUBJECT. Replace the entire requested person/photo/portrait/man/woman/model area in IMAGE 1 with the person from IMAGE 2, not only the face. The replaced person must clearly be IMAGE 2's identity/face/body/clothing when visible. Do NOT keep the old person from IMAGE 1 in that area, do NOT average faces, do NOT create a similar new person, do NOT change unrelated faces or design elements.";
 
 const TEMPLATE_SYSTEM =
   "You are a photorealistic image generator prompt engineer that must STRICTLY preserve the original visual identity of the two reference images. " +
@@ -106,7 +106,7 @@ async function elaboratePersonReplacePrompt(userPrompt: string): Promise<string>
       if (txt && txt.length > 20) return txt;
     }
   } catch (_e) { /* fallback */ }
-  return `Use IMAGE 1 as the exact original creative/design base. Preserve IMAGE 1 layout, crop, text, typography, colors, graphics, background, composition and camera angle. Replace the requested person/photo/portrait area in IMAGE 1 according to this instruction: ${userTheme}. Use IMAGE 2 as the replacement person identity: the final replaced person must clearly match IMAGE 2's face, identity, skin tone, hair, body and visible clothing. Blend naturally into IMAGE 1 lighting and framing. ${PERSON_REPLACE_LOCK} ${REALISM}. Negative: old person from IMAGE 1 still visible, unchanged person, face not matching IMAGE 2, mixed identity, averaged face, different layout, changed text, changed background unless required by the photo slot, collage, split screen, ${NEGATIVE}`;
+  return `Use IMAGE 1 as the exact original creative/design base. Preserve IMAGE 1 layout, crop, text, typography, colors, graphics, background, composition, personalization and camera angle. Replace the requested person/photo/portrait/man/woman area in IMAGE 1 according to this instruction: ${userTheme}. Use IMAGE 2 as the replacement person identity/source: the final replaced person must clearly match IMAGE 2's face, identity, skin tone, hair, body and visible clothing. If the instruction says "homem/man from creative/image 2", replace the whole man/person slot, not just the face. Blend naturally into IMAGE 1 lighting and framing. ${PERSON_REPLACE_LOCK} ${REALISM}. Negative: old person from IMAGE 1 still visible, unchanged person, face not matching IMAGE 2, mixed identity, averaged face, different layout, changed text, changed background unless required by the photo slot, collage, split screen, ${NEGATIVE}`;
 }
 
 const EDIT_SINGLE_SYSTEM =
@@ -182,6 +182,18 @@ function normalizeText(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+function isPersonReplacementInstruction(value: string): boolean {
+  const t = normalizeText(value || '');
+  const subject = /\b(homem|homen|mulher|pessoa|modelo|personagem|sujeito|retrato|foto|portrait|photo|man|woman|person|model)\b/i;
+  const action = /\b(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|colocar|coloca|botar|bota|inserir|insere|por|poe|p[oõ]e|usar|usa|pegar|pega|replace|swap|change|put|place|insert|use)\b/i;
+  const fromImage2 = /\b(imagem|criativo|foto)\s*2\b|\b(do|da|de)\s+(segundo|segunda)\s+(imagem|criativo|foto)\b/i;
+  const inImage1 = /\b(imagem|criativo|foto)\s*1\b|\b(no|na|em|do|da)\s+(primeiro|primeira)\s+(imagem|criativo|foto)\b/i;
+  return (
+    (action.test(t) && subject.test(t) && (fromImage2.test(t) || inImage1.test(t))) ||
+    /\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|homem\s+do\s+criativo\s*2|homen\s+do\s+criativo\s*2|homem\s+da\s+imagem\s*2|homen\s+da\s+imagem\s*2|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person|put\s+the\s+man|place\s+the\s+man)\b/i.test(t)
+  );
+}
+
 const COLOR_ALIASES: Array<{ re: RegExp; en: string; strong: string; avoid: string }> = [
   { re: /\b(azul|blue)\b/i, en: 'blue', strong: 'vivid bright pure blue (hex #1E73FF), clearly recognizable as blue', avoid: 'navy, dark blue, midnight blue, black, gray, teal, purple' },
   { re: /\b(vermelh[ao]|red)\b/i, en: 'red', strong: 'vivid pure red (hex #E53935)', avoid: 'orange, pink, brown, dark maroon, black' },
@@ -252,9 +264,8 @@ Deno.serve(async (req) => {
     const garmentKeywords = /(roupa|look|outfit|camiseta|camisa|blusa|vestido|jaqueta|casaco|paleto|terno|calca|short|uniforme|figurino|shirt|t-?shirt|dress|jacket|clothing|garment|ensaio)/i;
     const transferKeywords = /(mesma|igual|ingual|transfer|vestir|veste|coloc\w+\s+a\s+roupa|use\s+the\s+clothing|wear|swap|troc\w+\s+roupa|ensaio|fotograf|photoshoot)/i;
     const sceneCloneKeywords = /(clon\w+|replic\w+|reproduz\w+|mesma\s+cena|mesmo\s+cenario|mesmo\s+fundo|copia\w*\s+(a\s+)?cena|copiar\s+(o\s+)?look|look\s+e\s+(a\s+)?cena|cena\s+e\s+(o\s+)?look|same\s+scene|clone\s+the\s+scene)/i;
-    const personReplaceKeywords = /(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|replace|swap|change)\s+([ao]s?\s+)?(foto\s+d[ao]|retrato\s+d[ao]|homem|homen|mulher|pessoa|modelo|personagem|sujeito|portrait|photo|man|woman|person|model)|\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person)\b/i;
     const isSceneClone = mode === 'scene-clone' || sceneCloneKeywords.test(normalizedPrompt);
-    const isPersonReplace = !isSceneClone && !!image2_base64 && (mode === 'person-replace' || personReplaceKeywords.test(normalizedPrompt));
+    const isPersonReplace = !isSceneClone && !!image2_base64 && (mode === 'person-replace' || isPersonReplacementInstruction(normalizedPrompt));
     const isDetailTransfer = !isSceneClone && !isPersonReplace && !!image2_base64 && mode === 'detail-transfer';
     const isGarmentTransfer = !isSceneClone && !!image2_base64
       && (mode === 'garment' || (garmentKeywords.test(normalizedPrompt) && transferKeywords.test(normalizedPrompt)));
