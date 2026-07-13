@@ -322,15 +322,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (result.provider === 'local-fallback' && isSingle) {
+    if (result.provider === 'local-fallback') {
       return new Response(JSON.stringify({
         ok: false,
-        error: 'A IA de edição não está disponível agora. A chave Emergent está válida, mas o provedor está bloqueando por limite/cota diária; a imagem não foi alterada.',
+        error: 'A IA de imagem está sem créditos/cota em todos os provedores (Lovable, Gemini, OpenAI, Ollama). Não é possível preservar o rosto com uma colagem local — recarregue os créditos do Lovable AI ou configure outra chave (GEMINI_API_KEY / OPENAI_API_KEY / OLLAMA_URL) e tente novamente.',
         provider: result.provider,
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     return new Response(JSON.stringify({ ok: true, image: result.url, provider: result.provider, prompt_used: fullPrompt, mode: runMode }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
