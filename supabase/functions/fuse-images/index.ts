@@ -339,7 +339,18 @@ Deno.serve(async (req) => {
     const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64].filter(Boolean);
     const runMode = isSceneClone ? 'scene-clone' : (isPersonReplace ? 'person-replace' : (isDetailTransfer ? 'detail-transfer' : (isGarmentTransfer ? 'garment' : (isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion')))));
 
-    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
+    const outputPreset = output_preset && typeof output_preset === 'object'
+      ? (() => {
+          const raw = output_preset as { group?: unknown; name?: unknown; w?: unknown; h?: unknown };
+          const w = Number(raw.w);
+          const h = Number(raw.h);
+          return Number.isFinite(w) && Number.isFinite(h) && w >= 256 && h >= 256
+            ? { group: String(raw.group || ''), name: String(raw.name || ''), w, h }
+            : null;
+        })()
+      : null;
+
+    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode, outputPreset });
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {
