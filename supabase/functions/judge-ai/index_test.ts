@@ -152,3 +152,32 @@ Deno.test("accepts messages history array", async () => {
     restoreFetch();
   }
 });
+
+Deno.test("adapts system prompt for Gemini, GPT and Claude model families", async () => {
+  const captured: any[] = [];
+  mockFetch(async (_u, init) => {
+    captured.push(JSON.parse(String(init?.body ?? "{}")));
+    return new Response(sseStream(["data: [DONE]\n\n"]), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  });
+  try {
+    const cases = [
+      ["google/gemini-2.5-flash", "ADAPTAÇÃO PARA MODELOS GEMINI"],
+      ["openai/gpt-5", "ADAPTAÇÃO PARA MODELOS GPT"],
+      ["claude-sonnet-4-5", "ADAPTAÇÃO PARA MODELOS CLAUDE"],
+    ];
+
+    for (const [model, marker] of cases) {
+      const res = await handler(new Request("http://x", {
+        method: "POST",
+        body: JSON.stringify({ model, case: "Segurado busca aposentadoria." }),
+      }));
+      assertEquals(res.status, 200);
+      await res.text();
+      const prompt = captured.at(-1)?.messages?.[0]?.content ?? "";
+      assertStringIncludes(prompt, marker);
+      assertStringIncludes(prompt, "EC nº 103/2019");
+    }
+  } finally {
+    restoreFetch();
+  }
+});
