@@ -68,7 +68,7 @@ Deno.test("streams SSE with report sections and forwards system prompt", async (
     assertEquals(res.headers.get("Content-Type"), "text/event-stream");
     const text = await res.text();
     assertStringIncludes(text, "Relatório");
-    assertStringIncludes(text, "Dispositivo");
+    assertStringIncludes(text, "Conclusão");
     // system prompt forwarded
     assertEquals(capturedBody.messages[0].role, "system");
     assertStringIncludes(capturedBody.messages[0].content, "Juiz Virtual");
@@ -78,46 +78,50 @@ Deno.test("streams SSE with report sections and forwards system prompt", async (
   }
 });
 
-Deno.test("propagates 429 rate limit", async () => {
+Deno.test("maps 429 rate limit to friendly JSON", async () => {
   mockFetch(async () => new Response("rate", { status: 429 }));
   try {
     const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify({ case: "x" }) }));
-    assertEquals(res.status, 429);
+    assertEquals(res.status, 200);
     const j = await res.json();
     assertEquals(j.status, 429);
+    assertStringIncludes(j.error, "Limite");
   } finally {
     restoreFetch();
   }
 });
 
-Deno.test("propagates 402 payment required", async () => {
+Deno.test("maps 402 payment required to friendly JSON", async () => {
   mockFetch(async () => new Response("credits", { status: 402 }));
   try {
     const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify({ case: "x" }) }));
-    assertEquals(res.status, 402);
-    await res.json();
+    assertEquals(res.status, 200);
+    const j = await res.json();
+    assertEquals(j.status, 402);
+    assertStringIncludes(j.error, "Créditos");
   } finally {
     restoreFetch();
   }
 });
 
-Deno.test("maps other upstream errors to 500", async () => {
+Deno.test("maps other upstream errors to friendly JSON", async () => {
   mockFetch(async () => new Response("boom", { status: 503 }));
   try {
     const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify({ case: "x" }) }));
-    assertEquals(res.status, 500);
+    assertEquals(res.status, 200);
     const j = await res.json();
     assertEquals(j.status, 503);
+    assertStringIncludes(j.error, "gateway");
   } finally {
     restoreFetch();
   }
 });
 
-Deno.test("catches fetch throw and returns 500 JSON", async () => {
+Deno.test("catches fetch throw and returns friendly JSON", async () => {
   mockFetch(async () => { throw new Error("network down"); });
   try {
     const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify({ case: "x" }) }));
-    assertEquals(res.status, 500);
+    assertEquals(res.status, 200);
     const j = await res.json();
     assertStringIncludes(j.error, "network down");
   } finally {
