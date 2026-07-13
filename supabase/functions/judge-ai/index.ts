@@ -30,6 +30,9 @@ Estrutura obrigatória do parecer, em markdown, nesta ordem exata:
 ### 1. Relatório
 Reescreva o caso de forma neutra e completa. Aponte lacunas essenciais (idade, sexo, DN, DER/DIB, data de filiação, CNIS, tempo de contribuição, carência, categoria, atividade especial, professor, incapacidade, RPPS/CTC, salários de contribuição, documentos).
 
+### 2. Análise Documental (Perito)
+Só quando houver documentos/imagens. Resuma tipo do documento, dados extraídos, inconsistências e possibilidade de revisão (conforme CAMADA 0). Sem documentos → escrever "Não aplicável".
+
 ### 2. Fundamentação Jurídica
 Base legal segura e atual. Diferencie: antes/depois da EC 103/2019; RGPS x RPPS; direito adquirido (art. 3º EC 103/2019) x regras de transição x regra permanente. Cite lei somente se tiver certeza; nunca invente artigo, tema, súmula ou precedente.
 
