@@ -724,13 +724,31 @@ export default function Dashboard() {
               {/* WhatsApp messages */}
               <ScrollArea className="flex-1 px-5 py-4 bg-nude-50/50">
                 <div className="space-y-3">
-                  {messages.map((m) => (
-                    <div key={m.id} className={`flex ${m.from_me ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[70%] px-3.5 py-2 ${m.from_me ? "bubble-out" : "bubble-in"}`}>
-                        <div className="text-sm">{m.text}</div>
+                  {messages.map((m) => {
+                    const urlMatch = /(https?:\/\/[^\s]+)/i.exec(m.text || "");
+                    const url = urlMatch ? urlMatch[1] : null;
+                    const isImage = url && /\.(png|jpe?g|webp|gif|heic)(\?|$)/i.test(url);
+                    return (
+                      <div key={m.id} className={`flex ${m.from_me ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[70%] px-3.5 py-2 ${m.from_me ? "bubble-out" : "bubble-in"}`}>
+                          <div className="text-sm whitespace-pre-wrap break-words">{m.text}</div>
+                          {url && (
+                            <div className="mt-2">
+                              {isImage ? (
+                                <a href={url} target="_blank" rel="noreferrer">
+                                  <img src={url} alt="anexo" className="max-h-52 rounded-md border border-nude-200" />
+                                </a>
+                              ) : (
+                                <a href={url} target="_blank" rel="noreferrer" className="text-xs font-medium text-gold-700 underline">
+                                  Abrir arquivo
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {messages.length === 0 && (
                     <div className="text-center text-xs text-nude-400 py-8">Nenhuma mensagem ainda</div>
                   )}

@@ -16,7 +16,73 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const TWILIO_API_KEY = Deno.env.get("TWILIO_API_KEY")!;
-const AUDIO_BUCKET = "debug-uploads"; // bucket público
+const AUDIO_BUCKET = "debug-uploads"; // bucket público (TTS respostas)
+const DOCS_BUCKET = "whatsapp-documents"; // bucket privado (docs recebidos)
+const DOC_URL_TTL = 60 * 60 * 24 * 7; // 7 dias
+
+function extFromMime(mime: string): string {
+  const map: Record<string, string> = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/heic": "heic",
+    "video/mp4": "mp4",
+    "video/3gpp": "3gp",
+    "video/quicktime": "mov",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.ms-excel": "xls",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "text/plain": "txt",
+  };
+  return map[mime.toLowerCase()] || (mime.split("/")[1] || "bin").split(";")[0];
+}
+
+async function uploadWhatsappDocument(
+  bytes: Uint8Array,
+  mime: string,
+  contactId: string,
+  originalName?: string,
+): Promise<{ signedUrl: string | null; path: string } | null> {
+  try {
+    const ext = extFromMime(mime);
+    const safeContact = (contactId || "unknown").replace(/[^\d]/g, "") || "unknown";
+    const filename = (originalName || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`).replace(/[^\w.\-]/g, "_");
+    const path = `${safeContact}/${Date.now()}-${filename}`;
+    const up = await fetch(`${SUPABASE_URL}/storage/v1/object/${DOCS_BUCKET}/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": mime || "application/octet-stream",
+        "x-upsert": "true",
+      },
+      body: bytes,
+    });
+    if (!up.ok) {
+      console.error("[whatsapp] upload doc falhou", up.status, await up.text());
+      return null;
+    }
+    const sign = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${DOCS_BUCKET}/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ expiresIn: DOC_URL_TTL }),
+    });
+    const s = await sign.json().catch(() => ({}));
+    const signedPath = s.signedURL || s.signedUrl;
+    return { signedUrl: signedPath ? `${SUPABASE_URL}/storage/v1${signedPath}` : null, path };
+  } catch (e) {
+    console.error("[whatsapp] upload doc exceção", e);
+    return null;
+  }
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -197,29 +263,62 @@ Deno.serve(async (req) => {
     let audioFailed = false;
     let inboundWasAudio = false;
 
-    // Processa áudio sempre que houver mídia de áudio (mesmo se também vier Body)
-    if (numMedia > 0) {
-      const mediaUrl = String(form.get("MediaUrl0") || "");
-      const mediaTypeRaw = String(form.get("MediaContentType0") || "audio/ogg");
+    // Percorre todas as mídias: áudio → transcreve, restante → arquiva como documento
+    const docSummaries: string[] = [];
+    for (let i = 0; i < numMedia; i++) {
+      const mediaUrl = String(form.get(`MediaUrl${i}`) || "");
+      const mediaTypeRaw = String(form.get(`MediaContentType${i}`) || "");
       const mediaType = mediaTypeRaw.split(";")[0].trim().toLowerCase();
+      if (!mediaUrl) continue;
       const isAudio = mediaType.startsWith("audio") || mediaType.includes("ogg") || mediaType.includes("opus");
-      if (mediaUrl && isAudio) {
+
+      if (isAudio) {
         inboundWasAudio = true;
         try {
           console.log("[whatsapp] baixando áudio", { mediaUrl, mediaType });
           const { buffer, contentType } = await fetchTwilioMedia(mediaUrl);
           const cleanCt = (contentType || mediaType).split(";")[0].trim().toLowerCase();
-          console.log("[whatsapp] áudio baixado", { bytes: buffer.byteLength, cleanCt });
           const transcribed = await transcribe(buffer, cleanCt);
           console.log("[whatsapp] transcrição", { chars: transcribed.length, preview: transcribed.slice(0, 80) });
-          if (transcribed) userText = transcribed;
+          if (transcribed) userText = (userText ? userText + "\n" : "") + transcribed;
           else audioFailed = true;
         } catch (audioErr) {
           console.error("[whatsapp] erro no áudio:", audioErr);
           audioFailed = true;
         }
+        continue;
+      }
+
+      // Documento / imagem / vídeo → armazena no bucket privado
+      try {
+        console.log("[whatsapp] baixando documento", { mediaUrl, mediaType });
+        const { buffer, contentType } = await fetchTwilioMedia(mediaUrl);
+        const cleanCt = (contentType || mediaType).split(";")[0].trim().toLowerCase() || "application/octet-stream";
+        const uploaded = await uploadWhatsappDocument(new Uint8Array(buffer), cleanCt, contactId);
+        const kind = cleanCt.startsWith("image/") ? "🖼️ Imagem" : cleanCt === "application/pdf" ? "📄 PDF" : cleanCt.startsWith("video/") ? "🎥 Vídeo" : "📎 Documento";
+        const line = uploaded?.signedUrl
+          ? `${kind} recebido: ${uploaded.signedUrl}`
+          : `${kind} recebido (falha ao gerar link)`;
+        docSummaries.push(line);
+        // Registra cada arquivo como uma mensagem própria para aparecer no chat do dashboard
+        await logWhatsappMessage({
+          contactId,
+          contactPhone,
+          contactName,
+          text: line,
+          fromMe: false,
+          providerMessageId: providerMessageId ? `${providerMessageId}-media${i}` : undefined,
+        });
+      } catch (docErr) {
+        console.error("[whatsapp] erro ao armazenar documento:", docErr);
       }
     }
+
+    // Se veio só documento sem texto, cria um userText descritivo para o chat-ai responder
+    if (!userText && docSummaries.length > 0) {
+      userText = `O cliente enviou ${docSummaries.length} arquivo(s) por WhatsApp: ${docSummaries.map((s) => s.split(":")[0]).join(", ")}. Confirme o recebimento educadamente, avise que a Dra. Kênia analisará os documentos e retornará.`;
+    }
+
 
     if (!userText) {
       if (audioFailed) {
