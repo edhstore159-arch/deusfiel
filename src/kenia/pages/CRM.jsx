@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/kenia/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Badge } from "@/kenia/components/ui/badge";
@@ -8,8 +9,22 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/kenia/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kenia/components/ui/select";
-import { Plus, Phone, Mail, Trash2, Flame, Tag } from "lucide-react";
+import { Plus, Phone, Mail, Trash2, Flame, Tag, RefreshCcw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+
+const STAGE_OVERRIDE_KEY = "crm.autoImport.stageOverrides.v1";
+const HIDDEN_KEY = "crm.autoImport.hidden.v1";
+const readJSON = (k, f) => { try { return JSON.parse(localStorage.getItem(k) || "null") ?? f; } catch { return f; } };
+const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+const mapQualifToStage = (q) => {
+  const s = String(q || "").toLowerCase();
+  if (s === "qualificado") return "qualificado";
+  if (s === "nao_qualificado" || s === "não_qualificado") return "nao_interessado";
+  if (s === "necessita_mais_info") return "em_contato";
+  return "novos_leads";
+};
+
 
 const URG_COLORS = {
   baixa: "bg-nude-100 text-nude-700",
@@ -40,8 +55,10 @@ const FALLBACK_STAGES = [
 
 export default function CRM() {
   const [leads, setLeads] = useState([]);
+  const [autoLeads, setAutoLeads] = useState([]);
   const [stages, setStages] = useState([]);
   const [open, setOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", case_type: "", description: "" });
 
   useEffect(() => {
@@ -57,6 +74,9 @@ export default function CRM() {
       })
       .catch(() => setStages(FALLBACK_STAGES));
     load();
+    autoImport();
+    const t = setInterval(autoImport, 60000);
+    return () => clearInterval(t);
   }, []);
 
   const load = async () => {
@@ -65,6 +85,42 @@ export default function CRM() {
       setLeads(Array.isArray(data) ? data : Array.isArray(data?.leads) ? data.leads : []);
     } catch {
       setLeads([]);
+    }
+  };
+
+  const autoImport = async (opts = {}) => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase
+        .from("case_analyses")
+        .select("id, session_id, visitor_name, visitor_phone, area, resumo, qualificacao, acertividade, urgencia, tags, created_at, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      const overrides = readJSON(STAGE_OVERRIDE_KEY, {});
+      const hidden = new Set(readJSON(HIDDEN_KEY, []));
+      const items = (data || [])
+        .filter((r) => !hidden.has(String(r.id)))
+        .map((r) => ({
+          id: `case-${r.id}`,
+          _auto: true,
+          _caseId: String(r.id),
+          name: r.visitor_name || "Cliente (auto)",
+          phone: r.visitor_phone || "—",
+          email: "",
+          case_type: r.area || null,
+          description: r.resumo || "",
+          score: Number(r.acertividade || 0),
+          urgency: r.urgencia || "media",
+          tags: Array.isArray(r.tags) ? r.tags : [],
+          stage: overrides[String(r.id)] || mapQualifToStage(r.qualificacao),
+        }));
+      setAutoLeads(items);
+      if (opts.toast) toast.success(`${items.length} caso(s) sincronizado(s) no pipeline`);
+    } catch (e) {
+      if (opts.toast) toast.error("Falha ao sincronizar casos");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -85,15 +141,34 @@ export default function CRM() {
   };
 
   const moveStage = async (id, stage) => {
+    if (String(id).startsWith("case-")) {
+      const caseId = id.slice(5);
+      const overrides = readJSON(STAGE_OVERRIDE_KEY, {});
+      overrides[caseId] = stage;
+      writeJSON(STAGE_OVERRIDE_KEY, overrides);
+      setAutoLeads((prev) => prev.map((l) => (l.id === id ? { ...l, stage } : l)));
+      return;
+    }
     await api.patch(`/leads/${id}`, { stage });
     load();
   };
 
   const removeLead = async (id) => {
     if (!confirm("Excluir este lead?")) return;
+    if (String(id).startsWith("case-")) {
+      const caseId = id.slice(5);
+      const hidden = new Set(readJSON(HIDDEN_KEY, []));
+      hidden.add(caseId);
+      writeJSON(HIDDEN_KEY, Array.from(hidden));
+      setAutoLeads((prev) => prev.filter((l) => l.id !== id));
+      return;
+    }
     await api.delete(`/leads/${id}`);
     load();
   };
+
+  const allLeads = [...leads, ...autoLeads];
+
 
   return (
     <div className="h-screen flex flex-col bg-nude-50">
@@ -101,7 +176,15 @@ export default function CRM() {
         <div>
           <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold">CRM</div>
           <h1 className="font-display font-bold text-2xl">Pipeline Kanban</h1>
+          <div className="text-xs text-nude-500 mt-0.5 flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3 text-gold-500" />
+            {autoLeads.length} caso(s) auto-conectados · atualiza a cada 60s
+          </div>
         </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => autoImport({ toast: true })} disabled={syncing} data-testid="crm-sync-btn">
+            <RefreshCcw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} /> Sincronizar casos
+          </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="bg-nude-900 hover:bg-nude-800" data-testid="new-lead-btn">
@@ -132,12 +215,14 @@ export default function CRM() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
 
       <div className="flex-1 overflow-x-auto p-4">
         <div className="flex gap-4 min-w-max h-full">
           {stages.map(stage => {
-            const stageLeads = leads.filter(l => l.stage === stage.id);
+            const stageLeads = allLeads.filter(l => l.stage === stage.id);
             const c = COLOR_MAP[stage.color] || COLOR_MAP.blue;
             return (
               <div
