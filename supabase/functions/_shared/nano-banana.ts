@@ -9,7 +9,7 @@ type Content =
 export interface NanoBananaOptions {
   prompt: string;
   imageUrls?: string[]; // data URLs or http(s) URLs
-  mode?: "edit" | "fusion" | "template" | "generate" | "scene-clone" | "garment";
+  mode?: "edit" | "fusion" | "template" | "generate" | "scene-clone" | "garment" | "detail-transfer";
   allowTextOnlyFallback?: boolean; // Pollinations cannot read image references; keep false for edit/template flows.
   preferProvider?: "auto" | "pollinations" | "emergent";
 }
@@ -35,13 +35,18 @@ const SCENE_CLONE_FACE_SWAP_LOCK =
 const GARMENT_TRANSFER_LOCK =
   "Virtual try-on reference lock: IMAGE 1 supplies the clothing only; IMAGE 2 supplies the person identity. Preserve the face/body/background of IMAGE 2 while copying the garment from IMAGE 1 exactly.";
 
+const DETAIL_TRANSFER_LOCK =
+  "Detail-transfer edit lock: IMAGE 1 is the ORIGINAL CREATIVE and the exact base canvas. Preserve IMAGE 1's composition, layout, crop, camera angle, background, text, subject, clothing, body, pose, hair, and especially every face/identity 1:1. IMAGE 2 is ONLY a secondary visual reference for the specific detail(s) requested by the user (for example an accessory, texture, color, small object, logo, prop, or style detail). Transfer ONLY those requested non-facial details from IMAGE 2 onto IMAGE 1. Do NOT replace the whole creative, do NOT copy IMAGE 2's face/person/body/pose/background unless the user explicitly asks for that non-facial area, do NOT average or blend identities. If the requested detail is an accessory on a face, place it as a removable surface layer while keeping the original IMAGE 1 face underneath unchanged.";
+
 function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) {
   const modeLock = mode === "scene-clone"
     ? SCENE_CLONE_FACE_SWAP_LOCK
-    : (mode === "garment" ? GARMENT_TRANSFER_LOCK : FACE_PRESERVATION_LOCK);
+    : (mode === "garment" ? GARMENT_TRANSFER_LOCK : (mode === "detail-transfer" ? DETAIL_TRANSFER_LOCK : FACE_PRESERVATION_LOCK));
   const identityNegative = mode === "scene-clone"
     ? "face from IMAGE 1, unchanged original face, mixed identity, averaged face, new invented face, face not matching IMAGE 2,"
-    : "changed identity, different person, modified face, redrawn face, beautified face, smoothed face, slimmed face, altered eye shape, altered nose, altered mouth, altered jawline, symmetrized face, aged face, de-aged face, face-lift, plastic surgery look,";
+    : (mode === "detail-transfer"
+      ? "face from IMAGE 2, copied identity from IMAGE 2, replaced face, mixed identity, averaged identity, changed IMAGE 1 face, modified original creative face,"
+      : "changed identity, different person, modified face, redrawn face, beautified face, smoothed face, slimmed face, altered eye shape, altered nose, altered mouth, altered jawline, symmetrized face, aged face, de-aged face, face-lift, plastic surgery look,");
   return `${prompt}\n\n${HYPERREAL_LOCK}\n${SCENE_REALISM_LOCK}\n${REAL_SCALE_LOCK}\n${modeLock}\n${ACCESSORY_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, ${identityNegative} accessory fused into skin, accessory imprint left on face after removal, invented features under removed accessory, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, mismatched lighting between subject and background, cutout halo, composite edge, blurry, low quality, watermark.`;
 }
 
@@ -79,6 +84,11 @@ function referenceLabel(mode: NanoBananaOptions["mode"] | undefined, index: numb
     return index === 0
       ? "REFERENCE IMAGE 1: exact garment/clothing reference."
       : "REFERENCE IMAGE 2: target person/model whose identity must be preserved.";
+  }
+  if (mode === "detail-transfer") {
+    return index === 0
+      ? "REFERENCE IMAGE 1: ORIGINAL CREATIVE / base canvas. Preserve this image 1:1 except the requested detail edit."
+      : "REFERENCE IMAGE 2: secondary detail reference only. Copy only the user-requested non-facial detail(s), never the face/identity/person.";
   }
   return `REFERENCE IMAGE ${index + 1}`;
 }
@@ -344,7 +354,9 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
     ? "STRICT IMAGE EDIT MODE: the uploaded image is the exact base canvas. Do not generate a new photo. Preserve all pixels/details except the specifically requested edit. The requested edit must be visibly applied.\n\n"
     : (opts.mode === "scene-clone"
       ? "STRICT TWO-IMAGE EDIT MODE: use IMAGE 1 as the base scene/look/body and replace the visible facial identity with IMAGE 2. Do not ignore IMAGE 2.\n\n"
-      : "");
+      : (opts.mode === "detail-transfer"
+        ? "STRICT DETAIL TRANSFER MODE: IMAGE 1 is the original creative and final base canvas. IMAGE 2 is only a detail reference. Transfer only requested non-facial details from IMAGE 2; never copy IMAGE 2 face/person/body/background. Keep every IMAGE 1 face and identity pixel-faithful.\n\n"
+        : ""));
   const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt, opts.mode) };
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
 
@@ -547,7 +559,7 @@ export async function generateWithNanoBanana(
     errs.push("Fallback Pollinations ignorado porque não preserva imagem de referência");
   }
 
-  const canUseLocalFallback = opts.mode !== "scene-clone" && opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit";
+  const canUseLocalFallback = opts.mode !== "scene-clone" && opts.mode !== "garment" && opts.mode !== "template" && opts.mode !== "edit" && opts.mode !== "detail-transfer";
   const localFallback = canUseLocalFallback ? buildLocalFusionFallback(opts) : null;
   if (localFallback) {
     console.warn("⚠️ Todos os provedores falharam; usando composição local:", errs.join(" | "));
