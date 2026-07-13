@@ -146,8 +146,7 @@ Deno.serve(async (req) => {
     }
 
     const chatMessages = messages ?? [{ role: "user", content: caseText }];
-    const isClaudeReq = /^claude/i.test(requestedModel);
-    const sysPrompt = isClaudeReq ? SYSTEM_PROMPT_CLAUDE : SYSTEM_PROMPT;
+    const sysPrompt = systemPromptForModel(requestedModel);
     const fullMessages = [{ role: "system", content: sysPrompt }, ...chatMessages];
 
     // Roteamento por família: Claude sempre vai pela chave Emergent.
