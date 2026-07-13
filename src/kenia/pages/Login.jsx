@@ -180,6 +180,8 @@ export default function Login() {
             </p>
           </div>
 
+          <BibleVerseBox />
+
           <Card className="p-8 border-nude-200 shadow-sm shadow-nude-900/5 bg-card">
             <Tabs defaultValue="login">
               <TabsList
