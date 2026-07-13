@@ -54,6 +54,7 @@ const AdminCases = lazyWithReload(() => import("@/kenia/pages/AdminCases"));
 const SecretaryTasks = lazyWithReload(() => import("@/kenia/pages/SecretaryTasks"));
 const JuizVirtual = lazyWithReload(() => import("@/kenia/pages/JuizVirtual"));
 const Agents = lazyWithReload(() => import("@/kenia/pages/Agents"));
+const SocialConnect = lazyWithReload(() => import("@/kenia/pages/SocialConnect"));
 
 
 const ResetPassword = lazy(() => import("@/kenia/pages/ResetPassword"));
@@ -116,6 +117,7 @@ function App() {
                 <Route path="/app/creatives/gallery" element={<CreativesGallery />} />
                 <Route path="/app/image-fusion" element={<ImageFusion />} />
                 <Route path="/app/viral-video" element={<ViralVideoStudio />} />
+                <Route path="/app/social-connect" element={<SocialConnect />} />
                 <Route path="/app/analytics" element={<Analytics />} />
                 <Route path="/app/whatsapp" element={<WhatsAppSettings />} />
                 <Route path="/app/whatsapp-logs" element={<WhatsAppLogs />} />
