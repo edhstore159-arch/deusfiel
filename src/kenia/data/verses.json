@@ -1,0 +1,17 @@
+[
+  { "id": 1, "livro": "Salmos", "capitulo": 23, "versiculo": 1, "texto": "O Senhor é o meu pastor; nada me faltará." },
+  { "id": 2, "livro": "Jeremias", "capitulo": 29, "versiculo": 11, "texto": "Porque eu bem sei os pensamentos que penso de vós, diz o Senhor; pensamentos de paz e não de mal, para vos dar o fim que esperais." },
+  { "id": 3, "livro": "Filipenses", "capitulo": 4, "versiculo": 13, "texto": "Posso todas as coisas naquele que me fortalece." },
+  { "id": 4, "livro": "Isaías", "capitulo": 41, "versiculo": 10, "texto": "Não temas, porque eu sou contigo; não te assombres, porque eu sou o teu Deus; eu te fortaleço, e te ajudo, e te sustento com a destra da minha justiça." },
+  { "id": 5, "livro": "Provérbios", "capitulo": 3, "versiculo": 5, "texto": "Confia no Senhor de todo o teu coração e não te estribes no teu próprio entendimento." },
+  { "id": 6, "livro": "Romanos", "capitulo": 8, "versiculo": 28, "texto": "Sabemos que todas as coisas cooperam para o bem daqueles que amam a Deus." },
+  { "id": 7, "livro": "João", "capitulo": 3, "versiculo": 16, "texto": "Porque Deus amou o mundo de tal maneira que deu o seu Filho unigênito, para que todo aquele que nele crê não pereça, mas tenha a vida eterna." },
+  { "id": 8, "livro": "Salmos", "capitulo": 46, "versiculo": 10, "texto": "Aquietai-vos e sabei que eu sou Deus." },
+  { "id": 9, "livro": "Josué", "capitulo": 1, "versiculo": 9, "texto": "Sê forte e corajoso; não temas, nem te espantes, porque o Senhor teu Deus é contigo por onde quer que andares." },
+  { "id": 10, "livro": "Mateus", "capitulo": 11, "versiculo": 28, "texto": "Vinde a mim, todos os que estais cansados e oprimidos, e eu vos aliviarei." },
+  { "id": 11, "livro": "2 Timóteo", "capitulo": 1, "versiculo": 7, "texto": "Porque Deus não nos deu o espírito de temor, mas de fortaleza, e de amor, e de moderação." },
+  { "id": 12, "livro": "Salmos", "capitulo": 91, "versiculo": 1, "texto": "Aquele que habita no esconderijo do Altíssimo, à sombra do Onipotente descansará." },
+  { "id": 13, "livro": "Isaías", "capitulo": 40, "versiculo": 31, "texto": "Mas os que esperam no Senhor renovarão as suas forças e subirão com asas como águias." },
+  { "id": 14, "livro": "Salmos", "capitulo": 34, "versiculo": 18, "texto": "Perto está o Senhor dos que têm o coração quebrantado e salva os contritos de espírito." },
+  { "id": 15, "livro": "1 Coríntios", "capitulo": 13, "versiculo": 4, "texto": "O amor é sofredor, é benigno; o amor não é invejoso; o amor não trata com leviandade, não se ensoberbece." }
+]
