@@ -39,7 +39,7 @@ const DETAIL_TRANSFER_LOCK =
   "Detail-transfer edit lock: IMAGE 1 is the ORIGINAL CREATIVE and the exact base canvas. Preserve IMAGE 1's composition, layout, crop, camera angle, background, text, subject, clothing, body, pose, hair, and especially every face/identity 1:1. IMAGE 2 is ONLY a secondary visual reference for the specific detail(s) requested by the user (for example an accessory, texture, color, small object, logo, prop, or style detail). Transfer ONLY those requested non-facial details from IMAGE 2 onto IMAGE 1. Do NOT replace the whole creative, do NOT copy IMAGE 2's face/person/body/pose/background unless the user explicitly asks for that non-facial area, do NOT average or blend identities. If the requested detail is an accessory on a face, place it as a removable surface layer while keeping the original IMAGE 1 face underneath unchanged.";
 
 const PERSON_REPLACE_LOCK =
-  "Person/photo replacement lock: IMAGE 1 is the ORIGINAL CREATIVE / design base. Preserve IMAGE 1's full layout, composition, crop, text, typography, colors, background, graphic elements, camera perspective, product/object placement and overall creative design. IMAGE 2 is ONLY the replacement person/subject identity. Replace the person/photo/portrait area requested by the user in IMAGE 1 with the person from IMAGE 2. The final replaced person MUST be recognized as IMAGE 2: preserve IMAGE 2's face, identity, skin tone, hair, body proportions, clothing if visible and natural expression. Do NOT keep the old person from IMAGE 1 in the replaced area. Do NOT alter unrelated faces in IMAGE 1, do NOT change text/layout/background unless required to blend the replacement naturally. Make it one seamless photorealistic edit, not a collage.";
+  "Person/photo replacement lock: IMAGE 1 is the ORIGINAL CREATIVE / design base. Preserve IMAGE 1's full layout, composition, crop, text, typography, colors, background, graphic elements, camera perspective, product/object placement, personalization and overall creative design. IMAGE 2 is ONLY the replacement person/subject identity. Replace the entire requested person/photo/portrait/man/woman/model area in IMAGE 1 with the person from IMAGE 2, not only the face. The final replaced person MUST be recognized as IMAGE 2: preserve IMAGE 2's face, identity, skin tone, hair, body proportions, clothing if visible and natural expression. Do NOT keep the old person from IMAGE 1 in the replaced area. Do NOT alter unrelated faces in IMAGE 1, do NOT change text/layout/background unless required to blend the replacement naturally. Make it one seamless photorealistic edit, not a collage.";
 
 function userExplicitlyRequestsFaceChange(prompt: string): boolean {
   const p = (prompt || "").toLowerCase();
@@ -66,13 +66,32 @@ function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) 
         : (userWantsFaceEdit
           ? ""
           : "changed identity, different person, modified face, redrawn face, beautified face, smoothed face, slimmed face, altered eye shape, altered nose, altered mouth, altered jawline, symmetrized face, aged face, de-aged face, face-lift, plastic surgery look,")));
-  const explicitFaceNote = userWantsFaceEdit
-    ? "\nUser explicitly requested a face/identity change — apply ONLY the face change the user described; keep every other element (scene, pose, outfit, background, lighting) untouched."
-    : "";
+  const explicitFaceNote = mode === "person-replace"
+    ? "\nUser requested PERSON / PHOTO REPLACEMENT: preserve IMAGE 1's creative design/personalization, but replace the requested whole person/photo slot with IMAGE 2's person. Do not limit this to a face-only edit unless the user explicitly says face only."
+    : (userWantsFaceEdit
+      ? "\nUser explicitly requested a face/identity change — apply ONLY the face change the user described; keep every other element (scene, pose, outfit, background, lighting) untouched."
+      : "");
   return `${prompt}${explicitFaceNote}\n\n${HYPERREAL_LOCK}\n${SCENE_REALISM_LOCK}\n${REAL_SCALE_LOCK}\n${modeLock}\n${ACCESSORY_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, ${identityNegative} accessory fused into skin, accessory imprint left on face after removal, invented features under removed accessory, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, mismatched lighting between subject and background, cutout halo, composite edge, blurry, low quality, watermark.`;
 }
 
-function extractImageFromMessage(msg: any): string | null {
+type ProviderMessagePart = {
+  type?: string;
+  text?: string;
+  image_url?: { url?: string };
+};
+
+type ProviderMessage = {
+  images?: Array<{ image_url?: { url?: string }; url?: string }>;
+  content?: string | ProviderMessagePart[];
+};
+
+type GeminiPart = {
+  text?: string;
+  inlineData?: { data?: string; mimeType?: string };
+  inline_data?: { data?: string; mime_type?: string };
+};
+
+function extractImageFromMessage(msg: ProviderMessage | null | undefined): string | null {
   if (!msg) return null;
   const images = msg.images;
   if (Array.isArray(images) && images.length > 0) {
@@ -158,6 +177,26 @@ function buildLocalFusionFallback(opts: NanoBananaOptions): string | null {
   }
   const person = escapeXml(images[0]);
   const scene = escapeXml(images[1] || images[0]);
+  if (opts.mode === "person-replace") {
+    const base = person;
+    const replacement = scene;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="personShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18"/>
+      <feOffset dx="0" dy="18" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="replacementSlot"><rect x="172" y="92" width="680" height="860" rx="28" ry="28"/></clipPath>
+  </defs>
+  <image href="${base}" x="0" y="0" width="1024" height="1024" preserveAspectRatio="xMidYMid slice"/>
+  <g clip-path="url(#replacementSlot)" filter="url(#personShadow)">
+    <image href="${replacement}" x="172" y="92" width="680" height="860" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+</svg>`;
+    return `data:image/svg+xml;base64,${toBase64Utf8(svg)}`;
+  }
   // Fusão local SEM IA preservando o ROSTO:
   // - cenário ao fundo (leve desfoque) cobrindo toda a área
   // - pessoa centralizada com preserveAspectRatio="xMidYMid meet"
@@ -220,7 +259,7 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return { url: null, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
-  const parts: any[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
+  const parts: GeminiPart[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
   for (let i = 0; i < (opts.imageUrls || []).length; i += 1) {
     const u = opts.imageUrls?.[i] || "";
     parts.push({ text: referenceLabel(opts.mode, i) });
@@ -243,8 +282,8 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
       return { url: null, error: `Gemini direto ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
     }
     const data = await resp.json();
-    const out = data?.candidates?.[0]?.content?.parts || [];
-    const inline = out.find((p: any) => p?.inlineData?.data || p?.inline_data?.data);
+      const out = (data?.candidates?.[0]?.content?.parts || []) as GeminiPart[];
+      const inline = out.find((p) => p?.inlineData?.data || p?.inline_data?.data);
     const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
     const mime = inline?.inlineData?.mimeType || inline?.inline_data?.mime_type || "image/png";
     if (!b64) return { url: null, error: "Gemini direto não retornou imagem" };
@@ -383,7 +422,9 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
       ? "STRICT TWO-IMAGE EDIT MODE: use IMAGE 1 as the base scene/look/body and replace the visible facial identity with IMAGE 2. Do not ignore IMAGE 2.\n\n"
       : (opts.mode === "detail-transfer"
         ? "STRICT DETAIL TRANSFER MODE: IMAGE 1 is the original creative and final base canvas. IMAGE 2 is only a detail reference. Transfer only requested non-facial details from IMAGE 2; never copy IMAGE 2 face/person/body/background. Keep every IMAGE 1 face and identity pixel-faithful.\n\n"
-        : ""));
+        : (opts.mode === "person-replace"
+          ? "STRICT PERSON REPLACEMENT MODE: IMAGE 1 is the creative/design base and must keep its layout, text, colors, background and personalization. IMAGE 2 is the replacement person. Replace the requested whole person/photo slot in IMAGE 1 with IMAGE 2's person; do not keep the old person and do not treat this as detail transfer.\n\n"
+          : "")));
   const safeOpts = { ...opts, prompt: editPrefix + withFacePreservation(opts.prompt, opts.mode) };
   const imageUrls = (safeOpts.imageUrls || []).filter(Boolean);
 

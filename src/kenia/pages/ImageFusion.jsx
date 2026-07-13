@@ -45,7 +45,14 @@ const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,
 
 function isPersonReplacementPrompt(text = "") {
   const t = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return /(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|replace|swap|change)\s+([ao]s?\s+)?(foto\s+d[ao]|retrato\s+d[ao]|homem|homen|mulher|pessoa|modelo|personagem|sujeito|portrait|photo|man|woman|person|model)|\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person)\b/i.test(t);
+  const subject = /\b(homem|homen|mulher|pessoa|modelo|personagem|sujeito|retrato|foto|portrait|photo|man|woman|person|model)\b/i;
+  const action = /\b(trocar|troca|mudar|muda|alterar|altera|substituir|substitui|colocar|coloca|botar|bota|inserir|insere|por|poe|p[oõ]e|usar|usa|pegar|pega|replace|swap|change|put|place|insert|use)\b/i;
+  const fromImage2 = /\b(imagem|criativo|foto)\s*2\b|\b(do|da|de)\s+(segundo|segunda)\s+(imagem|criativo|foto)\b/i;
+  const inImage1 = /\b(imagem|criativo|foto)\s*1\b|\b(no|na|em|do|da)\s+(primeiro|primeira)\s+(imagem|criativo|foto)\b/i;
+  return (
+    (action.test(t) && subject.test(t) && (fromImage2.test(t) || inImage1.test(t))) ||
+    /\b(outro\s+homem|outro\s+homen|outra\s+mulher|outra\s+pessoa|novo\s+homem|novo\s+homen|nova\s+mulher|nova\s+pessoa|homem\s+do\s+criativo\s*2|homen\s+do\s+criativo\s*2|homem\s+da\s+imagem\s*2|homen\s+da\s+imagem\s*2|trocar\s+de\s+pessoa|mudar\s+a\s+pessoa|replace\s+the\s+person|replace\s+the\s+man|swap\s+person|put\s+the\s+man|place\s+the\s+man)\b/i.test(t)
+  );
 }
 
 // Cobre o canvas com a imagem original (cover/crop centralizado).
