@@ -9,6 +9,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/kenia/components/ui/tabs";
 import { Card } from "@/kenia/components/ui/card";
+import BibleVerseBox from "@/kenia/components/BibleVerseBox";
 import { Gem, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
@@ -178,6 +179,8 @@ export default function Login() {
               Seu estúdio jurídico inteligente te aguarda.
             </p>
           </div>
+
+          <BibleVerseBox />
 
           <Card className="p-8 border-nude-200 shadow-sm shadow-nude-900/5 bg-card">
             <Tabs defaultValue="login">
