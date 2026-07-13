@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/kenia/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Badge } from "@/kenia/components/ui/badge";
 import { Button } from "@/kenia/components/ui/button";
@@ -11,8 +12,34 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import {
   ShieldCheck, AlertTriangle, Gauge, Search, BookOpen,
   Sparkles, ChevronRight, RefreshCcw, Filter, FileText,
+  Scale, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+
+function buildJudgeCaseText(item, messages) {
+  const lines = [];
+  if (item?.visitor_name) lines.push(`Cliente: ${item.visitor_name}`);
+  if (item?.visitor_phone) lines.push(`Telefone: ${item.visitor_phone}`);
+  if (item?.area) lines.push(`Área jurídica: ${item.area}`);
+  if (typeof item?.acertividade === "number") lines.push(`Acertividade da IA triagem: ${item.acertividade}%`);
+  if (typeof item?.chance_exito === "number") lines.push(`Chance de êxito estimada: ${item.chance_exito}%`);
+  if (item?.qualificacao) lines.push(`Qualificação prévia: ${item.qualificacao}`);
+  if (item?.resumo) lines.push(`\nResumo técnico:\n${item.resumo}`);
+  if (item?.motivo) lines.push(`\nJustificativa da IA:\n${item.motivo}`);
+  if (Array.isArray(item?.fundamentos) && item.fundamentos.length) {
+    lines.push(`\nFundamentos indicados:\n- ${item.fundamentos.join("\n- ")}`);
+  }
+  if (Array.isArray(messages) && messages.length) {
+    lines.push(`\nTranscrição da conversa:`);
+    for (const m of messages) {
+      const who = m.role === "user" ? "Cliente" : "Atendimento";
+      lines.push(`${who}: ${String(m.content || "").trim()}`);
+    }
+  }
+  lines.push(`\nProduza o PARECER TÉCNICO completo do Juiz Virtual sobre este caso, seguindo integralmente a estrutura obrigatória.`);
+  return lines.join("\n");
+}
+
 
 const QUAL_META = {
   qualificado: { label: "Qualificado", cls: "bg-gold-600 text-white", icon: ShieldCheck },
@@ -28,6 +55,9 @@ export default function AdminCases() {
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
   const [adminNotes, setAdminNotes] = useState("");
+  const [judgeText, setJudgeText] = useState("");
+  const [judgeLoading, setJudgeLoading] = useState(false);
+  const [judgeCache, setJudgeCache] = useState({}); // { [caseId]: parecerMarkdown }
 
   const load = async () => {
     setLoading(true);
@@ -51,22 +81,96 @@ export default function AdminCases() {
     // eslint-disable-next-line
   }, [filter]);
 
+  const runJudge = async (item, messages) => {
+    if (!item) return;
+    setJudgeLoading(true);
+    setJudgeText("");
+    try {
+      const caseText = buildJudgeCaseText(item, messages);
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token;
+      const supaUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const resp = await fetch(`${supaUrl}/functions/v1/judge-ai`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey || "",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ case: caseText, model: "openai/gpt-5.5" }),
+      });
+      const ct = resp.headers.get("Content-Type") || "";
+      if (!resp.ok || !resp.body) {
+        const t = await resp.text().catch(() => "");
+        throw new Error(t || `HTTP ${resp.status}`);
+      }
+      if (!ct.includes("text/event-stream")) {
+        const j = await resp.json().catch(() => null);
+        throw new Error(j?.error || "Falha no Juiz Virtual");
+      }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let acc = "";
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          const s = line.trim();
+          if (!s.startsWith("data:")) continue;
+          const payload = s.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+          try {
+            const j = JSON.parse(payload);
+            const delta =
+              j?.choices?.[0]?.delta?.content ??
+              j?.choices?.[0]?.message?.content ??
+              "";
+            if (delta) {
+              acc += delta;
+              setJudgeText((prev) => prev + delta);
+            }
+          } catch { /* ignore keep-alive/comments */ }
+        }
+      }
+      setJudgeCache((c) => ({ ...c, [item.id]: acc }));
+    } catch (e) {
+      toast.error("Juiz Virtual: " + (e?.message || "falha"));
+    } finally {
+      setJudgeLoading(false);
+    }
+  };
+
   const openDetail = async (item) => {
     setSelected(item);
     setAdminNotes(item.admin_notes || "");
     // mostra detalhe imediatamente com fallback local enquanto busca o backend
     setDetail({ analysis: item, messages: [] });
+    // reusa parecer em cache, se houver
+    setJudgeText(judgeCache[item.id] || "");
+    let msgs = [];
     try {
       const { data } = await api.get(`/admin/case-analyses/${item.id}`);
+      msgs = Array.isArray(data?.messages) ? data.messages : [];
       setDetail({
         analysis: data?.analysis || item,
-        messages: Array.isArray(data?.messages) ? data.messages : [],
+        messages: msgs,
       });
     } catch (err) {
       console.error("openDetail failed", err);
       toast.error("Não foi possível carregar a conversa — exibindo apenas a análise.");
     }
+    // Dispara o Juiz Virtual automaticamente para TODO caso analisado pela IA.
+    if (!judgeCache[item.id]) {
+      runJudge(item, msgs);
+    }
   };
+
 
   const updateQual = async (q) => {
     if (!selected) return;
@@ -388,6 +492,39 @@ export default function AdminCases() {
                   </div>
 
                   <Separator />
+
+                  {/* JUIZ VIRTUAL — parecer automático para todo caso analisado pela IA */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs tracking-widest uppercase text-nude-500 font-semibold flex items-center gap-1.5">
+                        <Scale className="w-3 h-3 text-gold-700" /> Parecer do Juiz Virtual
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={judgeLoading}
+                        onClick={() => runJudge(selected, detail?.messages || [])}
+                        data-testid="rerun-judge-btn"
+                      >
+                        {judgeLoading ? (
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analisando…</>
+                        ) : (
+                          <><RefreshCcw className="w-3.5 h-3.5" /> {judgeText ? "Reanalisar" : "Analisar"}</>
+                        )}
+                      </Button>
+                    </div>
+                    <div className="bg-nude-50/60 border border-nude-200 rounded-md p-3 text-sm text-nude-800 whitespace-pre-wrap leading-relaxed min-h-[80px] max-h-[520px] overflow-y-auto">
+                      {judgeText
+                        ? judgeText
+                        : judgeLoading
+                          ? "O Juiz Virtual está avaliando este caso conforme EC 103/2019, Lei 8.213/91 e jurisprudência…"
+                          : "Aguardando análise do Juiz Virtual."}
+                    </div>
+                  </div>
+
+                  <Separator />
+
 
                   {/* transcript */}
                   <div>
