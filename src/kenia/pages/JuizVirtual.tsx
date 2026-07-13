@@ -12,8 +12,13 @@ const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 type Msg = { role: "user" | "assistant"; content: string };
 
 const AGENTS = [
+  { id: "openai/gpt-5.5", label: "GPT-5.5", desc: "Máximo rigor técnico" },
+  { id: "openai/gpt-5.4", label: "GPT-5.4", desc: "Raciocínio previdenciário avançado" },
+  { id: "openai/gpt-5.2", label: "GPT-5.2", desc: "Análise complexa" },
   { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "Rápido e econômico" },
   { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", desc: "Análise jurídica detalhada" },
+  { id: "google/gemini-3.5-flash", label: "Gemini 3.5 Flash", desc: "Gemini moderno e eficiente" },
+  { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", desc: "Raciocínio Gemini premium" },
   { id: "openai/gpt-5-mini", label: "GPT-5 mini", desc: "Equilibrado" },
   { id: "openai/gpt-5", label: "GPT-5", desc: "Máxima qualidade OpenAI" },
   { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5", desc: "Raciocínio jurídico premium" },
@@ -27,7 +32,7 @@ export default function JuizVirtual() {
   const [model, setModel] = useState<string>(() => {
     const stored = localStorage.getItem("juiz_model") || "";
     const valid = AGENTS.some((a) => a.id === stored);
-    return valid ? stored : "google/gemini-2.5-flash";
+    return valid ? stored : "openai/gpt-5.5";
   });
   const scrollRef = useRef<HTMLDivElement>(null);
 

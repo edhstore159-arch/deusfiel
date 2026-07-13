@@ -50,11 +50,13 @@ Deno.test("400 when no case/messages", async () => {
 
 Deno.test("streams SSE with report sections and forwards system prompt", async () => {
   let capturedBody: any = null;
+  let capturedHeaders: HeadersInit | undefined;
   mockFetch(async (_url, init) => {
     capturedBody = JSON.parse(String(init?.body ?? "{}"));
+    capturedHeaders = init?.headers;
     const parts = [
       "data: {\"choices\":[{\"delta\":{\"content\":\"### 1. Relatório\\n\"}}]}\n\n",
-      "data: {\"choices\":[{\"delta\":{\"content\":\"### 4. Dispositivo (parecer)\\n\"}}]}\n\n",
+      "data: {\"choices\":[{\"delta\":{\"content\":\"### 4. Conclusão\\n\"}}]}\n\n",
       "data: [DONE]\n\n",
     ];
     return new Response(sseStream(parts), { status: 200, headers: { "Content-Type": "text/event-stream" } });
@@ -68,56 +70,62 @@ Deno.test("streams SSE with report sections and forwards system prompt", async (
     assertEquals(res.headers.get("Content-Type"), "text/event-stream");
     const text = await res.text();
     assertStringIncludes(text, "Relatório");
-    assertStringIncludes(text, "Dispositivo");
+    assertStringIncludes(text, "Conclusão");
     // system prompt forwarded
     assertEquals(capturedBody.messages[0].role, "system");
     assertStringIncludes(capturedBody.messages[0].content, "Juiz Virtual");
+    assertStringIncludes(capturedBody.messages[0].content, "MECANISMO ANTI-ERRO");
+    assertEquals(new Headers(capturedHeaders).has("Lovable-API-Key"), true);
     assertEquals(capturedBody.stream, true);
   } finally {
     restoreFetch();
   }
 });
 
-Deno.test("propagates 429 rate limit", async () => {
+Deno.test("maps 429 rate limit to friendly JSON", async () => {
   mockFetch(async () => new Response("rate", { status: 429 }));
   try {
     const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify({ case: "x" }) }));
-    assertEquals(res.status, 429);
+    assertEquals(res.status, 200);
     const j = await res.json();
     assertEquals(j.status, 429);
+    assertStringIncludes(j.error, "Limite");
   } finally {
     restoreFetch();
   }
 });
 
-Deno.test("propagates 402 payment required", async () => {
+Deno.test("maps 402 payment required to friendly JSON", async () => {
   mockFetch(async () => new Response("credits", { status: 402 }));
   try {
     const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify({ case: "x" }) }));
-    assertEquals(res.status, 402);
-    await res.json();
+    assertEquals(res.status, 200);
+    const j = await res.json();
+    assertEquals(j.status, 402);
+    assertStringIncludes(j.error, "Créditos");
   } finally {
     restoreFetch();
   }
 });
 
-Deno.test("maps other upstream errors to 500", async () => {
+Deno.test("maps other upstream errors to friendly JSON", async () => {
   mockFetch(async () => new Response("boom", { status: 503 }));
   try {
     const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify({ case: "x" }) }));
-    assertEquals(res.status, 500);
+    assertEquals(res.status, 200);
     const j = await res.json();
     assertEquals(j.status, 503);
+    assertStringIncludes(j.error, "gateway");
   } finally {
     restoreFetch();
   }
 });
 
-Deno.test("catches fetch throw and returns 500 JSON", async () => {
+Deno.test("catches fetch throw and returns friendly JSON", async () => {
   mockFetch(async () => { throw new Error("network down"); });
   try {
     const res = await handler(new Request("http://x", { method: "POST", body: JSON.stringify({ case: "x" }) }));
-    assertEquals(res.status, 500);
+    assertEquals(res.status, 200);
     const j = await res.json();
     assertStringIncludes(j.error, "network down");
   } finally {
@@ -140,6 +148,35 @@ Deno.test("accepts messages history array", async () => {
     await res.text();
     assertEquals(captured.messages.length, 2);
     assertEquals(captured.messages[1].content, "olá");
+  } finally {
+    restoreFetch();
+  }
+});
+
+Deno.test("adapts system prompt for Gemini, GPT and Claude model families", async () => {
+  const captured: any[] = [];
+  mockFetch(async (_u, init) => {
+    captured.push(JSON.parse(String(init?.body ?? "{}")));
+    return new Response(sseStream(["data: [DONE]\n\n"]), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  });
+  try {
+    const cases = [
+      ["google/gemini-2.5-flash", "ADAPTAÇÃO PARA MODELOS GEMINI"],
+      ["openai/gpt-5", "ADAPTAÇÃO PARA MODELOS GPT"],
+      ["claude-sonnet-4-5", "ADAPTAÇÃO PARA MODELOS CLAUDE"],
+    ];
+
+    for (const [model, marker] of cases) {
+      const res = await handler(new Request("http://x", {
+        method: "POST",
+        body: JSON.stringify({ model, case: "Segurado busca aposentadoria." }),
+      }));
+      assertEquals(res.status, 200);
+      await res.text();
+      const prompt = captured.at(-1)?.messages?.[0]?.content ?? "";
+      assertStringIncludes(prompt, marker);
+      assertStringIncludes(prompt, "EC nº 103/2019");
+    }
   } finally {
     restoreFetch();
   }
