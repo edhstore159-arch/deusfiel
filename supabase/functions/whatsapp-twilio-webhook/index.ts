@@ -314,9 +314,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Se veio só documento sem texto, cria um userText descritivo para o chat-ai responder
-    if (!userText && docSummaries.length > 0) {
-      userText = `O cliente enviou ${docSummaries.length} arquivo(s) por WhatsApp: ${docSummaries.map((s) => s.split(":")[0]).join(", ")}. Confirme o recebimento educadamente, avise que a Dra. Kênia analisará os documentos e retornará.`;
+    // Se veio documento(s), confirma o recebimento diretamente (sem chat-ai para evitar
+    // que a IA diga que não pode receber anexos) e encerra se não houver texto adicional.
+    if (docSummaries.length > 0) {
+      const qtd = docSummaries.length;
+      const confirmMsg = qtd === 1
+        ? "Recebi seu arquivo aqui pelo WhatsApp ✅ A Dra. Kênia vai analisar e te retorno em seguida. Se puder, me conta rapidamente sobre o que se trata."
+        : `Recebi seus ${qtd} arquivos aqui pelo WhatsApp ✅ A Dra. Kênia vai analisar e te retorno em seguida. Se puder, me conta rapidamente sobre o que se trata.`;
+      await sendTwilioMessage(to, from, confirmMsg).catch((err) => console.error("[whatsapp] falha ao confirmar doc:", err));
+      await logWhatsappMessage({ contactId, contactPhone, contactName, text: confirmMsg, fromMe: true });
+      if (!userText) {
+        return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
+      }
     }
 
 
@@ -330,6 +339,7 @@ Deno.serve(async (req) => {
       }
       return new Response("<Response/>", { headers: { "Content-Type": "text/xml" }, status: 200 });
     }
+
 
     if (isOptOut(userText)) {
       await sendTwilioMessage(to, from, "Tudo bem, atendimento automático pausado. Se precisar falar conosco novamente, envie uma nova mensagem. ✨");
