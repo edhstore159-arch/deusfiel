@@ -86,6 +86,7 @@ type ProviderMessage = {
 };
 
 type GeminiPart = {
+  text?: string;
   inlineData?: { data?: string; mimeType?: string };
   inline_data?: { data?: string; mime_type?: string };
 };
@@ -258,7 +259,7 @@ async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string 
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return { url: null, error: "GEMINI_API_KEY ausente" };
   const model = "gemini-2.5-flash-image";
-  const parts: any[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
+  const parts: GeminiPart[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
   for (let i = 0; i < (opts.imageUrls || []).length; i += 1) {
     const u = opts.imageUrls?.[i] || "";
     parts.push({ text: referenceLabel(opts.mode, i) });
