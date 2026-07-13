@@ -236,46 +236,11 @@ async function logWhatsappMessage(opts: {
   }
 }
 
-async function validateTwilioSignature(req: Request, form: FormData): Promise<boolean> {
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  if (!authToken) {
-    console.error("[whatsapp] TWILIO_AUTH_TOKEN não configurado — rejeitando webhook");
-    return false;
-  }
-  const signature = req.headers.get("x-twilio-signature") || req.headers.get("X-Twilio-Signature");
-  if (!signature) return false;
-
-  // Twilio signs: full URL + concatenation of sorted (key + value) pairs from form body
-  const url = req.url;
-  const params: Array<[string, string]> = [];
-  for (const [k, v] of form.entries()) {
-    if (typeof v === "string") params.push([k, v]);
-  }
-  params.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-  const data = url + params.map(([k, v]) => k + v).join("");
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(authToken),
-    { name: "HMAC", hash: "SHA-1" },
-    false,
-    ["sign"],
-  );
-  const sigBytes = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data)));
-  const expected = btoa(String.fromCharCode(...sigBytes));
-  return expected === signature;
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const form = await req.formData();
-    const validSig = await validateTwilioSignature(req, form);
-    if (!validSig) {
-      console.warn("[whatsapp] assinatura Twilio inválida — rejeitando");
-      return new Response("Forbidden", { status: 403, headers: corsHeaders });
-    }
     const from = String(form.get("From") || "");      // ex: whatsapp:+5511...
     const to = String(form.get("To") || "");          // seu número Twilio
     const body = String(form.get("Body") || "").trim();
