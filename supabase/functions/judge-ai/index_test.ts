@@ -54,7 +54,7 @@ Deno.test("streams SSE with report sections and forwards system prompt", async (
     capturedBody = JSON.parse(String(init?.body ?? "{}"));
     const parts = [
       "data: {\"choices\":[{\"delta\":{\"content\":\"### 1. Relatório\\n\"}}]}\n\n",
-      "data: {\"choices\":[{\"delta\":{\"content\":\"### 4. Dispositivo (parecer)\\n\"}}]}\n\n",
+      "data: {\"choices\":[{\"delta\":{\"content\":\"### 4. Conclusão\\n\"}}]}\n\n",
       "data: [DONE]\n\n",
     ];
     return new Response(sseStream(parts), { status: 200, headers: { "Content-Type": "text/event-stream" } });
