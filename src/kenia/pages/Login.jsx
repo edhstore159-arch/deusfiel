@@ -22,8 +22,8 @@ export default function Login() {
   const { login, register, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [loginData, setLoginData] = useState({
-    email: "admin@kenia-garcia.com.br",
-    password: "Kenia@Admin2026",
+    email: "",
+    password: "",
   });
 
   const [regData, setRegData] = useState({ name: "", email: "", password: "", oab: "" });
