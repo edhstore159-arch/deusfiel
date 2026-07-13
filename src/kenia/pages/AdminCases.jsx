@@ -493,6 +493,39 @@ export default function AdminCases() {
 
                   <Separator />
 
+                  {/* JUIZ VIRTUAL — parecer automático para todo caso analisado pela IA */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs tracking-widest uppercase text-nude-500 font-semibold flex items-center gap-1.5">
+                        <Scale className="w-3 h-3 text-gold-700" /> Parecer do Juiz Virtual
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={judgeLoading}
+                        onClick={() => runJudge(selected, detail?.messages || [])}
+                        data-testid="rerun-judge-btn"
+                      >
+                        {judgeLoading ? (
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analisando…</>
+                        ) : (
+                          <><RefreshCcw className="w-3.5 h-3.5" /> {judgeText ? "Reanalisar" : "Analisar"}</>
+                        )}
+                      </Button>
+                    </div>
+                    <div className="bg-nude-50/60 border border-nude-200 rounded-md p-3 text-sm text-nude-800 whitespace-pre-wrap leading-relaxed min-h-[80px] max-h-[520px] overflow-y-auto">
+                      {judgeText
+                        ? judgeText
+                        : judgeLoading
+                          ? "O Juiz Virtual está avaliando este caso conforme EC 103/2019, Lei 8.213/91 e jurisprudência…"
+                          : "Aguardando análise do Juiz Virtual."}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+
                   {/* transcript */}
                   <div>
                     <div className="text-xs tracking-widest uppercase text-nude-500 font-semibold mb-2 flex items-center gap-1.5">
