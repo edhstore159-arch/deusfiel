@@ -502,15 +502,23 @@ export default function ImageFusion() {
       await generateVariants(finalImageUrl);
     };
     try {
-      const personReplaceMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode && isPersonReplacementPrompt(prompt);
-      const detailTransferMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode && !personReplaceMode;
-      const canUseFusionFallback = !singleMode && !sceneCloneMode && !detailTransferMode && !personReplaceMode;
-      const mode = sceneCloneMode ? "scene-clone" : (templateMode ? "template" : (singleMode ? "edit" : (personReplaceMode ? "person-replace" : (detailTransferMode ? "detail-transfer" : "fusion"))));
+      const swapKeepFaceMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode && isCreativeSwapKeepFace(prompt);
+      const effectiveSceneClone = sceneCloneMode || swapKeepFaceMode;
+      const personReplaceMode = !!img1 && !!img2 && !effectiveSceneClone && !templateMode && isPersonReplacementPrompt(prompt);
+      const detailTransferMode = !!img1 && !!img2 && !effectiveSceneClone && !templateMode && !personReplaceMode;
+      const canUseFusionFallback = !singleMode && !effectiveSceneClone && !detailTransferMode && !personReplaceMode;
+      const mode = effectiveSceneClone ? "scene-clone" : (templateMode ? "template" : (singleMode ? "edit" : (personReplaceMode ? "person-replace" : (detailTransferMode ? "detail-transfer" : "fusion"))));
+
+      // Em swapKeepFaceMode: image2 do usuário vira o novo criativo BASE (IMAGE 1 no backend)
+      // e image1 do usuário vira a fonte do ROSTO/identidade (IMAGE 2 no backend, esperada pelo scene-clone).
+      const payloadImg1 = swapKeepFaceMode ? img2 : (img1 || img2);
+      const payloadImg2 = singleMode ? null : (swapKeepFaceMode ? img1 : img2);
+
       const { data } = await api.post(
         "/creatives/fuse-images",
         {
-          image1_base64: img1 || img2,
-          image2_base64: singleMode ? null : img2,
+          image1_base64: payloadImg1,
+          image2_base64: payloadImg2,
           prompt,
           mode,
           output_preset: requestedPreset ? { group: requestedPreset.group, name: requestedPreset.name, w: requestedPreset.w, h: requestedPreset.h } : null,
@@ -518,12 +526,12 @@ export default function ImageFusion() {
         { timeout: 180000 }
       );
       if (data.ok && data.image) {
-        await finishWithImage(data.image, sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : (personReplaceMode ? "Pessoa substituída mantendo o criativo original! Salvando..." : (detailTransferMode ? "Detalhes aplicados mantendo o criativo original! Salvando..." : "Imagem gerada! Salvando e criando variações...")))));
+        await finishWithImage(data.image, swapKeepFaceMode ? "Criativo trocado para a Imagem 2 mantendo o rosto da Imagem 1! Salvando..." : (sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : (personReplaceMode ? "Pessoa substituída mantendo o criativo original! Salvando..." : (detailTransferMode ? "Detalhes aplicados mantendo o criativo original! Salvando..." : "Imagem gerada! Salvando e criando variações..."))))));
       } else if (canUseFusionFallback) {
         const fallback = await buildClientFusionFallback(img1, img2);
         await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
       } else {
-        toast.error(data.error || (personReplaceMode ? "Não foi possível substituir a pessoa pela Imagem 2 agora. Tente escrever: trocar o homem da Imagem 1 pelo homem da Imagem 2." : (detailTransferMode ? "Não foi possível aplicar os detalhes mantendo o rosto original. Tente nomear exatamente o detalhe da Imagem 2." : (sceneCloneMode ? "Não foi possível clonar com o rosto da Imagem 2 agora. Tente novamente com fotos mais nítidas." : "Falha ao gerar a imagem"))));
+        toast.error(data.error || (swapKeepFaceMode ? "Não foi possível trocar o criativo pela Imagem 2 mantendo o rosto da Imagem 1. Tente reformular." : (personReplaceMode ? "Não foi possível substituir a pessoa pela Imagem 2 agora. Tente escrever: trocar o homem da Imagem 1 pelo homem da Imagem 2." : (detailTransferMode ? "Não foi possível aplicar os detalhes mantendo o rosto original. Tente nomear exatamente o detalhe da Imagem 2." : (sceneCloneMode ? "Não foi possível clonar com o rosto da Imagem 2 agora. Tente novamente com fotos mais nítidas." : "Falha ao gerar a imagem")))));
       }
     } catch (e) {
       const personReplaceMode = !!img1 && !!img2 && !sceneCloneMode && !templateMode && isPersonReplacementPrompt(prompt);
