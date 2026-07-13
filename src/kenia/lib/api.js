@@ -1269,8 +1269,17 @@ const liveApi = axios.create({ baseURL: API });
 liveApi.interceptors.request.use((cfg) => {
   const token = localStorage.getItem("lf_token");
   if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  // Injeta ?instance=<nome> nas rotas Baileys para suportar múltiplos números.
+  const url = String(cfg.url || "");
+  if (url.startsWith("/whatsapp/baileys")) {
+    const inst = readBaileysInstance();
+    if (inst) {
+      cfg.params = { ...(cfg.params || {}), instance: inst };
+    }
+  }
   return cfg;
 });
+
 
 liveApi.interceptors.response.use(
   (r) => r,
