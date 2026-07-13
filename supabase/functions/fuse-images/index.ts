@@ -304,7 +304,6 @@ Deno.serve(async (req) => {
         'OUTPUT: one seamless photorealistic photograph. No collage, no split-screen, no reference thumbnail.',
         userTheme ? `USER NOTE: ${userTheme}.` : '',
         `STYLE: ${REALISM}.`,
-        outputLock,
         `Negative: face from IMAGE 1, unchanged face, mixed identity, averaged face, new invented face, different face than IMAGE 2, different scene, different background, different location, different lighting, different outfit, different pose, redesigned garment, altered prints, altered logos, missing accessories, ${NEGATIVE}`,
       ].filter(Boolean).join(' ');
     } else if (isDetailTransfer) {
@@ -323,7 +322,6 @@ Deno.serve(async (req) => {
         'OUTPUT: one seamless photorealistic photograph, professional fashion photoshoot quality. No collage, no split-screen, no side-by-side, no reference thumbnail.',
         userTheme ? `USER NOTE: ${userTheme}.` : '',
         `STYLE: ${REALISM}.`,
-        outputLock,
         `Negative: different garment, similar-but-different garment, redesigned garment, altered garment color, altered garment print, altered logo, missing prints, missing logos, changed neckline, changed sleeves, changed length, generic clothing, plain t-shirt replacing printed shirt, different person, face swap, altered face, beautified face, ${NEGATIVE}`,
       ].filter(Boolean).join(' ');
     } else if (isTemplate) {
