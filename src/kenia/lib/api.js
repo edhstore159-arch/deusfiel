@@ -1,9 +1,18 @@
 import axios from "axios";
 import { supabase } from "@/integrations/supabase/client";
 
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "https://minimal-arch-muse-384-bak.onrender.com").replace(/\/$/, "");
+const readBackendOverride = () => {
+  try { return (localStorage.getItem("kenia:baileys-backend-url") || "").trim().replace(/\/$/, ""); } catch { return ""; }
+};
+const readBaileysInstance = () => {
+  try { return (localStorage.getItem("kenia:baileys-instance") || "").trim(); } catch { return ""; }
+};
+const DEFAULT_BACKEND = "https://minimal-arch-muse-384-bak.onrender.com";
+const BACKEND_URL = (readBackendOverride() || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND).replace(/\/$/, "");
+export { BACKEND_URL };
 export const HAS_BACKEND = Boolean(BACKEND_URL);
 export const API = HAS_BACKEND ? `${BACKEND_URL}/api` : "";
+
 
 
 const nowIso = () => new Date().toISOString();
@@ -1260,8 +1269,17 @@ const liveApi = axios.create({ baseURL: API });
 liveApi.interceptors.request.use((cfg) => {
   const token = localStorage.getItem("lf_token");
   if (token) cfg.headers.Authorization = `Bearer ${token}`;
+  // Injeta ?instance=<nome> nas rotas Baileys para suportar múltiplos números.
+  const url = String(cfg.url || "");
+  if (url.startsWith("/whatsapp/baileys")) {
+    const inst = readBaileysInstance();
+    if (inst) {
+      cfg.params = { ...(cfg.params || {}), instance: inst };
+    }
+  }
   return cfg;
 });
+
 
 liveApi.interceptors.response.use(
   (r) => r,

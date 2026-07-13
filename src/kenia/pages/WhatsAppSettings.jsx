@@ -39,6 +39,52 @@ export default function WhatsAppSettings() {
   const [baileysStatus, setBaileysStatus] = useState(null);
   const [baileysQr, setBaileysQr] = useState(null);
   const [baileysLoggingOut, setBaileysLoggingOut] = useState(false);
+  // Self-hosted Baileys server config + multi-instance ("números virtuais")
+  const [baileysBackend, setBaileysBackend] = useState(() => {
+    try { return localStorage.getItem("kenia:baileys-backend-url") || ""; } catch { return ""; }
+  });
+  const [baileysInstances, setBaileysInstances] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("kenia:baileys-instances") || "[]"); } catch { return []; }
+  });
+  const [baileysInstance, setBaileysInstance] = useState(() => {
+    try { return localStorage.getItem("kenia:baileys-instance") || ""; } catch { return ""; }
+  });
+  const [newInstanceName, setNewInstanceName] = useState("");
+
+  const persistInstances = (list) => {
+    setBaileysInstances(list);
+    try { localStorage.setItem("kenia:baileys-instances", JSON.stringify(list)); } catch {}
+  };
+  const selectInstance = (name) => {
+    setBaileysInstance(name);
+    try { localStorage.setItem("kenia:baileys-instance", name || ""); } catch {}
+    setBaileysStatus(null);
+    setBaileysQr(null);
+    setTimeout(() => pollBaileys(), 200);
+  };
+  const addInstance = () => {
+    const name = (newInstanceName || "").trim().replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 40);
+    if (!name) { toast.error("Informe um nome para o número (ex: kenia, secretaria2)."); return; }
+    if (baileysInstances.includes(name)) { toast.info("Esse número já existe."); return; }
+    const next = [...baileysInstances, name];
+    persistInstances(next);
+    setNewInstanceName("");
+    selectInstance(name);
+    toast.success(`Número "${name}" adicionado. Escaneie o QR abaixo.`);
+  };
+  const removeInstance = (name) => {
+    if (!window.confirm(`Remover o número "${name}"? Isso não desconecta a sessão no servidor.`)) return;
+    const next = baileysInstances.filter((n) => n !== name);
+    persistInstances(next);
+    if (baileysInstance === name) selectInstance(next[0] || "");
+  };
+  const saveBackendUrl = () => {
+    const url = (baileysBackend || "").trim().replace(/\/$/, "");
+    try { localStorage.setItem("kenia:baileys-backend-url", url); } catch {}
+    toast.success("URL do servidor Baileys salva — recarregando...");
+    setTimeout(() => window.location.reload(), 600);
+  };
+
 
   const centerDigits = pickWhatsAppNumber(baileysStatus, cfg);
   const centerPhone = centerDigits ? formatWhatsAppPhone(centerDigits) : "—";
@@ -634,6 +680,93 @@ export default function WhatsAppSettings() {
                   dashboard e o robô IA (Modelo de Crédito) responde automaticamente. Não precisa
                   configurar webhook — tudo interno.
                 </div>
+
+                {/* Servidor Baileys auto-hospedado + gerenciamento de múltiplos números */}
+                <Card className="p-4 bg-white border-nude-200 space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Server className="w-4 h-4 text-nude-700" />
+                      <h3 className="font-semibold text-sm">Servidor Baileys (auto-hospedado)</h3>
+                    </div>
+                    <p className="text-xs text-nude-500 mb-2">
+                      Cole a URL pública do seu servidor Baileys (VPS/Railway/Render). Ele deve expor
+                      as rotas <code>/api/whatsapp/baileys/status|qr|logout|reconnect</code> e aceitar
+                      o parâmetro <code>?instance=&lt;nome&gt;</code> para múltiplos números.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="https://meu-baileys.exemplo.com"
+                        value={baileysBackend}
+                        onChange={(e) => setBaileysBackend(e.target.value)}
+                      />
+                      <Button onClick={saveBackendUrl} variant="outline" size="sm">Salvar</Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Smartphone className="w-4 h-4 text-nude-700" />
+                      <h3 className="font-semibold text-sm">Números virtuais (instâncias)</h3>
+                    </div>
+                    <p className="text-xs text-nude-500 mb-3">
+                      Cada número WhatsApp usa uma <strong>instância</strong> separada no servidor
+                      Baileys. Adicione um nome (ex: <code>kenia</code>, <code>secretaria2</code>) e
+                      escaneie o QR abaixo com o WhatsApp desse aparelho.
+                    </p>
+
+                    <div className="flex gap-2 mb-3">
+                      <Input
+                        placeholder="Nome do número (ex: secretaria2)"
+                        value={newInstanceName}
+                        onChange={(e) => setNewInstanceName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && addInstance()}
+                      />
+                      <Button onClick={addInstance} size="sm">
+                        <QrCode className="w-3.5 h-3.5 mr-1.5" /> Adicionar número
+                      </Button>
+                    </div>
+
+                    {baileysInstances.length === 0 ? (
+                      <div className="text-xs text-nude-500 italic">
+                        Nenhum número adicionado. Usando instância padrão do servidor.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {baileysInstances.map((name) => (
+                          <div
+                            key={name}
+                            className={`flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${
+                              baileysInstance === name
+                                ? "bg-gold-100 border-gold-400 text-gold-900"
+                                : "bg-white border-nude-300 text-nude-700"
+                            }`}
+                          >
+                            <button type="button" onClick={() => selectInstance(name)} className="font-medium">
+                              {baileysInstance === name ? "● " : ""}{name}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeInstance(name)}
+                              className="opacity-60 hover:opacity-100 hover:text-rose-600 ml-1"
+                              title="Remover"
+                            >
+                              <XCircle className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {baileysInstance && (
+                      <div className="text-[11px] text-nude-500 mt-2">
+                        Instância ativa: <code className="bg-nude-100 px-1.5 py-0.5 rounded">{baileysInstance}</code>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+
 
                 {!baileysStatus?.connected && baileysStatus?.state !== "static" && (
                   <div className="p-3 bg-gold-50 border border-gold-200 rounded text-xs text-gold-900" data-testid="baileys-howto">
