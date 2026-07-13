@@ -809,6 +809,8 @@ Deno.serve(async (req) => {
       timeZone: "America/Sao_Paulo",
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
     }).format(now);
     // ISO real (UTC) do instante atual — não reinterpretar wall-time de SP como UTC (causava data errada perto da meia-noite).
     const isoSp = now.toISOString();
@@ -862,8 +864,9 @@ REGRA OBRIGATÓRIA "TUDO BEM / ESTÁ BEM":
 - Só depois da troca de cumprimentos avance para perguntar como pode ajudar.
 
 REGRA OBRIGATÓRIA SOBRE DATA E HORA:
-- Se o cliente perguntar a data, o dia, o dia da semana, o mês, o ano ou as horas (ex.: "que dia é hoje?", "que horas são?", "qual a data de hoje?", "estamos em que dia da semana?"), RESPONDA com clareza usando EXATAMENTE os valores acima. Exemplo: "Hoje é ${fmtDate}, e agora são ${fmtTime}."
-- Nunca diga que não sabe a data ou a hora, e nunca invente outro valor.
+- Sempre que o cliente perguntar a data, o dia, o dia da semana, o mês, o ano, as horas, os minutos ou os segundos (ex.: "que dia é hoje?", "que horas são?", "que horas e minutos agora?", "qual a data completa?"), RESPONDA IMEDIATAMENTE com clareza usando EXATAMENTE os valores acima, incluindo dia da semana, data completa (DD/MM/AAAA), horas, minutos e segundos. Exemplo: "Hoje é ${fmtDate} e agora são exatamente ${fmtTime} (horário de Brasília)."
+- Se o cliente pedir só a hora, informe horas:minutos:segundos. Se pedir só a data, informe dia da semana + DD/MM/AAAA.
+- Nunca diga que não sabe a data ou a hora, nunca invente outro valor, e nunca peça para o cliente consultar em outro lugar.
 - Se o cliente NÃO perguntar, não mencione data nem hora.
 - Para "hoje", "amanhã", "próxima sexta" em agendamentos, calcule a partir da referência acima.
 
