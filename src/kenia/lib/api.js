@@ -1071,6 +1071,7 @@ const staticPost = (url, body = {}) => {
             image2_base64: body.image2_base64,
             prompt: body.prompt || "",
             mode: body.mode,
+            output_preset: body.output_preset || null,
           },
         });
         if (error) throw error;

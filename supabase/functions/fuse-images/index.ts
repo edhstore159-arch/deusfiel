@@ -7,6 +7,9 @@ const REALISM =
   "ultra realistic photography, 50mm lens, shallow depth of field, natural skin texture, " +
   "real imperfections, aligned eyes, realistic pupils, natural mouth and nose, cinematic lighting, high dynamic range, 4k, sharp focus";
 
+const OUTPUT_QUALITY_LOCK =
+  "OUTPUT QUALITY LOCK: generate a clean high-resolution final image with crisp details, sharp edges, legible typography, no compression artifacts, no pixelation, no low-res blur, no upscaling noise. Preserve the requested social-media aspect ratio and safe framing.";
+
 const NEGATIVE =
   "blurry, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, bad teeth, different person, new person, face swap, restyled face, beautified, airbrushed, younger, older, slimmer, heavier, different hair, recolored hair, cartoon, illustration, fake skin, plastic skin, over-smooth, " +
   "extra fingers, mutated, unrealistic proportions, collage, split screen, side-by-side, " +
@@ -181,6 +184,23 @@ function normalizeText(value: string) {
   return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+function buildOutputPresetLock(outputPreset: unknown): string {
+  if (!outputPreset || typeof outputPreset !== 'object') return '';
+  const preset = outputPreset as { group?: unknown; name?: unknown; w?: unknown; h?: unknown };
+  const w = Number(preset.w);
+  const h = Number(preset.h);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 256 || h < 256) return '';
+  const label = [preset.group, preset.name].filter((v) => typeof v === 'string' && v.trim()).join(' ');
+  const isVerticalStory = h > w && Math.abs((w / h) - (9 / 16)) < 0.03;
+  return [
+    `FINAL CANVAS REQUIREMENT: compose the result for ${Math.round(w)}x${Math.round(h)} pixels${label ? ` (${label})` : ''}, aspect ratio ${w}:${h}.`,
+    isVerticalStory
+      ? 'Instagram Stories / Reels safe layout: vertical 9:16, main face/person and all important text must stay inside the central safe area; do not crop the head, face, hands, product, logo, or typography.'
+      : 'Keep all important face, person, product, logo and typography inside the safe area for the requested format.',
+    OUTPUT_QUALITY_LOCK,
+  ].join(' ');
+}
+
 const COLOR_ALIASES: Array<{ re: RegExp; en: string; strong: string; avoid: string }> = [
   { re: /\b(azul|blue)\b/i, en: 'blue', strong: 'vivid bright pure blue (hex #1E73FF), clearly recognizable as blue', avoid: 'navy, dark blue, midnight blue, black, gray, teal, purple' },
   { re: /\b(vermelh[ao]|red)\b/i, en: 'red', strong: 'vivid pure red (hex #E53935)', avoid: 'orange, pink, brown, dark maroon, black' },
@@ -240,7 +260,7 @@ Deno.serve(async (req) => {
   if (_auth_res instanceof Response) return _auth_res;
 
   try {
-    const { image1_base64, image2_base64, prompt, mode } = await req.json();
+    const { image1_base64, image2_base64, prompt, mode, output_preset } = await req.json();
     if (!image1_base64) {
       return new Response(JSON.stringify({ ok: false, error: 'Envie ao menos uma imagem.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -266,6 +286,8 @@ Deno.serve(async (req) => {
     const isTemplate = isSingle && mode === 'template' && !forceEdit;
 
     let fullPrompt: string;
+    const outputLock = buildOutputPresetLock(output_preset);
+
     if (isSceneClone) {
       const userTheme = (prompt || '').trim();
       const hasPerson = !!image2_base64;
@@ -310,10 +332,25 @@ Deno.serve(async (req) => {
       fullPrompt = await elaborateFusionPrompt(prompt);
     }
 
+    if (outputLock) {
+      fullPrompt = `${fullPrompt} ${outputLock}`;
+    }
+
     const imageUrls = isSingle ? [image1_base64] : [image1_base64, image2_base64].filter(Boolean);
     const runMode = isSceneClone ? 'scene-clone' : (isPersonReplace ? 'person-replace' : (isDetailTransfer ? 'detail-transfer' : (isGarmentTransfer ? 'garment' : (isTemplate ? 'template' : (isSingle ? 'edit' : 'fusion')))));
 
-    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode });
+    const outputPreset = output_preset && typeof output_preset === 'object'
+      ? (() => {
+          const raw = output_preset as { group?: unknown; name?: unknown; w?: unknown; h?: unknown };
+          const w = Number(raw.w);
+          const h = Number(raw.h);
+          return Number.isFinite(w) && Number.isFinite(h) && w >= 256 && h >= 256
+            ? { group: String(raw.group || ''), name: String(raw.name || ''), w, h }
+            : null;
+        })()
+      : null;
+
+    const result = await generateWithNanoBanana({ prompt: fullPrompt, imageUrls, mode: runMode, outputPreset });
 
     if (!result.url) {
       return new Response(JSON.stringify({ ok: false, error: result.error || 'Sem imagem gerada' }), {
