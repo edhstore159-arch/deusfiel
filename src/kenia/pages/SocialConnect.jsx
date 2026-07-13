@@ -31,7 +31,13 @@ export default function SocialConnect() {
     })();
   }, []);
 
-  const srcOf = (it) => it?.image_url || it?.url || it?.image || (it?.image_b64 ? `data:image/png;base64,${it.image_b64}` : null);
+  const imageSrc = (value) => {
+    const s = String(value || "");
+    if (!s) return "";
+    if (s.startsWith("data:") || s.startsWith("http://") || s.startsWith("https://") || s.startsWith("blob:")) return s;
+    return `data:image/png;base64,${s}`;
+  };
+  const srcOf = (it) => imageSrc(it?.image_b64 || it?.image_url || it?.url || it?.image || it?.signedUrl || "");
 
   return (
     <div className="h-full flex flex-col">
