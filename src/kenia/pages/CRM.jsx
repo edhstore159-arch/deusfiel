@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/kenia/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Badge } from "@/kenia/components/ui/badge";
@@ -8,8 +9,22 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/kenia/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/kenia/components/ui/select";
-import { Plus, Phone, Mail, Trash2, Flame, Tag } from "lucide-react";
+import { Plus, Phone, Mail, Trash2, Flame, Tag, RefreshCcw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+
+const STAGE_OVERRIDE_KEY = "crm.autoImport.stageOverrides.v1";
+const HIDDEN_KEY = "crm.autoImport.hidden.v1";
+const readJSON = (k, f) => { try { return JSON.parse(localStorage.getItem(k) || "null") ?? f; } catch { return f; } };
+const writeJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+const mapQualifToStage = (q) => {
+  const s = String(q || "").toLowerCase();
+  if (s === "qualificado") return "qualificado";
+  if (s === "nao_qualificado" || s === "não_qualificado") return "nao_interessado";
+  if (s === "necessita_mais_info") return "em_contato";
+  return "novos_leads";
+};
+
 
 const URG_COLORS = {
   baixa: "bg-nude-100 text-nude-700",
