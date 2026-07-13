@@ -39,6 +39,52 @@ export default function WhatsAppSettings() {
   const [baileysStatus, setBaileysStatus] = useState(null);
   const [baileysQr, setBaileysQr] = useState(null);
   const [baileysLoggingOut, setBaileysLoggingOut] = useState(false);
+  // Self-hosted Baileys server config + multi-instance ("números virtuais")
+  const [baileysBackend, setBaileysBackend] = useState(() => {
+    try { return localStorage.getItem("kenia:baileys-backend-url") || ""; } catch { return ""; }
+  });
+  const [baileysInstances, setBaileysInstances] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("kenia:baileys-instances") || "[]"); } catch { return []; }
+  });
+  const [baileysInstance, setBaileysInstance] = useState(() => {
+    try { return localStorage.getItem("kenia:baileys-instance") || ""; } catch { return ""; }
+  });
+  const [newInstanceName, setNewInstanceName] = useState("");
+
+  const persistInstances = (list) => {
+    setBaileysInstances(list);
+    try { localStorage.setItem("kenia:baileys-instances", JSON.stringify(list)); } catch {}
+  };
+  const selectInstance = (name) => {
+    setBaileysInstance(name);
+    try { localStorage.setItem("kenia:baileys-instance", name || ""); } catch {}
+    setBaileysStatus(null);
+    setBaileysQr(null);
+    setTimeout(() => pollBaileys(), 200);
+  };
+  const addInstance = () => {
+    const name = (newInstanceName || "").trim().replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 40);
+    if (!name) { toast.error("Informe um nome para o número (ex: kenia, secretaria2)."); return; }
+    if (baileysInstances.includes(name)) { toast.info("Esse número já existe."); return; }
+    const next = [...baileysInstances, name];
+    persistInstances(next);
+    setNewInstanceName("");
+    selectInstance(name);
+    toast.success(`Número "${name}" adicionado. Escaneie o QR abaixo.`);
+  };
+  const removeInstance = (name) => {
+    if (!window.confirm(`Remover o número "${name}"? Isso não desconecta a sessão no servidor.`)) return;
+    const next = baileysInstances.filter((n) => n !== name);
+    persistInstances(next);
+    if (baileysInstance === name) selectInstance(next[0] || "");
+  };
+  const saveBackendUrl = () => {
+    const url = (baileysBackend || "").trim().replace(/\/$/, "");
+    try { localStorage.setItem("kenia:baileys-backend-url", url); } catch {}
+    toast.success("URL do servidor Baileys salva — recarregando...");
+    setTimeout(() => window.location.reload(), 600);
+  };
+
 
   const centerDigits = pickWhatsAppNumber(baileysStatus, cfg);
   const centerPhone = centerDigits ? formatWhatsAppPhone(centerDigits) : "—";
