@@ -5,7 +5,7 @@ import {
   LayoutDashboard, KanbanSquare, Scale, Wallet, Sparkles,
   BarChart3, LogOut, MessageSquare, Wrench, Radio,
   CalendarDays, Settings as SettingsIcon, Combine,
-  ShieldCheck, Bot, Menu, X, Clapperboard, Gavel,
+  ShieldCheck, Bot, Menu, X, Clapperboard, Gavel, Share2,
 } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
@@ -34,6 +34,7 @@ const NAV = [
   { to: "/app/creatives", label: "Criativos", icon: Sparkles, testid: "nav-creatives" },
   { to: "/app/image-fusion", label: "Fusão de Imagens", icon: Combine, testid: "nav-image-fusion" },
   { to: "/app/viral-video", label: "Vídeos Virais", icon: Clapperboard, testid: "nav-viral-video" },
+  { to: "/app/social-connect", label: "Conectar Redes Sociais", icon: Share2, testid: "nav-social-connect" },
   { to: "/app/analytics", label: "Métricas", icon: BarChart3, testid: "nav-analytics" },
   { to: "/app/whatsapp", label: "WhatsApp", icon: MessageSquare, testid: "nav-whatsapp" },
   { to: "/app/whatsapp-logs", label: "Logs WhatsApp", icon: Radio, testid: "nav-whatsapp-logs" },
