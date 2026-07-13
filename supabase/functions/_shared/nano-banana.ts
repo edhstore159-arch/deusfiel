@@ -38,16 +38,31 @@ const GARMENT_TRANSFER_LOCK =
 const DETAIL_TRANSFER_LOCK =
   "Detail-transfer edit lock: IMAGE 1 is the ORIGINAL CREATIVE and the exact base canvas. Preserve IMAGE 1's composition, layout, crop, camera angle, background, text, subject, clothing, body, pose, hair, and especially every face/identity 1:1. IMAGE 2 is ONLY a secondary visual reference for the specific detail(s) requested by the user (for example an accessory, texture, color, small object, logo, prop, or style detail). Transfer ONLY those requested non-facial details from IMAGE 2 onto IMAGE 1. Do NOT replace the whole creative, do NOT copy IMAGE 2's face/person/body/pose/background unless the user explicitly asks for that non-facial area, do NOT average or blend identities. If the requested detail is an accessory on a face, place it as a removable surface layer while keeping the original IMAGE 1 face underneath unchanged.";
 
+function userExplicitlyRequestsFaceChange(prompt: string): boolean {
+  const p = (prompt || "").toLowerCase();
+  return /(trocar|troca|mudar|muda|alterar|altera|modificar|modifica|substituir|substitui|refazer|refaz|redesenhar|redesenha|editar|edita)\s+([oa]s?\s+)?(rosto|face|cara|olhos?|nariz|boca|l[aá]bios?|queixo|mand[ií]bula|sobrancelhas?|pele|feature|identidade)|face\s*swap|trocar\s+de\s+pessoa|nova\s+pessoa|mudar\s+a\s+identidade|change\s+(the\s+)?face|swap\s+face/i.test(p);
+}
+
 function withFacePreservation(prompt: string, mode?: NanoBananaOptions["mode"]) {
+  const userWantsFaceEdit = userExplicitlyRequestsFaceChange(prompt);
   const modeLock = mode === "scene-clone"
     ? SCENE_CLONE_FACE_SWAP_LOCK
-    : (mode === "garment" ? GARMENT_TRANSFER_LOCK : (mode === "detail-transfer" ? DETAIL_TRANSFER_LOCK : FACE_PRESERVATION_LOCK));
+    : (mode === "garment"
+      ? GARMENT_TRANSFER_LOCK
+      : (mode === "detail-transfer"
+        ? DETAIL_TRANSFER_LOCK
+        : (userWantsFaceEdit ? "" : FACE_PRESERVATION_LOCK)));
   const identityNegative = mode === "scene-clone"
     ? "face from IMAGE 1, unchanged original face, mixed identity, averaged face, new invented face, face not matching IMAGE 2,"
     : (mode === "detail-transfer"
       ? "face from IMAGE 2, copied identity from IMAGE 2, replaced face, mixed identity, averaged identity, changed IMAGE 1 face, modified original creative face,"
-      : "changed identity, different person, modified face, redrawn face, beautified face, smoothed face, slimmed face, altered eye shape, altered nose, altered mouth, altered jawline, symmetrized face, aged face, de-aged face, face-lift, plastic surgery look,");
-  return `${prompt}\n\n${HYPERREAL_LOCK}\n${SCENE_REALISM_LOCK}\n${REAL_SCALE_LOCK}\n${modeLock}\n${ACCESSORY_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, ${identityNegative} accessory fused into skin, accessory imprint left on face after removal, invented features under removed accessory, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, mismatched lighting between subject and background, cutout halo, composite edge, blurry, low quality, watermark.`;
+      : (userWantsFaceEdit
+        ? ""
+        : "changed identity, different person, modified face, redrawn face, beautified face, smoothed face, slimmed face, altered eye shape, altered nose, altered mouth, altered jawline, symmetrized face, aged face, de-aged face, face-lift, plastic surgery look,"));
+  const explicitFaceNote = userWantsFaceEdit
+    ? "\nUser explicitly requested a face/identity change — apply ONLY the face change the user described; keep every other element (scene, pose, outfit, background, lighting) untouched."
+    : "";
+  return `${prompt}${explicitFaceNote}\n\n${HYPERREAL_LOCK}\n${SCENE_REALISM_LOCK}\n${REAL_SCALE_LOCK}\n${modeLock}\n${ACCESSORY_LOCK}\nNegative: illustration, painting, 3d render, cgi, cartoon, anime, stylized, digital art, airbrushed, plastic skin, waxy skin, doll-like, uncanny, distorted face, warped face, melted face, asymmetrical eyes, duplicated eyes, distorted pupils, fake teeth, over-smoothed skin, ${identityNegative} accessory fused into skin, accessory imprint left on face after removal, invented features under removed accessory, deformed hands, extra fingers, wrong proportions, wrong scale, background people same size as foreground, giant background figures, tiny foreground figures, floating figures, oversized head, tiny head, mismatched perspective, inconsistent eye level, mismatched lighting between subject and background, cutout halo, composite edge, blurry, low quality, watermark.`;
 }
 
 function extractImageFromMessage(msg: any): string | null {
