@@ -195,25 +195,30 @@ export default function BibleVerseBox() {
                 className="relative z-20 focus:outline-none"
                 aria-label="Abrir baú de promessas"
               >
-                <div className="relative h-[190px] w-[190px]">
-                  <motion.img
-                    src={arkImg}
-                    alt="Arca da Aliança com as Tábuas da Lei"
-                    width={200}
-                    height={200}
-                    loading="lazy"
-                    className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_12px_24px_rgba(180,140,60,0.5)]"
-                    animate={
-                      phase === "opening"
-                        ? { scale: [1, 1.08, 1.15], y: [0, -6, -10] }
-                        : { y: [0, -4, 0] }
-                    }
-                    transition={
-                      phase === "opening"
-                        ? { duration: 0.9, ease: "easeOut" }
-                        : { duration: 4, repeat: Infinity, ease: "easeInOut" }
-                    }
-                  />
+                <div className="relative h-[280px] w-[280px]">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.img
+                      key={frameIndex}
+                      src={ARK_FRAMES[frameIndex]}
+                      alt="Arca da Aliança"
+                      width={300}
+                      height={300}
+                      loading="lazy"
+                      className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_14px_28px_rgba(180,140,60,0.55)]"
+                      initial={{ opacity: 0 }}
+                      animate={
+                        phase === "opening"
+                          ? { opacity: [1, 0], scale: [1, 1.12] }
+                          : { opacity: 1, y: [0, -4, 0] }
+                      }
+                      exit={{ opacity: 0 }}
+                      transition={
+                        phase === "opening"
+                          ? { duration: 0.7, ease: "easeOut" }
+                          : { opacity: { duration: 0.25 }, y: { duration: 4, repeat: Infinity, ease: "easeInOut" } }
+                      }
+                    />
+                  </AnimatePresence>
                 </div>
                 {/* Brilho saindo durante opening */}
                 {phase === "opening" && (
