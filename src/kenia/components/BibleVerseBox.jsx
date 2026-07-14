@@ -97,7 +97,7 @@ export default function BibleVerseBox() {
   // Rotação 360° contínua enquanto fechada
   useEffect(() => {
     if (phase !== "closed") return;
-    const id = setInterval(() => setFrameIndex((i) => (i + 1) % ARK_FRAMES.length), 380);
+    const id = setInterval(() => setFrameIndex((i) => (i + 1) % ARK_FRAMES.length), 1100);
     return () => clearInterval(id);
   }, [phase]);
 
