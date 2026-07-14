@@ -153,7 +153,7 @@ export default function BibleVerseBox() {
         </p>
 
         {/* Área do baú */}
-        <div className="relative flex h-[220px] w-[240px] items-center justify-center">
+        <div className="relative flex h-[300px] w-[300px] items-center justify-center">
           <GentleConfetti active={confettiActive} />
 
           {/* Halo dourado */}
