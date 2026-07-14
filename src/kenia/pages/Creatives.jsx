@@ -28,7 +28,12 @@ const PLATFORMS = [
 
 
 export default function Creatives() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => {
+    try {
+      const cached = localStorage.getItem("kenia.creatives.cache");
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
   const [open, setOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -190,8 +195,9 @@ export default function Creatives() {
       const { data } = await api.get("/creatives");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.creatives) ? data.creatives : [];
       setItems(list);
+      try { localStorage.setItem("kenia.creatives.cache", JSON.stringify(list.slice(0, 24))); } catch {}
     } catch {
-      setItems([]);
+      // keep cached items on failure
     }
   };
 
