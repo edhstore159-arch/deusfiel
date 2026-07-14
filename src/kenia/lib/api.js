@@ -1019,46 +1019,63 @@ const staticPost = (url, body = {}) => {
         genError = e?.message || String(e);
       }
       if (!b64) b64 = buildLocalCreativeImage(body.title || topic, topic);
-      const storedImage = await compactImageForStorage(b64);
-      // Persiste a imagem gerada no bucket creative-assets + tabela generated_images
-      let storagePath = null;
-      try {
-        const { data: auth } = await supabase.auth.getUser();
-        const uid = auth?.user?.id;
-        if (!uid) {
-          console.warn("[creatives] usuário não autenticado — imagem só será salva localmente.");
-        } else if (b64) {
-          const { blob, contentType } = await imageToBlob(b64);
-          storagePath = `${uid}/creative-${Date.now()}.png`;
-          const { error: upErr } = await supabase.storage
-            .from("creative-assets")
-            .upload(storagePath, blob, { contentType, upsert: true });
-          if (!upErr) {
-            const { error: insErr } = await supabase.from("generated_images").insert({
-              user_id: uid, storage_path: storagePath, prompt: topic, kind: "creative", paid: false,
-            });
-            if (insErr) console.warn("[creatives] insert generated_images falhou:", insErr.message);
-          } else {
-            console.warn("[creatives] upload bucket falhou:", upErr.message);
-            storagePath = null;
-          }
-        }
-      } catch (e) {
-        console.warn("[creatives] persistência falhou:", e?.message || e);
-      }
+
+      // Monta o item imediatamente e retorna para a UI mostrar o criativo sem esperar
+      // upload no bucket / insert em generated_images / compactação para storage local.
       const item = {
         id: nextId("creative"),
         ...body,
         caption: (body.caption && String(body.caption).trim()) || `Post sugerido: ${topic}.\n\nExplique o direito com clareza, convide o cliente a separar documentos e finalize com chamada para atendimento.`,
-        image_b64: storedImage,
-        storage_path: storagePath,
+        image_b64: b64,
+        storage_path: null,
         ...(genError ? { error: genError } : {}),
       };
       const items = read("creatives", seedCreatives);
       items.unshift(item);
       write("creatives", items);
-      return response(item, 201);
 
+      // Persistência em background (não bloqueia a resposta)
+      (async () => {
+        try {
+          const storedImage = await compactImageForStorage(b64);
+          let storagePath = null;
+          try {
+            const { data: auth } = await supabase.auth.getUser();
+            const uid = auth?.user?.id;
+            if (uid && b64) {
+              const { blob, contentType } = await imageToBlob(b64);
+              storagePath = `${uid}/creative-${Date.now()}.png`;
+              const { error: upErr } = await supabase.storage
+                .from("creative-assets")
+                .upload(storagePath, blob, { contentType, upsert: true });
+              if (!upErr) {
+                const { error: insErr } = await supabase.from("generated_images").insert({
+                  user_id: uid, storage_path: storagePath, prompt: topic, kind: "creative", paid: false,
+                });
+                if (insErr) console.warn("[creatives] insert generated_images falhou:", insErr.message);
+              } else {
+                console.warn("[creatives] upload bucket falhou:", upErr.message);
+                storagePath = null;
+              }
+            }
+          } catch (e) {
+            console.warn("[creatives] persistência falhou:", e?.message || e);
+          }
+          // Atualiza o item salvo localmente com versão compacta + storage_path
+          try {
+            const cur = read("creatives", seedCreatives);
+            const idx = cur.findIndex((x) => x.id === item.id);
+            if (idx >= 0) {
+              cur[idx] = { ...cur[idx], image_b64: storedImage, storage_path: storagePath };
+              write("creatives", cur);
+            }
+          } catch {}
+        } catch (e) {
+          console.warn("[creatives] background persist erro:", e?.message || e);
+        }
+      })();
+
+      return response(item, 201);
     })();
   }
   if (path === "/debug/instruction") {
