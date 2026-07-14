@@ -10,7 +10,7 @@ import { Label } from "@/kenia/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/kenia/components/ui/tabs";
 import { Badge } from "@/kenia/components/ui/badge";
 import { toast } from "sonner";
-import { AlertTriangle, ImagePlus, Wand2, Send, Trash2, X, Download, Paperclip } from "lucide-react";
+import { AlertTriangle, ImagePlus, Wand2, Send, Trash2, X, Download, Paperclip, Mail, RefreshCw } from "lucide-react";
 
 const DEBUG_BUCKET = "debug-uploads";
 
