@@ -429,6 +429,112 @@ export default function DebugTool() {
                 </div>
               )}
             </TabsContent>
+
+            <TabsContent value="email" className="mt-6">
+              <div className="text-sm text-nude-500 mb-4">
+                Envie e-mails de teste e acompanhe o histórico de envios do sistema.
+              </div>
+
+              <div className="space-y-3 border border-nude-200 rounded-md p-4 bg-white">
+                <div className="text-xs uppercase tracking-widest font-semibold text-gold-600">
+                  Novo e-mail
+                </div>
+                <div>
+                  <Label>Destinatário</Label>
+                  <Input
+                    type="email"
+                    value={emailTo}
+                    onChange={(e) => setEmailTo(e.target.value)}
+                    placeholder="cliente@exemplo.com"
+                    data-testid="dbg-email-to"
+                  />
+                </div>
+                <div>
+                  <Label>Assunto</Label>
+                  <Input
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    placeholder="Assunto do e-mail"
+                    data-testid="dbg-email-subject"
+                  />
+                </div>
+                <div>
+                  <Label>Mensagem</Label>
+                  <Textarea
+                    rows={5}
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    placeholder="Conteúdo da mensagem…"
+                    data-testid="dbg-email-body"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={sendTestEmail}
+                    disabled={emailSending}
+                    className="bg-gold-600 hover:bg-gold-700 text-white"
+                    data-testid="dbg-email-send"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {emailSending ? "Enviando…" : "Enviar e-mail"}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs uppercase tracking-widest font-semibold text-nude-500">
+                    Histórico de envios
+                  </div>
+                  <Button variant="outline" size="sm" onClick={loadEmailLogs} disabled={emailLogsLoading}>
+                    <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${emailLogsLoading ? "animate-spin" : ""}`} />
+                    Atualizar
+                  </Button>
+                </div>
+
+                {emailLogsError && (
+                  <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded p-2 mb-2">
+                    {emailLogsError}
+                  </div>
+                )}
+
+                {emailLogs.length === 0 && !emailLogsLoading && !emailLogsError && (
+                  <div className="text-sm text-nude-500 bg-nude-50 border border-nude-200 rounded p-3 text-center">
+                    Nenhum e-mail enviado ainda.
+                  </div>
+                )}
+
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {emailLogs.map((log) => {
+                    const statusColor =
+                      log.status === "sent"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : log.status === "dlq" || log.status === "failed" || log.status === "bounced"
+                          ? "bg-rose-100 text-rose-700"
+                          : log.status === "suppressed"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-nude-100 text-nude-700";
+                    return (
+                      <div key={log.id} className="text-xs border border-nude-200 rounded-md p-2.5 bg-white">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-medium truncate">{log.recipient_email}</div>
+                          <Badge className={`${statusColor} border-0 text-[10px]`}>{log.status}</Badge>
+                        </div>
+                        <div className="flex justify-between text-nude-500 mt-1">
+                          <span className="truncate">{log.template_name}</span>
+                          <span>{new Date(log.created_at).toLocaleString("pt-BR")}</span>
+                        </div>
+                        {log.error_message && (
+                          <div className="mt-1 text-rose-600 truncate" title={log.error_message}>
+                            {log.error_message}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </TabsContent>
           </Tabs>
         </Card>
       </div>
