@@ -32,7 +32,7 @@ export default function DebugTool() {
   const attachInputRef = useRef(null);
 
   // Central de Email
-  const [emailTo, setEmailTo] = useState("");
+  const [emailTo, setEmailTo] = useState("lifisi7900@buloan.com");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [emailSending, setEmailSending] = useState(false);
