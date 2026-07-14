@@ -257,6 +257,9 @@ export default function AppLayout() {
         <div className="flex-1 overflow-auto">
           <Outlet />
         </div>
+        <footer className="shrink-0 border-t border-nude-200 bg-white/70 px-4 py-2 text-center text-[11px] text-nude-500">
+          Criado por <span className="font-semibold text-gold-700">Advocacia IA</span> — para todos os advogados
+        </footer>
       </main>
     </div>
   );
