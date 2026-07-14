@@ -83,6 +83,7 @@ export default function BibleVerseBox() {
   const [phase, setPhase] = useState("closed"); // closed | opening | open
   const [favs, setFavs] = useState(loadFavs);
   const [confettiActive, setConfettiActive] = useState(false);
+  const [frameIndex, setFrameIndex] = useState(0);
   const poolRef = useRef(loadPool() || VERSES.map((v) => v.id));
 
   const isFav = verse && favs.includes(verse.id);
@@ -92,6 +93,13 @@ export default function BibleVerseBox() {
     const t = setTimeout(() => setConfettiActive(false), 60000);
     return () => clearTimeout(t);
   }, [confettiActive]);
+
+  // Rotação 360° contínua enquanto fechada
+  useEffect(() => {
+    if (phase !== "closed") return;
+    const id = setInterval(() => setFrameIndex((i) => (i + 1) % ARK_FRAMES.length), 380);
+    return () => clearInterval(id);
+  }, [phase]);
 
   function drawVerse() {
     let pool = poolRef.current;
