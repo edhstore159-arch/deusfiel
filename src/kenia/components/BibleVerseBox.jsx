@@ -197,26 +197,30 @@ export default function BibleVerseBox() {
                 className="relative z-20 focus:outline-none"
                 aria-label="Abrir baú de promessas"
               >
-                <div className="relative h-[180px] w-[180px]">
-                  <motion.img
-                    src={arkClosedImg}
-                    alt="Arca da Aliança"
-                    width={200}
-                    height={200}
-                    loading="lazy"
-                    className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_10px_20px_rgba(180,140,60,0.45)]"
-                    animate={
-                      phase === "opening"
-                        ? { opacity: [1, 0], scale: [1, 1.05] }
-                        : { opacity: 1, y: [0, -4, 0] }
-                    }
-                    transition={
-                      phase === "opening"
-                        ? { duration: 0.6, ease: "easeOut" }
-                        : { duration: 3.5, repeat: Infinity, ease: "easeInOut" }
-                    }
-                  />
-                  {phase === "opening" && (
+                <div className="relative h-[180px] w-[180px] [perspective:800px]">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.img
+                      key={frameIndex}
+                      src={ARK_FRAMES[frameIndex]}
+                      alt="Arca da Aliança"
+                      width={200}
+                      height={200}
+                      loading="lazy"
+                      className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_10px_20px_rgba(180,140,60,0.45)]"
+                      initial={{ opacity: 0, rotateY: -25 }}
+                      animate={
+                        phase === "opening"
+                          ? { opacity: [1, 0], scale: [1, 1.05], rotateY: 0 }
+                          : { opacity: 1, rotateY: 0, y: [0, -3, 0] }
+                      }
+                      exit={{ opacity: 0, rotateY: 25 }}
+                      transition={
+                        phase === "opening"
+                          ? { duration: 0.6, ease: "easeOut" }
+                          : { opacity: { duration: 0.35 }, rotateY: { duration: 0.45 }, y: { duration: 3, repeat: Infinity, ease: "easeInOut" } }
+                      }
+                    />
+                  </AnimatePresence>
                     <motion.img
                       src={arkOpenImg}
                       alt=""
