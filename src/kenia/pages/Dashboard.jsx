@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/kenia/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import SystemReportCard from "@/kenia/components/SystemReportCard";
+import RecentCreativesStrip from "@/kenia/components/RecentCreativesStrip";
 
 const URG_COLORS = {
   baixa: "bg-nude-100 text-nude-700",
