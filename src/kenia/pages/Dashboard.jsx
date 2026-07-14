@@ -657,6 +657,7 @@ export default function Dashboard() {
       </div>
 
       <SystemReportCard />
+      <RecentCreativesStrip />
 
 
       {/* 3-column layout */}
