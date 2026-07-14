@@ -31,6 +31,59 @@ export default function DebugTool() {
   const [uploadingAttach, setUploadingAttach] = useState(false);
   const attachInputRef = useRef(null);
 
+  // Central de Email
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailLogs, setEmailLogs] = useState([]);
+  const [emailLogsLoading, setEmailLogsLoading] = useState(false);
+  const [emailLogsError, setEmailLogsError] = useState("");
+
+  const loadEmailLogs = async () => {
+    setEmailLogsLoading(true);
+    setEmailLogsError("");
+    try {
+      const { data, error } = await supabase
+        .from("email_send_log")
+        .select("id, message_id, template_name, recipient_email, status, error_message, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setEmailLogs(data || []);
+    } catch (e) {
+      setEmailLogsError(e?.message || "Não foi possível carregar os logs de e-mail.");
+      setEmailLogs([]);
+    } finally {
+      setEmailLogsLoading(false);
+    }
+  };
+
+  const sendTestEmail = async () => {
+    if (!emailTo || !emailSubject || !emailBody) {
+      toast.error("Preencha destinatário, assunto e mensagem.");
+      return;
+    }
+    setEmailSending(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "debug-test",
+          recipientEmail: emailTo,
+          idempotencyKey: `debug-test-${Date.now()}`,
+          templateData: { subject: emailSubject, body: emailBody },
+        },
+      });
+      if (error) throw error;
+      toast.success("E-mail enviado à fila.");
+      setTimeout(loadEmailLogs, 800);
+    } catch (e) {
+      toast.error(e?.message || "Falha ao enviar. Configure a Central de E-mail primeiro.");
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   useEffect(() => { loadHistory(); }, []);
 
   const loadHistory = async () => {
