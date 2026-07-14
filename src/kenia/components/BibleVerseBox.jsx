@@ -3,17 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Share2, Star, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import VERSES from "@/kenia/data/verses.json";
-import arkOpenImg from "@/kenia/assets/ark-open.png";
-import ark0 from "@/kenia/assets/ark-0.png";
-import ark45 from "@/kenia/assets/ark-45.png";
-import ark90 from "@/kenia/assets/ark-90.png";
-import ark135 from "@/kenia/assets/ark-135.png";
-import ark180 from "@/kenia/assets/ark-180.png";
-import ark225 from "@/kenia/assets/ark-225.png";
-import ark270 from "@/kenia/assets/ark-270.png";
-import ark315 from "@/kenia/assets/ark-315.png";
-
-const ARK_FRAMES = [ark0, ark45, ark90, ark135, ark180, ark225, ark270, ark315];
+import arkImg from "@/kenia/assets/ark-tablets.png";
 
 const FAV_KEY = "kenia.bible.favorites";
 const POOL_KEY = "kenia.bible.pool";
