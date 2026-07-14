@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     }
 
     const size = sizeFor(ratio);
-    const targetModel = (typeof model === "string" && model) || "vertex_ai/veo-3.1-fast";
+    const targetModel = (typeof model === "string" && model) || "vertex_ai/veo-3.0-fast-generate-preview";
     const auth = { Authorization: `Bearer ${key}` };
 
     const createRes = await fetch(`${BASE}/llm/videos`, {
