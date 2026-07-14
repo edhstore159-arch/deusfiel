@@ -221,6 +221,7 @@ export default function BibleVerseBox() {
                       }
                     />
                   </AnimatePresence>
+                  {phase === "opening" && (
                     <motion.img
                       src={arkOpenImg}
                       alt=""
