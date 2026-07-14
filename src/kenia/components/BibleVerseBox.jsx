@@ -3,17 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Share2, Star, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import VERSES from "@/kenia/data/verses.json";
-import arkOpenImg from "@/kenia/assets/ark-open.png";
-import ark0 from "@/kenia/assets/ark-0.png";
-import ark45 from "@/kenia/assets/ark-45.png";
-import ark90 from "@/kenia/assets/ark-90.png";
-import ark135 from "@/kenia/assets/ark-135.png";
-import ark180 from "@/kenia/assets/ark-180.png";
-import ark225 from "@/kenia/assets/ark-225.png";
-import ark270 from "@/kenia/assets/ark-270.png";
-import ark315 from "@/kenia/assets/ark-315.png";
-
-const ARK_FRAMES = [ark0, ark45, ark90, ark135, ark180, ark225, ark270, ark315];
+import arkImg from "@/kenia/assets/ark-tablets.png";
 
 const FAV_KEY = "kenia.bible.favorites";
 const POOL_KEY = "kenia.bible.pool";
@@ -83,7 +73,6 @@ export default function BibleVerseBox() {
   const [phase, setPhase] = useState("closed"); // closed | opening | open
   const [favs, setFavs] = useState(loadFavs);
   const [confettiActive, setConfettiActive] = useState(false);
-  const [frameIndex, setFrameIndex] = useState(0);
   const poolRef = useRef(loadPool() || VERSES.map((v) => v.id));
 
   const isFav = verse && favs.includes(verse.id);
@@ -93,15 +82,6 @@ export default function BibleVerseBox() {
     const t = setTimeout(() => setConfettiActive(false), 60000);
     return () => clearTimeout(t);
   }, [confettiActive]);
-
-  // Rotação 360° contínua da arca (troca de frame a cada 450ms) enquanto fechada
-  useEffect(() => {
-    if (phase !== "closed") return;
-    const id = setInterval(() => {
-      setFrameIndex((i) => (i + 1) % ARK_FRAMES.length);
-    }, 450);
-    return () => clearInterval(id);
-  }, [phase]);
 
   function drawVerse() {
     let pool = poolRef.current;
@@ -197,43 +177,25 @@ export default function BibleVerseBox() {
                 className="relative z-20 focus:outline-none"
                 aria-label="Abrir baú de promessas"
               >
-                <div className="relative h-[180px] w-[180px] [perspective:800px]">
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    <motion.img
-                      key={frameIndex}
-                      src={ARK_FRAMES[frameIndex]}
-                      alt="Arca da Aliança"
-                      width={200}
-                      height={200}
-                      loading="lazy"
-                      className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_10px_20px_rgba(180,140,60,0.45)]"
-                      initial={{ opacity: 0, rotateY: -25 }}
-                      animate={
-                        phase === "opening"
-                          ? { opacity: [1, 0], scale: [1, 1.05], rotateY: 0 }
-                          : { opacity: 1, rotateY: 0, y: [0, -3, 0] }
-                      }
-                      exit={{ opacity: 0, rotateY: 25 }}
-                      transition={
-                        phase === "opening"
-                          ? { duration: 0.6, ease: "easeOut" }
-                          : { opacity: { duration: 0.35 }, rotateY: { duration: 0.45 }, y: { duration: 3, repeat: Infinity, ease: "easeInOut" } }
-                      }
-                    />
-                  </AnimatePresence>
-                  {phase === "opening" && (
-                    <motion.img
-                      src={arkOpenImg}
-                      alt=""
-                      aria-hidden
-                      width={200}
-                      height={200}
-                      className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_12px_28px_rgba(255,215,120,0.55)]"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: [0, 1, 1], scale: [0.95, 1.08, 1.15] }}
-                      transition={{ duration: 0.9, ease: "easeOut" }}
-                    />
-                  )}
+                <div className="relative h-[190px] w-[190px]">
+                  <motion.img
+                    src={arkImg}
+                    alt="Arca da Aliança com as Tábuas da Lei"
+                    width={200}
+                    height={200}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_12px_24px_rgba(180,140,60,0.5)]"
+                    animate={
+                      phase === "opening"
+                        ? { scale: [1, 1.08, 1.15], y: [0, -6, -10] }
+                        : { y: [0, -4, 0] }
+                    }
+                    transition={
+                      phase === "opening"
+                        ? { duration: 0.9, ease: "easeOut" }
+                        : { duration: 4, repeat: Infinity, ease: "easeInOut" }
+                    }
+                  />
                 </div>
                 {/* Brilho saindo durante opening */}
                 {phase === "opening" && (
