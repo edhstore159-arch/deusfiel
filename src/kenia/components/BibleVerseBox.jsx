@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Share2, Star, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import VERSES from "@/kenia/data/verses.json";
-import chestImg from "@/kenia/assets/promise-chest.png";
+import arkClosedImg from "@/kenia/assets/ark-closed.png";
+import arkOpenImg from "@/kenia/assets/ark-open.png";
 
 const FAV_KEY = "kenia.bible.favorites";
 const POOL_KEY = "kenia.bible.pool";
@@ -177,16 +178,39 @@ export default function BibleVerseBox() {
                 className="relative z-20 focus:outline-none"
                 aria-label="Abrir baú de promessas"
               >
-                <motion.img
-                  src={chestImg}
-                  alt="Baú de promessas"
-                  width={200}
-                  height={200}
-                  loading="lazy"
-                  className="h-[180px] w-[180px] object-contain drop-shadow-[0_10px_20px_rgba(180,140,60,0.35)]"
-                  animate={{ y: [0, -4, 0] }}
-                  transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-                />
+                <div className="relative h-[180px] w-[180px]">
+                  <motion.img
+                    src={arkClosedImg}
+                    alt="Arca da Aliança"
+                    width={200}
+                    height={200}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_10px_20px_rgba(180,140,60,0.45)]"
+                    animate={
+                      phase === "opening"
+                        ? { opacity: [1, 0], scale: [1, 1.05] }
+                        : { opacity: 1, y: [0, -4, 0] }
+                    }
+                    transition={
+                      phase === "opening"
+                        ? { duration: 0.6, ease: "easeOut" }
+                        : { duration: 3.5, repeat: Infinity, ease: "easeInOut" }
+                    }
+                  />
+                  {phase === "opening" && (
+                    <motion.img
+                      src={arkOpenImg}
+                      alt=""
+                      aria-hidden
+                      width={200}
+                      height={200}
+                      className="absolute inset-0 h-full w-full object-contain drop-shadow-[0_12px_28px_rgba(255,215,120,0.55)]"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: [0, 1, 1], scale: [0.95, 1.08, 1.15] }}
+                      transition={{ duration: 0.9, ease: "easeOut" }}
+                    />
+                  )}
+                </div>
                 {/* Brilho saindo durante opening */}
                 {phase === "opening" && (
                   <motion.span
