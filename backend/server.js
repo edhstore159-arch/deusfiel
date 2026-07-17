@@ -19,7 +19,7 @@ import {
   downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://kzlxysxvvlupjtrmxqmb.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://wfycqufqdheluvzhgvfw.supabase.co";
 const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY ||
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
@@ -1389,21 +1389,6 @@ async function startSock() {
         from_me: fromMe,
         created_at,
       });
-
-      // CORREÇÃO 1: Logar mensagem no Supabase para trigger de agendamento
-      if (!fromMe && text && supabaseDb) {
-        supabaseDb.from("whatsapp_messages").insert({
-          contact_id: jid,
-          contact_phone: jidToPhone(jid),
-          contact_name: name,
-          user_id: null,
-          text: text,
-          from_me: false,
-          provider_message_id: m?.key?.id || null,
-        }).then(({ error }) => {
-          if (error) console.error("[whatsapp] log insert error:", error.message);
-        }).catch(() => {});
-      }
 
       const autoDecision = shouldAutoReplyToMessage({
         type,

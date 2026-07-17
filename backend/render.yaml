@@ -19,9 +19,9 @@ services:
       - key: AUTH_DIR
         value: /opt/render/project/src/backend/auth
       - key: SUPABASE_URL
-        value: https://kzlxysxvvlupjtrmxqmb.supabase.co
+        value: https://wfycqufqdheluvzhgvfw.supabase.co
       - key: SUPABASE_ANON_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6bHh5c3h2dmx1cGp0cm14cW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4OTM3MDUsImV4cCI6MjA5MjQ2OTcwNX0.iU5enYnsJExOHtbwpJKQ4bMGZS8hzQIURi6T2y2EQVM
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmeWNxdWZxZGhlbHV2emhndmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MDEwMjEsImV4cCI6MjA5MjQ3NzAyMX0.tt__n-MunXAz5FJiQiWEKF9XE6NHfd7XHyNwVMG4IV4
       - key: OLLAMA_URL
         value: https://unabashed-vertical-crispness.ngrok-free.dev
       - key: OLLAMA_MODEL
