@@ -1,3 +1,4 @@
+import { registerAiBuilderRoutes } from "./ai-builder-handler.js";
 // Backend mínimo para WhatsApp via Baileys.
 // Deploy no Render como Web Service: Build `npm install`, Start `npm start`.
 // Endpoints expostos sob /api/* para casar com o frontend (VITE_BACKEND_URL).
@@ -1151,8 +1152,9 @@ async function autoReply(jid, userText, contactName) {
     return;
   }
   const history = await loadPersistedAiHistory(jid);
+  const phoneDigits = jidToPhone(jid); // CORREÇÃO 2+3: formato numérico para session_id
   try {
-    const data = await callChatAiFunction({ message: userText, history, sessionId: `whatsapp:${jid}` });
+    const data = await callChatAiFunction({ message: userText, history, sessionId: phoneDigits, contact_phone: phoneDigits });
     const reply = cleanRepeatedText(removeTemporalLeaks(String(data?.response || ""), userText));
     if (reply) {
       history.push({ role: "user", content: userText });
@@ -1387,6 +1389,21 @@ async function startSock() {
         from_me: fromMe,
         created_at,
       });
+
+      // CORREÇÃO 1: Logar mensagem no Supabase para trigger de agendamento
+      if (!fromMe && text && supabaseDb) {
+        supabaseDb.from("whatsapp_messages").insert({
+          contact_id: jid,
+          contact_phone: jidToPhone(jid),
+          contact_name: name,
+          user_id: null,
+          text: text,
+          from_me: false,
+          provider_message_id: m?.key?.id || null,
+        }).then(({ error }) => {
+          if (error) console.error("[whatsapp] log insert error:", error.message);
+        }).catch(() => {});
+      }
 
       const autoDecision = shouldAutoReplyToMessage({
         type,
@@ -1987,6 +2004,8 @@ app.post("/api/chat/message", async (req, res) => {
     analysis: { acertividade: result.ok ? 90 : 70, qualificacao: result.ok ? "ok" : "fallback" },
   });
 });
+
+registerAiBuilderRoutes(app);
 
 // ---- Fallback /api/* ----
 app.all("/api/*", (_req, res) => res.json(ok({ fallback: true })));

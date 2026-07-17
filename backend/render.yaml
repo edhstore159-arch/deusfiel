@@ -44,3 +44,5 @@ services:
         value: "15000"
       - key: RECONNECT_MAX_DELAY_MS
         value: "300000"
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
