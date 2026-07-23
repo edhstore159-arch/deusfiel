@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
 import { Separator } from "@/kenia/components/ui/separator";
 import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Flame, Tag, Calendar, AlertTriangle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { MultiAISidePanel } from "@/components/MultiAISidePanel";
 
 const URG_COLORS = {
   baixa: "bg-nude-100 text-nude-700",
@@ -604,6 +605,7 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+      <MultiAISidePanel />
     </div>
   );
 }

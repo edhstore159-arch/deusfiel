@@ -25,6 +25,7 @@ import DebugTool from "@/kenia/pages/DebugTool";
 import ChatIA from "@/kenia/pages/ChatIA";
 import AdminCases from "@/kenia/pages/AdminCases";
 import ResetPassword from "@/kenia/pages/ResetPassword";
+import AIBuilder from "@/kenia/pages/AIBuilder";
 import AppLayout from "@/kenia/components/AppLayout";
 import ScrollToTop from "@/kenia/components/ScrollToTop";
 
@@ -59,6 +60,7 @@ function App() {
             >
               <Route path="/app" element={<Dashboard />} />
               <Route path="/app/chat-ia" element={<ChatIA />} />
+              <Route path="/app/ai-builder" element={<AIBuilder />} />
               <Route path="/app/admin" element={<AdminCases />} />
               <Route path="/app/onboarding" element={<Onboarding />} />
               <Route path="/app/agenda" element={<Agenda />} />

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, KanbanSquare, Scale, Wallet, Sparkles,
   BarChart3, LogOut, MessageSquare, Wrench, Radio,
   CalendarDays, Settings as SettingsIcon, Combine,
-  ShieldCheck, Bot, Menu, X, Smartphone,
+  ShieldCheck, Bot, Menu, X, Smartphone, Zap,
 } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
@@ -18,6 +18,7 @@ const LOGO_IMG = "https://customer-assets.emergentagent.com/job_nude-gold-dashbo
 const NAV = [
   { to: "/app", label: "Atendimento", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
   { to: "/app/chat-ia", label: "Chat IA · Análise", icon: Bot, testid: "nav-chat-ia" },
+  { to: "/app/ai-builder", label: "AI Builder", icon: Zap, testid: "nav-ai-builder" },
   { to: "/app/admin", label: "Painel Admin · Casos", icon: ShieldCheck, testid: "nav-admin" },
   { to: "/app/crm", label: "CRM Pipeline", icon: KanbanSquare, testid: "nav-crm" },
   { to: "/app/agenda", label: "Agenda", icon: CalendarDays, testid: "nav-agenda" },
