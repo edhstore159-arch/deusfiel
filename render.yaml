@@ -2,6 +2,7 @@ services:
   - type: web
     name: jatai-app
     runtime: static
+    autoDeploy: true
     buildCommand: npm install --legacy-peer-deps && npm run build
     staticPublishPath: ./dist
     pullRequestPreviewsEnabled: false
