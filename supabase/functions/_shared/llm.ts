@@ -118,62 +118,74 @@ export async function chatCompletion(opts: ChatOptions) {
 
 async function imageLovable(opts: ImageOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, error: "LOVABLE_API_KEY ausente" };
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
-    body: JSON.stringify({
-      model: "openai/gpt-image-2",
-      prompt: opts.prompt,
-      quality: opts.quality || "low",
-      size: opts.size || "1024x1024",
-      stream: false,
-    }),
-  });
-  if (!resp.ok) return { ok: false as const, error: `Lovable ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
-  const data = await resp.json();
-  const b64 = data?.data?.[0]?.b64_json;
-  if (!b64) return { ok: false as const, error: "Lovable não retornou imagem" };
-  return { ok: true as const, b64, provider: "lovable" };
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
+      body: JSON.stringify({
+        model: "openai/gpt-image-2",
+        prompt: opts.prompt,
+        quality: opts.quality || "low",
+        size: opts.size || "1024x1024",
+        stream: false,
+      }),
+    });
+    if (!resp.ok) return { ok: false as const, error: `Lovable ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
+    const data = await resp.json();
+    const b64 = data?.data?.[0]?.b64_json;
+    if (!b64) return { ok: false as const, error: "Lovable não retornou imagem" };
+    return { ok: true as const, b64, provider: "lovable" };
+  } catch (e) {
+    return { ok: false as const, error: `Lovable erro: ${(e as Error)?.message || e}` };
+  }
 }
 
 async function imageGemini(opts: ImageOptions) {
   if (!GEMINI_KEY) return { ok: false as const, error: "GEMINI_API_KEY ausente" };
-  const model = "gemini-2.5-flash-image";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
-      generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
-    }),
-  });
-  if (!resp.ok) return { ok: false as const, error: `Gemini ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
-  const data = await resp.json();
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  const inline = parts.find((p: any) => p?.inlineData?.data || p?.inline_data?.data);
-  const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
-  if (!b64) return { ok: false as const, error: "Gemini direto não retornou imagem" };
-  return { ok: true as const, b64, provider: "gemini" };
+  try {
+    const model = "gemini-2.5-flash-image";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+        generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+      }),
+    });
+    if (!resp.ok) return { ok: false as const, error: `Gemini ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
+    const data = await resp.json();
+    const parts = data?.candidates?.[0]?.content?.parts || [];
+    const inline = parts.find((p: any) => p?.inlineData?.data || p?.inline_data?.data);
+    const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
+    if (!b64) return { ok: false as const, error: "Gemini direto não retornou imagem" };
+    return { ok: true as const, b64, provider: "gemini" };
+  } catch (e) {
+    return { ok: false as const, error: `Gemini erro: ${(e as Error)?.message || e}` };
+  }
 }
 
 async function imageEmergent(opts: ImageOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, error: "EMERGENT_API_KEY ausente" };
-  const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
-    body: JSON.stringify({
-      model: "gpt-image-1",
-      prompt: opts.prompt,
-      size: opts.size || "1024x1024",
-      n: 1,
-    }),
-  });
-  if (!resp.ok) return { ok: false as const, error: `Emergent ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
-  const data = await resp.json();
-  const b64 = data?.data?.[0]?.b64_json;
-  if (!b64) return { ok: false as const, error: "Emergent não retornou imagem" };
-  return { ok: true as const, b64, provider: "emergent" };
+  try {
+    const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
+      body: JSON.stringify({
+        model: "gpt-image-1",
+        prompt: opts.prompt,
+        size: opts.size || "1024x1024",
+        n: 1,
+      }),
+    });
+    if (!resp.ok) return { ok: false as const, error: `Emergent ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
+    const data = await resp.json();
+    const b64 = data?.data?.[0]?.b64_json;
+    if (!b64) return { ok: false as const, error: "Emergent não retornou imagem" };
+    return { ok: true as const, b64, provider: "emergent" };
+  } catch (e) {
+    return { ok: false as const, error: `Emergent erro: ${(e as Error)?.message || e}` };
+  }
 }
 
 export async function generateImage(opts: ImageOptions) {
