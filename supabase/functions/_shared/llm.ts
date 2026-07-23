@@ -24,10 +24,11 @@ const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
 async function chatLovable(opts: ChatOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, status: 0, error: "LOVABLE_API_KEY ausente" };
   try {
+    const { model: _, ...body } = opts;
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
-      body: JSON.stringify({ model: opts.model || "google/gemini-3-flash-preview", ...opts }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
     return { ok: true as const, data: await resp.json(), provider: "lovable" };
@@ -93,9 +94,9 @@ async function chatEmergent(opts: ChatOptions) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
       body: JSON.stringify({
-        model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/")
-          ? opts.model
-          : "gpt-4o-mini",
+        model: opts.model?.startsWith("openai/")
+          ? opts.model.slice(6)
+          : opts.model || "gpt-4o-mini",
         messages: opts.messages,
         ...(opts.response_format ? { response_format: opts.response_format } : {}),
         ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),

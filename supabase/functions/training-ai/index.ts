@@ -399,7 +399,7 @@ Deno.serve(async (req: Request) => {
           { role: "system", content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
           { role: "user", content: `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nCLIENTE: ${clientName}\n\nResponda ao cliente como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento. Use o nome do cliente, seja empático e fundamentado. Máximo 400 palavras.` },
         ],
-        temperature: 0.5, maxTokens: 1500, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+        temperature: 0.5, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       const response = lawyerResult.ok
@@ -407,7 +407,7 @@ Deno.serve(async (req: Request) => {
         : "Erro ao gerar resposta.";
 
       return new Response(
-        JSON.stringify({ response, provider: lawyerResult.provider || "google/gemini-3-flash-preview" }),
+        JSON.stringify({ response, provider: lawyerResult.provider || "gpt-4o-mini" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     } else if (action === "evaluate") {
@@ -422,7 +422,7 @@ Deno.serve(async (req: Request) => {
           { role: "system", content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
           { role: "user", content: `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nResponda ao cliente como advogado, aplicando estratégias de atendimento. Use o nome do cliente, seja empático e fundamentado. Máximo 400 palavras.` },
         ],
-        temperature: 0.5, maxTokens: 1500, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+        temperature: 0.5, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       lawyerFeedback = "Análise não disponível.";
@@ -558,7 +558,7 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
           { role: "system", content: systemInstruction },
           { role: "user", content: userInstruction },
         ],
-        temperature: 0.7, maxTokens: 1500, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+        temperature: 0.7, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       if (!simResult.ok) {
@@ -599,7 +599,7 @@ Critérios obrigatórios:
           { role: "system", content: evalInstruction },
           { role: "user", content: `Mensagem do cliente: "${clientMessage}"\nResposta do profissional:\n${professionalResponse}\n\nAvalie considerando as estratégias de atendimento ao cliente. Score 0-100.` },
         ],
-        temperature: 0.3, maxTokens: 500, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+        temperature: 0.3, maxTokens: 500, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       let evaluation = { score: 50, feedback: "Avaliação não disponível", strengths: [] as string[], weaknesses: [] as string[] };
@@ -640,7 +640,7 @@ Crie um prompt MELHORADO que corrija os pontos fracos. O prompt deve:
 Responda APENAS com o prompt melhorado, sem explicações extras.` },
             { role: "user", content: `Prompt atual:\n${systemPromptBase}\n\nGere o prompt melhorado aplicando as estratégias de atendimento.` },
           ],
-          temperature: 0.5, maxTokens: 1000, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+          temperature: 0.5, maxTokens: 1000, model: "gpt-4o-mini", preferFastProvider: true,
         });
 
         if (improveResult.ok) {
@@ -666,7 +666,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           improved_prompt: improvedPrompt,
           mode,
           area,
-          provider: "google/gemini-3-flash-preview",
+          provider: "gpt-4o-mini",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -705,7 +705,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
                 { role: "system", content: GENERATE_CASE_PROMPT },
                 { role: "user", content: `Gere um caso simulado para treinamento de ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"} na área de ${iterArea.charAt(0).toUpperCase() + iterArea.slice(1)} com dificuldade Médio. Use nomes fictícios. Caso realista.` },
               ],
-              temperature: 0.8, maxTokens: 4000, model: "google/gemini-3-flash-preview",
+              temperature: 0.8, maxTokens: 4000, model: "gpt-4o-mini",
             });
             if (!caseResult.ok) continue;
             const caseParsed = parseJsonResponse(caseResult.data?.choices?.[0]?.message?.content || "");
@@ -718,7 +718,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
                 { role: "system", content: currentPrompt + "\n\n" + STRATEGIES_CONTEXT },
                 { role: "user", content: `Caso: ${caseData.title}\n\n${caseData.description}\n\nPergunta: ${caseData.question || ""}\n\nResponda como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento ao cliente.` },
               ],
-              temperature: 0.7, maxTokens: 3000, model: "google/gemini-3-flash-preview",
+              temperature: 0.7, maxTokens: 3000, model: "gpt-4o-mini",
             });
             if (!responseResult.ok) continue;
             const secretaryResponse = responseResult.data?.choices?.[0]?.message?.content || "";
@@ -729,7 +729,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
                 { role: "system", content: EVALUATE_PROMPT },
                 { role: "user", content: `Avalie RIGOROSAMENTE a resposta do profissional no modo ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"}.\n\nCASO:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS AO CASO: ${caseData.applicable_laws?.join(", ") || "N/A"}\nQUESTÕES JURÍDICAS CENTRAIS: ${caseData.key_issues?.join("; ") || "N/A"}\n\nRESPOSTA DO PROFISSIONAL:\n${secretaryResponse}\n\nScore deve ser RIGOROSO: respostas genéricas sem artigos específicos devem receber abaixo de 50.` },
               ],
-              temperature: 0.3, maxTokens: 1500, model: "google/gemini-3-flash-preview",
+              temperature: 0.3, maxTokens: 1500, model: "gpt-4o-mini",
             });
             if (!evalResult.ok) continue;
             const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
@@ -786,7 +786,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
             { role: "system", content: `Melhore o prompt do ${mode === "lawyer" ? "advogado" : "juiz"} para treinamento jurídico. JSON: {"improved_prompt": "...", "changes": []}` },
             { role: "user", content: `PROMPT ATUAL:\n${currentPrompt}\n\nWEAKNESSES:\n${allWeaknesses.slice(0, 5).join("\n")}\n\nSTRENGTHS:\n${allStrengths.slice(0, 3).join("\n")}\n\nScore atual: ${avgScore}/100. Meta: +${targetImprovement}%. Melhore o prompt para o profissional responder melhor em treinos.` },
           ],
-          temperature: 0.7, maxTokens: 4000, model: "google/gemini-3-flash-preview",
+          temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini",
         });
 
         if (improveResult.ok) {
@@ -820,7 +820,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           target_improvement: targetImprovement,
           reached_target: iterations[iterations.length - 1]?.reachedTarget || false,
           mode,
-          provider: "google/gemini-3-flash-preview",
+          provider: "gpt-4o-mini",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -843,7 +843,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           { role: "system", content: SECRETARY_STRATEGY_PROMPT },
           { role: "user", content: `Gere um cenário realista de atendimento para a estratégia: "${strategy.name}" — ${strategy.desc}.\n\nO cenário deve simular um cliente real de escritório de advocacia brasileiro. Inclua contexto emocional, urgência, objeções prováveis e detalhes que tornem o treinamento desafiador. Use nomes fictícios brasileiros.` },
         ],
-        temperature: 0.8, maxTokens: 2000, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+        temperature: 0.8, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       if (!stratResult.ok) {
@@ -864,7 +864,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
 
       console.log(`[training-ai] secretary_strategy: ${strategyId}`);
       return new Response(
-        JSON.stringify({ strategy: strategyData, provider: "google/gemini-3-flash-preview" }),
+        JSON.stringify({ strategy: strategyData, provider: "gpt-4o-mini" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -887,7 +887,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           { role: "system", content: SECRETARY_EVALUATE_PROMPT },
           { role: "user", content: `CENÁRIO DE TREINAMENTO:\n${scenario}\n\nESTRATÉGIA: ${strategyId}\n\nRESPOSTA DA SECRETÁRIA:\n${userResponse}\n\nPROMPT ATUAL DA SECRETÁRIA:\n${(currentPrompt || "").slice(0, 1500)}\n\nAvalie a resposta considerando todas as estratégias de atendimento ao cliente. Score 0-100.` },
         ],
-        temperature: 0.3, maxTokens: 2000, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+        temperature: 0.3, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       if (!evalResult.ok) {
@@ -910,7 +910,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           tips: Array.isArray(parsed?.tips) ? parsed.tips : [],
           improved_response: String(parsed?.improved_response || ""),
           real_pattern_check: parsed?.real_pattern_check || {},
-          provider: "google/gemini-3-flash-preview",
+          provider: "gpt-4o-mini",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -934,7 +934,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
           { role: "user", content: `PROMPT ATUAL DA SECRETÁRIA:\n${currentPrompt.slice(0, 3000)}\n\nRESUMO DA AVALIAÇÃO:\n${evaluationSummary.slice(0, 1500)}\n\nPONTOS FRACOS:\n${weaknesses.map((w, i) => `${i + 1}. ${w}`).join("\n") || "Nenhum identificado"}\n\nDICAS:\n${tips.map((t, i) => `${i + 1}. ${t}`).join("\n") || "Nenhuma identificada"}\n\nMELHORE o prompt da secretária para que ela responda melhor nos próximos treinos. O prompt deve ser completo e autocontido.` },
         ],
-        temperature: 0.7, maxTokens: 4000, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+        temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       if (!improveResult.ok) {
@@ -963,7 +963,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           improved_prompt: improvedPrompt,
           changes: Array.isArray(parsed?.changes) ? parsed.changes : [],
           reasoning: String(parsed?.reasoning || "Prompt melhorado com base no feedback."),
-          provider: "google/gemini-3-flash-preview",
+          provider: "gpt-4o-mini",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -988,7 +988,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
               { role: "system", content: SECRETARY_STRATEGY_PROMPT },
               { role: "user", content: `Gere um cenário para a estratégia: "${strategy.name}" — ${strategy.desc}. Use nomes fictícios brasileiros. Cenário realista.` },
             ],
-            temperature: 0.8, maxTokens: 1500, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+            temperature: 0.8, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
           });
           if (!scenResult.ok) continue;
           const scenParsed = parseJsonResponse(scenResult.data?.choices?.[0]?.message?.content || "");
@@ -1000,7 +1000,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
               { role: "system", content: currentPrompt },
               { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica da Dra. Kênia Garcia, aplicando estratégias de atendimento.` },
             ],
-            temperature: 0.7, maxTokens: 1000, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+            temperature: 0.7, maxTokens: 1000, model: "gpt-4o-mini", preferFastProvider: true,
           });
           if (!respResult.ok) continue;
           const secretaryResponse = respResult.data?.choices?.[0]?.message?.content || "";
@@ -1011,7 +1011,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
               { role: "system", content: SECRETARY_EVALUATE_PROMPT },
               { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nESTRATÉGIA: ${strategy.name}\n\nRESPOSTA DA SECRETÁRIA:\n${secretaryResponse}\n\nAvalie. Score 0-100.` },
             ],
-            temperature: 0.3, maxTokens: 1500, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+            temperature: 0.3, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
           });
           if (!evalResult.ok) continue;
           const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
@@ -1047,7 +1047,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
             { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
             { role: "user", content: `PROMPT ATUAL:\n${currentPrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${[...new Set(allWeaknesses)].slice(0, 8).join("\n")}\n\nSTRENGTHS:\n${[...new Set(allStrengths)].slice(0, 5).join("\n")}\n\nScore médio: ${avgScore}/100. Melhore o prompt.` },
           ],
-          temperature: 0.7, maxTokens: 4000, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+          temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini", preferFastProvider: true,
         });
         if (improveResult.ok) {
           const impParsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
@@ -1071,7 +1071,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           results,
           stats: { total, passed, avgScore },
           improved_prompt: improvedPrompt,
-          provider: "google/gemini-3-flash-preview",
+          provider: "gpt-4o-mini",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -1106,7 +1106,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
                 { role: "system", content: SECRETARY_STRATEGY_PROMPT },
                 { role: "user", content: `Cenário para: "${strategy.name}" — ${strategy.desc}. Només fictícios.` },
               ],
-              temperature: 0.8, maxTokens: 1200, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+              temperature: 0.8, maxTokens: 1200, model: "gpt-4o-mini", preferFastProvider: true,
             });
             if (!scenResult.ok) continue;
             const scenParsed = parseJsonResponse(scenResult.data?.choices?.[0]?.message?.content || "");
@@ -1117,7 +1117,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
                 { role: "system", content: activePrompt },
                 { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica.` },
               ],
-              temperature: 0.7, maxTokens: 800, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+              temperature: 0.7, maxTokens: 800, model: "gpt-4o-mini", preferFastProvider: true,
             });
             if (!respResult.ok) continue;
             const secretaryResponse = respResult.data?.choices?.[0]?.message?.content || "";
@@ -1127,7 +1127,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
                 { role: "system", content: SECRETARY_EVALUATE_PROMPT },
                 { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nRESPOSTA:\n${secretaryResponse}\n\nAvalie. Score 0-100.` },
               ],
-              temperature: 0.3, maxTokens: 1200, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+              temperature: 0.3, maxTokens: 1200, model: "gpt-4o-mini", preferFastProvider: true,
             });
             if (!evalResult.ok) continue;
             const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
@@ -1175,7 +1175,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
             { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
             { role: "user", content: `PROMPT ATUAL:\n${activePrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${allWeaknesses.slice(0, 5).join("\n")}\n\nSTRENGTHS:\n${allStrengths.slice(0, 3).join("\n")}\n\nScore: ${avgScore}/100. Meta: +${targetImprovement}%. Melhore o prompt.` },
           ],
-          temperature: 0.7, maxTokens: 4000, model: "google/gemini-3-flash-preview", preferFastProvider: true,
+          temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini", preferFastProvider: true,
         });
         if (improveResult.ok) {
           const impParsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
@@ -1208,7 +1208,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           total_improvement: totalImprovement,
           target_improvement: targetImprovement,
           reached_target: iterations[iterations.length - 1]?.reachedTarget || false,
-          provider: "google/gemini-3-flash-preview",
+          provider: "gpt-4o-mini",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -1226,7 +1226,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
       messages,
       temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
       maxTokens: 4000,
-      model: "google/gemini-3-flash-preview",
+      model: "gpt-4o-mini",
     });
 
     if (!aiResult.ok) {
