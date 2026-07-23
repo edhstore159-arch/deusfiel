@@ -25,6 +25,8 @@ services:
         value: https://unabashed-vertical-crispness.ngrok-free.dev/api/generate
       - key: VITE_OLLAMA_MODEL
         value: qwen2.5:3b-instruct
+      - key: VITE_BACKEND_URL
+        value: https://kenia-whatsapp-backend.onrender.com
   - type: web
     name: kenia-whatsapp-backend
     runtime: node
