@@ -207,6 +207,10 @@ export default function LegalTraining() {
   const [improvementData, setImprovementData] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  const [improvingPrompt, setImprovingPrompt] = useState(false);
+  const [improvePromptData, setImprovePromptData] = useState(null);
+  const [showImprovePrompt, setShowImprovePrompt] = useState(false);
+
   const [autoLoopTraining, setAutoLoopTraining] = useState(false);
   const [autoLoopResults, setAutoLoopResults] = useState(null);
   const [autoLoopProgress, setAutoLoopProgress] = useState(null);
@@ -453,6 +457,7 @@ export default function LegalTraining() {
         messages: [...updatedSession.messages, { role: "assistant", content: data.feedback }],
         score: data.score,
         evaluation: data.evaluation,
+        lawyer_feedback: data.lawyer_feedback,
       };
       setCurrentSession(finalSession);
 
@@ -536,14 +541,48 @@ export default function LegalTraining() {
     }
   };
 
+  const improvePrompt = async () => {
+    if (!currentSession || currentSession.score == null || improvingPrompt) return;
+    setImprovingPrompt(true);
+    setImprovePromptData(null);
+    try {
+      const lastUserMsg = [...currentSession.messages].reverse().find((m) => m.role === "user")?.content || "";
+      const evaluation = currentSession.evaluation || {};
+      const weaknesses = evaluation.weaknesses || [];
+      const tips = [];
+      const feedback = currentSession.messages.find((m) => m.content?.includes("Avaliação"))?.content || "";
+
+      const { data, error } = await supabase.functions.invoke("training-ai", {
+        body: {
+          action: "improve_prompt",
+          current_prompt: currentPrompt || `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`,
+          evaluation_summary: feedback.slice(0, 2000),
+          weaknesses,
+          tips,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setImprovePromptData(data);
+      setShowImprovePrompt(true);
+      toast.success("Prompt melhorado gerado!");
+    } catch (e) {
+      toast.error("Erro ao melhorar prompt: " + (e?.message || e));
+    } finally {
+      setImprovingPrompt(false);
+    }
+  };
+
   const resetSession = () => {
     setCurrentSession(null);
     setShowConfig(true);
     setInput("");
     setCorrectedData(null);
     setImprovementData(null);
-
+    setImprovePromptData(null);
     setShowSuggestions(false);
+    setShowImprovePrompt(false);
   };
 
   const simulateWhatsApp = async () => {
@@ -1002,7 +1041,58 @@ export default function LegalTraining() {
                         {improving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Lightbulb className="w-3 h-3 mr-1" />}
                         Melhorar
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={improvePrompt}
+                        disabled={improvingPrompt}
+                        className="flex-1 text-[10px] h-7"
+                      >
+                        {improvingPrompt ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Target className="w-3 h-3 mr-1" />}
+                        Melhorar Prompt
+                      </Button>
                     </div>
+
+                    {/* Judge/Lawyer Position */}
+                    {currentSession.lawyer_feedback && (
+                      <div className="mt-3 p-3 rounded-lg border border-purple-200 bg-purple-50/50">
+                        <div className="text-[10px] font-medium text-purple-800 mb-2 flex items-center gap-1">
+                          {mode === "lawyer" ? <Scale className="w-3 h-3" /> : <Star className="w-3 h-3" />}
+                          {mode === "lawyer" ? "Posição do Advogado" : "Posição do Juiz"} em relação ao caso
+                        </div>
+                        <div className="text-xs text-purple-900 whitespace-pre-wrap leading-relaxed">
+                          {currentSession.lawyer_feedback}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Improve Prompt Modal */}
+                    {showImprovePrompt && improvePromptData && (
+                      <div className="mt-3 p-3 rounded-lg border border-amber-200 bg-amber-50/50">
+                        <div className="text-[10px] font-medium text-amber-800 mb-2 flex items-center gap-1">
+                          <Target className="w-3 h-3" /> Prompt Melhorado
+                        </div>
+                        {improvePromptData.changes?.length > 0 && (
+                          <div className="mb-2 space-y-1">
+                            {improvePromptData.changes.map((c, i) => (
+                              <div key={i} className="text-[10px] text-amber-700">• {c}</div>
+                            ))}
+                          </div>
+                        )}
+                        {improvePromptData.reasoning && (
+                          <div className="text-[10px] text-amber-600 italic mb-2">{improvePromptData.reasoning}</div>
+                        )}
+                        <pre className="text-[10px] bg-amber-100 rounded p-2 whitespace-pre-wrap max-h-[20vh] overflow-auto border border-amber-200">{improvePromptData.improved_prompt}</pre>
+                        <div className="mt-2 flex gap-2">
+                          <Button size="sm" onClick={() => { setCurrentPrompt(improvePromptData.improved_prompt); toast.success("Prompt aplicado!"); setShowImprovePrompt(false); }} className="flex-1 text-[10px] h-7 bg-amber-600 hover:bg-amber-700">
+                            <CheckCircle2 className="w-3 h-3 mr-1" /> Aplicar Prompt
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setShowImprovePrompt(false)} className="text-[10px] h-7">
+                            Fechar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1347,7 +1437,40 @@ export default function LegalTraining() {
                           {improving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Lightbulb className="w-3 h-3 mr-1" />}
                           Melhorar
                         </Button>
+                        <Button size="sm" variant="outline" onClick={improvePrompt} disabled={improvingPrompt} className="flex-1 text-[10px] h-7">
+                          {improvingPrompt ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Target className="w-3 h-3 mr-1" />}
+                          Prompt
+                        </Button>
                       </div>
+
+                      {/* Mobile: Judge/Lawyer Position */}
+                      {currentSession.lawyer_feedback && (
+                        <div className="mt-3 p-2 rounded border border-purple-200 bg-purple-50/50">
+                          <div className="text-[10px] font-medium text-purple-800 mb-1 flex items-center gap-1">
+                            {mode === "lawyer" ? <Scale className="w-3 h-3" /> : <Star className="w-3 h-3" />}
+                            {mode === "lawyer" ? "Posição do Advogado" : "Posição do Juiz"}
+                          </div>
+                          <div className="text-[10px] text-purple-900 whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">
+                            {currentSession.lawyer_feedback}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Mobile: Improve Prompt Modal */}
+                      {showImprovePrompt && improvePromptData && (
+                        <div className="mt-3 p-2 rounded border border-amber-200 bg-amber-50/50">
+                          <div className="text-[10px] font-medium text-amber-800 mb-1">Prompt Melhorado</div>
+                          <pre className="text-[10px] bg-amber-100 rounded p-2 whitespace-pre-wrap max-h-24 overflow-auto border border-amber-200">{improvePromptData.improved_prompt}</pre>
+                          <div className="mt-2 flex gap-2">
+                            <Button size="sm" onClick={() => { setCurrentPrompt(improvePromptData.improved_prompt); toast.success("Prompt aplicado!"); setShowImprovePrompt(false); }} className="flex-1 text-[10px] h-7 bg-amber-600 hover:bg-amber-700">
+                              <CheckCircle2 className="w-3 h-3 mr-1" /> Aplicar
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setShowImprovePrompt(false)} className="text-[10px] h-7">
+                              Fechar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

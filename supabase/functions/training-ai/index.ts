@@ -1265,7 +1265,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
       const feedback = String(parsed.feedback || "Avaliação concluída.");
       console.log("[training-ai] Evaluated via", aiResult.provider, "Score:", evalScore);
       return new Response(
-        JSON.stringify({ score: evalScore, feedback: lawyerFeedback + "\n\n---\n\n" + feedback, evaluation: evalData, provider: aiResult.provider }),
+        JSON.stringify({ score: evalScore, feedback: lawyerFeedback + "\n\n---\n\n" + feedback, evaluation: evalData, lawyer_feedback: lawyerFeedback, provider: aiResult.provider }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
