@@ -13,7 +13,7 @@ import { buildDebugInstructionMessage, deliverLovableDebugInstruction } from "@/
  * No editor da Lovable usa CustomEvent para acionar o "Try to Fix" nativo.
  * Fora do editor salva a instrução no backend para não quebrar a tela.
  */
-const BUCKET = "debug-uploads";
+const BUCKET = "debug-attachments";
 
 type Uploaded = { name: string; url: string; type: string; size: number };
 
@@ -59,29 +59,43 @@ export const ErrorDebugPopup = () => {
     };
   }, []);
 
+  const readAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error || new Error("read error"));
+      reader.readAsDataURL(file);
+    });
+
   const handleUpload = async (list: FileList | null) => {
     if (!list || list.length === 0) return;
     setUploading(true);
     const out: Uploaded[] = [];
     try {
       for (const file of Array.from(list)) {
-        const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-        const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
         setProgress({ name: file.name, pct: 0 });
-        const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type || "application/octet-stream",
-        });
-        if (error) throw error;
-        const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-        out.push({ name: file.name, url: data.publicUrl, type: file.type, size: file.size });
+        let url = "";
+        // Tenta o bucket primeiro; se falhar, faz fallback para data URL local
+        try {
+          const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+          const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
+          const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type || "application/octet-stream",
+          });
+          if (error) throw error;
+          url = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+        } catch {
+          url = await readAsDataUrl(file);
+        }
+        out.push({ name: file.name, url, type: file.type, size: file.size });
         setProgress({ name: file.name, pct: 100 });
       }
       setFiles((prev) => [...prev, ...out]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      alert(`Falha no upload: ${msg}`);
+      alert(`Falha ao anexar: ${msg}`);
     } finally {
       setUploading(false);
       setProgress(null);
@@ -106,11 +120,12 @@ export const ErrorDebugPopup = () => {
       status: "pending",
     };
 
-    const { error } = await (supabase.from("debug_instructions") as any).insert(payload);
+    const sb = supabase as any;
+    const { error } = await sb.from("debug_instructions").insert(payload);
     if (!error) return;
 
     if (/schema cache|column/i.test(error.message || "")) {
-      const { error: retryError } = await (supabase.from("debug_instructions") as any).insert({
+      const { error: retryError } = await sb.from("debug_instructions").insert({
         user_id: user?.id ?? null,
         instruction: instructionWithUser,
         attachments: files,

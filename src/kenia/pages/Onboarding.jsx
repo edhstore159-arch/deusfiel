@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, DEFAULT_PROMPT } from "@/kenia/lib/api";
+import { api } from "@/kenia/lib/api";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
@@ -16,6 +16,21 @@ import {
   Building2, MessageSquare, Sparkles, Loader2, QrCode,
 } from "lucide-react";
 
+const DEFAULT_BOT_PROMPT = [
+  "Você é a secretária da Kênia Garcia no WhatsApp.",
+  "Sua função é atender clientes com cordialidade, empatia e profissionalismo, auxiliando em questões jurídicas e dúvidas gerais.",
+  "Nunca diga que é uma inteligência artificial, assistente virtual, chatbot, robô ou sistema automatizado.",
+  "Não mencione tecnologias, modelos de IA, automações ou sistemas internos.",
+  "Quando iniciar conversa ou se apresentar, diga exatamente: \"Olá! Sou a secretária da Kênia Garcia. Como posso ajudar?\"",
+  "Responda de forma clara, objetiva e humanizada. Não informe data, hora ou dia, exceto se o cliente pedir.",
+  "Não repita a mesma frase em mensagens consecutivas, não repita a apresentação em todas as respostas e apresente-se apenas no início da conversa ou quando necessário.",
+  "Evite repetir perguntas já respondidas e orientações já fornecidas; se o cliente não responder, reformule a pergunta de outra forma.",
+  "Use todo o histórico disponível para manter continuidade; não pergunte novamente informações que o cliente já respondeu.",
+  "Relacione novas informações com fatos anteriores e mantenha contexto sobre nome, telefone, e-mail, área jurídica, fatos principais, datas, documentos, objetivo e status do atendimento.",
+  "Em agendamentos, confirme apenas dados necessários que ainda não foram fornecidos; nunca trate cada mensagem como uma conversa nova quando houver histórico.",
+  "Nunca invente leis ou prometa resultado jurídico.",
+].join(" ");
+
 export default function Onboarding() {
   const [step, setStep] = useState(1);
   const { user } = useAuth();
@@ -23,7 +38,7 @@ export default function Onboarding() {
   const [data, setData] = useState({
     office_name: "", oab: user?.oab || "",
     main_area: "Trabalhista",
-    bot_prompt: DEFAULT_PROMPT,
+    bot_prompt: DEFAULT_BOT_PROMPT,
   });
   const [zapi, setZapi] = useState({
     zapi_instance_id: "", zapi_instance_token: "", zapi_client_token: "",
@@ -57,22 +72,28 @@ export default function Onboarding() {
 
   useEffect(() => {
     if (step !== 3 || connected) return;
+    let stopped = false;
     const refreshQr = async () => {
       try {
         const { data: status } = await api.get("/whatsapp/baileys/status");
         if (status?.connected) {
           setConnected(true);
           setQrImg(null);
+          try { localStorage.setItem("wa_connected", "1"); } catch {}
           return;
         }
-        const { data: qrData } = await api.get("/whatsapp/qr");
-        applyQrResponse(qrData);
+        // Só pede novo QR se ainda não temos um — evita invalidar a sessão atual
+        if (!qrImg && !stopped) {
+          const { data: qrData } = await api.get("/whatsapp/qr");
+          applyQrResponse(qrData);
+        }
       } catch {}
     };
     refreshQr();
-    const timer = window.setInterval(refreshQr, 10000);
-    return () => window.clearInterval(timer);
-  }, [step, connected]);
+    // Polling longo (60s) para não derrubar QR/sessão ativa
+    const timer = window.setInterval(refreshQr, 60000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [step, connected, qrImg]);
 
   const saveStep1 = async () => {
     if (!data.office_name) { toast.error("Informe o nome do escritório"); return; }
@@ -133,14 +154,8 @@ export default function Onboarding() {
   const progress = (step / 4) * 100;
 
   return (
-    <div className="min-h-screen bg-nude-50 flex items-center justify-center p-3 sm:p-6">
+    <div className="min-h-screen bg-nude-50 flex items-start justify-center p-3 sm:p-6 pt-28">
       <div className="w-full max-w-2xl">
-        <div className="flex items-center gap-2.5 mb-4 sm:mb-6">
-          <div className="w-9 h-9 rounded-md bg-nude-900 grid place-items-center shrink-0">
-            <Scale className="w-5 h-5 text-white" />
-          </div>
-          <div className="font-display font-bold text-lg sm:text-xl truncate">Espírito Santo<span className="text-gold-600">.</span></div>
-        </div>
 
         <Card className="p-4 sm:p-8 border-nude-200 shadow-sm">
           <div className="mb-6">

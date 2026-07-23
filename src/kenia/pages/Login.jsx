@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/kenia/contexts/AuthContext";
 import { api } from "@/kenia/lib/api";
@@ -9,8 +9,54 @@ import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/kenia/components/ui/tabs";
 import { Card } from "@/kenia/components/ui/card";
-import { Gem, ArrowRight } from "lucide-react";
+import BibleVerseBox from "@/kenia/components/BibleVerseBox";
+import { Gem, ArrowRight, Cross } from "lucide-react";
 import { toast } from "sonner";
+import VERSES from "@/kenia/data/verses.json";
+
+const DAILY_PROMISE_KEY = "kenia.daily_promise";
+
+function DailyPromise() {
+  const verse = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      const stored = JSON.parse(localStorage.getItem(DAILY_PROMISE_KEY) || "null");
+      if (stored && stored.date === today) return stored.verse;
+    } catch {}
+    const idx = Math.floor(Math.random() * VERSES.length);
+    const v = VERSES[idx];
+    try { localStorage.setItem(DAILY_PROMISE_KEY, JSON.stringify({ date: today, verse: v })); } catch {}
+    return v;
+  }, []);
+
+  if (!verse) return null;
+
+  return (
+    <div className="mx-auto w-full max-w-[360px] mb-5 animate-fade-up">
+      <div className="relative overflow-hidden rounded-xl border border-amber-200/60 bg-gradient-to-br from-amber-50/80 via-white to-amber-50/50 p-4 shadow-[0_4px_20px_-6px_rgba(180,140,60,0.2)]">
+        <div className="absolute -top-2 -right-2 opacity-10">
+          <Cross className="w-16 h-16 text-amber-700 rotate-12" />
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm">
+            <Cross className="h-4 w-4 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700">
+              Promessa de Deus para hoje
+            </p>
+            <p className="mt-1.5 font-serif text-[14px] leading-relaxed text-nude-800 italic">
+              "{verse.texto}"
+            </p>
+            <p className="mt-1.5 text-[11px] font-semibold text-amber-600">
+              {verse.livro} {verse.capitulo}:{verse.versiculo}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const HERO_IMG =
   "https://customer-assets.emergentagent.com/job_nude-gold-dashboard/artifacts/3q8ey4x2_5.IMG_8848.jpg";
@@ -43,7 +89,12 @@ export default function Login() {
       if (error) throw error;
       toast.success("E-mail de recuperação enviado. Verifique sua caixa de entrada.");
     } catch (err) {
-      toast.error(err?.message || "Erro ao enviar e-mail");
+      const msg = String(err?.message || "").toLowerCase();
+      if (msg.includes("rate") || msg.includes("limit")) {
+        toast.error("Muitas tentativas. Aguarde alguns minutos e tente novamente.");
+      } else {
+        toast.error(err?.message || "Erro ao enviar e-mail");
+      }
     } finally {
       setLoading(false);
     }
@@ -58,7 +109,12 @@ export default function Login() {
       const done = localStorage.getItem("onboarding_done");
       navigate(done ? "/app" : "/app/onboarding");
     } catch (err) {
-      toast.error(err?.message || "Erro ao entrar");
+      const msg = String(err?.message || "").toLowerCase();
+      if (msg.includes("rate") || msg.includes("limit")) {
+        toast.error("Muitas tentativas. Aguarde alguns minutos e tente novamente.");
+      } else {
+        toast.error(err?.message || "Erro ao entrar");
+      }
     } finally { setLoading(false); }
   };
   // Após o callback do Google, o lovable SDK detecta os tokens na URL e dispara
@@ -103,7 +159,12 @@ export default function Login() {
       toast.success("Conta criada. Vamos configurar seu escritório.");
       navigate("/app/onboarding");
     } catch (err) {
-      toast.error(err?.message || "Erro no cadastro");
+      const msg = String(err?.message || "").toLowerCase();
+      if (msg.includes("rate") || msg.includes("limit")) {
+        toast.error("Muitas tentativas. Aguarde alguns minutos e tente novamente.");
+      } else {
+        toast.error(err?.message || "Erro no cadastro");
+      }
     } finally { setLoading(false); }
   };
 
@@ -178,6 +239,10 @@ export default function Login() {
               Seu estúdio jurídico inteligente te aguarda.
             </p>
           </div>
+
+          <BibleVerseBox />
+
+          <DailyPromise />
 
           <Card className="p-8 border-nude-200 shadow-sm shadow-nude-900/5 bg-card">
             <Tabs defaultValue="login">

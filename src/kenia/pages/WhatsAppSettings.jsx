@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/kenia/components/ui/
 import { Badge } from "@/kenia/components/ui/badge";
 import { Separator } from "@/kenia/components/ui/separator";
 import { toast } from "sonner";
+import { formatWhatsAppPhone, pickWhatsAppNumber } from "@/kenia/lib/phone";
 import {
   Zap, Server, Building2, Smartphone, CheckCircle2, XCircle,
   Loader2, Bot, Send, QrCode, Copy, Activity, AlertTriangle, RefreshCw,
@@ -38,6 +39,55 @@ export default function WhatsAppSettings() {
   const [baileysStatus, setBaileysStatus] = useState(null);
   const [baileysQr, setBaileysQr] = useState(null);
   const [baileysLoggingOut, setBaileysLoggingOut] = useState(false);
+  // Self-hosted Baileys server config + multi-instance ("números virtuais")
+  const [baileysBackend, setBaileysBackend] = useState(() => {
+    try { return localStorage.getItem("kenia:baileys-backend-url") || ""; } catch { return ""; }
+  });
+  const [baileysInstances, setBaileysInstances] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("kenia:baileys-instances") || "[]"); } catch { return []; }
+  });
+  const [baileysInstance, setBaileysInstance] = useState(() => {
+    try { return localStorage.getItem("kenia:baileys-instance") || ""; } catch { return ""; }
+  });
+  const [newInstanceName, setNewInstanceName] = useState("");
+
+  const persistInstances = (list) => {
+    setBaileysInstances(list);
+    try { localStorage.setItem("kenia:baileys-instances", JSON.stringify(list)); } catch {}
+  };
+  const selectInstance = (name) => {
+    setBaileysInstance(name);
+    try { localStorage.setItem("kenia:baileys-instance", name || ""); } catch {}
+    setBaileysStatus(null);
+    setBaileysQr(null);
+    setTimeout(() => pollBaileys(), 200);
+  };
+  const addInstance = () => {
+    const name = (newInstanceName || "").trim().replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 40);
+    if (!name) { toast.error("Informe um nome para o número (ex: kenia, secretaria2)."); return; }
+    if (baileysInstances.includes(name)) { toast.info("Esse número já existe."); return; }
+    const next = [...baileysInstances, name];
+    persistInstances(next);
+    setNewInstanceName("");
+    selectInstance(name);
+    toast.success(`Número "${name}" adicionado. Escaneie o QR abaixo.`);
+  };
+  const removeInstance = (name) => {
+    if (!window.confirm(`Remover o número "${name}"? Isso não desconecta a sessão no servidor.`)) return;
+    const next = baileysInstances.filter((n) => n !== name);
+    persistInstances(next);
+    if (baileysInstance === name) selectInstance(next[0] || "");
+  };
+  const saveBackendUrl = () => {
+    const url = (baileysBackend || "").trim().replace(/\/$/, "");
+    try { localStorage.setItem("kenia:baileys-backend-url", url); } catch {}
+    toast.success("URL do servidor Baileys salva — recarregando...");
+    setTimeout(() => window.location.reload(), 600);
+  };
+
+
+  const centerDigits = pickWhatsAppNumber(baileysStatus, cfg);
+  const centerPhone = centerDigits ? formatWhatsAppPhone(centerDigits) : "—";
 
   const backendUrl = (import.meta.env.VITE_BACKEND_URL || "");
   const webhookBase = `${backendUrl}/api/whatsapp/webhook`;
@@ -58,13 +108,33 @@ export default function WhatsAppSettings() {
   useEffect(() => {
     if (cfg?.provider !== "baileys") return;
     pollBaileys();
-    const t = setInterval(pollBaileys, 8000);
+    const t = setInterval(pollBaileys, 30000);
     return () => clearInterval(t);
   }, [cfg?.provider]);
 
-  // Contador de falhas consecutivas para evitar flapping (desconexões falsas)
+  // Contadores de flapping para evitar desconexões falsas por glitch de rede/sidecar
   const failureCountRef = useRef(0);
-  const MAX_FAILURES_BEFORE_OFFLINE = 5;
+  const disconnectCountRef = useRef(0);
+  const MAX_FAILURES_BEFORE_OFFLINE = 8;
+  const MAX_DISCONNECTS_BEFORE_OFFLINE = 5;
+
+  // Auto-renew QR when it's about to expire (every 25 seconds when QR is visible)
+  useEffect(() => {
+    if (cfg?.provider !== "baileys" || baileysStatus?.connected || !baileysQr?.qr) return;
+    const t = setInterval(async () => {
+      try {
+        const { data: st } = await api.get("/whatsapp/baileys/status");
+        if (st?.connected) return;
+        if (st?.qr_available && st?.qr_expires_in_s != null && st.qr_expires_in_s < 20) {
+          const { data } = await api.post("/whatsapp/baileys/reconnect");
+          if (data?.ok) {
+            setTimeout(() => pollBaileys(), 2000);
+          }
+        }
+      } catch {}
+    }, 25000);
+    return () => clearInterval(t);
+  }, [cfg?.provider, baileysStatus?.connected, baileysQr?.qr]);
 
   const load = async () => {
     try {
@@ -80,15 +150,28 @@ export default function WhatsAppSettings() {
       const { data: st } = await api.get("/whatsapp/baileys/status");
       const normalized = normalizeBaileysStatus(st);
       failureCountRef.current = 0;
-      setBaileysStatus(normalized);
-      if (!normalized.connected) {
-        try {
-          const { data: qr } = await api.get("/whatsapp/baileys/qr");
-          setBaileysQr(qr);
-        } catch { /* ignore qr fetch errors */ }
-      } else {
+      if (normalized.connected) {
+        disconnectCountRef.current = 0;
+        setBaileysStatus(normalized);
         setBaileysQr(null);
         if (cfg?.provider !== "baileys") setCfg((current) => current ? { ...current, provider: "baileys", bot_enabled: true } : current);
+      } else {
+        // Tolerância: se já estava conectado, exige N status "desconectado" seguidos
+        // antes de baixar o estado, evitando flapping enquanto o sidecar renegocia.
+        disconnectCountRef.current += 1;
+        setBaileysStatus((prev) => {
+          if (prev?.connected && disconnectCountRef.current < MAX_DISCONNECTS_BEFORE_OFFLINE) {
+            return prev;
+          }
+          return normalized;
+        });
+        // Só busca QR depois de confirmada a desconexão, evitando piscar QR à toa
+        if (disconnectCountRef.current >= MAX_DISCONNECTS_BEFORE_OFFLINE) {
+          try {
+            const { data: qr } = await api.get("/whatsapp/baileys/qr");
+            setBaileysQr(qr);
+          } catch { /* ignore qr fetch errors */ }
+        }
       }
     } catch (e) {
       // Tolerância a falhas transitórias: só marca offline após N falhas seguidas.
@@ -107,8 +190,15 @@ export default function WhatsAppSettings() {
 
 
   const baileysLogout = async () => {
-    const confirmed = window.confirm("Isso desconecta o WhatsApp e apaga a sessão atual. Deseja realmente gerar um novo QR Code?");
-    if (!confirmed) return;
+    const c1 = window.confirm("⚠️ ATENÇÃO: isso vai DESCONECTAR o WhatsApp e apagar a sessão atual.\n\nVocê precisará escanear um novo QR Code para reconectar.\n\nDeseja realmente continuar?");
+    if (!c1) return;
+    const c2 = window.confirm("Tem CERTEZA? Esta ação é irreversível — todas as mensagens em andamento podem ser interrompidas.");
+    if (!c2) return;
+    const typed = window.prompt('Para confirmar, digite exatamente: DESCONECTAR');
+    if ((typed || "").trim().toUpperCase() !== "DESCONECTAR") {
+      toast.info("Desconexão cancelada.");
+      return;
+    }
     setBaileysLoggingOut(true);
     try {
       await api.post("/whatsapp/baileys/logout");
@@ -121,6 +211,7 @@ export default function WhatsAppSettings() {
       setBaileysLoggingOut(false);
     }
   };
+
 
   const baileysReconnect = async () => {
     if (!HAS_BACKEND || baileysStatus?.state === "static") {
@@ -532,11 +623,12 @@ export default function WhatsAppSettings() {
         <Card className="border-nude-200">
           <div className="p-5">
             <Tabs value={cfg.provider} onValueChange={(v) => up("provider", v)}>
-              <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+              <TabsList className="grid grid-cols-5 w-full max-w-3xl">
                 <TabsTrigger value="zapi" data-testid="tab-zapi"><Zap className="w-3.5 h-3.5 mr-1.5" />Z-API</TabsTrigger>
                 <TabsTrigger value="baileys" data-testid="tab-baileys"><Smartphone className="w-3.5 h-3.5 mr-1.5" />Baileys</TabsTrigger>
                 <TabsTrigger value="evolution" data-testid="tab-evolution"><Server className="w-3.5 h-3.5 mr-1.5" />Evolution</TabsTrigger>
                 <TabsTrigger value="meta" data-testid="tab-meta"><Building2 className="w-3.5 h-3.5 mr-1.5" />Meta Cloud</TabsTrigger>
+                <TabsTrigger value="twilio" data-testid="tab-twilio"><Send className="w-3.5 h-3.5 mr-1.5" />Twilio</TabsTrigger>
               </TabsList>
 
               <TabsContent value="zapi" className="mt-5 space-y-3">
@@ -603,9 +695,96 @@ export default function WhatsAppSettings() {
                 <div className="text-xs text-nude-500 max-w-2xl leading-relaxed">
                   O Baileys roda como serviço local no servidor. Ao escanear o QR Code abaixo com
                   seu WhatsApp (Aparelhos conectados), as mensagens recebidas vão direto para o
-                  dashboard e o robô IA (Emergent LLM) responde automaticamente. Não precisa
+                  dashboard e o robô IA (Modelo de Crédito) responde automaticamente. Não precisa
                   configurar webhook — tudo interno.
                 </div>
+
+                {/* Servidor Baileys auto-hospedado + gerenciamento de múltiplos números */}
+                <Card className="p-4 bg-white border-nude-200 space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Server className="w-4 h-4 text-nude-700" />
+                      <h3 className="font-semibold text-sm">Servidor Baileys (auto-hospedado)</h3>
+                    </div>
+                    <p className="text-xs text-nude-500 mb-2">
+                      Cole a URL pública do seu servidor Baileys (VPS/Railway/Render). Ele deve expor
+                      as rotas <code>/api/whatsapp/baileys/status|qr|logout|reconnect</code> e aceitar
+                      o parâmetro <code>?instance=&lt;nome&gt;</code> para múltiplos números.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="https://meu-baileys.exemplo.com"
+                        value={baileysBackend}
+                        onChange={(e) => setBaileysBackend(e.target.value)}
+                      />
+                      <Button onClick={saveBackendUrl} variant="outline" size="sm">Salvar</Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Smartphone className="w-4 h-4 text-nude-700" />
+                      <h3 className="font-semibold text-sm">Números virtuais (instâncias)</h3>
+                    </div>
+                    <p className="text-xs text-nude-500 mb-3">
+                      Cada número WhatsApp usa uma <strong>instância</strong> separada no servidor
+                      Baileys. Adicione um nome (ex: <code>kenia</code>, <code>secretaria2</code>) e
+                      escaneie o QR abaixo com o WhatsApp desse aparelho.
+                    </p>
+
+                    <div className="flex gap-2 mb-3">
+                      <Input
+                        placeholder="Nome do número (ex: secretaria2)"
+                        value={newInstanceName}
+                        onChange={(e) => setNewInstanceName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && addInstance()}
+                      />
+                      <Button onClick={addInstance} size="sm">
+                        <QrCode className="w-3.5 h-3.5 mr-1.5" /> Adicionar número
+                      </Button>
+                    </div>
+
+                    {baileysInstances.length === 0 ? (
+                      <div className="text-xs text-nude-500 italic">
+                        Nenhum número adicionado. Usando instância padrão do servidor.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {baileysInstances.map((name) => (
+                          <div
+                            key={name}
+                            className={`flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${
+                              baileysInstance === name
+                                ? "bg-gold-100 border-gold-400 text-gold-900"
+                                : "bg-white border-nude-300 text-nude-700"
+                            }`}
+                          >
+                            <button type="button" onClick={() => selectInstance(name)} className="font-medium">
+                              {baileysInstance === name ? "● " : ""}{name}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeInstance(name)}
+                              className="opacity-60 hover:opacity-100 hover:text-rose-600 ml-1"
+                              title="Remover"
+                            >
+                              <XCircle className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {baileysInstance && (
+                      <div className="text-[11px] text-nude-500 mt-2">
+                        Instância ativa: <code className="bg-nude-100 px-1.5 py-0.5 rounded">{baileysInstance}</code>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+
 
                 {!baileysStatus?.connected && baileysStatus?.state !== "static" && (
                   <div className="p-3 bg-gold-50 border border-gold-200 rounded text-xs text-gold-900" data-testid="baileys-howto">
@@ -625,7 +804,7 @@ export default function WhatsAppSettings() {
                       {baileysStatus?.connected ? (
                         <div className="flex items-center gap-2 text-gold-700 font-medium">
                           <CheckCircle2 className="w-4 h-4" />
-                          Conectado{baileysStatus.me?.id ? ` — ${baileysStatus.me.id.split("@")[0]}` : ""}
+                          Conectado{centerDigits ? ` — ${centerPhone}` : ""}
                         </div>
                       ) : baileysStatus?.state === "conflicted" ? (
                         <div className="flex items-center gap-2 text-rose-700 font-medium">
@@ -651,6 +830,11 @@ export default function WhatsAppSettings() {
                       <div className="text-xs text-nude-500 mt-1">
                         Estado: <code className="bg-white px-1.5 py-0.5 rounded text-[11px]">{baileysStatus?.state || "—"}</code>
                       </div>
+                      {centerDigits && (
+                        <div className="text-xs text-nude-600 mt-1">
+                          Número real da central: <code className="bg-white px-1.5 py-0.5 rounded text-[11px]">{centerPhone}</code>
+                        </div>
+                      )}
                       {baileysStatus?.last_error && (baileysStatus?.state === "conflicted" || baileysStatus?.state === "offline" || baileysStatus?.state === "static") && (
                         <div className="text-xs text-gold-800 mt-2 p-2 bg-gold-50 border border-gold-200 rounded" data-testid="baileys-conflict-msg">
                           ⚠️ {baileysStatus.last_error}
@@ -815,6 +999,72 @@ export default function WhatsAppSettings() {
                 <div><Label>Access Token</Label><Input value={cfg.meta_access_token || ""} onChange={(e) => up("meta_access_token", e.target.value)} data-testid="meta-token" className="font-mono text-xs" /></div>
                 <div><Label>Phone Number ID</Label><Input value={cfg.meta_phone_number_id || ""} onChange={(e) => up("meta_phone_number_id", e.target.value)} data-testid="meta-phone-id" className="font-mono text-xs" /></div>
               </TabsContent>
+
+              <TabsContent value="twilio" className="mt-5 space-y-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Recomendado</Badge>
+                  <span className="text-sm text-nude-600">100% serverless via edge functions. Sem QR Code, sem servidor próprio.</span>
+                </div>
+
+                <Card className="bg-nude-50 border-nude-200 p-4 space-y-2 text-xs text-nude-700">
+                  <div className="font-semibold text-nude-900 text-sm">Como ativar (3 passos):</div>
+                  <ol className="list-decimal pl-5 space-y-1.5 leading-relaxed">
+                    <li>Conecte o <strong>Twilio</strong> nas integrações do Lovable (Settings → Integrations → Twilio).</li>
+                    <li>No <a href="https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn" target="_blank" rel="noreferrer" className="text-emerald-700 underline">Twilio Console → WhatsApp Sandbox</a> (ou número aprovado), cole a URL do webhook abaixo no campo <em>"When a message comes in"</em> (POST).</li>
+                    <li>Preencha o número de envio (formato <code>whatsapp:+14155238886</code>) e clique em Salvar no topo.</li>
+                  </ol>
+                </Card>
+
+                <div>
+                  <Label>Webhook URL (cole no Twilio Console)</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      readOnly
+                      value={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-twilio-webhook`}
+                      className="font-mono text-xs"
+                      data-testid="twilio-webhook-url"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-twilio-webhook`);
+                        toast.success("Webhook copiado!");
+                      }}
+                      data-testid="twilio-copy-webhook"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Número de envio (From)</Label>
+                  <Input
+                    placeholder="whatsapp:+14155238886"
+                    value={cfg.twilio_from_number || ""}
+                    onChange={(e) => up("twilio_from_number", e.target.value)}
+                    data-testid="twilio-from"
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-[11px] text-nude-500 mt-1.5">
+                    No sandbox use <code>whatsapp:+14155238886</code>. Em produção, use o número
+                    aprovado pela Meta no seu painel Twilio.
+                  </p>
+                </div>
+
+                <Card className="bg-emerald-50 border-emerald-200 p-3 text-xs text-emerald-900">
+                  <div className="font-semibold mb-1 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Vantagens
+                  </div>
+                  <ul className="list-disc pl-5 space-y-0.5">
+                    <li>Roda 100% nas edge functions — sem servidor extra para hospedar.</li>
+                    <li>Robô IA já responde automaticamente (Lovable AI Gateway).</li>
+                    <li>Número oficial aprovado — sem risco de banimento.</li>
+                  </ul>
+                </Card>
+              </TabsContent>
             </Tabs>
           </div>
         </Card>
@@ -832,7 +1082,7 @@ export default function WhatsAppSettings() {
                 )}
               </div>
               <p className="text-sm text-nude-500 mt-1">
-                Responde automaticamente as mensagens recebidas usando GPT-4o Mini (Emergent LLM).
+                Responde automaticamente as mensagens recebidas usando GPT-4o Mini (Modelo de Crédito).
               </p>
               <p className="text-xs text-nude-400 mt-1">
                 Para ativar: clique no switch ao lado → o botão fica laranja → clique em <strong>Salvar</strong> no topo.

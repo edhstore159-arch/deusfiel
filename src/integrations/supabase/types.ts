@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_agents: {
+        Row: {
+          created_at: string
+          id: string
+          knowledge: string
+          model: string
+          name: string
+          role: string | null
+          system_prompt: string
+          temperature: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          knowledge?: string
+          model?: string
+          name: string
+          role?: string | null
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          knowledge?: string
+          model?: string
+          name?: string
+          role?: string | null
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           appointment_date: string
@@ -71,42 +110,164 @@ export type Database = {
         }
         Relationships: []
       }
-      calls: {
+      case_analyses: {
         Row: {
-          caller_avatar: string | null
-          caller_id: string
-          caller_name: string | null
+          acertividade: number
+          admin_notes: string
+          area: string
+          chance_exito: number
           created_at: string
+          fundamentos: Json
           id: string
-          kind: string
-          receiver_id: string
-          room: string
-          status: string
+          motivo: string | null
+          proxima_pergunta: string | null
+          qualificacao: string
+          resumo: string | null
+          session_id: string | null
           updated_at: string
+          user_id: string | null
+          visitor_name: string | null
+          visitor_phone: string | null
         }
         Insert: {
-          caller_avatar?: string | null
-          caller_id: string
-          caller_name?: string | null
+          acertividade?: number
+          admin_notes?: string
+          area?: string
+          chance_exito?: number
           created_at?: string
-          id?: string
-          kind?: string
-          receiver_id: string
-          room: string
-          status?: string
+          fundamentos?: Json
+          id: string
+          motivo?: string | null
+          proxima_pergunta?: string | null
+          qualificacao?: string
+          resumo?: string | null
+          session_id?: string | null
           updated_at?: string
+          user_id?: string | null
+          visitor_name?: string | null
+          visitor_phone?: string | null
         }
         Update: {
-          caller_avatar?: string | null
-          caller_id?: string
-          caller_name?: string | null
+          acertividade?: number
+          admin_notes?: string
+          area?: string
+          chance_exito?: number
+          created_at?: string
+          fundamentos?: Json
+          id?: string
+          motivo?: string | null
+          proxima_pergunta?: string | null
+          qualificacao?: string
+          resumo?: string | null
+          session_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          visitor_name?: string | null
+          visitor_phone?: string | null
+        }
+        Relationships: []
+      }
+      case_transcripts: {
+        Row: {
+          analysis_id: string | null
+          content: string
+          created_at: string
+          id: string
+          role: string
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          analysis_id?: string | null
+          content: string
           created_at?: string
           id?: string
-          kind?: string
-          receiver_id?: string
-          room?: string
-          status?: string
+          role: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          analysis_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_transcripts_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "case_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cloud_objects: {
+        Row: {
+          created_at: string
+          id: string
+          mime: string | null
+          name: string
+          path: string
+          size: number
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mime?: string | null
+          name: string
+          path: string
+          size?: number
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mime?: string | null
+          name?: string
+          path?: string
+          size?: number
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cloud_sites: {
+        Row: {
+          created_at: string
+          html: string
+          id: string
+          is_public: boolean
+          slug: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          html?: string
+          id?: string
+          is_public?: boolean
+          slug: string
+          title: string
           updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          html?: string
+          id?: string
+          is_public?: boolean
+          slug?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -134,6 +295,51 @@ export type Database = {
           response?: string | null
           session_id?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      creative_assets: {
+        Row: {
+          created_at: string
+          description: string | null
+          height: number | null
+          id: string
+          mime_type: string | null
+          name: string
+          size_bytes: number | null
+          storage_path: string
+          tags: string[]
+          updated_at: string
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          name: string
+          size_bytes?: number | null
+          storage_path: string
+          tags?: string[]
+          updated_at?: string
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          height?: number | null
+          id?: string
+          mime_type?: string | null
+          name?: string
+          size_bytes?: number | null
+          storage_path?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+          width?: number | null
         }
         Relationships: []
       }
@@ -170,93 +376,168 @@ export type Database = {
         }
         Relationships: []
       }
-      event_registrations: {
+      generated_images: {
         Row: {
-          event_id: string
+          created_at: string
           id: string
-          registered_at: string
+          kind: string
+          paid: boolean
+          prompt: string | null
+          storage_path: string
           user_id: string
         }
         Insert: {
-          event_id: string
+          created_at?: string
           id?: string
-          registered_at?: string
+          kind?: string
+          paid?: boolean
+          prompt?: string | null
+          storage_path: string
           user_id: string
         }
         Update: {
-          event_id?: string
+          created_at?: string
           id?: string
-          registered_at?: string
+          kind?: string
+          paid?: boolean
+          prompt?: string | null
+          storage_path?: string
           user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_registrations_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      events: {
-        Row: {
-          address: string
-          background_image_url: string
-          created_by: string
-          creator: string
-          date: string
-          description: string
-          id: string
-          target_date: string
-          time: string
-          title: string
-        }
-        Insert: {
-          address: string
-          background_image_url: string
-          created_by?: string
-          creator: string
-          date: string
-          description: string
-          id?: string
-          target_date: string
-          time: string
-          title: string
-        }
-        Update: {
-          address?: string
-          background_image_url?: string
-          created_by?: string
-          creator?: string
-          date?: string
-          description?: string
-          id?: string
-          target_date?: string
-          time?: string
-          title?: string
         }
         Relationships: []
       }
-      profiles: {
+      instagram_accounts: {
         Row: {
+          access_token: string
           created_at: string
-          display_name: string | null
+          expires_at: string | null
           id: string
+          ig_user_id: string
+          ig_username: string | null
+          page_id: string
+          page_name: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          access_token: string
           created_at?: string
-          display_name?: string | null
+          expires_at?: string | null
           id?: string
+          ig_user_id: string
+          ig_username?: string | null
+          page_id: string
+          page_name?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          access_token?: string
           created_at?: string
-          display_name?: string | null
+          expires_at?: string | null
           id?: string
+          ig_user_id?: string
+          ig_username?: string | null
+          page_id?: string
+          page_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          patient_id: string
+          session_id: string
+          status: string | null
+          stripe_payment_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          patient_id: string
+          session_id: string
+          status?: string | null
+          stripe_payment_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          patient_id?: string
+          session_id?: string
+          status?: string | null
+          stripe_payment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          full_name: string
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name: string
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -266,340 +547,147 @@ export type Database = {
         Row: {
           caption: string
           created_at: string
-          creative_id: string | null
           error_message: string | null
-          hashtags: string | null
+          external_post_id: string | null
           id: string
-          image_b64: string | null
-          last_attempt_at: string | null
-          media_url: string | null
-          platform_results: Json
-          platforms: Database["public"]["Enums"]["social_platform"][]
-          published_at: string | null
-          scheduled_for: string | null
+          image_url: string
+          platforms: string[]
+          scheduled_at: string
           status: Database["public"]["Enums"]["post_status"]
-          title: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          caption: string
+          caption?: string
           created_at?: string
-          creative_id?: string | null
           error_message?: string | null
-          hashtags?: string | null
+          external_post_id?: string | null
           id?: string
-          image_b64?: string | null
-          last_attempt_at?: string | null
-          media_url?: string | null
-          platform_results?: Json
-          platforms?: Database["public"]["Enums"]["social_platform"][]
-          published_at?: string | null
-          scheduled_for?: string | null
+          image_url: string
+          platforms?: string[]
+          scheduled_at: string
           status?: Database["public"]["Enums"]["post_status"]
-          title?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           caption?: string
           created_at?: string
-          creative_id?: string | null
           error_message?: string | null
-          hashtags?: string | null
+          external_post_id?: string | null
           id?: string
-          image_b64?: string | null
-          last_attempt_at?: string | null
-          media_url?: string | null
-          platform_results?: Json
-          platforms?: Database["public"]["Enums"]["social_platform"][]
-          published_at?: string | null
-          scheduled_for?: string | null
+          image_url?: string
+          platforms?: string[]
+          scheduled_at?: string
           status?: Database["public"]["Enums"]["post_status"]
-          title?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
       }
-      social_accounts: {
-        Row: {
-          account_handle: string
-          account_name: string
-          created_at: string
-          id: string
-          is_connected: boolean
-          platform: Database["public"]["Enums"]["social_platform"]
-          user_id: string
-        }
-        Insert: {
-          account_handle: string
-          account_name: string
-          created_at?: string
-          id?: string
-          is_connected?: boolean
-          platform: Database["public"]["Enums"]["social_platform"]
-          user_id: string
-        }
-        Update: {
-          account_handle?: string
-          account_name?: string
-          created_at?: string
-          id?: string
-          is_connected?: boolean
-          platform?: Database["public"]["Enums"]["social_platform"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-      svc_categories: {
+      sessions: {
         Row: {
           created_at: string
-          icon: string | null
+          duration: number | null
           id: string
-          name: string
-          slug: string
-          sort_order: number
-        }
-        Insert: {
-          created_at?: string
-          icon?: string | null
-          id?: string
-          name: string
-          slug: string
-          sort_order?: number
-        }
-        Update: {
-          created_at?: string
-          icon?: string | null
-          id?: string
-          name?: string
-          slug?: string
-          sort_order?: number
-        }
-        Relationships: []
-      }
-      svc_conversations: {
-        Row: {
-          created_at: string
-          id: string
-          last_message_at: string | null
-          user_a: string
-          user_b: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          last_message_at?: string | null
-          user_a: string
-          user_b: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          last_message_at?: string | null
-          user_a?: string
-          user_b?: string
-        }
-        Relationships: []
-      }
-      svc_messages: {
-        Row: {
-          content: string | null
-          conversation_id: string
-          created_at: string
-          id: string
-          lat: number | null
-          lng: number | null
-          media_type: string | null
-          media_url: string | null
-          read_at: string | null
-          sender_id: string
-        }
-        Insert: {
-          content?: string | null
-          conversation_id: string
-          created_at?: string
-          id?: string
-          lat?: number | null
-          lng?: number | null
-          media_type?: string | null
-          media_url?: string | null
-          read_at?: string | null
-          sender_id: string
-        }
-        Update: {
-          content?: string | null
-          conversation_id?: string
-          created_at?: string
-          id?: string
-          lat?: number | null
-          lng?: number | null
-          media_type?: string | null
-          media_url?: string | null
-          read_at?: string | null
-          sender_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "svc_messages_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "svc_conversations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      svc_posts: {
-        Row: {
-          address: string | null
-          budget_range: string | null
-          category_slug: string | null
-          created_at: string
-          description: string
-          id: string
-          lat: number | null
-          lng: number | null
-          photos: string[]
-          post_type: string
-          status: string
-          title: string
+          notes: string | null
+          patient_id: string
+          price: number
+          room_url: string | null
+          scheduled_at: string
+          status: Database["public"]["Enums"]["session_status"] | null
+          therapist_id: string
           updated_at: string
-          user_id: string
-          videos: string[]
         }
         Insert: {
-          address?: string | null
-          budget_range?: string | null
-          category_slug?: string | null
           created_at?: string
-          description: string
+          duration?: number | null
           id?: string
-          lat?: number | null
-          lng?: number | null
-          photos?: string[]
-          post_type?: string
-          status?: string
-          title: string
+          notes?: string | null
+          patient_id: string
+          price: number
+          room_url?: string | null
+          scheduled_at: string
+          status?: Database["public"]["Enums"]["session_status"] | null
+          therapist_id: string
           updated_at?: string
-          user_id: string
-          videos?: string[]
         }
         Update: {
-          address?: string | null
-          budget_range?: string | null
-          category_slug?: string | null
           created_at?: string
-          description?: string
+          duration?: number | null
           id?: string
-          lat?: number | null
-          lng?: number | null
-          photos?: string[]
-          post_type?: string
-          status?: string
-          title?: string
+          notes?: string | null
+          patient_id?: string
+          price?: number
+          room_url?: string | null
+          scheduled_at?: string
+          status?: Database["public"]["Enums"]["session_status"] | null
+          therapist_id?: string
           updated_at?: string
-          user_id?: string
-          videos?: string[]
         }
-        Relationships: [
-          {
-            foreignKeyName: "svc_posts_category_slug_fkey"
-            columns: ["category_slug"]
-            isOneToOne: false
-            referencedRelation: "svc_categories"
-            referencedColumns: ["slug"]
-          },
-        ]
+        Relationships: []
       }
-      svc_profiles: {
+      therapist_availability: {
         Row: {
-          avatar_url: string | null
-          bio: string | null
-          categories: string[]
-          city: string | null
-          cover_url: string | null
-          created_at: string
-          display_name: string
+          day_of_week: number
+          end_time: string
           id: string
-          lat: number | null
-          lng: number | null
-          phone: string | null
-          rating: number
-          role: string
+          start_time: string
+          therapist_id: string
+        }
+        Insert: {
+          day_of_week: number
+          end_time: string
+          id?: string
+          start_time: string
+          therapist_id: string
+        }
+        Update: {
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          start_time?: string
+          therapist_id?: string
+        }
+        Relationships: []
+      }
+      therapist_profiles: {
+        Row: {
+          created_at: string
+          crp: string | null
+          education: string | null
+          experience_years: number | null
+          id: string
+          is_available: boolean | null
+          session_duration: number | null
+          session_price: number | null
+          specialties: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          avatar_url?: string | null
-          bio?: string | null
-          categories?: string[]
-          city?: string | null
-          cover_url?: string | null
           created_at?: string
-          display_name: string
+          crp?: string | null
+          education?: string | null
+          experience_years?: number | null
           id?: string
-          lat?: number | null
-          lng?: number | null
-          phone?: string | null
-          rating?: number
-          role?: string
+          is_available?: boolean | null
+          session_duration?: number | null
+          session_price?: number | null
+          specialties?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          avatar_url?: string | null
-          bio?: string | null
-          categories?: string[]
-          city?: string | null
-          cover_url?: string | null
           created_at?: string
-          display_name?: string
+          crp?: string | null
+          education?: string | null
+          experience_years?: number | null
           id?: string
-          lat?: number | null
-          lng?: number | null
-          phone?: string | null
-          rating?: number
-          role?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      svc_subscriptions: {
-        Row: {
-          amount_brl: number
-          created_at: string
-          expires_at: string | null
-          id: string
-          pix_brcode: string | null
-          pix_txid: string | null
-          status: string
-          trial_ends_at: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          amount_brl?: number
-          created_at?: string
-          expires_at?: string | null
-          id?: string
-          pix_brcode?: string | null
-          pix_txid?: string | null
-          status?: string
-          trial_ends_at?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          amount_brl?: number
-          created_at?: string
-          expires_at?: string | null
-          id?: string
-          pix_brcode?: string | null
-          pix_txid?: string | null
-          status?: string
-          trial_ends_at?: string | null
+          is_available?: boolean | null
+          session_duration?: number | null
+          session_price?: number | null
+          specialties?: string[] | null
           updated_at?: string
           user_id?: string
         }
@@ -607,22 +695,58 @@ export type Database = {
       }
       user_roles: {
         Row: {
-          created_at: string | null
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
-          created_at?: string | null
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
-          created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_messages: {
+        Row: {
+          contact_id: string
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          from_me: boolean
+          id: string
+          provider_message_id: string | null
+          text: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          contact_id: string
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          from_me?: boolean
+          id?: string
+          provider_message_id?: string | null
+          text: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          contact_id?: string
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          from_me?: boolean
+          id?: string
+          provider_message_id?: string | null
+          text?: string
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -631,7 +755,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      ensure_svc_category: { Args: { _name: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -639,24 +762,11 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_volunteer_or_helper: { Args: { _uid: string }; Returns: boolean }
-      svc_get_or_create_conversation: {
-        Args: { _other_user: string }
-        Returns: string
-      }
     }
     Enums: {
-      app_role: "admin" | "user" | "migrant" | "volunteer" | "helper"
-      post_status: "draft" | "scheduled" | "publishing" | "published" | "failed"
-      social_platform:
-        | "instagram"
-        | "facebook"
-        | "linkedin"
-        | "tiktok"
-        | "youtube"
-        | "x"
-        | "pinterest"
-        | "whatsapp"
+      app_role: "patient" | "therapist" | "admin"
+      post_status: "pending" | "posted" | "failed" | "cancelled"
+      session_status: "scheduled" | "completed" | "cancelled" | "in_progress"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -784,18 +894,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user", "migrant", "volunteer", "helper"],
-      post_status: ["draft", "scheduled", "publishing", "published", "failed"],
-      social_platform: [
-        "instagram",
-        "facebook",
-        "linkedin",
-        "tiktok",
-        "youtube",
-        "x",
-        "pinterest",
-        "whatsapp",
-      ],
+      app_role: ["patient", "therapist", "admin"],
+      post_status: ["pending", "posted", "failed", "cancelled"],
+      session_status: ["scheduled", "completed", "cancelled", "in_progress"],
     },
   },
 } as const

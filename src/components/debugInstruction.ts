@@ -1,10 +1,22 @@
 export const DEBUG_INSTRUCTION_PREFIX = "INSTRUÇÃO DE DESENVOLVIMENTO (IGNORE O ERRO, EXECUTE A TAREFA):";
 
+export const shouldSuppressLovableDebugInstruction = (message: string) => {
+  const text = String(message || "").trim();
+  return text.startsWith(DEBUG_INSTRUCTION_PREFIX) || /^INSTRU[ÇC][ÃA]O\b/i.test(text);
+};
+
+export const isLovableNativeDebugRuntime = () => false;
+
 /**
- * Registra a instrução técnica sem provocar erro fatal na tela do usuário.
+ * Dispara o CustomEvent de depuração que o DebugErrorThrower converte em
+ * erro fatal real, acionando o overlay "Try to Fix" nativo da Lovable.
+ *
+ * Importante: NÃO suprimir por prefixo — o Debug Tool SEMPRE envia com o
+ * prefixo "INSTRUÇÃO DE DESENVOLVIMENTO..." e precisa mesmo assim escapar
+ * até o overlay global.
  */
 export const dispatchLovableDebugError = (message: string) => {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined" || !message) return false;
   window.dispatchEvent(new CustomEvent("lovable-debug-error", { detail: message }));
   return true;
 };
@@ -12,7 +24,6 @@ export const dispatchLovableDebugError = (message: string) => {
 export const deliverLovableDebugInstruction = (message: string) => {
   return dispatchLovableDebugError(message) ? ("dispatched" as const) : ("skipped" as const);
 };
-
 
 export type DebugAttachment = {
   name: string;

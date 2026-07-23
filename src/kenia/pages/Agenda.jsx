@@ -19,6 +19,14 @@ const STATUS_COLORS = {
   confirmado: "bg-gold-100 text-gold-800",
   pendente: "bg-gold-100 text-gold-800",
   cancelado: "bg-rose-100 text-rose-800",
+  recusado: "bg-rose-100 text-rose-800",
+};
+
+const STATUS_MESSAGES = {
+  confirmado: "Agendamento confirmado",
+  pendente: "Agendamento marcado como pendente",
+  cancelado: "Agendamento cancelado",
+  recusado: "Agendamento recusado e movido para a lista de excluídos",
 };
 
 export default function Agenda() {
@@ -28,12 +36,27 @@ export default function Agenda() {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("list");
   const [cursor, setCursor] = useState(new Date());
+  const [listFilter, setListFilter] = useState("ativos"); // "ativos" | "recusados"
   const [form, setForm] = useState({
     title: "", client_name: "", starts_at: "", duration_min: 60,
     location: "Google Meet", notes: "", status: "confirmado",
   });
 
-  useEffect(() => { load(); loadDeadlines(); }, []);
+  useEffect(() => {
+    load();
+    loadDeadlines();
+    // Auto-sync: poll every 30s to pick up WhatsApp-created/rescheduled appointments
+    const interval = setInterval(() => {
+      load();
+    }, 30000);
+    // Refresh when tab regains focus
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
   const load = async () => {
     try {
       const { data } = await api.get("/appointments");
@@ -44,8 +67,10 @@ export default function Agenda() {
           : Array.isArray(data?.appointments)
             ? data.appointments
             : [];
+      console.log("[Agenda] loaded", appointments.length, "appointments:", appointments);
       setItems(appointments);
-    } catch {
+    } catch (err) {
+      console.warn("[Agenda] load error:", err?.message || err);
       setItems([]);
     }
   };
@@ -91,7 +116,7 @@ export default function Agenda() {
   const create = async () => {
     if (!form.title || !form.starts_at) { toast.error("Título e data obrigatórios"); return; }
     try {
-      await api.post("/appointments", { ...form, starts_at: new Date(form.starts_at).toISOString() });
+      await api.post("/appointments", { ...form, starts_at: form.starts_at });
       toast.success("Reunião agendada");
       setOpen(false);
       setForm({ title: "", client_name: "", starts_at: "", duration_min: 60, location: "Google Meet", notes: "", status: "confirmado" });
@@ -106,8 +131,14 @@ export default function Agenda() {
   };
 
   const toggleStatus = async (item, status) => {
-    await api.patch(`/appointments/${item.id}`, { status });
-    load();
+    try {
+      await api.patch(`/appointments/${item.id}`, { status });
+      toast.success(STATUS_MESSAGES[status] || "Status atualizado");
+      if (status === "recusado") setListFilter("recusados");
+      load();
+    } catch {
+      toast.error("Não foi possível atualizar o status");
+    }
   };
 
   const copyLink = (link) => {
@@ -133,30 +164,34 @@ export default function Agenda() {
     itemsByDay[key].push(i);
   });
 
+  const isRejected = (i) => i.status === "recusado" || i.status === "cancelado";
   const upcoming = appointments
-    .filter(i => new Date(i.starts_at) >= new Date(today.setHours(0, 0, 0, 0)))
+    .filter(i => listFilter === "recusados"
+      ? isRejected(i)
+      : !isRejected(i) && new Date(i.starts_at) >= new Date(today.setHours(0, 0, 0, 0)))
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
-    .slice(0, 20);
+    .slice(0, 50);
 
   return (
     <div className="h-screen flex flex-col bg-nude-50 overflow-hidden">
-      <div className="px-6 py-4 bg-white border-b border-nude-200 flex items-center justify-between">
+      <div className="px-4 sm:px-6 py-4 bg-white border-b border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold">Calendário</div>
-          <h1 className="font-display font-bold text-2xl">Agenda de Reuniões</h1>
+          <h1 className="font-display font-bold text-xl sm:text-2xl">Agenda de Reuniões</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="border-nude-300" onClick={syncDeadlines} disabled={syncingDeadlines} data-testid="sync-deadlines-btn">
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncingDeadlines ? "animate-spin" : ""}`} /> Sincronizar prazos
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="border-nude-300 flex-1 sm:flex-none min-w-0" onClick={syncDeadlines} disabled={syncingDeadlines} data-testid="sync-deadlines-btn">
+            <RefreshCw className={`w-4 h-4 mr-2 shrink-0 ${syncingDeadlines ? "animate-spin" : ""}`} />
+            <span className="truncate">Sincronizar prazos</span>
           </Button>
-          <div className="inline-flex border border-nude-200 rounded-md p-0.5 bg-white">
+          <div className="inline-flex border border-nude-200 rounded-md p-0.5 bg-white shrink-0">
             <Button size="sm" variant={view === "calendar" ? "default" : "ghost"} className="h-7" onClick={() => setView("calendar")}>Mês</Button>
             <Button size="sm" variant={view === "list" ? "default" : "ghost"} className="h-7" onClick={() => setView("list")}>Lista</Button>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-nude-900 hover:bg-nude-800" data-testid="new-appt-btn">
-                <Plus className="w-4 h-4 mr-2" /> Nova reunião
+              <Button size="sm" className="bg-nude-900 hover:bg-nude-800 flex-1 sm:flex-none min-w-0" data-testid="new-appt-btn">
+                <Plus className="w-4 h-4 mr-2 shrink-0" /> <span className="truncate">Nova reunião</span>
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -290,9 +325,17 @@ export default function Agenda() {
 
         {view === "list" && (
           <div className="space-y-3">
+            <div className="inline-flex border border-nude-200 rounded-md p-0.5 bg-white">
+              <Button size="sm" variant={listFilter === "ativos" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setListFilter("ativos")} data-testid="filter-ativos">
+                Ativos
+              </Button>
+              <Button size="sm" variant={listFilter === "recusados" ? "default" : "ghost"} className="h-7 text-xs" onClick={() => setListFilter("recusados")} data-testid="filter-recusados">
+                Recusados / Excluídos ({appointments.filter(isRejected).length})
+              </Button>
+            </div>
             {upcoming.length === 0 ? (
               <Card className="p-10 border-dashed border-nude-300 text-center text-nude-400">
-                Nenhuma reunião agendada. Clique em "Nova reunião" para começar.
+                {listFilter === "recusados" ? "Nenhum agendamento recusado." : 'Nenhuma reunião agendada. Clique em "Nova reunião" para começar.'}
               </Card>
             ) : upcoming.map(it => {
               const d = new Date(it.starts_at);
@@ -333,17 +376,20 @@ export default function Agenda() {
                           {it.status}
                         </Badge>
                       </div>
-                      <div className="flex gap-1.5 mt-3 pt-3 border-t border-nude-100">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleStatus(it, "confirmado")}>
+                      <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-nude-100">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "confirmado")}>
                           <CheckCircle2 className="w-3 h-3 mr-1 text-gold-600" /> Confirmar
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleStatus(it, "pendente")}>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "pendente")}>
                           <AlertCircle className="w-3 h-3 mr-1 text-gold-600" /> Pendente
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleStatus(it, "cancelado")}>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "cancelado")}>
                           <XCircle className="w-3 h-3 mr-1 text-rose-500" /> Cancelar
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs ml-auto text-rose-500 hover:text-rose-600" onClick={() => remove(it.id)}>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => toggleStatus(it, "recusado")} data-testid={`reject-${it.id}`}>
+                          <XCircle className="w-3 h-3 mr-1 text-rose-600" /> Recusar
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs px-2 sm:ml-auto text-rose-500 hover:text-rose-600" onClick={() => remove(it.id)}>
                           <Trash2 className="w-3 h-3 mr-1" /> Excluir
                         </Button>
                       </div>

@@ -197,3 +197,61 @@ h1, h2, h3, h4, h5, h6, .font-display {
     outline: 2px solid hsl(40 52% 53% / 0.5);
     outline-offset: 2px;
 }
+
+/* Glow pulse for "Fale comigo" orb — intense sun-like glow */
+@keyframes orb-glow {
+    0%, 100% {
+        box-shadow:
+            0 0 0 4px rgba(255, 244, 190, 0.95),
+            0 0 28px 12px rgba(255, 220, 82, 0.95),
+            0 0 78px 28px rgba(255, 173, 36, 0.78),
+            0 0 150px 52px rgba(255, 118, 18, 0.48),
+            0 0 240px 86px rgba(255, 205, 74, 0.38);
+    }
+    50% {
+        box-shadow:
+            0 0 0 6px rgba(255, 252, 226, 1),
+            0 0 44px 18px rgba(255, 235, 126, 1),
+            0 0 118px 42px rgba(255, 190, 52, 0.95),
+            0 0 220px 76px rgba(255, 126, 24, 0.72),
+            0 0 340px 120px rgba(255, 214, 88, 0.58);
+    }
+}
+.animate-orb-glow {
+    animation: orb-glow 1.35s ease-in-out infinite;
+}
+.voice-orb-sun {
+    overflow: visible;
+    isolation: isolate;
+}
+.voice-orb-sun::before,
+.voice-orb-sun::after {
+    content: '';
+    position: absolute;
+    border-radius: 9999px;
+    pointer-events: none;
+}
+.voice-orb-sun::before {
+    inset: -18px;
+    z-index: -1;
+    background: radial-gradient(circle, rgba(255, 249, 207, 0.96) 0%, rgba(255, 219, 82, 0.72) 34%, rgba(255, 151, 28, 0.42) 62%, rgba(255, 182, 50, 0) 78%);
+    filter: blur(8px);
+    animation: orb-solar-flare 1.35s ease-in-out infinite;
+}
+.voice-orb-sun::after {
+    inset: -32px;
+    z-index: -2;
+    background: radial-gradient(circle, rgba(255, 236, 137, 0.52) 0%, rgba(255, 186, 43, 0.28) 44%, rgba(255, 144, 21, 0) 72%);
+    filter: blur(16px);
+    animation: orb-solar-flare 1.9s ease-in-out infinite reverse;
+}
+@keyframes orb-solar-flare {
+    0%, 100% { transform: scale(0.92); opacity: 0.76; }
+    50% { transform: scale(1.18); opacity: 1; }
+}
+
+@keyframes secretary-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1.5px) scale(1.015); }
+}
+.secretary-breathe { animation: secretary-breathe 4.2s ease-in-out infinite; transform-origin: center bottom; }

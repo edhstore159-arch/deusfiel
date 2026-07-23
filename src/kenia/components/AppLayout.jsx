@@ -5,14 +5,15 @@ import {
   LayoutDashboard, KanbanSquare, Scale, Wallet, Sparkles,
   BarChart3, LogOut, MessageSquare, Wrench, Radio,
   CalendarDays, Settings as SettingsIcon, Combine,
-  ShieldCheck, Bot, Menu, X, Smartphone, Zap,
-  Users, Globe, Gavel, BookOpen, FileText, Send,
-  Target, Share2, Video, CheckSquare, Link2,
+  ShieldCheck, Bot, Menu, X, Clapperboard, Gavel, Share2,
+  ClipboardCheck, FolderOpen, FileText, GraduationCap, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
 import { ErrorDebugPopup } from "@/components/ErrorDebugPopup";
-import { VirtualAssistantBubble } from "@/components/VirtualAssistantBubble";
+import FloatingVoiceOrb from "@/kenia/components/FloatingVoiceOrb";
+import VirtualSecretaryAvatar from "@/kenia/components/VirtualSecretaryAvatar";
+
 import { api } from "@/kenia/lib/api";
 
 const LOGO_IMG = "https://customer-assets.emergentagent.com/job_nude-gold-dashboard/artifacts/ckw9kwam_IMG-20241228-WA0003.jpg";
@@ -20,35 +21,70 @@ const LOGO_IMG = "https://customer-assets.emergentagent.com/job_nude-gold-dashbo
 const NAV = [
   { to: "/app", label: "Atendimento", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
   { to: "/app/chat-ia", label: "Chat IA · Análise", icon: Bot, testid: "nav-chat-ia" },
-  { to: "/app/ai-builder", label: "AI Builder", icon: Zap, testid: "nav-ai-builder" },
+  { to: "/app/chat-multi-modelo", label: "Chat Multi-Modelo", icon: Sparkles, testid: "nav-chat-multi" },
   { to: "/app/admin", label: "Painel Admin · Casos", icon: ShieldCheck, testid: "nav-admin" },
+  { to: "/app/secretary-tasks", label: "Tarefas Secretária", icon: MessageSquare, testid: "nav-secretary-tasks" },
+  { to: "/app/juiz-virtual", label: "Juiz Virtual", icon: Gavel, testid: "nav-juiz-virtual" },
+  { to: "/app/agents", label: "Agentes IA", icon: Bot, testid: "nav-agents" },
+  { to: "/app/dstboard", label: "Painel de Controle", icon: ClipboardCheck, testid: "nav-dstboard" },
+  { to: "/app/document-builder", label: "Construtor de Documentos", icon: FileText, testid: "nav-document-builder" },
+  { to: "/app/legal-training", label: "Treinamento Jurídico", icon: GraduationCap, testid: "nav-legal-training" },
+  { to: "/app/secretary-marketing", label: "Treinamento Secretária", icon: TrendingUp, testid: "nav-secretary-marketing" },
+  
+  
   { to: "/app/crm", label: "CRM Pipeline", icon: KanbanSquare, testid: "nav-crm" },
   { to: "/app/agenda", label: "Agenda", icon: CalendarDays, testid: "nav-agenda" },
   { to: "/app/processes", label: "Processos", icon: Scale, testid: "nav-processes" },
   { to: "/app/finance", label: "Financeiro", icon: Wallet, testid: "nav-finance" },
   { to: "/app/creatives", label: "Criativos", icon: Sparkles, testid: "nav-creatives" },
   { to: "/app/image-fusion", label: "Fusão de Imagens", icon: Combine, testid: "nav-image-fusion" },
+  { to: "/app/viral-video", label: "Vídeos Virais", icon: Clapperboard, testid: "nav-viral-video" },
+  { to: "/app/social-connect", label: "Conectar Redes Sociais", icon: Share2, testid: "nav-social-connect" },
   { to: "/app/analytics", label: "Métricas", icon: BarChart3, testid: "nav-analytics" },
   { to: "/app/whatsapp", label: "WhatsApp", icon: MessageSquare, testid: "nav-whatsapp" },
-  { to: "/app/whatsapp-connection", label: "WhatsApp Connection", icon: Smartphone, testid: "nav-whatsapp-connection" },
   { to: "/app/whatsapp-logs", label: "Logs WhatsApp", icon: Radio, testid: "nav-whatsapp-logs" },
+  { to: "/app/whatsapp-media", label: "Arquivos WhatsApp", icon: FolderOpen, testid: "nav-whatsapp-media" },
   { to: "/app/settings", label: "Configurações", icon: SettingsIcon, testid: "nav-settings" },
-  { to: "/app/juiz-virtual", label: "Juiz Virtual", icon: Gavel, testid: "nav-juiz-virtual" },
-  { to: "/app/legal-training", label: "Treinamento Jurídico", icon: BookOpen, testid: "nav-legal-training" },
-  { to: "/app/agents", label: "Agentes IA", icon: Users, testid: "nav-agents" },
-  { to: "/app/chat-multi-modelo", label: "Chat Multi-Modelo", icon: MessageSquare, testid: "nav-chat-multi" },
-  { to: "/app/document-builder", label: "Construtor de Documentos", icon: FileText, testid: "nav-document-builder" },
-  { to: "/app/site-builder", label: "Construtor de Sites", icon: Globe, testid: "nav-site-builder" },
-  { to: "/app/creatives-gallery", label: "Galeria de Criativos", icon: Sparkles, testid: "nav-creatives-gallery" },
-  { to: "/app/social-connect", label: "Conexão Social", icon: Share2, testid: "nav-social-connect" },
-  { to: "/app/secretary-marketing", label: "Secretária Marketing", icon: Send, testid: "nav-secretary-marketing" },
-  { to: "/app/secretary-tasks", label: "Tarefas Secretária", icon: CheckSquare, testid: "nav-secretary-tasks" },
-  { to: "/app/competitor-analysis", label: "Análise Concorrentes", icon: Target, testid: "nav-competitor" },
-  { to: "/app/viral-video-studio", label: "Estúdio de Vídeo", icon: Video, testid: "nav-viral-video" },
-  { to: "/app/whatsapp-media", label: "WhatsApp Mídia", icon: Smartphone, testid: "nav-whatsapp-media" },
-  { to: "/app/trust", label: "Confiança", icon: ShieldCheck, testid: "nav-trust" },
   { to: "/app/debug", label: "Debug Tool", icon: Wrench, testid: "nav-debug" },
+  { to: "/app/emergent-login", label: "Login Plataforma IA", icon: SettingsIcon, testid: "nav-emergent-login" },
 ];
+
+// Prefetch lazy route chunks on hover/focus para que a navegação seja instantânea
+const PREFETCH = {
+  "/app": () => import("@/kenia/pages/Dashboard"),
+  "/app/chat-ia": () => import("@/kenia/pages/ChatIA"),
+  "/app/chat-multi-modelo": () => import("@/kenia/pages/ChatMultiModelo"),
+  "/app/admin": () => import("@/kenia/pages/AdminCases"),
+  "/app/secretary-tasks": () => import("@/kenia/pages/SecretaryTasks"),
+  "/app/juiz-virtual": () => import("@/kenia/pages/JuizVirtual"),
+  "/app/agents": () => import("@/kenia/pages/Agents"),
+  "/app/dstboard": () => import("@/kenia/pages/Dstboard"),
+  "/app/document-builder": () => import("@/kenia/pages/DocumentBuilder"),
+  "/app/legal-training": () => import("@/kenia/pages/LegalTraining"),
+  "/app/secretary-marketing": () => import("@/kenia/pages/SecretaryMarketing"),
+  
+  
+  "/app/crm": () => import("@/kenia/pages/CRM"),
+  "/app/agenda": () => import("@/kenia/pages/Agenda"),
+  "/app/processes": () => import("@/kenia/pages/Processes"),
+  "/app/finance": () => import("@/kenia/pages/Finance"),
+  "/app/creatives": () => import("@/kenia/pages/Creatives"),
+  "/app/image-fusion": () => import("@/kenia/pages/ImageFusion"),
+  "/app/viral-video": () => import("@/kenia/pages/ViralVideoStudio"),
+  "/app/analytics": () => import("@/kenia/pages/Analytics"),
+  "/app/whatsapp": () => import("@/kenia/pages/WhatsAppSettings"),
+  "/app/whatsapp-logs": () => import("@/kenia/pages/WhatsAppLogs"),
+  "/app/whatsapp-media": () => import("@/kenia/pages/WhatsAppMedia"),
+  "/app/settings": () => import("@/kenia/pages/Settings"),
+  "/app/debug": () => import("@/kenia/pages/DebugTool"),
+};
+const prefetched = new Set();
+const prefetch = (to) => {
+  if (prefetched.has(to)) return;
+  prefetched.add(to);
+  const fn = PREFETCH[to];
+  if (fn) fn().catch(() => prefetched.delete(to));
+};
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
@@ -99,9 +135,9 @@ export default function AppLayout() {
       {/* Sidebar — nude/gold executive (drawer no mobile, fixo no desktop) */}
       <aside
         className={`bg-card border-r border-nude-200 flex flex-col w-64 z-50
-                    fixed inset-y-0 left-0 transform transition-transform duration-300 ease-in-out
+                    fixed inset-y-0 left-0 h-[100dvh] max-h-[100dvh] overflow-y-auto overscroll-contain [touch-action:pan-y] transform transition-transform duration-300 ease-in-out
                     ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-                    lg:static lg:translate-x-0 lg:z-auto`}
+                    lg:static lg:translate-x-0 lg:z-auto lg:h-auto lg:max-h-none lg:overflow-visible`}
         data-testid="app-sidebar"
       >
         <div className="px-6 py-6 border-b border-nude-200 flex items-center justify-between">
@@ -128,17 +164,20 @@ export default function AppLayout() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
+        <nav className="shrink-0 px-3 py-5 space-y-0.5 overflow-visible lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
               data-testid={item.testid}
+              onMouseEnter={() => prefetch(item.to)}
+              onFocus={() => prefetch(item.to)}
+              onTouchStart={() => prefetch(item.to)}
               className={({ isActive }) =>
-                `relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[13px] transition-all duration-200 ${
+                `relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[11px] uppercase tracking-wide transition-all duration-200 ${
                   isActive
-                    ? "bg-gold-50 text-gold-700 font-medium nav-active-accent"
+                    ? "bg-gold-50 text-gold-700 font-semibold nav-active-accent"
                     : "text-nude-600 hover:bg-nude-100 hover:text-nude-900"
                 }`
               }
@@ -146,17 +185,17 @@ export default function AppLayout() {
               {({ isActive }) => (
                 <>
                   <item.icon
-                    className={`w-4 h-4 ${isActive ? "text-gold-500" : "text-nude-500"}`}
+                    className={`w-5 h-5 ${isActive ? "text-gold-500" : "text-nude-500"}`}
                     strokeWidth={1.6}
                   />
-                  <span className="font-medium">{item.label}</span>
+                  <span className="font-semibold">{item.label}</span>
                 </>
               )}
             </NavLink>
           ))}
         </nav>
 
-        <div className="p-3 border-t border-nude-200">
+        <div className="shrink-0 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] border-t border-nude-200 lg:pb-3">
           <div className="flex items-center gap-3 px-2 py-2">
             <Avatar className="w-9 h-9 ring-1 ring-gold-300/60">
               <AvatarFallback className="bg-gold-100 text-gold-700 text-xs font-semibold font-sans">
@@ -186,20 +225,11 @@ export default function AppLayout() {
       {/* Main */}
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <ErrorDebugPopup />
-        <VirtualAssistantBubble />
-        {deadlineCount > 0 && (
-          <button
-            type="button"
-            onClick={() => navigate("/app/agenda")}
-            className="fixed right-5 bottom-5 z-40 inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-900/20 hover:bg-rose-700"
-            data-testid="deadline-floating-alert"
-            aria-label={`${deadlineCount} prazo(s) vencendo`}
-          >
-            <Radio className="h-4 w-4" />
-            {deadlineCount} prazo{deadlineCount > 1 ? "s" : ""}
-          </button>
-        )}
+        <FloatingVoiceOrb />
+        <VirtualSecretaryAvatar />
         {/* Topbar mobile com botão de menu */}
+        {/* Espaçador no mobile para que o orb fixo no topo não cubra a topbar/conteúdo */}
+        <div aria-hidden="true" className="lg:hidden h-24 shrink-0" />
         <header className="lg:hidden sticky top-0 z-30 h-14 px-3 flex items-center justify-between bg-card border-b border-nude-200">
           <button
             className="p-2 -ml-1 rounded-md text-nude-700 hover:bg-nude-100"
@@ -209,16 +239,38 @@ export default function AppLayout() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2 min-w-0">
-            <img src={LOGO_IMG} alt="" className="w-7 h-7 rounded object-cover ring-1 ring-gold-300/40" />
-            <span className="font-serif text-sm text-nude-900 truncate">Kênia Garcia</span>
-          </div>
-          <div className="w-9" />
+          <NavLink
+            to="/app/creatives"
+            className={({ isActive }) =>
+              `inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-xs font-semibold border transition-colors ${
+                isActive
+                  ? "bg-gold-50 text-gold-700 border-gold-200"
+                  : "bg-white text-nude-800 border-nude-200 hover:bg-gold-50"
+              }`
+            }
+            data-testid="mobile-nav-creatives"
+            onMouseEnter={() => prefetch("/app/creatives")}
+            onFocus={() => prefetch("/app/creatives")}
+            onTouchStart={() => prefetch("/app/creatives")}
+          >
+            <Sparkles className="w-4 h-4" />
+            Criativos
+          </NavLink>
+          <button
+            className="p-2 rounded-md text-nude-700 hover:bg-nude-100"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Abrir navegação"
+          >
+            <Bot className="w-5 h-5" />
+          </button>
         </header>
 
         <div className="flex-1 overflow-auto">
           <Outlet />
         </div>
+        <footer className="shrink-0 border-t border-nude-200 bg-white/70 px-4 py-2 text-center text-[11px] text-nude-500">
+          Criado por <span className="font-semibold text-gold-700">Advocacia IA</span> — para todos os advogados
+        </footer>
       </main>
     </div>
   );

@@ -13,13 +13,20 @@ import {
   Send, Volume2, VolumeX, Sparkles, Bot, Gauge, ShieldCheck,
   AlertTriangle, BookOpen, Loader2, RefreshCcw, Pause, Play,
   CalendarPlus, CalendarCheck, X, Mic, MicOff, Paperclip, FileText,
+  Trash2, Video,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/kenia/contexts/AuthContext";
 
 const SCHEDULE_REGEX = /\b(agendar|agendamento|marcar|marca[cç][aã]o|hor[aá]rio|consulta|reuni[aã]o|atendimento|appointment|schedule)\b/i;
 const WAIT_FOLLOW_UP_MS = 65000;
-const ASSISTANT_GREETING = "Tudo bem? Sou a assistente virtual da Dra. Kênia Garcia. Como posso ajudar você hoje?";
-const ASSISTANT_SPEAKER = "Assistente virtual";
+const initialChatMessages = [
+  {
+    role: "assistant",
+    content: "Olá! Sou a secretária da Kênia Garcia. Como posso ajudar?",
+    audio_base64: null,
+  },
+];
 
 // Gera link de videoconferência (Jitsi — funciona como Google Meet, sem necessidade de login)
 // Pode ser substituído por integração oficial com Google Calendar API no futuro.
@@ -57,7 +64,7 @@ const renderMessageContent = (text) => {
 
 const cleanRepeatedText = (text) => {
   const noRepeatedWords = String(text || "")
-    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>?/giu, "")
+    .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>/giu, "")
     .replace(/`{1,3}\s*HANDOFF[_\s-]*K[EÊ]NIA\s*`{1,3}/giu, "")
     .replace(/\b((?:[\p{L}\p{N}]{2,}\s+){1,3}[\p{L}\p{N}]{2,})(?:[\s,.;:!?-]+\1\b)+/giu, "$1")
     .replace(/\b([\p{L}\p{N}]{2,})(?:[\s,.;:!?-]+\1\b)+/giu, "$1")
@@ -200,89 +207,84 @@ const QUAL_META = {
   },
 };
 
-const STORAGE_KEY = "kenia.chatia.session.v1";
+const LEGAL_KEYWORDS = [
+  { area: "Direito de Família", words: /\b(div[oó]rcio|guarda|pens[aã]o|alimentos|visita|uni[aã]o\s+est[aá]vel|invent[aá]rio|partilha|heran[cç]a)\b/i },
+  { area: "Direito Bancário", words: /\b(banco|empr[eé]stimo|consignado|juros|cart[aã]o|pix|golpe|negativa[cç][aã]o|serasa|spc|d[ií]vida)\b/i },
+  { area: "Direito Previdenciário", words: /\b(inss|aposentadoria|aux[ií]lio|benef[ií]cio|bpc|loas|per[ií]cia|pens[aã]o\s+por\s+morte)\b/i },
+  { area: "Direito Trabalhista", words: /\b(trabalho|demiss[aã]o|rescis[aã]o|fgts|sal[aá]rio|horas?\s+extras?|f[eé]rias|ass[eé]dio|emprego)\b/i },
+  { area: "Direito do Consumidor", words: /\b(produto|servi[cç]o|compra|defeito|garantia|cancelamento|reembolso|cobran[cç]a|consumidor)\b/i },
+];
 
-const normalizeMessageForDedupe = (value) =>
-  cleanRepeatedText(value)
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const dedupeChatMessages = (list = []) => {
-  const output = [];
-  const assistantSinceLastUser = new Set();
-  for (const item of Array.isArray(list) ? list : []) {
-    const role = item?.role === "user" ? "user" : "assistant";
-    const content = role === "assistant" ? cleanRepeatedText(item?.content) : String(item?.content || "").trim();
-    const normalized = normalizeMessageForDedupe(content);
-    const typing = Boolean(item?.typing);
-    if (!normalized && !typing) continue;
-
-    if (role === "user") assistantSinceLastUser.clear();
-    const last = output[output.length - 1];
-    const lastNormalized = last ? normalizeMessageForDedupe(last.content) : "";
-    if (typing) {
-      output.push({ ...item, role, content, typing, _typingId: item?._typingId });
-      continue;
-    }
-    if (last?.role === role && lastNormalized && lastNormalized === normalized) continue;
-    if (role === "assistant" && normalized && assistantSinceLastUser.has(normalized)) continue;
-
-    if (role === "assistant" && normalized) assistantSinceLastUser.add(normalized);
-    output.push({ ...item, role, content, typing, _typingId: item?._typingId });
-  }
-  return output;
+const clampPercent = (value, fallback) => {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fallback;
 };
 
-const loadPersistedSession = () => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== "object") return null;
-    if (!Array.isArray(data.messages) || data.messages.length === 0) return null;
-    // Limpa flags transitórias e remove duplicações salvas de versões anteriores.
-    data.messages = dedupeChatMessages(data.messages.map((m) => ({ ...m, typing: false, _typingId: undefined })));
-    return data;
-  } catch {
-    return null;
-  }
+const normalizeAnalysis = (value, fallback = {}) => {
+  const source = value && typeof value === "object" ? value : {};
+  const qualificacao = source.qualificacao === "desqualificado"
+    ? "nao_qualificado"
+    : QUAL_META[source.qualificacao]
+      ? source.qualificacao
+      : fallback.qualificacao || "necessita_mais_info";
+  return {
+    acertividade: clampPercent(source.acertividade, fallback.acertividade ?? 35),
+    chance_exito: clampPercent(source.chance_exito, fallback.chance_exito ?? 30),
+    qualificacao,
+    area: String(source.area || fallback.area || "Em análise"),
+    resumo: String(source.resumo || fallback.resumo || "Analisando os detalhes informados no atendimento."),
+    motivo: String(source.motivo || fallback.motivo || "Quanto mais contexto for enviado, mais precisa fica a avaliação."),
+    proxima_pergunta: String(source.proxima_pergunta || fallback.proxima_pergunta || ""),
+    fundamentos: Array.isArray(source.fundamentos) ? source.fundamentos : (Array.isArray(fallback.fundamentos) ? fallback.fundamentos : []),
+  };
+};
+
+const buildLocalAnalysis = (history, currentMessage, previous = null) => {
+  const userTexts = [...history.filter((m) => m.role === "user").map((m) => m.content), currentMessage]
+    .map((text) => String(text || "").trim())
+    .filter(Boolean);
+  const combined = userTexts.join("\n");
+  const matched = LEGAL_KEYWORDS.find((item) => item.words.test(combined));
+  const infoCount = Math.min(5, userTexts.length);
+  const hasDeadline = /\b(prazo|audi[eê]ncia|intima[cç][aã]o|urgente|hoje|amanh[aã]|dias?|data)\b/i.test(combined);
+  const hasDocument = /\b(documento|contrato|processo|print|prova|comprovante|foto|anexo)\b/i.test(combined);
+  const score = clampPercent(30 + infoCount * 10 + (matched ? 18 : 0) + (hasDeadline ? 10 : 0) + (hasDocument ? 8 : 0), 45);
+  return normalizeAnalysis({
+    acertividade: Math.max(previous?.acertividade || 0, score),
+    chance_exito: Math.max(previous?.chance_exito || 0, Math.max(25, score - 10)),
+    qualificacao: score >= 75 ? "qualificado" : "necessita_mais_info",
+    area: matched?.area || previous?.area || "Em análise jurídica",
+    resumo: combined.slice(0, 180) || "Cliente iniciou a descrição do caso.",
+    motivo: matched
+      ? "A conversa já contém sinais da área jurídica e detalhes suficientes para uma triagem inicial."
+      : "Ainda faltam dados objetivos sobre área, datas, documentos e impacto do problema.",
+    proxima_pergunta: hasDeadline
+      ? "Você tem algum documento, contrato, comprovante ou número de processo sobre esse caso?"
+      : "Existe algum prazo, audiência, bloqueio ou urgência acontecendo agora?",
+    fundamentos: matched ? [matched.area] : [],
+  }, previous || {});
 };
 
 export default function ChatIA() {
-  const persisted = typeof window !== "undefined" ? loadPersistedSession() : null;
-
-  const [messages, setMessages] = useState(
-    persisted?.messages?.length
-      ? persisted.messages
-      : [
-          {
-            role: "assistant",
-            content: ASSISTANT_GREETING,
-            audio_base64: null,
-          },
-        ]
-  );
+  const { user } = useAuth();
+  const [messages, setMessages] = useState(initialChatMessages);
   const [input, setInput] = useState("");
-  const [name, setName] = useState(persisted?.name || "");
-  const [phone, setPhone] = useState(persisted?.phone || "");
-  const [voice, setVoice] = useState(persisted?.voice || "nova");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [voice, setVoice] = useState("nova");
   const [autoplay, setAutoplay] = useState(true);
   const [thinking, setThinking] = useState(false);
-  const [sessionId, setSessionId] = useState(persisted?.sessionId || null);
-  const [analysis, setAnalysis] = useState(persisted?.analysis || null);
+  const [sessionId, setSessionId] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
   const [legDate, setLegDate] = useState("");
   const [legBrief, setLegBrief] = useState("");
   const [playingIdx, setPlayingIdx] = useState(null);
   const [scheduler, setScheduler] = useState(null);
   const [scheduling, setScheduling] = useState(false);
-  const [leadId, setLeadId] = useState(persisted?.leadId || null);
+  const [leadId, setLeadId] = useState(null);
   const [showAnalysisPanel, setShowAnalysisPanel] = useState(true);
-  const [activeSpeaker, setActiveSpeaker] = useState(persisted?.activeSpeaker || ASSISTANT_SPEAKER);
+  const [activeSpeaker, setActiveSpeaker] = useState("Secretária");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const audioRef = useRef(null);
   const scrollRef = useRef(null);
   const [recording, setRecording] = useState(false);
@@ -293,31 +295,81 @@ export default function ChatIA() {
   const waitFollowUpTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
-  const messagesRef = useRef(messages);
-  const assistantTypingTextRef = useRef(new Set());
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [videoPrompt, setVideoPrompt] = useState("");
+  const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [videoResult, setVideoResult] = useState(null);
+  const hydratedRef = useRef(false);
+  const storageKey = `kenia:chatia-atendimento:${user?.id || "local"}`;
 
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  // Persiste a conversa para sobreviver a desconexões/refresh
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const saveChatState = (next = {}) => {
+    if (!hydratedRef.current) return;
     try {
-      const payload = {
-        messages: dedupeChatMessages(messages).map(({ _typingId, ...message }) => message),
+      localStorage.setItem(storageKey, JSON.stringify({
+        messages,
         sessionId,
+        analysis,
         name,
         phone,
-        voice,
-        analysis,
-        leadId,
-        activeSpeaker,
-        savedAt: Date.now(),
-      };
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        updatedAt: new Date().toISOString(),
+        ...next,
+      }));
     } catch {}
-  }, [messages, sessionId, name, phone, voice, analysis, leadId, activeSpeaker]);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    hydratedRef.current = false;
+    const hydrate = async () => {
+      let restored = false;
+      try {
+        const raw = localStorage.getItem(storageKey);
+        const saved = raw ? JSON.parse(raw) : null;
+        if (saved?.messages?.length) {
+          setMessages(saved.messages);
+          setSessionId(saved.sessionId || null);
+          setAnalysis(saved.analysis || null);
+          setName(saved.name || "");
+          setPhone(saved.phone || "");
+          restored = true;
+        }
+      } catch {}
+
+      if (user?.id) {
+        try {
+          const { data, error } = await supabase
+            .from("conversations")
+            .select("session_id,message,response,created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(40);
+          if (!cancelled && !error && Array.isArray(data) && data.length && !restored) {
+            const latestSession = data.find((row) => row.session_id)?.session_id || data[0].session_id || null;
+            const rows = data
+              .filter((row) => !latestSession || row.session_id === latestSession)
+              .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            const restoredMessages = [initialChatMessages[0]];
+            rows.forEach((row) => {
+              if (row.message) restoredMessages.push({ role: "user", content: row.message });
+              if (row.response) restoredMessages.push({ role: "assistant", content: row.response, audio_base64: null });
+            });
+            setMessages(restoredMessages);
+            setSessionId(latestSession);
+          }
+        } catch (err) {
+          console.warn("Não consegui restaurar conversas salvas:", err);
+        }
+      }
+
+      if (!cancelled) hydratedRef.current = true;
+    };
+    hydrate();
+    return () => { cancelled = true; };
+  }, [storageKey, user?.id]);
+
+  useEffect(() => {
+    saveChatState();
+  }, [messages, sessionId, analysis, name, phone, storageKey]);
 
   const sanitizeFolder = (s) =>
     String(s || "anonimo").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "anonimo";
@@ -358,59 +410,76 @@ export default function ChatIA() {
     }
   };
 
+  const generateVideo = async () => {
+    if (!videoPrompt.trim()) return;
+    setGeneratingVideo(true);
+    setVideoResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("emergent-video", {
+        body: {
+          prompt: videoPrompt.trim(),
+          durationSeconds: 6,
+          aspectRatio: "9:16",
+          provider: "gemini",
+        },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Falha ao gerar vídeo");
+      setVideoResult(data);
+      toast.success("Vídeo gerado com sucesso!");
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `🎬 Vídeo gerado com Gemini!\n\nPrompt: "${videoPrompt}"\nModelo: ${data.model || "gemini"}\nTamanho: ${data.bytes ? `${(data.bytes / 1024 / 1024).toFixed(1)}MB` : "?"}`,
+          video_b64: data.b64,
+        },
+      ]);
+      setShowVideoModal(false);
+      setVideoPrompt("");
+    } catch (err) {
+      console.error("Erro ao gerar vídeo:", err);
+      toast.error(err.message || "Não consegui gerar o vídeo. Tente novamente.");
+    } finally {
+      setGeneratingVideo(false);
+    }
+  };
+
 
   // Simula digitação humana: insere a mensagem do assistente caractere por caractere,
   // com pequenas pausas naturais em pontuação. Resolve quando termina.
   const typeAssistantMessage = (fullText, audioB64 = null, speaker = null) =>
     new Promise((resolve) => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       const text = cleanRepeatedText(fullText);
-      if (!text) { resolve(); return; }
-      const normalizedText = normalizeMessageForDedupe(text);
-      const existingReply = [...messagesRef.current]
-        .reverse()
-        .find((m) => m.role === "assistant" && !m.typing && normalizeMessageForDedupe(m.content) === normalizedText);
-      if (existingReply) { resolve(); return; }
-      if (assistantTypingTextRef.current.has(normalizedText)) { resolve(); return; }
-      if (typingTimerRef.current) {
-        clearTimeout(typingTimerRef.current);
-        typingTimerRef.current = null;
-        assistantTypingTextRef.current.clear();
-      }
-      assistantTypingTextRef.current.add(normalizedText);
       const isKenia = speaker && /k[eê]nia/i.test(speaker);
+      // pausas mais longas quando é a própria Dra. Kênia digitando (parece humano)
       const baseDelay = isKenia ? 38 : 22;
       let idx = 0;
-      const typingId = `typing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      setMessages((prev) => {
-        // Reaproveita um placeholder de digitação pendente, se existir
-        const lastIdx = prev.length - 1;
-        if (lastIdx >= 0 && prev[lastIdx].role === "assistant" && prev[lastIdx].typing) {
-          const copy = [...prev];
-          copy[lastIdx] = { ...copy[lastIdx], _typingId: typingId, content: "", speaker };
-          return dedupeChatMessages(copy);
-        }
-        return dedupeChatMessages([...prev, { role: "assistant", content: "", audio_base64: null, typing: true, speaker, _typingId: typingId }]);
-      });
-
-      const updateTyping = (updater) => {
-        setMessages((prev) => {
-          const i = prev.findIndex((m) => m._typingId === typingId);
-          if (i < 0) return prev;
-          const copy = [...prev];
-          copy[i] = updater(copy[i]);
-          return dedupeChatMessages(copy);
-        });
-      };
+      setMessages((prev) => [...prev, { role: "assistant", content: "", audio_base64: null, typing: true, speaker }]);
 
       const step = () => {
         idx += 1;
         const partial = text.slice(0, idx);
-        updateTyping((m) => ({ ...m, content: partial }));
+        setMessages((prev) => {
+          const copy = [...prev];
+          const last = copy[copy.length - 1];
+          if (last && last.role === "assistant") {
+            copy[copy.length - 1] = { ...last, content: partial };
+          }
+          return copy;
+        });
 
         if (idx >= text.length) {
-          updateTyping((m) => ({ ...m, content: text, audio_base64: audioB64, typing: false, speaker, _typingId: undefined }));
-          assistantTypingTextRef.current.delete(normalizedText);
+          setMessages((prev) => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last && last.role === "assistant") {
+              copy[copy.length - 1] = { ...last, content: text, audio_base64: audioB64, typing: false, speaker };
+            }
+            return copy;
+          });
           typingTimerRef.current = null;
           resolve();
           return;
@@ -637,11 +706,20 @@ export default function ChatIA() {
   };
 
   const openScheduler = (area) => {
-    const slot = nextBusinessSlot();
-    setScheduler({ date: slot.date, time: slot.time, duration: 60, area: area || analysis?.area || "" });
-    // No mobile, garante que o painel do chat (onde o scheduler é renderizado) fique visível
-    setShowAnalysisPanel(false);
+    try {
+      const slot = nextBusinessSlot();
+      setScheduler({ date: slot.date, time: slot.time, duration: 60, area: area || analysis?.area || "" });
+      setShowAnalysisPanel(false);
+      toast.success("Escolha data e horário");
+      setTimeout(() => {
+        document.querySelector('[data-testid="scheduler-panel"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    } catch (err) {
+      console.error("Falha ao abrir agendador:", err);
+      toast.error("Não consegui abrir o agendador.");
+    }
   };
+
 
   const createAppointment = async ({ date, time, duration = 60, area = "" }) => {
     const starts_at = getAppointmentDateTime(date, time);
@@ -777,25 +855,19 @@ export default function ChatIA() {
     setPlayingIdx(null);
   };
 
-  const sendingRef = useRef(false);
-  const activeRequestIdRef = useRef(0);
   const send = async (text) => {
     const msg = (text ?? input).trim();
     if (!msg) return;
-    if (sendingRef.current || thinking) return;
-    sendingRef.current = true;
-    const requestId = ++activeRequestIdRef.current;
+    const historySnapshot = messages.map((m) => ({ role: m.role, content: m.content }));
     if (waitFollowUpTimerRef.current) {
       clearTimeout(waitFollowUpTimerRef.current);
       waitFollowUpTimerRef.current = null;
     }
-    setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      if (last && last.role === "user" && normalizeMessageForDedupe(last.content) === normalizeMessageForDedupe(msg)) return dedupeChatMessages(prev);
-      return dedupeChatMessages([...prev, { role: "user", content: msg }]);
-    });
+    setMessages((prev) => [...prev, { role: "user", content: msg }]);
     setInput("");
     setThinking(true);
+    const optimisticAnalysis = buildLocalAnalysis(historySnapshot, msg, analysis);
+    setAnalysis(optimisticAnalysis);
     const scheduleIntent = extractScheduleIntent(msg);
     if (scheduleIntent) {
       try {
@@ -817,7 +889,6 @@ export default function ChatIA() {
         openScheduler(analysis?.area || "Atendimento jurídico");
         toast.error("Não consegui criar o agendamento automaticamente");
       }
-      sendingRef.current = false;
       return;
     }
     try {
@@ -825,22 +896,26 @@ export default function ChatIA() {
         "/chat/message",
         {
           message: msg,
-          history: dedupeChatMessages(messagesRef.current).map((m) => ({ role: m.role, content: m.content })),
+          history: historySnapshot,
           session_id: sessionId,
+          user_id: user?.id || null,
           visitor_name: name || null,
           visitor_phone: phone || null,
           voice,
-          want_audio: autoplay,
+          want_audio: true,
           return_analysis: true,
         },
         { timeout: 90000 }
       );
-      if (activeRequestIdRef.current !== requestId) return;
       setSessionId(data.session_id);
       if (data.appointment) {
         toast.success("Consulta salva automaticamente na Agenda");
       }
-      if (data.analysis) setAnalysis(data.analysis);
+      if (data.analysis) {
+        setAnalysis(normalizeAnalysis(data.analysis, optimisticAnalysis));
+      } else {
+        setAnalysis(optimisticAnalysis);
+      }
       upsertLead({ description: msg });
       setThinking(false);
       if (data.handoff) {
@@ -861,11 +936,10 @@ export default function ChatIA() {
       const responseText = cleanRepeatedText(data.response);
       const speaker = data.handoff || activeSpeaker === "Dra. Kênia Garcia" ? "Dra. Kênia Garcia" : data.speaker || null;
       await typeAssistantMessage(responseText, data.audio_base64 || null, speaker);
-      const wantsKenia = data.handoff || speaker === "Dra. Kênia Garcia";
-      if (wantsKenia && shouldScheduleWaitFollowUp(data.response)) {
+      if (shouldScheduleWaitFollowUp(data.response)) {
         if (waitFollowUpTimerRef.current) clearTimeout(waitFollowUpTimerRef.current);
         waitFollowUpTimerRef.current = setTimeout(() => {
-          typeAssistantMessage(buildWaitFollowUpText(name), null, speaker || ASSISTANT_SPEAKER);
+          typeAssistantMessage(buildWaitFollowUpText(name), null, speaker || "Secretária");
           waitFollowUpTimerRef.current = null;
         }, WAIT_FOLLOW_UP_MS);
       }
@@ -876,14 +950,9 @@ export default function ChatIA() {
       console.error("Erro ao conversar com a IA:", err);
       toast.error("Erro ao conversar com a IA. Tente novamente.");
       setThinking(false);
-      if (activeRequestIdRef.current === requestId) {
-        await typeAssistantMessage("Desculpe, tive uma instabilidade aqui. Pode repetir sua mensagem? 🙏");
-      }
+      await typeAssistantMessage("Desculpe, tive uma instabilidade aqui. Pode repetir sua mensagem? 🙏");
     } finally {
-      if (activeRequestIdRef.current === requestId) {
-        setThinking(false);
-        sendingRef.current = false;
-      }
+      setThinking(false);
     }
   };
 
@@ -897,22 +966,31 @@ export default function ChatIA() {
 
   const reset = () => {
     setMessages([
-      {
-        role: "assistant",
-        content: ASSISTANT_GREETING,
-        audio_base64: null,
-      },
+      initialChatMessages[0],
     ]);
     setSessionId(null);
     setAnalysis(null);
-    setLeadId(null);
-    setActiveSpeaker(ASSISTANT_SPEAKER);
-    try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(storageKey); } catch {}
     stopAudio();
   };
 
+  const deleteConversation = async () => {
+    try { localStorage.removeItem(storageKey); } catch {}
+    if (user?.id) {
+      try { await supabase.from("conversations").delete().eq("user_id", user.id); } catch {}
+    }
+    setMessages([initialChatMessages[0]]);
+    setSessionId(null);
+    setAnalysis(null);
+    setName("");
+    setPhone("");
+    setLeadId(null);
+    stopAudio();
+    setConfirmDelete(false);
+    toast.success("Conversa apagada com sucesso.");
+  };
+
   const QM = analysis ? QUAL_META[analysis.qualificacao] || QUAL_META.necessita_mais_info : null;
-  const visibleMessages = dedupeChatMessages(messages);
 
   return (
     <div className="min-h-full flex flex-col bg-background" data-testid="chat-ia-page">
@@ -948,6 +1026,15 @@ export default function ChatIA() {
           >
             <RefreshCcw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Nova conversa</span><span className="sm:hidden">Nova</span>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmDelete(true)}
+            className="gap-1.5 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+            data-testid="delete-chat-btn"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Apagar</span>
+          </Button>
         </div>
       </div>
 
@@ -976,9 +1063,9 @@ export default function ChatIA() {
       {/* Main Layout */}
       <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-3 sm:gap-4 p-3 sm:p-4 lg:overflow-hidden min-h-0">
         {/* CHAT */}
-        {!showAnalysisPanel && (
+        {(
           <Card
-            className="flex-1 min-h-[60vh] lg:min-h-0 lg:col-span-8 flex flex-col overflow-hidden border-nude-200"
+            className={`${showAnalysisPanel ? "hidden lg:flex" : "flex"} flex-1 min-h-[60vh] lg:min-h-0 lg:col-span-8 flex-col overflow-hidden border-nude-200`}
             data-testid="chat-panel"
           >
             {/* visitor info */}
@@ -1031,7 +1118,7 @@ export default function ChatIA() {
             {/* messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5 bg-gradient-to-b from-nude-50/40 to-background">
               <div className="space-y-4 max-w-3xl mx-auto">
-                {visibleMessages.map((m, i) => (
+                {messages.map((m, i) => (
                   <div
                     key={i}
                     className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
@@ -1047,7 +1134,7 @@ export default function ChatIA() {
                       {m.role === "assistant" && (m.speaker || i === 0) && (
                         <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-semibold tracking-widest uppercase text-gold-600">
                           <Sparkles className="w-3 h-3" />
-                          {m.speaker ? m.speaker : ASSISTANT_SPEAKER}
+                          {m.speaker ? m.speaker : "Ana · secretária"}
                         </div>
                       )}
                       <div className="text-sm leading-relaxed whitespace-pre-wrap">{renderMessageContent(m.content)}</div>
@@ -1075,6 +1162,16 @@ export default function ChatIA() {
                             )}
                           </button>
                           <NativeAudioPlayer audioB64={m.audio_base64} index={i} />
+                        </div>
+                      )}
+                      {m.role === "assistant" && m.video_b64 && (
+                        <div className="mt-3">
+                          <video
+                            controls
+                            preload="metadata"
+                            className="w-full max-w-[280px] rounded-xl border border-nude-200"
+                            src={`data:video/mp4;base64,${m.video_b64}`}
+                          />
                         </div>
                       )}
                     </div>
@@ -1201,6 +1298,16 @@ export default function ChatIA() {
                 </Button>
                 <Button
                   type="button"
+                  onClick={() => setShowVideoModal(true)}
+                  disabled={thinking || generatingVideo}
+                  title="Gerar vídeo com Gemini"
+                  className="h-12 px-3 sm:px-4 shrink-0 bg-nude-200 hover:bg-nude-300 text-nude-800"
+                  data-testid="chat-video-btn"
+                >
+                  {generatingVideo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-4 h-4" />}
+                </Button>
+                <Button
+                  type="button"
                   onClick={recording ? stopRecording : startRecording}
                   disabled={thinking || transcribing}
                   title={recording ? "Parar gravação" : "Gravar mensagem de áudio"}
@@ -1233,9 +1340,9 @@ export default function ChatIA() {
         )}
 
         {/* ANALYSIS SIDE */}
-        {showAnalysisPanel && (
+        {(
           <Card
-            className="lg:col-span-4 flex flex-col overflow-hidden border-nude-200"
+            className={`${showAnalysisPanel ? "flex" : "hidden lg:flex"} lg:col-span-4 flex-col overflow-hidden border-nude-200`}
             data-testid="analysis-panel"
           >
             <div className="px-5 py-3 border-b border-nude-200 bg-nude-50/60">
@@ -1389,6 +1496,91 @@ export default function ChatIA() {
           </Card>
         )}
       </div>
+
+      {/* Modal de confirmação: Apagar conversa */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-nude-900">Apagar conversa?</h2>
+                <p className="text-sm text-nude-500">Essa ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmDelete(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={deleteConversation}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Apagar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Gerar vídeo com Gemini */}
+      {showVideoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
+                <Video className="w-5 h-5 text-violet-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-nude-900">Gerar vídeo com Gemini</h2>
+                <p className="text-sm text-nude-500">Descreva a cena que deseja gerar</p>
+              </div>
+            </div>
+            <Textarea
+              placeholder="Ex.: Um advogado em um escritório moderno explicando direitos trabalhistas, estilo profissional, 4K..."
+              value={videoPrompt}
+              onChange={(e) => setVideoPrompt(e.target.value)}
+              rows={4}
+              className="resize-none"
+              disabled={generatingVideo}
+            />
+            <p className="text-[11px] text-nude-500">
+              Vídeo vertical (9:16), ~6 segundos. Pode levar até 2 minutos.
+            </p>
+            {generatingVideo && (
+              <div className="flex items-center gap-2 text-sm text-violet-700">
+                <Loader2 className="w-4 h-4 animate-spin" /> Gerando vídeo...
+              </div>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setShowVideoModal(false); setVideoPrompt(""); setVideoResult(null); }}
+                disabled={generatingVideo}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+                onClick={generateVideo}
+                disabled={generatingVideo || !videoPrompt.trim()}
+              >
+                {generatingVideo ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Video className="w-3.5 h-3.5 mr-1.5" />}
+                Gerar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

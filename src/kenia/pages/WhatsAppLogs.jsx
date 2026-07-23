@@ -5,10 +5,11 @@ import { Button } from "@/kenia/components/ui/button";
 import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Input } from "@/kenia/components/ui/input";
+import { extractWhatsAppDigits, formatWhatsAppPhone } from "@/kenia/lib/phone";
 import { toast } from "sonner";
 import {
   ArrowDownLeft, ArrowUpRight, Bot, RefreshCw, CheckCheck,
-  AlertCircle, Search, Radio,
+  AlertCircle, Search, Radio, Phone,
 } from "lucide-react";
 
 export default function WhatsAppLogs() {
@@ -215,6 +216,8 @@ function LogRow({ msg }) {
   const isBot = !!msg.bot;
   const time = new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const date = new Date(msg.created_at).toLocaleDateString("pt-BR");
+  const displayPhone = formatWhatsAppPhone(msg.contact_phone);
+  const telDigits = extractWhatsAppDigits(msg.contact_phone);
   const tagColor = isIn
     ? "bg-blue-100 text-blue-800"
     : isBot
@@ -231,7 +234,20 @@ function LogRow({ msg }) {
         <div className="flex items-center gap-2 flex-wrap">
           <Badge className={`${tagColor} hover:${tagColor} text-[10px]`}>{tagLabel}</Badge>
           <span className="font-medium text-sm">{msg.contact_name || "—"}</span>
-          <span className="text-xs text-nude-500 font-mono">{msg.contact_phone}</span>
+          <span className="text-xs text-nude-500 font-mono" title={msg.contact_phone}>{displayPhone}</span>
+          {telDigits && (
+            <a
+              href={`tel:+${telDigits}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                toast.success(`Ligando para ${msg.contact_name || msg.contact_phone}…`);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gold-600 hover:bg-gold-700 text-white text-[10px] font-medium"
+              data-testid="call-contact-btn"
+            >
+              <Phone className="w-3 h-3" /> Telefonar
+            </a>
+          )}
           <span className="text-xs text-nude-400 ml-auto">{date} • {time}</span>
         </div>
         <div className="text-sm text-nude-700 mt-1 whitespace-pre-wrap break-words">
