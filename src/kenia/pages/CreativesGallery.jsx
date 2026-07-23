@@ -85,8 +85,7 @@ export default function CreativesGallery() {
         return true;
       });
       setItems(unique);
-      const leanCache = unique.map(({ image_b64, signed_url, image_url, ...meta }) => meta);
-      try { localStorage.setItem("kenia.gallery.cache", JSON.stringify(leanCache.slice(0, 100))); } catch {}
+      try { localStorage.setItem("kenia.gallery.cache", JSON.stringify(unique.slice(0, 100))); } catch {}
     } catch {
       try {
         const cached = JSON.parse(localStorage.getItem("kenia.gallery.cache") || "[]");
@@ -113,8 +112,7 @@ export default function CreativesGallery() {
     if (recovered > 0) {
       setItems(updated);
       toast.success(`${recovered} imagem(ns) recuperada(s)`);
-      const leanUpdated = updated.map(({ image_b64, signed_url, image_url, ...meta }) => meta);
-      try { localStorage.setItem("kenia.gallery.cache", JSON.stringify(leanUpdated.slice(0, 100))); } catch {}
+      try { localStorage.setItem("kenia.gallery.cache", JSON.stringify(updated.slice(0, 100))); } catch {}
     } else {
       toast.message("Nenhuma imagem para recuperar");
     }

@@ -86,7 +86,7 @@ export default function SecretaryMarketing() {
     setSelectedStrategy(strategy);
     setSending(true);
     try {
-      const { data, error } = await supabase.functions.invoke("training-engine", {
+      const { data, error } = await supabase.functions.invoke("training-ai", {
         body: { action: "secretary_strategy", strategy_id: strategy.id },
       });
       if (error) throw error;
@@ -119,7 +119,7 @@ export default function SecretaryMarketing() {
 
     try {
       const currentPrompt = loadChatConfig().prompt || CHAT_DEFAULT_PROMPT;
-      const { data, error } = await supabase.functions.invoke("training-engine", {
+      const { data, error } = await supabase.functions.invoke("training-ai", {
         body: { action: "secretary_evaluate", scenario: currentSession.scenario?.scenario || "", user_response: userMsg, strategy_id: currentSession.strategy_id, current_prompt: currentPrompt },
       });
       if (error) throw error;
@@ -170,7 +170,7 @@ export default function SecretaryMarketing() {
       const tips = tipsMatch ? tipsMatch[1].split("\n").filter((l) => l.startsWith("• ")).map((l) => l.slice(2)) : [];
 
       const currentPrompt = loadChatConfig().prompt || CHAT_DEFAULT_PROMPT;
-      const { data, error } = await supabase.functions.invoke("training-engine", {
+      const { data, error } = await supabase.functions.invoke("training-ai", {
         body: {
           action: "improve_prompt",
           current_prompt: currentPrompt,
@@ -228,15 +228,18 @@ export default function SecretaryMarketing() {
         });
       }, 3000);
 
-      const { data, error } = await supabase.functions.invoke("training-engine", {
+      const { data, error } = await supabase.functions.invoke("training-ai", {
         body: { action: "auto_train", current_prompt: currentPrompt },
       });
       clearInterval(progressInterval);
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      if (data.improved_prompt && data.improved_prompt !== currentPrompt) {
+        saveChatConfig({ prompt: data.improved_prompt });
+      }
       setAutoResults(data);
       setAutoProgress({ current: 17, total: 17, strategy: "Concluído!" });
-      toast.success(`Treinamento concluído! ${data.stats.passed}/${data.stats.total} aprovados`);
+      toast.success(`Treinamento concluído! ${data.stats.passed}/${data.stats.total} aprovados${data.improved_prompt ? "\nPrompt atualizado e salvo!" : ""}`);
     } catch (e) {
       toast.error("Erro no treinamento: " + (e?.message || e));
     } finally {
@@ -251,7 +254,7 @@ export default function SecretaryMarketing() {
     setAutoLoopProgress({ iteration: 0, maxIterations: 3, score: 0, status: "Iniciando loop de melhoria..." });
     try {
       const currentPrompt = loadChatConfig().prompt || CHAT_DEFAULT_PROMPT;
-      const { data, error } = await supabase.functions.invoke("training-engine", {
+      const { data, error } = await supabase.functions.invoke("training-ai", {
         body: { action: "auto_train_loop", current_prompt: currentPrompt, target_improvement: 20, max_iterations: 3 },
       });
       if (error) throw error;

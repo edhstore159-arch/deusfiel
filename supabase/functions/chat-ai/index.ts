@@ -1,6 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { chatCompletion } from "../_shared/llm.ts";
+import { getEvolvedPrompt } from "../_shared/prompts.ts";
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const EMERGENT_API_KEY = Deno.env.get("EMERGENT_API_KEY");
@@ -885,8 +886,27 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
     const history: Array<{ role: string; content: string }> = compactHistory(Array.isArray(body.history) ? body.history : []);
-    // Sempre usar o DEFAULT_PROMPT atual — ignora prompts antigos salvos no cliente
-    const extraPrompt: string = DEFAULT_PROMPT;
+    // Tenta usar prompt evoluído do treinamento; senão, usa o padrão hardcoded
+    let extraPrompt: string = DEFAULT_PROMPT;
+    try {
+      const evolved = await getEvolvedPrompt("secretary");
+      if (evolved && evolved.trim().length > 100) {
+        extraPrompt = evolved;
+        console.log("[chat-ai] Usando prompt evoluído do treinamento (agent_type=secretary)");
+      }
+    } catch (e) {
+      console.warn("[chat-ai] Falha ao buscar prompt evoluído, usando padrão:", e);
+    }
+
+    // Buscar também prompt evoluído do advogado para enriquecer conhecimento jurídico
+    try {
+      const lawyerEvolved = await getEvolvedPrompt("lawyer", "*");
+      if (lawyerEvolved && lawyerEvolved.trim().length > 100) {
+        extraPrompt += `\n\n# CONHECIMENTO JURÍDICO AVANÇADO (Treinamento de Advogado)\n${lawyerEvolved.slice(0, 2000)}`;
+        console.log("[chat-ai] Prompt evoluído do advogado incorporado ao conhecimento jurídico");
+      }
+    } catch { /* optional */ }
+
     const sessionId: string | null = body.session_id ? String(body.session_id) : null;
     const userId: string | null = body.user_id ? String(body.user_id) : null;
 

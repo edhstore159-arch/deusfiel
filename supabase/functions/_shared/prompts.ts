@@ -16,6 +16,7 @@ function getAdminClient() {
 /**
  * Get the active evolved prompt for an agent type + area.
  * Falls back to null if no evolved prompt exists.
+ * Pass area="*" to get the latest prompt regardless of area.
  */
 export async function getEvolvedPrompt(
   agentType: "lawyer" | "judge" | "secretary",
@@ -23,12 +24,15 @@ export async function getEvolvedPrompt(
 ): Promise<string | null> {
   try {
     const supa = getAdminClient();
-    const { data, error } = await supa
+    let query = supa
       .from("agent_prompts")
       .select("prompt")
       .eq("agent_type", agentType)
-      .eq("is_active", true)
-      .eq("area", area || "general")
+      .eq("is_active", true);
+    if (area && area !== "*") {
+      query = query.eq("area", area);
+    }
+    const { data, error } = await query
       .order("version", { ascending: false })
       .limit(1)
       .maybeSingle();

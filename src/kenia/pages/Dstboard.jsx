@@ -14,6 +14,7 @@ import {
   ClipboardCheck, Kanban, Plus, Trash2, ChevronDown, ChevronRight,
   CheckCircle2, Circle, Clock, ArrowRight, Sparkles, Eye, EyeOff,
   Scale, Printer, RefreshCcw, Loader2, Target, User, Bot, BarChart3,
+  Image, Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -601,6 +602,16 @@ export default function Dstboard() {
               <BarChart3 className="w-3.5 h-3.5 mr-1.5 inline" />
               Análises
             </button>
+            <button
+              onClick={() => setView("criativos")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                view === "criativos" ? "bg-white text-nude-900 shadow-sm" : "text-nude-500 hover:text-nude-700"
+              }`}
+              data-testid="view-criativos"
+            >
+              <Image className="w-3.5 h-3.5 mr-1.5 inline" />
+              Criativos
+            </button>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -691,6 +702,8 @@ export default function Dstboard() {
           <LawyersView />
         ) : view === "analises" ? (
           <AnalisesView />
+        ) : view === "criativos" ? (
+          <CriativosView />
         ) : (
           <PipelineView
             processes={allLeads}
@@ -1432,6 +1445,301 @@ function PipelineView({ processes, moveStage, setActiveProcess, setView }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────── */
+/* CRIATIVOS VIEW — Imagens Geradas            */
+/* ──────────────────────────────────────────── */
+function CriativosView() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [activeTab, setActiveTab] = useState("all");
+
+  useEffect(() => {
+    loadAll();
+  }, []);
+
+  const imageSrc = (item) => {
+    if (!item) return "";
+    const candidates = [item.image_b64, item.signedUrl, item.url, item.image_url, item.image].filter(Boolean);
+    for (const c of candidates) {
+      const s = String(c);
+      if (s.length === 0) continue;
+      if (s.startsWith("data:") || s.startsWith("http://") || s.startsWith("https://") || s.startsWith("blob:")) return s;
+      return `data:image/png;base64,${s}`;
+    }
+    return "";
+  };
+
+  const loadAll = async () => {
+    setLoading(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth?.user?.id;
+      if (!uid) {
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+
+      // 1. Fetch all generated images from table
+      const { data: rows } = await supabase
+        .from("generated_images")
+        .select("*")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(120);
+
+      // 2. List storage files to recover orphans
+      const { data: files } = await supabase.storage
+        .from("creative-assets")
+        .list(uid, { limit: 200, sortBy: { column: "created_at", order: "desc" } });
+
+      const tablePaths = new Set((rows || []).map((r) => r.storage_path).filter(Boolean));
+      const storagePaths = new Set((files || []).filter((f) => f.name).map((f) => `${uid}/${f.name}`));
+
+      // 3. Insert orphans into table
+      const orphanPaths = [...storagePaths].filter((p) => !tablePaths.has(p));
+      for (const path of orphanPaths) {
+        const fileName = path.split("/").pop() || "";
+        await supabase.from("generated_images").insert({
+          user_id: uid, storage_path: path,
+          prompt: fileName.replace(/\.[^.]+$/, "").replace(/^fusion-/i, "").replace(/[_-]/g, " ").trim() || null,
+          kind: path.includes("fusion") ? "fusion" : "creative",
+          paid: false,
+        }).maybeSingle();
+      }
+
+      // 4. Re-fetch if orphans were added
+      const allRows = orphanPaths.length > 0
+        ? (await supabase
+            .from("generated_images")
+            .select("*")
+            .eq("user_id", uid)
+            .order("created_at", { ascending: false })
+            .limit(120)).data || rows || []
+        : rows || [];
+
+      // 5. Generate signed URLs for all paths
+      const allPaths = allRows.map((r) => r.storage_path).filter(Boolean);
+      const { data: signed } = allPaths.length > 0
+        ? await supabase.storage.from("creative-assets").createSignedUrls(allPaths, 60 * 60 * 24 * 7)
+        : { data: [] };
+
+      const urlByPath = {};
+      (signed || []).forEach((s, i) => { if (s?.signedUrl) urlByPath[allPaths[i]] = s.signedUrl; });
+
+      // 6. Build final items list
+      const merged = allRows.map((r) => ({
+        ...r,
+        image_b64: urlByPath[r.storage_path] || "",
+      }));
+
+      setItems(merged);
+    } catch (e) {
+      console.warn("CriativosView load error:", e);
+      setItems([]);
+    }
+    setLoading(false);
+  };
+
+  const formatDate = (iso) => {
+    if (!iso) return "";
+    try {
+      return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch { return ""; }
+  };
+
+  const downloadImage = (url, name) => {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name || "criativo.png";
+    a.click();
+  };
+
+  const filteredItems = activeTab === "all"
+    ? items
+    : activeTab === "creatives"
+      ? items.filter((it) => it.kind !== "fusion")
+      : items.filter((it) => it.kind === "fusion");
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-gold-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-auto p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-6">
+          <div className="overline text-gold-600">Criativos</div>
+          <h1 className="font-serif text-2xl text-nude-900 mt-1 flex items-center gap-2">
+            <Image className="w-6 h-6 text-gold-600" /> Imagens Geradas
+          </h1>
+          <p className="text-sm text-nude-500 mt-1">
+            {items.filter(i => i.kind !== "fusion").length} criativo(s) · {items.filter(i => i.kind === "fusion").length} fusão(ões) · Gerador de Imagens + Image Fusion
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab("all")}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              activeTab === "all" ? "bg-gold-600 text-white shadow-sm" : "bg-nude-100 text-nude-600 hover:bg-nude-200"
+            }`}
+          >
+            Todos ({items.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("creatives")}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              activeTab === "creatives" ? "bg-gold-600 text-white shadow-sm" : "bg-nude-100 text-nude-600 hover:bg-nude-200"
+            }`}
+          >
+            Criativos ({items.filter(i => i.kind !== "fusion").length})
+          </button>
+          <button
+            onClick={() => setActiveTab("fusions")}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              activeTab === "fusions" ? "bg-gold-600 text-white shadow-sm" : "bg-nude-100 text-nude-600 hover:bg-nude-200"
+            }`}
+          >
+            Fusões ({items.filter(i => i.kind === "fusion").length})
+          </button>
+          <div className="flex-1" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 h-8 text-xs"
+            onClick={loadAll}
+          >
+            <RefreshCcw className="w-3.5 h-3.5" /> Atualizar
+          </Button>
+        </div>
+
+        {filteredItems.length === 0 ? (
+          <div className="text-center py-16">
+            <Image className="w-12 h-12 text-nude-300 mx-auto mb-4" />
+            <div className="text-nude-500 text-sm">Nenhum criativo gerado ainda.</div>
+            <div className="text-nude-400 text-xs mt-1">
+              Acesse <a href="/app/creatives" className="text-gold-600 hover:underline">Criativos</a> ou <a href="/app/image-fusion" className="text-gold-600 hover:underline">Image Fusion</a> para gerar imagens.
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredItems.map((item) => {
+              const src = imageSrc(item);
+              const isFusion = item.kind === "fusion";
+              return (
+                <Card
+                  key={item.id}
+                  className="border-nude-200 overflow-hidden transition-all hover:shadow-md hover:border-gold-300 cursor-pointer group"
+                  onClick={() => setSelectedImage({ ...item, _src: src })}
+                >
+                  <div className="aspect-square bg-nude-100 relative overflow-hidden">
+                    {src ? (
+                      <img
+                        src={src}
+                        alt={item.title || "Criativo"}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-nude-400">
+                        <Image className="w-8 h-8" />
+                      </div>
+                    )}
+                    <div className="absolute top-2 right-2">
+                      <Badge className={`text-[10px] ${
+                        isFusion ? "bg-purple-600 text-white" : "bg-blue-600 text-white"
+                      }`}>
+                        {isFusion ? "Fusão" : "Criativo"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <div className="font-medium text-sm text-nude-900 truncate">{item.title || "Sem título"}</div>
+                    {(item.topic || item.prompt) && (
+                      <div className="text-[11px] text-nude-500 mt-1 line-clamp-2">{item.topic || item.prompt}</div>
+                    )}
+                    <div className="flex items-center gap-2 mt-2 text-[10px] text-nude-400">
+                      {item.network && <Badge variant="outline" className="text-[9px]">{item.network}</Badge>}
+                      {item.format && <Badge variant="outline" className="text-[9px]">{item.format}</Badge>}
+                      {item.created_at && <span>{formatDate(item.created_at)}</span>}
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Detail Modal */}
+        {selectedImage && (
+          <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Image className="w-5 h-5 text-gold-600" />
+                  {selectedImage.title || "Criativo"}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {selectedImage._src && (
+                  <div className="rounded-md overflow-hidden border border-nude-200">
+                    <img
+                      src={selectedImage._src}
+                      alt={selectedImage.title}
+                      className="w-full object-contain max-h-[50vh]"
+                    />
+                  </div>
+                )}
+
+                {(selectedImage.topic || selectedImage.prompt) && (
+                  <div className="bg-nude-50 border border-nude-200 rounded-md p-3">
+                    <div className="text-xs font-semibold text-nude-700 mb-1">Prompt</div>
+                    <div className="text-xs text-nude-600 whitespace-pre-wrap">{selectedImage.topic || selectedImage.prompt}</div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 text-xs text-nude-500">
+                  <Badge className={`text-[10px] ${
+                    selectedImage.kind === "fusion"
+                      ? "bg-purple-100 text-purple-700"
+                      : "bg-blue-100 text-blue-700"
+                  }`}>
+                    {selectedImage.kind === "fusion" ? "Fusão" : "Criativo"}
+                  </Badge>
+                  {selectedImage.network && <span>Rede: {selectedImage.network}</span>}
+                  {selectedImage.format && <span>Formato: {selectedImage.format}</span>}
+                  {selectedImage.created_at && <span>{formatDate(selectedImage.created_at)}</span>}
+                </div>
+
+                <div className="flex gap-2">
+                  {selectedImage._src && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => downloadImage(selectedImage._src, selectedImage.title)}
+                    >
+                      <Download className="w-3.5 h-3.5" /> Baixar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </div>
   );

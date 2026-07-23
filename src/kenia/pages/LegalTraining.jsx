@@ -53,6 +53,14 @@ function saveState(state) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
 }
 
+function loadEvolvedLegalPrompt(mode) {
+  try { return localStorage.getItem(`legal-training:evolved-prompt:${mode}`) || ""; } catch { return ""; }
+}
+
+function saveEvolvedLegalPrompt(mode, prompt) {
+  try { localStorage.setItem(`legal-training:evolved-prompt:${mode}`, String(prompt || "")); } catch {}
+}
+
 function ScoreGauge({ score, label }) {
   const color = score >= 80 ? "text-green-600" : score >= 60 ? "text-yellow-600" : "text-red-600";
   const bg = score >= 80 ? "bg-green-100" : score >= 60 ? "bg-yellow-100" : "bg-red-100";
@@ -311,7 +319,10 @@ export default function LegalTraining() {
       toast.success("Caso gerado! Iniciando treinamento automático...");
 
       // --- PIPELINE AUTOMÁTICO ---
-      const autoLoopPrompt = `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`;
+      const previousLoopPrompt = loadEvolvedLegalPrompt(mode);
+      const autoLoopPrompt = previousLoopPrompt && previousLoopPrompt.trim().length > 50
+        ? previousLoopPrompt
+        : `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`;
 
       // 1) Loop de Melhoria automático
       setAutoLoopTraining(true);
@@ -329,6 +340,10 @@ export default function LegalTraining() {
           },
         });
         if (!loopRes.error && loopRes.data) {
+          // Salvar prompt evoluído para próxima sessão
+          if (loopRes.data.final_prompt && loopRes.data.final_prompt !== autoLoopPrompt) {
+            saveEvolvedLegalPrompt(mode, loopRes.data.final_prompt);
+          }
           setAutoLoopResults(loopRes.data);
           const finalScore = loopRes.data.final_score || 0;
           const totalImprovement = loopRes.data.total_improvement || 0;
@@ -354,7 +369,7 @@ export default function LegalTraining() {
         tributario: "Recebi uma cobrança de imposto que acho indevida.",
         administrativo: "Fui penalizado por um órgão público e quero recorrer.",
         constitucional: "Meus direitos constitucionais estão sendo violados.",
-        consumeridor: "Comprei um produto defeituoso e a loja se recusa a trocar.",
+        consumidor: "Comprei um produto defeituoso e a loja se recusa a trocar.",
         ambiental: "Estou sofrendo com poluição vizinha ao meu imóvel.",
       };
       const autoClientMsg = sampleMessages[area] || "Olá, preciso de orientação jurídica. " + (data.case_data?.description?.slice(0, 150) || "Tenho um caso para analisar.");
@@ -605,7 +620,11 @@ export default function LegalTraining() {
     setAutoLoopResults(null);
     setAutoLoopProgress({ iteration: 0, maxIterations: 3, score: 0, status: "Iniciando loop de melhoria..." });
     try {
-      const autoLoopPrompt = `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`;
+      // Usar prompt evoluído anterior ou o genérico
+      const previousPrompt = loadEvolvedLegalPrompt(mode);
+      const autoLoopPrompt = previousPrompt && previousPrompt.trim().length > 50
+        ? previousPrompt
+        : `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`;
       const { data, error } = await supabase.functions.invoke("training-ai", {
         body: {
           action: "auto_train_loop",
@@ -619,6 +638,10 @@ export default function LegalTraining() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      // Salvar prompt evoluído para próxima sessão
+      if (data.final_prompt && data.final_prompt !== autoLoopPrompt) {
+        saveEvolvedLegalPrompt(mode, data.final_prompt);
+      }
       setAutoLoopResults(data);
       const finalScore = data.final_score || 0;
       const totalImprovement = data.total_improvement || 0;
@@ -628,7 +651,7 @@ export default function LegalTraining() {
         score: finalScore,
         status: data.reached_target ? `Meta atingida! +${totalImprovement}%` : `Melhoria total: +${totalImprovement}%`,
       });
-      toast.success(`Loop concluído! Score final: ${finalScore}/100 (+${totalImprovement}%)`);
+      toast.success(`Loop concluído! Score final: ${finalScore}/100 (+${totalImprovement}%)${data.final_prompt ? "\nPrompt atualizado e salvo!" : ""}`);
     } catch (e) {
       toast.error("Erro no loop: " + (e?.message || e));
     } finally {

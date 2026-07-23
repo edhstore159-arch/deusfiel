@@ -234,9 +234,8 @@ export default function Creatives() {
       const { data } = await api.get("/creatives");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.creatives) ? data.creatives : [];
       setItems(list);
-      const lean = list.map(({ image_b64, signed_url, image_url, ...meta }) => meta);
-      try { localStorage.setItem("kenia.creatives.cache", JSON.stringify(lean.slice(0, 24))); } catch {}
-      try { localStorage.setItem("kenia.gallery.cache", JSON.stringify(lean.slice(0, 100))); } catch {}
+      try { localStorage.setItem("kenia.creatives.cache", JSON.stringify(list.slice(0, 24))); } catch {}
+      try { localStorage.setItem("kenia.gallery.cache", JSON.stringify(list.slice(0, 100))); } catch {}
     } catch {
       // keep cached items on failure
     }

@@ -1,5 +1,5 @@
 import { chatCompletion } from "../_shared/llm.ts";
-import { saveEvolvedPrompt } from "../_shared/prompts.ts";
+import { saveEvolvedPrompt, getEvolvedPrompt } from "../_shared/prompts.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -236,6 +236,114 @@ REGRAS OBRIGATÓRIAS:
 - Não repita o que já está bom — foque apenas nos pontos fracos
 - As sugestões devem ser aplicáveis IMEDIATAMENTE pelo profissional
 - quick_wins devem ser mudanças simples que melhoram muito o score`;
+
+// --- PROMPTS DE TREINAMENTO DE SECRETARIA ---
+const SECRETARY_STRATEGY_PROMPT = `Você é um diretor de vendas de um escritório de advocacia brasileiro criando cenários realistas de treinamento para secretárias jurídicas. Gere um cenário de atendimento ao cliente baseado na estratégia solicitada.
+
+FORMATO — SEMPRE retorne JSON válido:
+{
+  "scenario": "Descrição detalhada do cenário (mínimo 150 palavras). Inclua: contexto do cliente, problema jurídico, estado emocional, objeções prováveis, urgência, e qualquer detalhe que torne o cenário realista.",
+  "script": "Roteiro sugestivo de como a secretária deveria conduzir o atendimento (mínimo 100 palavras). Passo a passo com frases exemplos.",
+  "client_profile": "Perfil resumido do cliente simulado: nome fictício, idade, situação, tom de voz provável, nível de conhecimento jurídico"
+}
+
+REGRAS:
+- Cenários devem ser REALISTAS e variados
+- Use nomes fictícios brasileiros
+- Inclua detalhes emocionais e situacionais
+- O cenário deve ter TENSÃO — o cliente pode ter dúvidas, medos, objeções
+- Adapte a complexidade ao nível de dificuldade`;
+
+const SECRETARY_EVALUATE_PROMPT = `Você é um consultor de vendas e atendimento jurídico avaliando o desempenho de uma secretária jurídica em simulação de atendimento. Avalie com base nas melhores práticas de atendimento ao cliente e estratégias de vendas éticas.
+
+FORMATO — SEMPRE retorne JSON válido:
+{
+  "score": 75,
+  "feedback": "Feedback detalhado e construtivo. Mínimo 3 frases. Seja específico sobre o que funcionou e o que pode melhorar.",
+  "strengths": ["Ponto forte específico 1", "Ponto forte específico 2"],
+  "weaknesses": ["Ponto fraco com sugestão de melhoria 1", "Ponto fraco com sugestão de melhoria 2"],
+  "tips": ["Dica prática 1", "Dica prática 2", "Dica prática 3"],
+  "improved_response": "Versão melhorada da resposta da secretária (mínimo 100 palavras). Reescreva como uma profissional experiente faria.",
+  "real_pattern_check": {
+    "identity_ok": true,
+    "short_response": true,
+    "one_question": true,
+    "active_listening": true,
+    "scheduling_offered": false,
+    "objection_handled": "na",
+    "psychological_trigger": false
+  }
+}
+
+RUBRICA DE AVALIAÇÃO:
+
+IDENTIDADE (critério obrigatório):
+- A secretária manteve identidade humana? Não revelou ser IA?
+- Resposta curta e objetiva (estilo WhatsApp)?
+- Uma pergunta por vez?
+
+ESCUTA ATIVA (25 pts):
+- 0-5: Não demonstrou compreensão do problema
+- 6-15: Demonstra alguma escuta mas não aprofunda
+- 16-25: Escuta genuína, faz perguntas estratégicas, valida sentimento do cliente
+
+TRATAMENTO DE OBJEÇÕES (20 pts):
+- 0-5: Ignorou objeções ou respondeu de forma seca
+- 6-15: Tratou objeções de forma genérica
+- 16-20: Tratou objeções com empatia, ofereceu alternativas, superou resistência
+
+GATILHOS PSICOLÓGICOS (15 pts):
+- 0-5: Sem nenhum gatilho de persuasão
+- 6-10: Alguns gatilhos presentes mas superficiais
+- 11-15: Reciprocidade, prova social, autoridade, escassez aplicados naturalmente
+
+FECHAMENTO (20 pts):
+- 0-5: Não ofereceu próximo passo
+- 6-15: Ofereceu agendamento de forma genérica
+- 16-20: Fechamento natural, ofereceu horários específicos, criou urgência ética
+
+PERSONALIZAÇÃO (10 pts):
+- 0-5: Resposta genérica sem usar dados do cliente
+- 6-10: Usou nome do cliente, referenciou detalhes específicos do caso
+
+PROFISSIONALISMO (10 pts):
+- 0-5: Linguagem inadequada ou fria demais
+- 6-10: Tom profissional, acolhedor, humano
+
+REGRAS:
+- Score deve refletir RIGOROSAMENTE a rubrica
+- Feedback deve ser ESPECÍFICO — cite trechos da resposta
+- tips devem ser PRÁTICAS e imediatamente aplicáveis
+- improved_response deve ser um EXEMPLO de como a secretária deveria ter respondido
+- real_pattern_check: marque true/false para cada critério; "na" se não aplicável ao cenário
+- SEMPRE retorne JSON válido`;
+
+const SECRETARY_IMPROVE_PROMPT_PROMPT = `Você é um consultor de vendas e comunicação jurídica especialista em otimização de prompts para secretárias virtuais de escritórios de advocacia. Sua tarefa é MELHORAR o prompt da secretária com base nos feedbacks de treinamento.
+
+FORMATO — SEMPRE retorne JSON válido:
+{
+  "improved_prompt": "O prompt completo melhorado (mínimo 500 palavras). Deve ser uma instrução completa e acionável para a secretária virtual.",
+  "changes": [
+    {
+      "area": "Área alterada (ex: Identidade, Escuta Ativa, Fechamento)",
+      "before": "Como estava antes",
+      "after": "Como ficou depois",
+      "reason": "Motivo da melhoria"
+    }
+  ],
+  "reasoning": "Resumo das principais melhorias aplicadas e por quê"
+}
+
+REGRAS OBRIGATÓRIAS:
+- O prompt melhorado deve ser COMPLETO e AUTOCONTIDO (a secretária deve entender tudo sem explicações externas)
+- Mantenha a IDENTIDADE da secretária (humana, jurídica, da Dra. Kênia Garcia)
+- ADICIONE instruções específicas para os pontos fracos identificados
+- MANTENHA o que já funcionava bem
+- Inclua exemplos práticos de como responder
+- O prompt deve cobrir: identidade, escuta ativa, tratamento de objeções, gatilhos psicológicos, fechamento, personalização, formatação WhatsApp
+- Não remova seções que já estavam funcionando bem
+- Priorize: (1) Corrigir pontos críticos, (2) Adicionar exemplos práticos, (3) Reforçar boas práticas
+- O resultado deve ser um prompt que, quando lido pela IA, faça a secretária agir como uma profissional humana experiente`;
 
 function parseJsonResponse(raw: string): Record<string, unknown> | null {
   const text = (raw || "").trim();
@@ -712,6 +820,394 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           target_improvement: targetImprovement,
           reached_target: iterations[iterations.length - 1]?.reachedTarget || false,
           mode,
+          provider: "openai/gpt-4o-mini",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // === AÇÕES DE TREINAMENTO DE SECRETARIA ===
+
+    if (action === "secretary_strategy") {
+      const strategyId: string = String(body.strategy_id ?? "").trim();
+      const strategy = SECRETARY_STRATEGIES.find((s) => s.id === strategyId);
+      if (!strategy) {
+        return new Response(
+          JSON.stringify({ error: `Estratégia não encontrada: ${strategyId}` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const stratResult = await chatCompletion({
+        messages: [
+          { role: "system", content: SECRETARY_STRATEGY_PROMPT },
+          { role: "user", content: `Gere um cenário realista de atendimento para a estratégia: "${strategy.name}" — ${strategy.desc}.\n\nO cenário deve simular um cliente real de escritório de advocacia brasileiro. Inclua contexto emocional, urgência, objeções prováveis e detalhes que tornem o treinamento desafiador. Use nomes fictícios brasileiros.` },
+        ],
+        temperature: 0.8, maxTokens: 2000, model: "openai/gpt-4o-mini", preferFastProvider: true,
+      });
+
+      if (!stratResult.ok) {
+        return new Response(
+          JSON.stringify({ error: "Falha ao gerar cenário" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const parsed = parseJsonResponse(stratResult.data?.choices?.[0]?.message?.content || "");
+      const strategyData = {
+        scenario: String(parsed?.scenario || "Cenário não disponível."),
+        script: String(parsed?.script || ""),
+        client_profile: String(parsed?.client_profile || "Cliente não especificado."),
+        strategy_id: strategyId,
+        strategy_name: strategy.name,
+      };
+
+      console.log(`[training-ai] secretary_strategy: ${strategyId}`);
+      return new Response(
+        JSON.stringify({ strategy: strategyData, provider: "openai/gpt-4o-mini" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (action === "secretary_evaluate") {
+      const scenario: string = String(body.scenario ?? "").trim();
+      const userResponse: string = String(body.user_response ?? "").trim();
+      const strategyId: string = String(body.strategy_id ?? "").trim();
+      const currentPrompt: string = String(body.current_prompt ?? "").trim();
+
+      if (!userResponse) {
+        return new Response(
+          JSON.stringify({ error: "user_response obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const evalResult = await chatCompletion({
+        messages: [
+          { role: "system", content: SECRETARY_EVALUATE_PROMPT },
+          { role: "user", content: `CENÁRIO DE TREINAMENTO:\n${scenario}\n\nESTRATÉGIA: ${strategyId}\n\nRESPOSTA DA SECRETÁRIA:\n${userResponse}\n\nPROMPT ATUAL DA SECRETÁRIA:\n${(currentPrompt || "").slice(0, 1500)}\n\nAvalie a resposta considerando todas as estratégias de atendimento ao cliente. Score 0-100.` },
+        ],
+        temperature: 0.3, maxTokens: 2000, model: "openai/gpt-4o-mini", preferFastProvider: true,
+      });
+
+      if (!evalResult.ok) {
+        return new Response(
+          JSON.stringify({ error: "Falha ao avaliar resposta" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const parsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
+      const score = typeof parsed?.score === "number" ? Math.min(100, Math.max(0, parsed.score)) : 50;
+
+      console.log(`[training-ai] secretary_evaluate: ${strategyId} | Score: ${score}`);
+      return new Response(
+        JSON.stringify({
+          score,
+          feedback: String(parsed?.feedback || "Avaliação concluída."),
+          strengths: Array.isArray(parsed?.strengths) ? parsed.strengths : [],
+          weaknesses: Array.isArray(parsed?.weaknesses) ? parsed.weaknesses : [],
+          tips: Array.isArray(parsed?.tips) ? parsed.tips : [],
+          improved_response: String(parsed?.improved_response || ""),
+          real_pattern_check: parsed?.real_pattern_check || {},
+          provider: "openai/gpt-4o-mini",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (action === "improve_prompt") {
+      const currentPrompt: string = String(body.current_prompt ?? "").trim();
+      const evaluationSummary: string = String(body.evaluation_summary ?? "").trim();
+      const weaknesses: string[] = Array.isArray(body.weaknesses) ? body.weaknesses : [];
+      const tips: string[] = Array.isArray(body.tips) ? body.tips : [];
+
+      if (!currentPrompt) {
+        return new Response(
+          JSON.stringify({ error: "current_prompt obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const improveResult = await chatCompletion({
+        messages: [
+          { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
+          { role: "user", content: `PROMPT ATUAL DA SECRETÁRIA:\n${currentPrompt.slice(0, 3000)}\n\nRESUMO DA AVALIAÇÃO:\n${evaluationSummary.slice(0, 1500)}\n\nPONTOS FRACOS:\n${weaknesses.map((w, i) => `${i + 1}. ${w}`).join("\n") || "Nenhum identificado"}\n\nDICAS:\n${tips.map((t, i) => `${i + 1}. ${t}`).join("\n") || "Nenhuma identificada"}\n\nMELHORE o prompt da secretária para que ela responda melhor nos próximos treinos. O prompt deve ser completo e autocontido.` },
+        ],
+        temperature: 0.7, maxTokens: 4000, model: "openai/gpt-4o-mini", preferFastProvider: true,
+      });
+
+      if (!improveResult.ok) {
+        return new Response(
+          JSON.stringify({ error: "Falha ao melhorar prompt" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const parsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
+      const improvedPrompt = String(parsed?.improved_prompt || currentPrompt);
+
+      // Salvar prompt melhorado no banco para que chat-ai (WhatsApp) use
+      if (improvedPrompt && improvedPrompt !== currentPrompt && improvedPrompt.trim().length > 100) {
+        await saveEvolvedPrompt("secretary", "general", improvedPrompt, 0, {
+          source: "secretary_improve_prompt",
+          weaknesses_count: weaknesses.length,
+          tips_count: tips.length,
+        });
+        console.log(`[training-ai] improve_prompt: prompt salvo no agent_prompts para WhatsApp`);
+      }
+
+      console.log(`[training-ai] improve_prompt: ${weaknesses.length} weaknesses addressed`);
+      return new Response(
+        JSON.stringify({
+          improved_prompt: improvedPrompt,
+          changes: Array.isArray(parsed?.changes) ? parsed.changes : [],
+          reasoning: String(parsed?.reasoning || "Prompt melhorado com base no feedback."),
+          provider: "openai/gpt-4o-mini",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (action === "auto_train") {
+      const currentPrompt: string = String(body.current_prompt ?? "").trim();
+      if (!currentPrompt) {
+        return new Response(
+          JSON.stringify({ error: "current_prompt obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const results: Array<Record<string, unknown>> = [];
+
+      for (const strategy of SECRETARY_STRATEGIES) {
+        try {
+          // 1. Gerar cenário
+          const scenResult = await chatCompletion({
+            messages: [
+              { role: "system", content: SECRETARY_STRATEGY_PROMPT },
+              { role: "user", content: `Gere um cenário para a estratégia: "${strategy.name}" — ${strategy.desc}. Use nomes fictícios brasileiros. Cenário realista.` },
+            ],
+            temperature: 0.8, maxTokens: 1500, model: "openai/gpt-4o-mini", preferFastProvider: true,
+          });
+          if (!scenResult.ok) continue;
+          const scenParsed = parseJsonResponse(scenResult.data?.choices?.[0]?.message?.content || "");
+          const scenarioText = String(scenParsed?.scenario || "Cenário não disponível.");
+
+          // 2. Gerar resposta da secretária com o prompt atual
+          const respResult = await chatCompletion({
+            messages: [
+              { role: "system", content: currentPrompt },
+              { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica da Dra. Kênia Garcia, aplicando estratégias de atendimento.` },
+            ],
+            temperature: 0.7, maxTokens: 1000, model: "openai/gpt-4o-mini", preferFastProvider: true,
+          });
+          if (!respResult.ok) continue;
+          const secretaryResponse = respResult.data?.choices?.[0]?.message?.content || "";
+
+          // 3. Avaliar resposta
+          const evalResult = await chatCompletion({
+            messages: [
+              { role: "system", content: SECRETARY_EVALUATE_PROMPT },
+              { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nESTRATÉGIA: ${strategy.name}\n\nRESPOSTA DA SECRETÁRIA:\n${secretaryResponse}\n\nAvalie. Score 0-100.` },
+            ],
+            temperature: 0.3, maxTokens: 1500, model: "openai/gpt-4o-mini", preferFastProvider: true,
+          });
+          if (!evalResult.ok) continue;
+          const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
+
+          results.push({
+            strategy_id: strategy.id,
+            strategy_name: strategy.name,
+            score: typeof evalParsed?.score === "number" ? evalParsed.score : 50,
+            feedback: String(evalParsed?.feedback || ""),
+            strengths: Array.isArray(evalParsed?.strengths) ? evalParsed.strengths : [],
+            weaknesses: Array.isArray(evalParsed?.weaknesses) ? evalParsed.weaknesses : [],
+          });
+        } catch { /* skip */ }
+      }
+
+      const scores = results.map((r) => r.score as number || 0);
+      const total = results.length;
+      const passed = scores.filter((s) => s >= 60).length;
+      const avgScore = total > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / total) : 0;
+
+      // Coletar weaknesses e melhorar prompt
+      const allWeaknesses: string[] = [];
+      const allStrengths: string[] = [];
+      results.forEach((r) => {
+        if (Array.isArray(r.weaknesses)) allWeaknesses.push(...(r.weaknesses as string[]));
+        if (Array.isArray(r.strengths)) allStrengths.push(...(r.strengths as string[]));
+      });
+
+      let improvedPrompt: string | null = null;
+      if (allWeaknesses.length > 0) {
+        const improveResult = await chatCompletion({
+          messages: [
+            { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
+            { role: "user", content: `PROMPT ATUAL:\n${currentPrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${[...new Set(allWeaknesses)].slice(0, 8).join("\n")}\n\nSTRENGTHS:\n${[...new Set(allStrengths)].slice(0, 5).join("\n")}\n\nScore médio: ${avgScore}/100. Melhore o prompt.` },
+          ],
+          temperature: 0.7, maxTokens: 4000, model: "openai/gpt-4o-mini", preferFastProvider: true,
+        });
+        if (improveResult.ok) {
+          const impParsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
+          if (impParsed?.improved_prompt) improvedPrompt = impParsed.improved_prompt as string;
+        }
+      }
+
+      // Salvar prompt melhorado no banco
+      if (improvedPrompt && improvedPrompt !== currentPrompt && improvedPrompt.trim().length > 100) {
+        await saveEvolvedPrompt("secretary", "general", improvedPrompt, avgScore, {
+          source: "secretary_auto_train",
+          strategies_tested: total,
+          avg_score: avgScore,
+        });
+        console.log(`[training-ai] auto_train: prompt melhorado salvo no agent_prompts`);
+      }
+
+      console.log(`[training-ai] auto_train: ${total} strategies, avg: ${avgScore}, passed: ${passed}`);
+      return new Response(
+        JSON.stringify({
+          results,
+          stats: { total, passed, avgScore },
+          improved_prompt: improvedPrompt,
+          provider: "openai/gpt-4o-mini",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (action === "auto_train_loop") {
+      // Secretary-specific auto_train_loop (different from the legal training one)
+      const currentPrompt: string = String(body.current_prompt ?? "").trim();
+      const targetImprovement: number = Number(body.target_improvement ?? 20);
+      const maxIterations: number = Math.min(Number(body.max_iterations ?? 3), 3);
+
+      if (!currentPrompt) {
+        return new Response(
+          JSON.stringify({ error: "current_prompt obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const iterations: Array<Record<string, unknown>> = [];
+      let activePrompt = currentPrompt;
+      let baselineScore = 0;
+
+      for (let iter = 1; iter <= maxIterations; iter++) {
+        console.log(`[training-ai] secretary auto_train_loop iteration ${iter}/${maxIterations}`);
+
+        const iterResults: Array<Record<string, unknown>> = [];
+
+        for (const strategy of SECRETARY_STRATEGIES.slice(0, 5)) {
+          try {
+            const scenResult = await chatCompletion({
+              messages: [
+                { role: "system", content: SECRETARY_STRATEGY_PROMPT },
+                { role: "user", content: `Cenário para: "${strategy.name}" — ${strategy.desc}. Només fictícios.` },
+              ],
+              temperature: 0.8, maxTokens: 1200, model: "openai/gpt-4o-mini", preferFastProvider: true,
+            });
+            if (!scenResult.ok) continue;
+            const scenParsed = parseJsonResponse(scenResult.data?.choices?.[0]?.message?.content || "");
+            const scenarioText = String(scenParsed?.scenario || "");
+
+            const respResult = await chatCompletion({
+              messages: [
+                { role: "system", content: activePrompt },
+                { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica.` },
+              ],
+              temperature: 0.7, maxTokens: 800, model: "openai/gpt-4o-mini", preferFastProvider: true,
+            });
+            if (!respResult.ok) continue;
+            const secretaryResponse = respResult.data?.choices?.[0]?.message?.content || "";
+
+            const evalResult = await chatCompletion({
+              messages: [
+                { role: "system", content: SECRETARY_EVALUATE_PROMPT },
+                { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nRESPOSTA:\n${secretaryResponse}\n\nAvalie. Score 0-100.` },
+              ],
+              temperature: 0.3, maxTokens: 1200, model: "openai/gpt-4o-mini", preferFastProvider: true,
+            });
+            if (!evalResult.ok) continue;
+            const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
+
+            iterResults.push({
+              strategy_id: strategy.id,
+              score: typeof evalParsed?.score === "number" ? evalParsed.score : 50,
+              weaknesses: Array.isArray(evalParsed?.weaknesses) ? evalParsed.weaknesses : [],
+              strengths: Array.isArray(evalParsed?.strengths) ? evalParsed.strengths : [],
+            });
+          } catch { /* skip */ }
+        }
+
+        const scores = iterResults.map((r) => r.score as number || 0);
+        const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+        if (iter === 1) baselineScore = avgScore;
+
+        const improvement = baselineScore > 0 ? Math.round(((avgScore - baselineScore) / baselineScore) * 100) : 0;
+        const reachedTarget = improvement >= targetImprovement;
+
+        const allWeaknesses: string[] = [];
+        const allStrengths: string[] = [];
+        iterResults.forEach((r) => {
+          if (Array.isArray(r.weaknesses)) allWeaknesses.push(...(r.weaknesses as string[]));
+          if (Array.isArray(r.strengths)) allStrengths.push(...(r.strengths as string[]));
+        });
+
+        iterations.push({
+          iteration: iter,
+          avgScore,
+          baselineScore,
+          improvement,
+          passed: scores.filter((s) => s >= 60).length,
+          total: iterResults.length,
+          weaknesses: [...new Set(allWeaknesses)].slice(0, 10),
+          strengths: [...new Set(allStrengths)].slice(0, 10),
+          reachedTarget,
+        });
+
+        if (reachedTarget || iter >= maxIterations) break;
+
+        // Melhorar prompt
+        const improveResult = await chatCompletion({
+          messages: [
+            { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
+            { role: "user", content: `PROMPT ATUAL:\n${activePrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${allWeaknesses.slice(0, 5).join("\n")}\n\nSTRENGTHS:\n${allStrengths.slice(0, 3).join("\n")}\n\nScore: ${avgScore}/100. Meta: +${targetImprovement}%. Melhore o prompt.` },
+          ],
+          temperature: 0.7, maxTokens: 4000, model: "openai/gpt-4o-mini", preferFastProvider: true,
+        });
+        if (improveResult.ok) {
+          const impParsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
+          if (impParsed?.improved_prompt) activePrompt = impParsed.improved_prompt as string;
+        }
+      }
+
+      const finalScore = iterations[iterations.length - 1]?.avgScore || 0;
+      const totalImprovement = baselineScore > 0
+        ? Math.round(((finalScore as number) - baselineScore) / baselineScore * 100)
+        : 0;
+
+      // Save evolved prompt
+      if (activePrompt !== currentPrompt) {
+        await saveEvolvedPrompt("secretary", "general", activePrompt, finalScore as number, {
+          source: "secretary_auto_train_loop",
+          iterations: iterations.length,
+          total_improvement: totalImprovement,
+        });
+      }
+
+      console.log(`[training-ai] secretary auto_train_loop done: score ${finalScore}, improvement: +${totalImprovement}%`);
+      return new Response(
+        JSON.stringify({
+          iterations,
+          final_prompt: activePrompt,
+          initial_prompt: currentPrompt,
+          baseline_score: baselineScore,
+          final_score: finalScore,
+          total_improvement: totalImprovement,
+          target_improvement: targetImprovement,
+          reached_target: iterations[iterations.length - 1]?.reachedTarget || false,
           provider: "openai/gpt-4o-mini",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },

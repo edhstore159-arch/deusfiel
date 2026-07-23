@@ -455,7 +455,15 @@ const read = (key, fallback) => {
   }
 };
 const stripHeavyImages = (value) => Array.isArray(value)
-  ? value.map((item) => ({ ...item, image_b64: item?.image_b64 ? String(item.image_b64).slice(0, 200) : "" }))
+  ? value.map((item) => {
+      if (!item?.image_b64) return { ...item, image_b64: "" };
+      const src = String(item.image_b64);
+      if (src.startsWith("http://") || src.startsWith("https://")) return item;
+      if (src.length <= 200) return item;
+      const m = src.match(/^(data:image\/[a-zA-Z0-9.+-]+;base64,)/);
+      if (m) return { ...item, image_b64: m[1] + src.slice(m[1].length, m[1].length + 8000) };
+      return { ...item, image_b64: src.slice(0, 8000) };
+    })
   : value;
 const write = (key, value) => {
   volatileStore.set(key, clone(value));
@@ -915,7 +923,7 @@ const staticGet = async (url, config = {}) => {
             });
           const signedUrl = urlByPath[r.storage_path] || "";
           const localImg = localMatch?.image_b64 || "";
-          const image = localImg || signedUrl;
+          const image = signedUrl || localImg;
           return {
             id: localMatch?.id || `creative-${r.id}`,
             title: localMatch?.title || r.title || r.prompt || "Criativo",
