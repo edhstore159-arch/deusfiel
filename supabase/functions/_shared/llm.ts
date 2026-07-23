@@ -23,13 +23,17 @@ const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
 
 async function chatLovable(opts: ChatOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, status: 0, error: "LOVABLE_API_KEY ausente" };
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
-    body: JSON.stringify({ model: opts.model || "google/gemini-3-flash-preview", ...opts }),
-  });
-  if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-  return { ok: true as const, data: await resp.json(), provider: "lovable" };
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
+      body: JSON.stringify({ model: opts.model || "google/gemini-3-flash-preview", ...opts }),
+    });
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    return { ok: true as const, data: await resp.json(), provider: "lovable" };
+  } catch (e) {
+    return { ok: false as const, status: 0, error: `Lovable erro: ${(e as Error)?.message || e}` };
+  }
 }
 
 function messagesToGeminiContents(messages: ChatMessage[]) {
@@ -52,49 +56,56 @@ function messagesToGeminiContents(messages: ChatMessage[]) {
 
 async function chatGemini(opts: ChatOptions) {
   if (!GEMINI_KEY) return { ok: false as const, status: 0, error: "GEMINI_API_KEY ausente" };
-  const { system, contents } = messagesToGeminiContents(opts.messages);
-  const model = "gemini-2.5-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
-  const body: any = { contents };
-  if (system) body.systemInstruction = { parts: [{ text: system }] };
-  if (opts.response_format?.type === "json_object") {
-    body.generationConfig = { responseMimeType: "application/json" };
+  try {
+    const { system, contents } = messagesToGeminiContents(opts.messages);
+    const model = "gemini-2.5-flash";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+    const body: any = { contents };
+    if (system) body.systemInstruction = { parts: [{ text: system }] };
+    if (opts.response_format?.type === "json_object") {
+      body.generationConfig = { responseMimeType: "application/json" };
+    }
+    if (typeof opts.temperature === "number") {
+      body.generationConfig = { ...(body.generationConfig || {}), temperature: opts.temperature };
+    }
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    const data = await resp.json();
+    const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || "").join("") || "";
+    return {
+      ok: true as const,
+      provider: "gemini",
+      data: { choices: [{ message: { role: "assistant", content: text } }] },
+    };
+  } catch (e) {
+    return { ok: false as const, status: 0, error: `Gemini erro: ${(e as Error)?.message || e}` };
   }
-  if (typeof opts.temperature === "number") {
-    body.generationConfig = { ...(body.generationConfig || {}), temperature: opts.temperature };
-  }
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-  const data = await resp.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || "").join("") || "";
-  // Wrap into OpenAI-compatible shape so callers can read choices[0].message.content
-  return {
-    ok: true as const,
-    provider: "gemini",
-    data: { choices: [{ message: { role: "assistant", content: text } }] },
-  };
 }
 
 async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
-  const resp = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
-    body: JSON.stringify({
-      model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/")
-        ? opts.model
-        : "gpt-4o-mini",
-      messages: opts.messages,
-      ...(opts.response_format ? { response_format: opts.response_format } : {}),
-      ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
-    }),
-  });
-  if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-  return { ok: true as const, data: await resp.json(), provider: "emergent" };
+  try {
+    const resp = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
+      body: JSON.stringify({
+        model: opts.model?.startsWith("openai/") || opts.model?.startsWith("google/")
+          ? opts.model
+          : "gpt-4o-mini",
+        messages: opts.messages,
+        ...(opts.response_format ? { response_format: opts.response_format } : {}),
+        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+      }),
+    });
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    return { ok: true as const, data: await resp.json(), provider: "emergent" };
+  } catch (e) {
+    return { ok: false as const, status: 0, error: `Emergent erro: ${(e as Error)?.message || e}` };
+  }
 }
 
 export async function chatCompletion(opts: ChatOptions) {
