@@ -6,6 +6,8 @@ import {
   BarChart3, LogOut, MessageSquare, Wrench, Radio,
   CalendarDays, Settings as SettingsIcon, Combine,
   ShieldCheck, Bot, Menu, X, Smartphone, Zap,
+  Users, Globe, Gavel, BookOpen, FileText, Send,
+  Target, Share2, Video, CheckSquare, Link2,
 } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
@@ -31,6 +33,20 @@ const NAV = [
   { to: "/app/whatsapp-connection", label: "WhatsApp Connection", icon: Smartphone, testid: "nav-whatsapp-connection" },
   { to: "/app/whatsapp-logs", label: "Logs WhatsApp", icon: Radio, testid: "nav-whatsapp-logs" },
   { to: "/app/settings", label: "Configurações", icon: SettingsIcon, testid: "nav-settings" },
+  { to: "/app/juiz-virtual", label: "Juiz Virtual", icon: Gavel, testid: "nav-juiz-virtual" },
+  { to: "/app/legal-training", label: "Treinamento Jurídico", icon: BookOpen, testid: "nav-legal-training" },
+  { to: "/app/agents", label: "Agentes IA", icon: Users, testid: "nav-agents" },
+  { to: "/app/chat-multi-modelo", label: "Chat Multi-Modelo", icon: MessageSquare, testid: "nav-chat-multi" },
+  { to: "/app/document-builder", label: "Construtor de Documentos", icon: FileText, testid: "nav-document-builder" },
+  { to: "/app/site-builder", label: "Construtor de Sites", icon: Globe, testid: "nav-site-builder" },
+  { to: "/app/creatives-gallery", label: "Galeria de Criativos", icon: Sparkles, testid: "nav-creatives-gallery" },
+  { to: "/app/social-connect", label: "Conexão Social", icon: Share2, testid: "nav-social-connect" },
+  { to: "/app/secretary-marketing", label: "Secretária Marketing", icon: Send, testid: "nav-secretary-marketing" },
+  { to: "/app/secretary-tasks", label: "Tarefas Secretária", icon: CheckSquare, testid: "nav-secretary-tasks" },
+  { to: "/app/competitor-analysis", label: "Análise Concorrentes", icon: Target, testid: "nav-competitor" },
+  { to: "/app/viral-video-studio", label: "Estúdio de Vídeo", icon: Video, testid: "nav-viral-video" },
+  { to: "/app/whatsapp-media", label: "WhatsApp Mídia", icon: Smartphone, testid: "nav-whatsapp-media" },
+  { to: "/app/trust", label: "Confiança", icon: ShieldCheck, testid: "nav-trust" },
   { to: "/app/debug", label: "Debug Tool", icon: Wrench, testid: "nav-debug" },
 ];
 

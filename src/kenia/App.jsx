@@ -26,6 +26,22 @@ import ChatIA from "@/kenia/pages/ChatIA";
 import AdminCases from "@/kenia/pages/AdminCases";
 import ResetPassword from "@/kenia/pages/ResetPassword";
 import AIBuilder from "@/kenia/pages/AIBuilder";
+import Agents from "@/kenia/pages/Agents";
+import ChatMultiModelo from "@/kenia/pages/ChatMultiModelo";
+import CompetitorAnalysis from "@/kenia/pages/CompetitorAnalysis";
+import CreativesGallery from "@/kenia/pages/CreativesGallery";
+import DocumentBuilder from "@/kenia/pages/DocumentBuilder";
+import Dstboard from "@/kenia/pages/Dstboard";
+import EmergentLogin from "@/kenia/pages/EmergentLogin";
+import JuizVirtual from "@/kenia/pages/JuizVirtual";
+import LegalTraining from "@/kenia/pages/LegalTraining";
+import SecretaryMarketing from "@/kenia/pages/SecretaryMarketing";
+import SecretaryTasks from "@/kenia/pages/SecretaryTasks";
+import SiteBuilder from "@/kenia/pages/SiteBuilder";
+import SocialConnect from "@/kenia/pages/SocialConnect";
+import Trust from "@/kenia/pages/Trust";
+import ViralVideoStudio from "@/kenia/pages/ViralVideoStudio";
+import WhatsAppMedia from "@/kenia/pages/WhatsAppMedia";
 import AppLayout from "@/kenia/components/AppLayout";
 import ScrollToTop from "@/kenia/components/ScrollToTop";
 
@@ -75,6 +91,22 @@ function App() {
               <Route path="/app/whatsapp-logs" element={<WhatsAppLogs />} />
               <Route path="/app/settings" element={<Settings />} />
               <Route path="/app/debug" element={<DebugTool />} />
+              <Route path="/app/agents" element={<Agents />} />
+              <Route path="/app/chat-multi-modelo" element={<ChatMultiModelo />} />
+              <Route path="/app/competitor-analysis" element={<CompetitorAnalysis />} />
+              <Route path="/app/creatives-gallery" element={<CreativesGallery />} />
+              <Route path="/app/document-builder" element={<DocumentBuilder />} />
+              <Route path="/app/dstboard" element={<Dstboard />} />
+              <Route path="/app/emergent-login" element={<EmergentLogin />} />
+              <Route path="/app/juiz-virtual" element={<JuizVirtual />} />
+              <Route path="/app/legal-training" element={<LegalTraining />} />
+              <Route path="/app/secretary-marketing" element={<SecretaryMarketing />} />
+              <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
+              <Route path="/app/site-builder" element={<SiteBuilder />} />
+              <Route path="/app/social-connect" element={<SocialConnect />} />
+              <Route path="/app/trust" element={<Trust />} />
+              <Route path="/app/viral-video-studio" element={<ViralVideoStudio />} />
+              <Route path="/app/whatsapp-media" element={<WhatsAppMedia />} />
             </Route>
           </Routes>
 
