@@ -311,6 +311,36 @@ export default function LegalTraining() {
   const [currentPrompt, setCurrentPrompt] = useState("");
 
   const [activeSection, setActiveSection] = useState("treinamento");
+
+  const [secStrategy, setSecStrategy] = useState(null);
+  const [secScenario, setSecScenario] = useState(null);
+  const [secLoading, setSecLoading] = useState(false);
+  const [secEval, setSecEval] = useState(null);
+  const [secImprovingPrompt, setSecImprovingPrompt] = useState(false);
+  const [secImprovedPrompt, setSecImprovedPrompt] = useState(null);
+  const [secAutoGenerating, setSecAutoGenerating] = useState(false);
+
+  const SEC_STRATEGIES = [
+    { id: "abordagem_inicial", name: "Abordagem Inicial", desc: "Primeira impressão e quebra de gelo", color: "#22c55e" },
+    { id: "identificacao_dor", name: "Identificação de Dor", desc: "Mapear a necessidade real do cliente", color: "#3b82f6" },
+    { id: "demonstracao_valor", name: "Demonstração de Valor", desc: "Mostrar diferenciais do escritório", color: "#8b5cf6" },
+    { id: "tratamento_objecao", name: "Tratamento de Objeções", desc: "Superar resistências comuns", color: "#f59e0b" },
+    { id: "fechamento", name: "Fechar o Lead", desc: "Converter orientação em agendamento", color: "#06b6d4" },
+    { id: "follow_up", name: "Follow-up Estratégico", desc: "Manter contato após primeira interação", color: "#ec4899" },
+    { id: "captura_whatsapp", name: "Captação via WhatsApp", desc: "Estratégias específicas para WhatsApp", color: "#14b8a6" },
+    { id: "indicacao", name: "Captação por Indicação", desc: "Como pedir e receber indicações", color: "#6366f1" },
+    { id: "escuta_ativa", name: "Escuta Ativa com Perguntas", desc: "Coletar dados com perguntas estratégicas", color: "#ef4444" },
+    { id: "urgencia_etica", name: "Criação de Urgência", desc: "Motivar ação imediata de forma ética", color: "#f97316" },
+    { id: "gatilhos_psicologicos", name: "Gatilhos Psicológicos", desc: "Reciprocidade, prova social, escassez", color: "#a855f7" },
+    { id: "lead_divorcio", name: "Lead — Divórcio", desc: "Atendimento para casos de família", color: "#e11d48" },
+    { id: "lead_previdenciario", name: "Lead — Previdenciário", desc: "Atendimento para aposentadorias e INSS", color: "#0891b2" },
+    { id: "lead_bancario", name: "Lead — Direito Bancário", desc: "Atendimento para questões bancárias", color: "#4f46e5" },
+    { id: "lead_hesitante", name: "Lead Hesitante", desc: "Cliente indeciso que precisa de incentivo", color: "#ca8a04" },
+    { id: "lead_urgencia", name: "Lead com Urgência", desc: "Cliente em situação urgente", color: "#dc2626" },
+    { id: "pos_duvida_juridica", name: "Após Dúvida Jurídica", desc: "Converter orientação em agendamento", color: "#059669" },
+    { id: "saudacao", name: "Saudação", desc: "Abertura e acolhimento", color: "#10b981" },
+  ];
+
   const [waConversations, setWaConversations] = useState([]);
   const [waSelectedId, setWaSelectedId] = useState(null);
   const [waMessages, setWaMessages] = useState([]);
@@ -409,6 +439,38 @@ export default function LegalTraining() {
   const startTraining = async () => {
     setSending(true);
     try {
+      if (mode === "secretary") {
+        if (!secStrategy) { toast.error("Selecione uma estratégia"); setSending(false); return; }
+        setSecLoading(true);
+        const { data, error } = await supabase.functions.invoke("training-ai", {
+          body: { action: "secretary_strategy", strategy_id: secStrategy.id },
+        });
+        setSecLoading(false);
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        setSecScenario(data.strategy);
+
+        const session = {
+          id: Date.now().toString(),
+          mode: "secretary",
+          area: "secretaria",
+          difficulty: "medio",
+          case_data: { title: secStrategy.name, description: data.strategy.scenario, strategy: secStrategy },
+          messages: [
+            { role: "assistant", content: `📋 **CENÁRIO — ${secStrategy.name}**\n\n${data.strategy.scenario}\n\n👤 Perfil: ${data.strategy.client_profile}\n\n💬 Script sugerido:\n${data.strategy.script || "Nenhum script sugerido."}` },
+          ],
+          score: null,
+          evaluation: null,
+          created_at: new Date().toISOString(),
+        };
+        setCurrentSession(session);
+        setShowConfig(false);
+        saveSessionToDb(session);
+        toast.success(`Cenário de treinamento gerado: ${secStrategy.name}`);
+        setSending(false);
+        return;
+      }
+
       if (useRealCase && selectedCaseId) {
         const selected = realCases.find((c) => c.id === selectedCaseId);
         if (selected) {
@@ -601,6 +663,40 @@ export default function LegalTraining() {
     setCurrentSession(updatedSession);
 
     try {
+      if (currentSession.mode === "secretary") {
+        const { data, error } = await supabase.functions.invoke("training-ai", {
+          body: {
+            action: "secretary_evaluate",
+            scenario: currentSession.case_data?.description || "",
+            user_response: userMsg,
+            strategy_id: secStrategy?.id || "",
+            current_prompt: currentPrompt || "",
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        const finalSession = {
+          ...updatedSession,
+          messages: [...updatedSession.messages, { role: "assistant", content: data.feedback }],
+          score: data.score,
+          evaluation: {
+            score: data.score,
+            feedback: data.feedback,
+            strengths: data.strengths || [],
+            weaknesses: data.weaknesses || [],
+            tips: data.tips || [],
+          },
+        };
+        setCurrentSession(finalSession);
+        setSecEval(data);
+        setSessions((prev) => [finalSession, ...prev].slice(0, 50));
+        saveSessionToDb(finalSession);
+        toast.success(`Avaliação: ${data.score}/100`);
+        setSending(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("training-ai", {
         body: {
           action: "evaluate",
@@ -934,35 +1030,99 @@ export default function LegalTraining() {
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-2 block">Modo de Treinamento</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => setMode("lawyer")}
-                      className={`p-3 rounded-lg border text-left transition-all ${
+                      className={`p-2 rounded-lg border text-left transition-all ${
                         mode === "lawyer"
                           ? "border-gold-300 bg-gold-50 text-gold-800"
                           : "border-nude-200 hover:border-gold-200"
                       }`}
                     >
-                      <Scale className="w-5 h-5 mb-1" />
-                      <div className="text-xs font-semibold">Advogado</div>
-                      <div className="text-[10px] text-muted-foreground">Argumente a favor do cliente</div>
+                      <Scale className="w-4 h-4 mb-1" />
+                      <div className="text-[11px] font-semibold">Advogado</div>
+                      <div className="text-[9px] text-muted-foreground">Argumente a favor</div>
                     </button>
                     <button
                       onClick={() => setMode("judge")}
-                      className={`p-3 rounded-lg border text-left transition-all ${
+                      className={`p-2 rounded-lg border text-left transition-all ${
                         mode === "judge"
                           ? "border-gold-300 bg-gold-50 text-gold-800"
                           : "border-nude-200 hover:border-gold-200"
                       }`}
                     >
-                      <Star className="w-5 h-5 mb-1" />
-                      <div className="text-xs font-semibold">Juiz</div>
-                      <div className="text-[10px] text-muted-foreground">Analise e julgue o caso</div>
+                      <Star className="w-4 h-4 mb-1" />
+                      <div className="text-[11px] font-semibold">Juiz</div>
+                      <div className="text-[9px] text-muted-foreground">Analise e julgue</div>
+                    </button>
+                    <button
+                      onClick={() => { setMode("secretary"); setSecStrategy(null); setSecScenario(null); setSecEval(null); setSecImprovedPrompt(null); }}
+                      className={`p-2 rounded-lg border text-left transition-all ${
+                        mode === "secretary"
+                          ? "border-purple-300 bg-purple-50 text-purple-800"
+                          : "border-nude-200 hover:border-purple-200"
+                      }`}
+                    >
+                      <Phone className="w-4 h-4 mb-1" />
+                      <div className="text-[11px] font-semibold">Secretaria</div>
+                      <div className="text-[9px] text-muted-foreground">Treino com estratégias</div>
                     </button>
                   </div>
                 </div>
 
-                <div>
+                {mode === "secretary" && (
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Estratégia de Treinamento</label>
+                    <div className="space-y-1 max-h-[25vh] overflow-auto">
+                      {SEC_STRATEGIES.map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => { setSecStrategy(s); setSecScenario(null); setSecEval(null); setSecImprovedPrompt(null); }}
+                          className={`w-full text-left px-2 py-1.5 rounded text-[11px] flex items-center gap-2 transition-colors ${
+                            secStrategy?.id === s.id
+                              ? "bg-purple-100 text-purple-800 font-medium border border-purple-300"
+                              : "hover:bg-muted border border-transparent"
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                          <span className="truncate">{s.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {secStrategy && (
+                      <Button
+                        onClick={async () => {
+                          if (!secStrategy || secLoading) return;
+                          setSecLoading(true);
+                          setSecScenario(null);
+                          setSecEval(null);
+                          setSecImprovedPrompt(null);
+                          try {
+                            const { data, error } = await supabase.functions.invoke("training-ai", {
+                              body: { action: "secretary_strategy", strategy_id: secStrategy.id },
+                            });
+                            if (error) throw error;
+                            if (data?.error) throw new Error(data.error);
+                            setSecScenario(data.strategy);
+                            setShowConfig(false);
+                            toast.success(`Cenário gerado: ${secStrategy.name}`);
+                          } catch (e) {
+                            toast.error("Erro: " + (e?.message || e));
+                          } finally {
+                            setSecLoading(false);
+                          }
+                        }}
+                        disabled={secLoading}
+                        className="w-full mt-2"
+                      >
+                        {secLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Target className="w-3 h-3 mr-1" />}
+                        Gerar Cenário
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {mode !== "secretary" && <>
                   <label className="text-xs font-medium text-muted-foreground mb-2 block">Área do Direito</label>
                   <div className="grid grid-cols-2 gap-1.5">
                     {LEGAL_AREAS.map((a) => (
@@ -979,7 +1139,6 @@ export default function LegalTraining() {
                       </button>
                     ))}
                   </div>
-                </div>
 
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-2 block">Dificuldade</label>
@@ -1041,10 +1200,11 @@ export default function LegalTraining() {
                     </div>
                   )}
                 </div>
+                </>}
 
-                <Button onClick={startTraining} disabled={sending || (useRealCase && !selectedCaseId)} className="w-full">
+                <Button onClick={startTraining} disabled={sending || (useRealCase && !selectedCaseId) || (mode === "secretary" && !secStrategy)} className="w-full">
                   {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Target className="w-4 h-4 mr-2" />}
-                  {useRealCase && selectedCaseId ? "Carregar Caso Real" : "Gerar Caso para Treino"}
+                  {mode === "secretary" ? "Iniciar Treino Secretaria" : useRealCase && selectedCaseId ? "Carregar Caso Real" : "Gerar Caso para Treino"}
                 </Button>
 
                 {sessions.length > 0 && (
@@ -1165,6 +1325,94 @@ export default function LegalTraining() {
                         Melhorar Prompt
                       </Button>
                     </div>
+
+                    {/* Secretary-specific: Efficiency & Effectiveness */}
+                    {currentSession.mode === "secretary" && secEval && (
+                      <div className="mt-3 space-y-2">
+                        <div className="p-2 rounded bg-purple-50 border border-purple-200">
+                          <div className="text-[10px] font-medium text-purple-800 mb-1">Eficiência & Efetividade</div>
+                          <div className="flex gap-3">
+                            <div className="flex-1 text-center">
+                              <div className="text-lg font-bold text-purple-700">{secEval.score}%</div>
+                              <div className="text-[9px] text-muted-foreground">Score Geral</div>
+                            </div>
+                          </div>
+                          {secEval.tips?.length > 0 && (
+                            <div className="mt-2">
+                              <div className="text-[9px] font-medium text-purple-700 mb-0.5">Dicas:</div>
+                              {secEval.tips.map((t, i) => (
+                                <div key={i} className="text-[9px] text-purple-600">• {t}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              if (!secEval || secImprovingPrompt) return;
+                              setSecImprovingPrompt(true);
+                              try {
+                                const { data, error } = await supabase.functions.invoke("training-ai", {
+                                  body: {
+                                    action: "improve_prompt",
+                                    current_prompt: currentPrompt || "",
+                                    evaluation_summary: secEval.feedback || "",
+                                    weaknesses: secEval.weaknesses || [],
+                                    tips: secEval.tips || [],
+                                  },
+                                });
+                                if (error) throw error;
+                                if (data?.error) throw new Error(data.error);
+                                setSecImprovedPrompt(data);
+                                toast.success("Prompt melhorado!");
+                              } catch (e) {
+                                toast.error("Erro: " + (e?.message || e));
+                              } finally {
+                                setSecImprovingPrompt(false);
+                              }
+                            }}
+                            disabled={secImprovingPrompt}
+                            className="flex-1 text-[10px] h-7"
+                          >
+                            {secImprovingPrompt ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Target className="w-3 h-3 mr-1" />}
+                            Melhorar Prompt
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSecEval(null);
+                              setSecImprovedPrompt(null);
+                              toast.success("Pronto para nova resposta!");
+                            }}
+                            className="flex-1 text-[10px] h-7"
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            Nova Resposta
+                          </Button>
+                        </div>
+                        {secImprovedPrompt && (
+                          <div className="p-2 rounded border border-amber-200 bg-amber-50/50">
+                            <div className="text-[10px] font-medium text-amber-800 mb-1 flex items-center gap-1">
+                              <Target className="w-3 h-3" /> Prompt Melhorado
+                            </div>
+                            {secImprovedPrompt.changes?.length > 0 && (
+                              <div className="mb-1 space-y-0.5">
+                                {secImprovedPrompt.changes.map((c, i) => (
+                                  <div key={i} className="text-[9px] text-amber-700">• {c}</div>
+                                ))}
+                              </div>
+                            )}
+                            <pre className="text-[9px] bg-amber-100 rounded p-1.5 whitespace-pre-wrap max-h-[15vh] overflow-auto border border-amber-200">{secImprovedPrompt.improved_prompt}</pre>
+                            <Button size="sm" onClick={() => { setCurrentPrompt(secImprovedPrompt.improved_prompt); toast.success("Prompt aplicado!"); setSecImprovedPrompt(null); }} className="w-full mt-1 text-[10px] h-6 bg-amber-600 hover:bg-amber-700">
+                              <CheckCircle2 className="w-3 h-3 mr-1" /> Aplicar Prompt
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Judge/Lawyer Position */}
                     {currentSession.lawyer_feedback && (
@@ -1340,9 +1588,11 @@ export default function LegalTraining() {
                 placeholder={
                   !currentSession
                     ? "Gere um caso primeiro..."
-                    : currentSession.mode === "lawyer"
-                      ? "Escreva sua argumentação jurídica..."
-                      : "Escreva sua sentença/decisão..."
+                    : currentSession.mode === "secretary"
+                      ? "Responda ao cenário de treinamento..."
+                      : currentSession.mode === "lawyer"
+                        ? "Escreva sua argumentação jurídica..."
+                        : "Escreva sua sentença/decisão..."
                 }
                 disabled={sending || !currentSession}
               />
@@ -1364,23 +1614,37 @@ export default function LegalTraining() {
           <TabsContent value="config" className="flex-1 min-h-0 mt-2">
             <ScrollArea className="h-full p-3">
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setMode("lawyer")} className={`p-3 rounded-lg border text-left ${mode === "lawyer" ? "border-gold-300 bg-gold-50" : "border-nude-200"}`}>
-                    <Scale className="w-5 h-5 mb-1" /><div className="text-xs font-semibold">Advogado</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => setMode("lawyer")} className={`p-2 rounded-lg border text-left ${mode === "lawyer" ? "border-gold-300 bg-gold-50" : "border-nude-200"}`}>
+                    <Scale className="w-4 h-4 mb-1" /><div className="text-[11px] font-semibold">Advogado</div>
                   </button>
-                  <button onClick={() => setMode("judge")} className={`p-3 rounded-lg border text-left ${mode === "judge" ? "border-gold-300 bg-gold-50" : "border-nude-200"}`}>
-                    <Star className="w-5 h-5 mb-1" /><div className="text-xs font-semibold">Juiz</div>
+                  <button onClick={() => setMode("judge")} className={`p-2 rounded-lg border text-left ${mode === "judge" ? "border-gold-300 bg-gold-50" : "border-nude-200"}`}>
+                    <Star className="w-4 h-4 mb-1" /><div className="text-[11px] font-semibold">Juiz</div>
+                  </button>
+                  <button onClick={() => { setMode("secretary"); setSecStrategy(null); setSecScenario(null); setSecEval(null); setSecImprovedPrompt(null); }} className={`p-2 rounded-lg border text-left ${mode === "secretary" ? "border-purple-300 bg-purple-50" : "border-nude-200"}`}>
+                    <Phone className="w-4 h-4 mb-1" /><div className="text-[11px] font-semibold">Secretaria</div>
                   </button>
                 </div>
-                <div className="flex gap-2">
+                {mode === "secretary" && (
+                  <div className="space-y-1 max-h-[20vh] overflow-auto">
+                    {SEC_STRATEGIES.map((s) => (
+                      <button key={s.id} onClick={() => { setSecStrategy(s); setSecScenario(null); setSecEval(null); setSecImprovedPrompt(null); }}
+                        className={`w-full text-left px-2 py-1.5 rounded text-[11px] flex items-center gap-2 ${secStrategy?.id === s.id ? "bg-purple-100 text-purple-800 font-medium border border-purple-300" : "hover:bg-muted border border-transparent"}`}>
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                        <span className="truncate">{s.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {mode !== "secretary" && <div className="flex gap-2">
                   {DIFFICULTY_LEVELS.map((d) => (
                     <button key={d.value} onClick={() => { setDifficulty(d.value); setSelectedCaseId(null); }} className={`flex-1 px-2 py-2 rounded text-[11px] text-center ${difficulty === d.value ? "bg-gold-100 text-gold-700 font-medium" : "text-muted-foreground border"}`}>
                       {d.label}
                     </button>
                   ))}
-                </div>
+                </div>}
 
-                <div className="p-2 rounded bg-muted/50 border">
+                {mode !== "secretary" && <div className="p-2 rounded bg-muted/50 border">
                   <label className="flex items-center gap-2 text-[11px] cursor-pointer">
                     <input
                       type="checkbox"
@@ -1418,11 +1682,11 @@ export default function LegalTraining() {
                       )}
                     </div>
                   )}
-                </div>
+                </div>}
 
-                <Button onClick={startTraining} disabled={sending || (useRealCase && !selectedCaseId)} className="w-full">
+                <Button onClick={startTraining} disabled={sending || (useRealCase && !selectedCaseId) || (mode === "secretary" && !secStrategy)} className="w-full">
                   {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Target className="w-4 h-4 mr-2" />}
-                  Gerar Caso
+                  {mode === "secretary" ? "Iniciar Treino Secretaria" : "Gerar Caso"}
                 </Button>
 
                 {/* Loop de Melhoria Mobile */}
