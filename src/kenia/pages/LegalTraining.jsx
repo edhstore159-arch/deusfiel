@@ -890,92 +890,43 @@ export default function LegalTraining() {
         </div>
 
         <TabsContent value="treinamento" className="flex-1 min-h-0 mt-2">
-          <div className="h-full flex flex-col gap-4 overflow-auto">
+          <div className="h-full flex flex-col gap-2">
 
-      {/* Stats bar */}
-      <div className="flex gap-4 shrink-0">
-        <Card className="flex-1 px-3 py-2">
-          <div className="flex items-center gap-3">
-            <Scale className="w-4 h-4 text-gold-600" />
-            <div className="flex-1">
-              <div className="text-[10px] text-muted-foreground uppercase">Advogados</div>
-              <div className="text-sm font-bold">{lawyerRate}% acerto</div>
-            </div>
-            <div className="text-[10px] text-muted-foreground">{lawyerStats.total} casos</div>
+      {/* Stats bar - compact */}
+      <div className="flex gap-2 shrink-0">
+        <Card className="flex-1 px-2 py-1">
+          <div className="flex items-center gap-2">
+            <Scale className="w-3.5 h-3.5 text-gold-600" />
+            <div className="text-[10px] text-muted-foreground uppercase">Advogados</div>
+            <div className="text-xs font-bold ml-auto">{lawyerRate}% <span className="font-normal text-muted-foreground">({lawyerStats.total})</span></div>
           </div>
         </Card>
-        <Card className="flex-1 px-3 py-2">
-          <div className="flex items-center gap-3">
-            <Star className="w-4 h-4 text-gold-600" />
-            <div className="flex-1">
-              <div className="text-[10px] text-muted-foreground uppercase">Juízes</div>
-              <div className="text-sm font-bold">{judgeRate}% acerto</div>
+        <Card className="flex-1 px-2 py-1">
+          <div className="flex items-center gap-2">
+            <Star className="w-3.5 h-3.5 text-gold-600" />
+            <div className="text-[10px] text-muted-foreground uppercase">Juízes</div>
+            <div className="text-xs font-bold ml-auto">{judgeRate}% <span className="font-normal text-muted-foreground">({judgeStats.total})</span></div>
+          </div>
+        </Card>
+        <Card className="flex-1 px-2 py-1">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <div className="text-[10px] text-muted-foreground uppercase">Loop</div>
+            <div className="text-xs font-bold ml-auto">
+              {autoLoopProgress ? `${autoLoopProgress.currentScore}/100` : autoLoopResults?.final_score ? `${autoLoopResults.final_score}/100 ✓` : "—"}
             </div>
-            <div className="text-[10px] text-muted-foreground">{judgeStats.total} casos</div>
           </div>
         </Card>
       </div>
 
-      {/* Loop de Melhoria */}
-      <Card className="shrink-0 px-3 py-2">
-        <div className="flex items-center gap-3">
-          <Sparkles className="w-4 h-4 text-purple-600" />
-          <div className="flex-1">
-            <div className="text-[10px] font-medium">Loop de Melhoria (Treinar → Melhorar → Repetir até +20%)</div>
-            {autoLoopProgress && (
-              <div className="mt-1">
-                <div className="w-full bg-gray-200 rounded-full h-1.5">
-                  <div className="bg-purple-600 h-1.5 rounded-full transition-all"
-                    style={{ width: `${(autoLoopProgress.iteration / autoLoopProgress.maxIterations) * 100}%` }} />
-                </div>
-                <div className="text-[10px] text-muted-foreground mt-1">
-                  Iteração {autoLoopProgress.iteration}/{autoLoopProgress.maxIterations} — {autoLoopProgress.status}
-                </div>
-              </div>
-            )}
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={startAutoLoopTraining}
-            disabled={autoLoopTraining}
-            className="text-[10px] h-7"
-          >
-            {autoLoopTraining ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
-            {autoLoopTraining ? "Treinando..." : "Iniciar Loop"}
-          </Button>
-        </div>
-
-        {autoLoopResults && !autoLoopTraining && (
-          <div className="mt-2 text-[10px]">
-            <div className="flex gap-2">
-              <span className="text-blue-600">Inicial: {autoLoopResults.baseline_score}</span>
-              <span className="text-emerald-600">Final: {autoLoopResults.final_score}</span>
-              <span className="text-purple-600">+{autoLoopResults.total_improvement}%</span>
-            </div>
-            {(autoLoopResults.iterations || []).map((iter, i) => (
-              <div key={i} className="text-[10px] text-muted-foreground mt-1">
-                Iter {iter.iteration}: Score {iter.avgScore}/100 | +{iter.improvement}% | {iter.passed}/{iter.total} aprovados
-                {iter.reachedTarget && " ✓"}
-              </div>
-            ))}
-            {autoLoopResults.final_prompt && autoLoopResults.final_prompt !== autoLoopResults.initial_prompt && (
-              <div className="mt-2">
-                <p className="text-[10px] text-green-600 font-medium">✓ Prompt melhorado com estratégias de secretaria</p>
-                <pre className="text-[10px] bg-green-50 rounded p-2 whitespace-pre-wrap max-h-[15vh] overflow-auto border mt-1">{autoLoopResults.final_prompt}</pre>
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
         {/* Desktop layout */}
-        <div className="flex-1 min-h-0 hidden lg:flex gap-4">
+        <div className="flex-1 min-h-0 hidden lg:flex gap-3">
         {/* Left: Config or History */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col w-[280px] shrink-0">
           <div className="px-3 py-2 border-b flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-gold-600" />
             <span className="text-xs font-medium">
-              {showConfig ? "Configurar Treino" : "Detalhes do Caso"}
+              {showConfig ? "Configurar Treino" : "Análise de Argumentação"}
             </span>
           </div>
           <ScrollArea className="flex-1 p-3">
