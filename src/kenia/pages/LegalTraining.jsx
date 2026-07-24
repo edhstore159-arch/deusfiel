@@ -16,15 +16,24 @@ import { toast } from "sonner";
 const STORAGE_KEY = "legal-training:state";
 
 const WA_STRATEGIES = [
-  { name: "saudacao", label: "Saudação", color: "#22c55e", description: "Abertura e boas-vindas ao contato" },
-  { name: "identificacao", label: "Identificação", color: "#3b82f6", description: "Coleta de dados pessoais do membro" },
-  { name: "diagnostico", label: "Diagnóstico", color: "#f59e0b", description: "Identificação do problema ou necessidade" },
-  { name: "direcionamento", label: "Direcionamento", color: "#8b5cf6", description: "Encaminhamento para o ministério adequado" },
-  { name: "encerramento", label: "Encerramento", color: "#06b6d4", description: "Finalização e follow-up" },
-  { name: "urgencia", label: "Urgência", color: "#ef4444", description: "Situação que precisa de atendimento imediato" },
-  { name: "oracao", label: "Oração", color: "#ec4899", description: "Momento de oração e acolhimento espiritual" },
-  { name: "agendamento", label: "Agendamento", color: "#14b8a6", description: "Marcação de reunião ou compromisso" },
-  { name: "pos_atendimento", label: "Pós-Atendimento", color: "#6366f1", description: "Verificação e acompanhamento" },
+  { name: "abordagem_inicial", label: "Abordagem Inicial", color: "#22c55e", group: "captação", description: "Primeira impressão e quebra de gelo" },
+  { name: "identificacao_dor", label: "Identificação de Dor", color: "#3b82f6", group: "captação", description: "Mapear a necessidade real do cliente" },
+  { name: "demonstracao_valor", label: "Demonstração de Valor", color: "#8b5cf6", group: "captação", description: "Mostrar diferenciais do escritório" },
+  { name: "tratamento_objecoes", label: "Tratamento de Objeções", color: "#f59e0b", group: "captação", description: "Superar resistências comuns" },
+  { name: "fechamento", label: "Fechamento", color: "#06b6d4", group: "captação", description: "Conversão do lead em cliente" },
+  { name: "follow_up", label: "Follow-up Estratégico", color: "#ec4899", group: "captação", description: "Manter contato após primeira interação" },
+  { name: "captação_whatsapp", label: "Captação via WhatsApp", color: "#14b8a6", group: "captação", description: "Estratégias específicas para WhatsApp" },
+  { name: "captação_indicação", label: "Captação por Indicação", color: "#6366f1", group: "captação", description: "Como pedir e receber indicações" },
+  { name: "escuta_ativa", label: "Escuta Ativa com Perguntas", color: "#ef4444", group: "captação", description: "Coletar dados com perguntas estratégicas" },
+  { name: "criação_urgência", label: "Criação de Urgência", color: "#f97316", group: "captação", description: "Motivar ação imediata de forma ética" },
+  { name: "gatilhos_psicológicos", label: "Gatilhos Psicológicos", color: "#a855f7", group: "captação", description: "Reciprocidade, prova social, escassez" },
+  { name: "lead_divorcio", label: "Lead — Divórcio", color: "#e11d48", group: "leads", description: "Atendimento para casos de família" },
+  { name: "lead_previdenciario", label: "Lead — Previdenciário", color: "#0891b2", group: "leads", description: "Atendimento para aposentadorias e INSS" },
+  { name: "lead_bancario", label: "Lead — Direito Bancário", color: "#4f46e5", group: "leads", description: "Atendimento para questões bancárias" },
+  { name: "lead_hesitante", label: "Lead Hesitante", color: "#ca8a04", group: "leads", description: "Cliente indeciso que precisa de incentivo" },
+  { name: "lead_urgencia", label: "Lead com Urgência", color: "#dc2626", group: "leads", description: "Cliente em situação urgente" },
+  { name: "após_dúvida_jurídica", label: "Após Dúvida Jurídica", color: "#059669", group: "captação", description: "Converter orientação em contrato" },
+  { name: "saudacao", label: "Saudação", color: "#10b981", group: "atendimento", description: "Abertura e boas-vindas" },
 ];
 
 const DEMO_CONVERSATIONS = [
@@ -33,19 +42,19 @@ const DEMO_CONVERSATIONS = [
     phone: "+5511999887766",
     member_name: "Maria Silva",
     status: "active",
-    current_strategy: "diagnostico",
+    current_strategy: "identificacao_dor",
     updated_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     messages: [
-      { direction: "incoming", content: "Olá, boa tarde! Vim à igreja no domingo e gostaria de saber mais sobre os ministérios.", strategy_name: "saudacao", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Olá Maria! Que bom ter você conosco! Seja muito bem-vinda! 😊 Posso te ajudar a conhecer nossos ministérios. Me conta, qual sua idade?", strategy_name: "saudacao", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 2 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Tenho 28 anos, sou professora.", strategy_name: "identificacao", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 5 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Que lindo! Profissão tão bonita! Maria, você tem filhos? E como foi sua experiência no domingo?", strategy_name: "identificacao", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 7 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Não tenho filhos ainda. Achei a igreja muito acolhedora, a música me emocionou muito.", strategy_name: "diagnostico", created_at: new Date(Date.now() - 60 * 60 * 1000 - 50 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Fico muito feliz em ouvir isso! Parece que o coração de Deus tocou o seu. Você tem algum ministério que te desperta interesse? Temos jovens, louvor, infantil...", strategy_name: "diagnostico", created_at: new Date(Date.now() - 60 * 60 * 1000 - 48 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Adoraria participar do ministério de louvor! Canto na escola.", strategy_name: "direcionamento", created_at: new Date(Date.now() - 60 * 60 * 1000 - 35 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Perfeito, Maria! Vou direcionar você para nosso coordenador de louvor. Ele faz uma avaliação musical toda quinta às 19h. Pode vir?", strategy_name: "agendamento", created_at: new Date(Date.now() - 60 * 60 * 1000 - 33 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Sim, posso! Muito obrigada pela atenção!", strategy_name: "encerramento", created_at: new Date(Date.now() - 60 * 60 * 1000 - 25 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Tudo bem, Maria! Vou te mandar o endereço e o contato do coordenador. Que Deus te abençoe! 🙏", strategy_name: "encerramento", created_at: new Date(Date.now() - 60 * 60 * 1000 - 23 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Olá, boa tarde! Vim à igreja no domingo e gostaria de saber mais sobre os ministérios.", strategy_name: "abordagem_inicial", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "Olá Maria! Que bom ter você conosco! Seja muito bem-vinda! 😊 Posso te ajudar a conhecer nossos ministérios. Me conta, qual sua idade?", strategy_name: "abordagem_inicial", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 2 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Tenho 28 anos, sou professora.", strategy_name: "identificacao_dor", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 5 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "Que lindo! Profissão tão bonita! Maria, você tem filhos? E como foi sua experiência no domingo?", strategy_name: "escuta_ativa", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 7 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Não tenho filhos ainda. Achei a igreja muito acolhedora, a música me emocionou muito.", strategy_name: "identificacao_dor", created_at: new Date(Date.now() - 60 * 60 * 1000 - 50 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "Fico muito feliz em ouvir isso! Parece que o coração de Deus tocou o seu. Você tem algum ministério que te desperta interesse? Temos jovens, louvor, infantil...", strategy_name: "demonstracao_valor", created_at: new Date(Date.now() - 60 * 60 * 1000 - 48 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Adoraria participar do ministério de louvor! Canto na escola.", strategy_name: "fechamento", created_at: new Date(Date.now() - 60 * 60 * 1000 - 35 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "Perfeito, Maria! Vou direcionar você para nosso coordenador de louvor. Ele faz uma avaliação musical toda quinta às 19h. Pode vir?", strategy_name: "captação_whatsapp", created_at: new Date(Date.now() - 60 * 60 * 1000 - 33 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Sim, posso! Muito obrigada pela atenção!", strategy_name: "follow_up", created_at: new Date(Date.now() - 60 * 60 * 1000 - 25 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "Tudo bem, Maria! Vou te mandar o endereço e o contato do coordenador. Que Deus te abençoe! 🙏", strategy_name: "follow_up", created_at: new Date(Date.now() - 60 * 60 * 1000 - 23 * 60 * 1000).toISOString() },
     ],
   },
   {
@@ -53,16 +62,16 @@ const DEMO_CONVERSATIONS = [
     phone: "+5521988776655",
     member_name: "João Santos",
     status: "active",
-    current_strategy: "urgencia",
+    current_strategy: "lead_divorcio",
     updated_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString(),
     messages: [
-      { direction: "incoming", content: "Preciso de ajuda. Meu casamento está desmoronando. Minha esposa quer separar.", strategy_name: "urgencia", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "João, sinto muito pelo que está passando. Quero que saiba que Deus pode restaurar tudo. Você e sua esposa são da igreja?", strategy_name: "saudacao", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 1 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Sim, frequentamos há 5 anos. Mas nos afastamos nos últimos meses.", strategy_name: "identificacao", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 5 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Entendo. Às vezes a distância nos afasta. João, posso orar por você agora mesmo? A oração pode ser o primeiro passo para a restauração.", strategy_name: "oracao", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 10 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Sim, por favor. Preciso muito de oração.", strategy_name: "oracao", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 12 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "🙏 Pai celestial, que restauras o que está quebrado... abençoa o casamento de João. Dá sabedoria e reconciliação. Amém.\n\nJoão, temos um ministério de casais muito forte. Posso marcar uma conversa com o pastor? É sigiloso e gratuito.", strategy_name: "agendamento", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 15 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Isso seria ótimo. Obrigado, de verdade.", strategy_name: "encerramento", created_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Preciso de ajuda. Meu casamento está desmoronando. Minha esposa quer separar.", strategy_name: "lead_urgencia", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "João, sinto muito pelo que está passando. Quero que saiba que Deus pode restaurar tudo. Você e sua esposa são da igreja?", strategy_name: "abordagem_inicial", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 1 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Sim, frequentamos há 5 anos. Mas nos afastamos nos últimos meses.", strategy_name: "identificacao_dor", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 5 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "Entendo. Às vezes a distância nos afasta. João, posso orar por você agora mesmo? A oração pode ser o primeiro passo para a restauração.", strategy_name: "demonstracao_valor", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 10 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Sim, por favor. Preciso muito de oração.", strategy_name: "gatilhos_psicológicos", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 12 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "🙏 Pai celestial, que restauras o que está quebrado... abençoa o casamento de João. Dá sabedoria e reconciliação. Amém.\n\nJoão, temos um ministério de casais muito forte. Posso marcar uma conversa com o pastor? É sigiloso e gratuito.", strategy_name: "fechamento", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 15 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Isso seria ótimo. Obrigado, de verdade.", strategy_name: "follow_up", created_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString() },
     ],
   },
   {
@@ -70,15 +79,15 @@ const DEMO_CONVERSATIONS = [
     phone: "+5531977665544",
     member_name: "Ana Oliveira",
     status: "active",
-    current_strategy: "oracao",
+    current_strategy: "após_dúvida_jurídica",
     updated_at: new Date(Date.now() - 33 * 60 * 1000).toISOString(),
     messages: [
-      { direction: "incoming", content: "Igreja, minha filha de 7 anos está no hospital. Pedi oração no grupo mas queria falar com alguém.", strategy_name: "urgencia", created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Ana, estamos contigo! Qual o nome da sua filha e o que aconteceu?", strategy_name: "saudacao", created_at: new Date(Date.now() - 43 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Elena. Ela teve uma crise de asma forte. Está internada desde ontem.", strategy_name: "identificacao", created_at: new Date(Date.now() - 40 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Vamos orar pela Elena agora! 🙏\n\nAna, nossos líderes de intercessão já foram acionados. Você gostaria que alguém fosse ao hospital para orar presencialmente com vocês?", strategy_name: "oracao", created_at: new Date(Date.now() - 38 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Sim, por favor! Estamos no Hospital São Lucas, quarto 204.", strategy_name: "agendamento", created_at: new Date(Date.now() - 35 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Anotado! Vou acionar a equipe de visitação. Ana, fique firme na fé — Deus é fiel! Vamos te atualizar em breve. ❤️", strategy_name: "encerramento", created_at: new Date(Date.now() - 33 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Igreja, minha filha de 7 anos está no hospital. Pedi oração no grupo mas queria falar com alguém.", strategy_name: "lead_urgencia", created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "Ana, estamos contigo! Qual o nome da sua filha e o que aconteceu?", strategy_name: "abordagem_inicial", created_at: new Date(Date.now() - 43 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Elena. Ela teve uma crise de asma forte. Está internada desde ontem.", strategy_name: "identificacao_dor", created_at: new Date(Date.now() - 40 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "Vamos orar pela Elena agora! 🙏\n\nAna, nossos líderes de intercessão já foram acionados. Você gostaria que alguém fosse ao hospital para orar presencialmente com vocês?", strategy_name: "demonstracao_valor", created_at: new Date(Date.now() - 38 * 60 * 1000).toISOString() },
+      { direction: "incoming", content: "Sim, por favor! Estamos no Hospital São Lucas, quarto 204.", strategy_name: "captação_whatsapp", created_at: new Date(Date.now() - 35 * 60 * 1000).toISOString() },
+      { direction: "outgoing", content: "Anotado! Vou acionar a equipe de visitação. Ana, fique firme na fé — Deus é fiel! Vamos te atualizar em breve. ❤️", strategy_name: "follow_up", created_at: new Date(Date.now() - 33 * 60 * 1000).toISOString() },
     ],
   },
 ];
@@ -368,6 +377,11 @@ export default function LegalTraining() {
   function formatWaTime(dateStr) {
     return new Date(dateStr).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   }
+
+  const [waSelectedMsgIdx, setWaSelectedMsgIdx] = useState(null);
+  const [waCorrection, setWaCorrection] = useState("");
+  const [waSelectedStrategy, setWaSelectedStrategy] = useState(null);
+  const [waTrainingPanel, setWaTrainingPanel] = useState(true);
 
   useEffect(() => { saveState({ sessions, stats }); }, [sessions, stats]);
 
@@ -1687,43 +1701,40 @@ export default function LegalTraining() {
       </TabsContent>
 
       <TabsContent value="conversas" className="flex-1 min-h-0 mt-2">
-        <div className="h-full flex flex-col lg:flex-row gap-4">
-          {/* Conversations list */}
-          <div className="w-full lg:w-[320px] shrink-0 flex flex-col border border-border rounded-xl bg-card overflow-hidden">
-            <div className="p-3 border-b border-border">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <div className="h-full flex gap-3 overflow-hidden">
+          {/* Col 1: Conversations list */}
+          <div className="w-[220px] shrink-0 flex flex-col border border-border rounded-xl bg-card overflow-hidden">
+            <div className="p-2.5 border-b border-border">
+              <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Conversas ({waConversations.length})
               </h2>
               {waDataSource === "demo" && (
-                <span className="text-[10px] text-amber-600 font-medium">Dados de demonstração</span>
+                <span className="text-[9px] text-amber-600 font-medium">Demonstração</span>
               )}
             </div>
             <div className="flex-1 overflow-y-auto">
               {waLoading ? (
-                <div className="p-4 text-sm text-muted-foreground text-center flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+                <div className="p-3 text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Carregando...
                 </div>
               ) : waConversations.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma conversa ainda</div>
+                <div className="p-4 text-center text-xs text-muted-foreground">Nenhuma conversa</div>
               ) : (
                 waConversations.map((conv) => (
                   <button
                     key={conv.id}
-                    onClick={() => loadWaMessages(conv.id)}
-                    className={`w-full text-left p-3 border-b border-border transition-colors hover:bg-accent ${waSelectedId === conv.id ? "bg-accent" : ""}`}
+                    onClick={() => { loadWaMessages(conv.id); setWaSelectedMsgIdx(null); setWaCorrection(""); }}
+                    className={`w-full text-left p-2.5 border-b border-border transition-colors hover:bg-accent ${waSelectedId === conv.id ? "bg-accent" : ""}`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold truncate">{conv.member_name || formatWaPhone(conv.phone)}</p>
-                        <p className="text-xs text-muted-foreground truncate">{conv.phone}</p>
+                        <p className="text-xs font-semibold truncate">{conv.member_name || formatWaPhone(conv.phone)}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{conv.phone}</p>
                       </div>
-                      <div className="text-right shrink-0 ml-2">
-                        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getWaStrategyColor(conv.current_strategy) }} />
-                        <p className="text-[10px] text-muted-foreground mt-1">{formatWaTime(conv.updated_at)}</p>
-                      </div>
+                      <span className="inline-block h-2 w-2 rounded-full shrink-0 ml-1" style={{ backgroundColor: getWaStrategyColor(conv.current_strategy) }} />
                     </div>
-                    <div className="mt-1.5 flex items-center gap-1.5">
-                      <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: getWaStrategyColor(conv.current_strategy) + "22", color: getWaStrategyColor(conv.current_strategy) }}>
+                    <div className="mt-1">
+                      <span className="inline-block rounded-full px-1.5 py-0.5 text-[9px] font-semibold" style={{ backgroundColor: getWaStrategyColor(conv.current_strategy) + "22", color: getWaStrategyColor(conv.current_strategy) }}>
                         {getWaStrategyLabel(conv.current_strategy)}
                       </span>
                     </div>
@@ -1733,39 +1744,44 @@ export default function LegalTraining() {
             </div>
           </div>
 
-          {/* Messages panel */}
-          <div className="flex-1 flex flex-col border border-border rounded-xl bg-card overflow-hidden">
+          {/* Col 2: Messages panel */}
+          <div className="flex-1 flex flex-col border border-border rounded-xl bg-card overflow-hidden min-w-0">
             {waSelectedId ? (() => {
               const selectedConv = waConversations.find((c) => c.id === waSelectedId);
               if (!selectedConv) return null;
               return (
                 <>
-                  <div className="p-3 border-b border-border flex items-center justify-between">
+                  <div className="p-2.5 border-b border-border flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold">{selectedConv.member_name || formatWaPhone(selectedConv.phone)}</p>
-                      <p className="text-xs text-muted-foreground">{selectedConv.phone}</p>
+                      <p className="text-xs font-semibold">{selectedConv.member_name || formatWaPhone(selectedConv.phone)}</p>
+                      <p className="text-[10px] text-muted-foreground">{selectedConv.phone}</p>
                     </div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: getWaStrategyColor(selectedConv.current_strategy) + "22", color: getWaStrategyColor(selectedConv.current_strategy), border: `1px solid ${getWaStrategyColor(selectedConv.current_strategy)}44` }}>
-                      <span className="h-2 w-2 rounded-full animate-pulse" style={{ backgroundColor: getWaStrategyColor(selectedConv.current_strategy) }} />
+                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: getWaStrategyColor(selectedConv.current_strategy) + "22", color: getWaStrategyColor(selectedConv.current_strategy), border: `1px solid ${getWaStrategyColor(selectedConv.current_strategy)}44` }}>
+                      <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: getWaStrategyColor(selectedConv.current_strategy) }} />
                       {getWaStrategyLabel(selectedConv.current_strategy)}
                     </span>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {waMessages.map((msg) => {
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                    {waMessages.map((msg, idx) => {
                       const color = getWaStrategyColor(msg.strategy_name);
                       const isOut = msg.direction === "outgoing";
+                      const isSelected = waSelectedMsgIdx === idx;
                       return (
                         <div key={msg.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-                          <div className="max-w-[70%] rounded-xl px-4 py-2.5 shadow-sm" style={{ backgroundColor: color + "18", border: `1px solid ${color}33`, borderLeft: isOut ? undefined : `3px solid ${color}`, borderRight: isOut ? `3px solid ${color}` : undefined }}>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: color, color: "#fff" }}>
+                          <div
+                            onClick={() => { setWaSelectedMsgIdx(idx); setWaSelectedStrategy(msg.strategy_name); setWaCorrection(""); }}
+                            className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm cursor-pointer transition-all ${isSelected ? "ring-2 ring-gold-400" : ""}`}
+                            style={{ backgroundColor: color + "18", border: `1px solid ${color}33`, borderLeft: isOut ? undefined : `3px solid ${color}`, borderRight: isOut ? `3px solid ${color}` : undefined }}
+                          >
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="inline-block rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider" style={{ backgroundColor: color, color: "#fff" }}>
                                 {getWaStrategyLabel(msg.strategy_name)}
                               </span>
-                              <span className="text-[10px] text-muted-foreground">{formatWaTime(msg.created_at)}</span>
+                              <span className="text-[9px] text-muted-foreground">{formatWaTime(msg.created_at)}</span>
                             </div>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                            <div className="mt-1">
-                              <span className="text-[10px] text-muted-foreground">{isOut ? "↗ Enviado" : "↘ Recebido"}</span>
+                            <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                            <div className="mt-0.5">
+                              <span className="text-[9px] text-muted-foreground">{isOut ? "↗ Enviado" : "↘ Recebido"}</span>
                             </div>
                           </div>
                         </div>
@@ -1778,20 +1794,117 @@ export default function LegalTraining() {
             })() : (
               <div className="flex-1 flex items-center justify-center text-muted-foreground">
                 <div className="text-center">
-                  <div className="text-4xl mb-4">💬</div>
-                  <p className="text-lg font-semibold">Selecione uma conversa</p>
-                  <p className="text-sm mt-1 max-w-sm">As mensagens aparecem com cores por estratégia de treinamento.</p>
-                  <div className="mt-6 flex flex-wrap justify-center gap-2 max-w-md">
-                    {WA_STRATEGIES.slice(0, 6).map((s) => (
-                      <div key={s.name} className="flex items-center gap-1.5 text-xs">
-                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.color }} />
-                        <span>{s.label}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <div className="text-3xl mb-3">💬</div>
+                  <p className="text-sm font-semibold">Selecione uma conversa</p>
+                  <p className="text-[10px] mt-1 max-w-xs">Clique em uma mensagem para aplicar correções e treinar estratégias.</p>
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Col 3: Training / Correction panel */}
+          <div className="w-[280px] shrink-0 flex flex-col border border-border rounded-xl bg-card overflow-hidden">
+            <div className="p-2.5 border-b border-border">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-3.5 h-3.5 text-gold-600" />
+                <h2 className="text-[11px] font-semibold uppercase tracking-wider">Treinamento</h2>
+              </div>
+              <p className="text-[9px] text-muted-foreground mt-0.5">Selecione uma mensagem para corrigir</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2.5 space-y-3">
+              {waSelectedMsgIdx !== null ? (
+                <>
+                  {/* Selected message preview */}
+                  <div className="p-2 rounded-lg bg-muted/50 border">
+                    <div className="text-[9px] font-medium text-muted-foreground mb-1">Mensagem selecionada:</div>
+                    <p className="text-[10px] leading-relaxed">{waMessages[waSelectedMsgIdx]?.content?.slice(0, 120)}{waMessages[waSelectedMsgIdx]?.content?.length > 120 ? "..." : ""}</p>
+                    <div className="mt-1.5 flex items-center gap-1">
+                      <span className="inline-block rounded-full px-1.5 py-0.5 text-[8px] font-bold" style={{ backgroundColor: getWaStrategyColor(waMessages[waSelectedMsgIdx]?.strategy_name), color: "#fff" }}>
+                        {getWaStrategyLabel(waMessages[waSelectedMsgIdx]?.strategy_name)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Strategy selector */}
+                  <div>
+                    <div className="text-[9px] font-medium text-muted-foreground mb-1.5">Reclassificar estratégia:</div>
+                    <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                      {WA_STRATEGIES.map((s) => (
+                        <button
+                          key={s.name}
+                          onClick={() => setWaSelectedStrategy(s.name)}
+                          className={`w-full text-left p-1.5 rounded-lg text-[10px] transition-colors flex items-center gap-2 ${waSelectedStrategy === s.name ? "ring-1" : "hover:bg-muted"}`}
+                          style={waSelectedStrategy === s.name ? { backgroundColor: s.color + "18", borderColor: s.color } : {}}
+                        >
+                          <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{s.label}</div>
+                            <div className="text-[8px] text-muted-foreground truncate">{s.description}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Correction textarea */}
+                  <div>
+                    <div className="text-[9px] font-medium text-muted-foreground mb-1">Correção da resposta:</div>
+                    <textarea
+                      value={waCorrection}
+                      onChange={(e) => setWaCorrection(e.target.value)}
+                      placeholder="Escreva a resposta corrigida..."
+                      className="w-full text-[10px] p-2 rounded-lg border bg-background resize-none h-20"
+                    />
+                  </div>
+
+                  <Button
+                    size="sm"
+                    className="w-full text-[10px] h-7"
+                    onClick={() => {
+                      if (!waCorrection.trim()) { toast.error("Escreva a correção"); return; }
+                      toast.success("Correção aplicada! Estratégia: " + getWaStrategyLabel(waSelectedStrategy));
+                      setWaSelectedMsgIdx(null);
+                      setWaCorrection("");
+                    }}
+                  >
+                    <CheckCircle2 className="w-3 h-3 mr-1" /> Aplicar Correção
+                  </Button>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">Estratégias de Captação</div>
+                  {WA_STRATEGIES.filter(s => s.group === "captação").map((s) => (
+                    <div key={s.name} className="flex items-start gap-2 p-1.5 rounded-lg">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: s.color }} />
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-medium">{s.label}</div>
+                        <div className="text-[8px] text-muted-foreground">{s.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider pt-1">Leads por Área</div>
+                  {WA_STRATEGIES.filter(s => s.group === "leads").map((s) => (
+                    <div key={s.name} className="flex items-start gap-2 p-1.5 rounded-lg">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: s.color }} />
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-medium">{s.label}</div>
+                        <div className="text-[8px] text-muted-foreground">{s.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider pt-1">Atendimento</div>
+                  {WA_STRATEGIES.filter(s => s.group === "atendimento").map((s) => (
+                    <div key={s.name} className="flex items-start gap-2 p-1.5 rounded-lg">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: s.color }} />
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-medium">{s.label}</div>
+                        <div className="text-[8px] text-muted-foreground">{s.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </TabsContent>
