@@ -10,743 +10,817 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
-      ai_agents: {
+      assistant_conversations: {
         Row: {
+          church_id: string
           created_at: string
+          created_by: string
           id: string
-          knowledge: string
-          model: string
-          name: string
-          role: string | null
-          system_prompt: string
-          temperature: number
+          title: string
           updated_at: string
-          user_id: string
         }
         Insert: {
+          church_id?: string
           created_at?: string
+          created_by: string
           id?: string
-          knowledge?: string
-          model?: string
-          name: string
-          role?: string | null
-          system_prompt?: string
-          temperature?: number
+          title?: string
           updated_at?: string
-          user_id: string
         }
         Update: {
+          church_id?: string
           created_at?: string
+          created_by?: string
           id?: string
-          knowledge?: string
-          model?: string
-          name?: string
-          role?: string | null
-          system_prompt?: string
-          temperature?: number
+          title?: string
           updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }
-      appointments: {
+      assistant_messages: {
         Row: {
-          appointment_date: string
-          appointment_time: string
-          case_summary: string | null
-          city: string | null
-          client_name: string
-          created_at: string
-          email: string | null
-          id: string
-          legal_area: string | null
-          phone: string | null
-          raw_payload: Json
-          session_id: string | null
-          source: string
-          status: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          appointment_date: string
-          appointment_time: string
-          case_summary?: string | null
-          city?: string | null
-          client_name: string
-          created_at?: string
-          email?: string | null
-          id?: string
-          legal_area?: string | null
-          phone?: string | null
-          raw_payload?: Json
-          session_id?: string | null
-          source?: string
-          status?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          appointment_date?: string
-          appointment_time?: string
-          case_summary?: string | null
-          city?: string | null
-          client_name?: string
-          created_at?: string
-          email?: string | null
-          id?: string
-          legal_area?: string | null
-          phone?: string | null
-          raw_payload?: Json
-          session_id?: string | null
-          source?: string
-          status?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      case_analyses: {
-        Row: {
-          acertividade: number
-          admin_notes: string
-          area: string
-          chance_exito: number
-          created_at: string
-          fundamentos: Json
-          id: string
-          motivo: string | null
-          proxima_pergunta: string | null
-          qualificacao: string
-          resumo: string | null
-          session_id: string | null
-          updated_at: string
-          user_id: string | null
-          visitor_name: string | null
-          visitor_phone: string | null
-        }
-        Insert: {
-          acertividade?: number
-          admin_notes?: string
-          area?: string
-          chance_exito?: number
-          created_at?: string
-          fundamentos?: Json
-          id: string
-          motivo?: string | null
-          proxima_pergunta?: string | null
-          qualificacao?: string
-          resumo?: string | null
-          session_id?: string | null
-          updated_at?: string
-          user_id?: string | null
-          visitor_name?: string | null
-          visitor_phone?: string | null
-        }
-        Update: {
-          acertividade?: number
-          admin_notes?: string
-          area?: string
-          chance_exito?: number
-          created_at?: string
-          fundamentos?: Json
-          id?: string
-          motivo?: string | null
-          proxima_pergunta?: string | null
-          qualificacao?: string
-          resumo?: string | null
-          session_id?: string | null
-          updated_at?: string
-          user_id?: string | null
-          visitor_name?: string | null
-          visitor_phone?: string | null
-        }
-        Relationships: []
-      }
-      case_transcripts: {
-        Row: {
-          analysis_id: string | null
+          church_id: string
           content: string
+          conversation_id: string
           created_at: string
           id: string
           role: string
-          session_id: string | null
-          user_id: string | null
         }
         Insert: {
-          analysis_id?: string | null
+          church_id?: string
           content: string
+          conversation_id: string
           created_at?: string
           id?: string
           role: string
-          session_id?: string | null
-          user_id?: string | null
         }
         Update: {
-          analysis_id?: string | null
+          church_id?: string
           content?: string
+          conversation_id?: string
           created_at?: string
           id?: string
           role?: string
-          session_id?: string | null
-          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "case_transcripts_analysis_id_fkey"
-            columns: ["analysis_id"]
+            foreignKeyName: "assistant_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
             isOneToOne: false
-            referencedRelation: "case_analyses"
+            referencedRelation: "assistant_conversations"
             referencedColumns: ["id"]
           },
         ]
       }
-      cloud_objects: {
+      checkins: {
         Row: {
+          checked_in_at: string
+          checked_out_at: string | null
+          checkout_code_hash: string | null
+          checkout_guardian_id: string | null
+          child_id: string
+          church_id: string | null
           created_at: string
+          event_id: string | null
           id: string
-          mime: string | null
-          name: string
-          path: string
-          size: number
-          url: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          mime?: string | null
-          name: string
-          path: string
-          size?: number
-          url: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          mime?: string | null
-          name?: string
-          path?: string
-          size?: number
-          url?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      cloud_sites: {
-        Row: {
-          created_at: string
-          html: string
-          id: string
-          is_public: boolean
-          slug: string
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          html?: string
-          id?: string
-          is_public?: boolean
-          slug: string
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          html?: string
-          id?: string
-          is_public?: boolean
-          slug?: string
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      conversations: {
-        Row: {
-          created_at: string
-          id: string
-          message: string
-          response: string | null
-          session_id: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          message: string
-          response?: string | null
-          session_id?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          message?: string
-          response?: string | null
-          session_id?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      creative_assets: {
-        Row: {
-          created_at: string
-          description: string | null
-          height: number | null
-          id: string
-          mime_type: string | null
-          name: string
-          size_bytes: number | null
-          storage_path: string
-          tags: string[]
-          updated_at: string
-          user_id: string
-          width: number | null
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          height?: number | null
-          id?: string
-          mime_type?: string | null
-          name: string
-          size_bytes?: number | null
-          storage_path: string
-          tags?: string[]
-          updated_at?: string
-          user_id: string
-          width?: number | null
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          height?: number | null
-          id?: string
-          mime_type?: string | null
-          name?: string
-          size_bytes?: number | null
-          storage_path?: string
-          tags?: string[]
-          updated_at?: string
-          user_id?: string
-          width?: number | null
-        }
-        Relationships: []
-      }
-      debug_instructions: {
-        Row: {
-          applied_at: string | null
-          attachments: Json
-          created_at: string
-          id: string
-          instruction: string
+          notes: string | null
           status: string
           updated_at: string
-          user_id: string | null
         }
         Insert: {
-          applied_at?: string | null
-          attachments?: Json
+          checked_in_at?: string
+          checked_out_at?: string | null
+          checkout_code_hash?: string | null
+          checkout_guardian_id?: string | null
+          child_id: string
+          church_id?: string | null
           created_at?: string
+          event_id?: string | null
           id?: string
-          instruction: string
+          notes?: string | null
           status?: string
           updated_at?: string
-          user_id?: string | null
         }
         Update: {
-          applied_at?: string | null
-          attachments?: Json
+          checked_in_at?: string
+          checked_out_at?: string | null
+          checkout_code_hash?: string | null
+          checkout_guardian_id?: string | null
+          child_id?: string
+          church_id?: string | null
           created_at?: string
+          event_id?: string | null
           id?: string
-          instruction?: string
+          notes?: string | null
           status?: string
           updated_at?: string
-          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "checkins_checkout_guardian_id_fkey"
+            columns: ["checkout_guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkins_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkins_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkins_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      generated_images: {
+      child_guardians: {
         Row: {
+          child_id: string
           created_at: string
+          guardian_id: string
           id: string
-          kind: string
-          paid: boolean
-          prompt: string | null
-          storage_path: string
-          user_id: string
+          is_pickup_authorized: boolean
+          relationship: string | null
         }
         Insert: {
+          child_id: string
           created_at?: string
+          guardian_id: string
           id?: string
-          kind?: string
-          paid?: boolean
-          prompt?: string | null
-          storage_path: string
-          user_id: string
+          is_pickup_authorized?: boolean
+          relationship?: string | null
         }
         Update: {
+          child_id?: string
           created_at?: string
+          guardian_id?: string
           id?: string
-          kind?: string
-          paid?: boolean
-          prompt?: string | null
-          storage_path?: string
-          user_id?: string
+          is_pickup_authorized?: boolean
+          relationship?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "child_guardians_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "child_guardians_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      instagram_accounts: {
+      children: {
         Row: {
-          access_token: string
+          active: boolean
+          allergies: string | null
+          birth_date: string | null
+          church_id: string | null
           created_at: string
-          expires_at: string | null
+          first_name: string
           id: string
-          ig_user_id: string
-          ig_username: string | null
-          page_id: string
-          page_name: string | null
+          last_name: string | null
+          notes: string | null
           updated_at: string
-          user_id: string
         }
         Insert: {
-          access_token: string
+          active?: boolean
+          allergies?: string | null
+          birth_date?: string | null
+          church_id?: string | null
           created_at?: string
-          expires_at?: string | null
+          first_name: string
           id?: string
-          ig_user_id: string
-          ig_username?: string | null
-          page_id: string
-          page_name?: string | null
+          last_name?: string | null
+          notes?: string | null
           updated_at?: string
-          user_id: string
         }
         Update: {
-          access_token?: string
+          active?: boolean
+          allergies?: string | null
+          birth_date?: string | null
+          church_id?: string | null
           created_at?: string
-          expires_at?: string | null
+          first_name?: string
           id?: string
-          ig_user_id?: string
-          ig_username?: string | null
-          page_id?: string
-          page_name?: string | null
+          last_name?: string | null
+          notes?: string | null
           updated_at?: string
-          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "children_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      churches: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      couple_ministry_signups: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          message: string | null
+          name: string
+          phone: string | null
+          source_slug: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          name: string
+          phone?: string | null
+          source_slug?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          name?: string
+          phone?: string | null
+          source_slug?: string
+        }
+        Relationships: []
+      }
+      events: {
+        Row: {
+          active: boolean
+          church_id: string | null
+          created_at: string
+          ends_at: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          starts_at: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          church_id?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          starts_at?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          church_id?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          starts_at?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_monthly: {
+        Row: {
+          church_id: string
+          created_at: string
+          created_by: string
+          donations: number
+          expenses: number
+          id: string
+          month: string
+          notes: string | null
+          offerings: number
+          tithes: number
+          updated_at: string
+        }
+        Insert: {
+          church_id?: string
+          created_at?: string
+          created_by: string
+          donations?: number
+          expenses?: number
+          id?: string
+          month: string
+          notes?: string | null
+          offerings?: number
+          tithes?: number
+          updated_at?: string
+        }
+        Update: {
+          church_id?: string
+          created_at?: string
+          created_by?: string
+          donations?: number
+          expenses?: number
+          id?: string
+          month?: string
+          notes?: string | null
+          offerings?: number
+          tithes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      guardians: {
+        Row: {
+          church_id: string | null
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          church_id?: string | null
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          church_id?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardians_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kids_ministry_signups: {
+        Row: {
+          child_age: number | null
+          child_name: string
+          created_at: string
+          email: string | null
+          id: string
+          message: string | null
+          parent_name: string
+          phone: string | null
+          source_slug: string
+        }
+        Insert: {
+          child_age?: number | null
+          child_name: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          parent_name: string
+          phone?: string | null
+          source_slug?: string
+        }
+        Update: {
+          child_age?: number | null
+          child_name?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          parent_name?: string
+          phone?: string | null
+          source_slug?: string
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          message: string | null
+          name: string
+          phone: string | null
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          name: string
+          phone?: string | null
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          name?: string
+          phone?: string | null
+          source?: string
+        }
+        Relationships: []
+      }
+      members: {
+        Row: {
+          birth_date: string | null
+          church_id: string
+          created_at: string
+          created_by: string
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string | null
+          ministry: string | null
+          notes: string | null
+          participation: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          birth_date?: string | null
+          church_id?: string
+          created_at?: string
+          created_by: string
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name?: string | null
+          ministry?: string | null
+          notes?: string | null
+          participation?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          birth_date?: string | null
+          church_id?: string
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string | null
+          ministry?: string | null
+          notes?: string | null
+          participation?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
       messages: {
         Row: {
+          channel: string
+          child_id: string | null
+          church_id: string | null
           content: string
           created_at: string
+          guardian_id: string | null
           id: string
-          is_read: boolean | null
-          receiver_id: string
-          sender_id: string
+          sender_user_id: string | null
         }
         Insert: {
+          channel?: string
+          child_id?: string | null
+          church_id?: string | null
           content: string
           created_at?: string
+          guardian_id?: string | null
           id?: string
-          is_read?: boolean | null
-          receiver_id: string
-          sender_id: string
+          sender_user_id?: string | null
         }
         Update: {
+          channel?: string
+          child_id?: string | null
+          church_id?: string | null
           content?: string
           created_at?: string
+          guardian_id?: string | null
           id?: string
-          is_read?: boolean | null
-          receiver_id?: string
-          sender_id?: string
-        }
-        Relationships: []
-      }
-      payments: {
-        Row: {
-          amount: number
-          created_at: string
-          id: string
-          patient_id: string
-          session_id: string
-          status: string | null
-          stripe_payment_id: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          id?: string
-          patient_id: string
-          session_id: string
-          status?: string | null
-          stripe_payment_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          id?: string
-          patient_id?: string
-          session_id?: string
-          status?: string | null
-          stripe_payment_id?: string | null
+          sender_user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "payments_session_id_fkey"
-            columns: ["session_id"]
+            foreignKeyName: "messages_child_id_fkey"
+            columns: ["child_id"]
             isOneToOne: false
-            referencedRelation: "sessions"
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ministries: {
+        Row: {
+          created_at: string
+          id: string
+          slug: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          slug: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          slug?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ministry_image_cache: {
+        Row: {
+          id: string
+          images: string[]
+          ministry_id: string
+          sources: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          images?: string[]
+          ministry_id: string
+          sources?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          images?: string[]
+          ministry_id?: string
+          sources?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ministry_image_cache_ministry_id_fkey"
+            columns: ["ministry_id"]
+            isOneToOne: true
+            referencedRelation: "ministries"
             referencedColumns: ["id"]
           },
         ]
       }
       profiles: {
         Row: {
-          avatar_url: string | null
-          bio: string | null
+          church_id: string | null
           created_at: string
-          full_name: string
+          display_name: string | null
           id: string
-          phone: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          avatar_url?: string | null
-          bio?: string | null
+          church_id?: string | null
           created_at?: string
-          full_name: string
+          display_name?: string | null
           id?: string
-          phone?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          avatar_url?: string | null
-          bio?: string | null
+          church_id?: string | null
           created_at?: string
-          full_name?: string
+          display_name?: string | null
           id?: string
-          phone?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
-      }
-      scheduled_posts: {
-        Row: {
-          caption: string
-          created_at: string
-          error_message: string | null
-          external_post_id: string | null
-          id: string
-          image_url: string
-          platforms: string[]
-          scheduled_at: string
-          status: Database["public"]["Enums"]["post_status"]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          caption?: string
-          created_at?: string
-          error_message?: string | null
-          external_post_id?: string | null
-          id?: string
-          image_url: string
-          platforms?: string[]
-          scheduled_at: string
-          status?: Database["public"]["Enums"]["post_status"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          caption?: string
-          created_at?: string
-          error_message?: string | null
-          external_post_id?: string | null
-          id?: string
-          image_url?: string
-          platforms?: string[]
-          scheduled_at?: string
-          status?: Database["public"]["Enums"]["post_status"]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      sessions: {
-        Row: {
-          created_at: string
-          duration: number | null
-          id: string
-          notes: string | null
-          patient_id: string
-          price: number
-          room_url: string | null
-          scheduled_at: string
-          status: Database["public"]["Enums"]["session_status"] | null
-          therapist_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          duration?: number | null
-          id?: string
-          notes?: string | null
-          patient_id: string
-          price: number
-          room_url?: string | null
-          scheduled_at: string
-          status?: Database["public"]["Enums"]["session_status"] | null
-          therapist_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          duration?: number | null
-          id?: string
-          notes?: string | null
-          patient_id?: string
-          price?: number
-          room_url?: string | null
-          scheduled_at?: string
-          status?: Database["public"]["Enums"]["session_status"] | null
-          therapist_id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      therapist_availability: {
-        Row: {
-          day_of_week: number
-          end_time: string
-          id: string
-          start_time: string
-          therapist_id: string
-        }
-        Insert: {
-          day_of_week: number
-          end_time: string
-          id?: string
-          start_time: string
-          therapist_id: string
-        }
-        Update: {
-          day_of_week?: number
-          end_time?: string
-          id?: string
-          start_time?: string
-          therapist_id?: string
-        }
-        Relationships: []
-      }
-      therapist_profiles: {
-        Row: {
-          created_at: string
-          crp: string | null
-          education: string | null
-          experience_years: number | null
-          id: string
-          is_available: boolean | null
-          session_duration: number | null
-          session_price: number | null
-          specialties: string[] | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          crp?: string | null
-          education?: string | null
-          experience_years?: number | null
-          id?: string
-          is_available?: boolean | null
-          session_duration?: number | null
-          session_price?: number | null
-          specialties?: string[] | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          crp?: string | null
-          education?: string | null
-          experience_years?: number | null
-          id?: string
-          is_available?: boolean | null
-          session_duration?: number | null
-          session_price?: number | null
-          specialties?: string[] | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
+          created_at: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
+          created_at?: string
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
+          created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
         Relationships: []
       }
-      whatsapp_messages: {
+      wa_conversations: {
         Row: {
-          contact_id: string
-          contact_name: string | null
-          contact_phone: string | null
           created_at: string
-          from_me: boolean
+          current_strategy: string | null
           id: string
-          provider_message_id: string | null
-          text: string
+          member_name: string | null
+          metadata: Json | null
+          phone: string
+          started_at: string
+          status: string
           updated_at: string
-          user_id: string | null
         }
         Insert: {
-          contact_id: string
-          contact_name?: string | null
-          contact_phone?: string | null
           created_at?: string
-          from_me?: boolean
+          current_strategy?: string | null
           id?: string
-          provider_message_id?: string | null
-          text: string
+          member_name?: string | null
+          metadata?: Json | null
+          phone: string
+          started_at?: string
+          status?: string
           updated_at?: string
-          user_id?: string | null
         }
         Update: {
-          contact_id?: string
-          contact_name?: string | null
-          contact_phone?: string | null
           created_at?: string
-          from_me?: boolean
+          current_strategy?: string | null
           id?: string
-          provider_message_id?: string | null
-          text?: string
+          member_name?: string | null
+          metadata?: Json | null
+          phone?: string
+          started_at?: string
+          status?: string
           updated_at?: string
-          user_id?: string | null
+        }
+        Relationships: []
+      }
+      wa_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          direction: string
+          id: string
+          message_type: string | null
+          metadata: Json | null
+          strategy_id: string | null
+          strategy_name: string | null
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          direction: string
+          id?: string
+          message_type?: string | null
+          metadata?: Json | null
+          strategy_id?: string | null
+          strategy_name?: string | null
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          message_type?: string | null
+          metadata?: Json | null
+          strategy_id?: string | null
+          strategy_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "wa_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_messages_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "wa_strategies"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      wa_strategies: {
+        Row: {
+          color: string
+          created_at: string
+          description: string | null
+          id: string
+          label: string
+          name: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          label: string
+          name: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          label?: string
+          name?: string
         }
         Relationships: []
       }
@@ -755,6 +829,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_church_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -764,9 +839,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "patient" | "therapist" | "admin"
-      post_status: "pending" | "posted" | "failed" | "cancelled"
-      session_status: "scheduled" | "completed" | "cancelled" | "in_progress"
+      app_role: "admin" | "user" | "leader" | "volunteer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -894,9 +967,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["patient", "therapist", "admin"],
-      post_status: ["pending", "posted", "failed", "cancelled"],
-      session_status: ["scheduled", "completed", "cancelled", "in_progress"],
+      app_role: ["admin", "user", "leader", "volunteer"],
     },
   },
 } as const
