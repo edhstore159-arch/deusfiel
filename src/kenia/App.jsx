@@ -108,7 +108,8 @@ function App() {
                 <Route path="/app" element={<Dashboard />} />
                 <Route path="/app/chat-ia" element={<ChatIA />} />
                 <Route path="/app/chat-multi-modelo" element={<ChatMultiModelo />} />
-                <Route path="/app/admin" element={<AdminSecretaria />} />
+                <Route path="/app/admin" element={<AdminCases />} />
+                <Route path="/app/admin/secretaria" element={<AdminSecretaria />} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
                 <Route path="/app/juiz-virtual" element={<JuizVirtual />} />
                 <Route path="/app/agents" element={<Agents />} />
