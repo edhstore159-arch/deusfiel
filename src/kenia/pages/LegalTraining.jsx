@@ -34,6 +34,18 @@ const DIFFICULTY_LEVELS = [
   { value: "dificil", label: "Difícil", desc: "Casos complexos com múltiplas teses" },
 ];
 
+const SECRETARY_STRATEGY_COLORS = {
+  saudacao: { color: "#22c55e", label: "Saudação" },
+  identificacao: { color: "#3b82f6", label: "Identificação" },
+  diagnostico: { color: "#f59e0b", label: "Diagnóstico" },
+  direcionamento: { color: "#8b5cf6", label: "Direcionamento" },
+  encerramento: { color: "#06b6d4", label: "Encerramento" },
+  urgencia: { color: "#ef4444", label: "Urgência" },
+  oracao: { color: "#ec4899", label: "Oração" },
+  agendamento: { color: "#14b8a6", label: "Agendamento" },
+  pos_atendimento: { color: "#6366f1", label: "Pós-Atendimento" },
+};
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1366,8 +1378,31 @@ export default function LegalTraining() {
                     {simulationData && (
                       <div className="mt-2 space-y-2">
                         <div className="p-2 rounded bg-blue-50 border border-blue-200">
-                          <div className="text-[10px] font-medium text-blue-800 mb-1">Resposta</div>
-                          <div className="text-[10px] text-blue-700 whitespace-pre-wrap">{simulationData.professional_response}</div>
+                          <div className="text-[10px] font-medium text-blue-800 mb-1">Resposta do {mode === "lawyer" ? "Advogado" : "Juiz"}</div>
+                          <div className="text-[10px] text-blue-700 whitespace-pre-wrap">
+                            {simulationData.strategy_tags && simulationData.strategy_tags.length > 0
+                              ? simulationData.strategy_tags.map((tag, ti) => {
+                                  const strat = SECRETARY_STRATEGY_COLORS[tag.strategy] || { color: "#64748b", label: tag.strategy };
+                                  return (
+                                    <span key={ti} className="block mb-2">
+                                      <span
+                                        className="inline-block rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider mr-1.5 align-middle"
+                                        style={{ backgroundColor: strat.color, color: "#fff", lineHeight: "1.4" }}
+                                      >
+                                        {strat.label}
+                                      </span>
+                                      <span
+                                        className="border-b-2 leading-relaxed"
+                                        style={{ borderColor: strat.color }}
+                                      >
+                                        {tag.text}
+                                      </span>
+                                    </span>
+                                  );
+                                })
+                              : <span>{simulationData.professional_response}</span>
+                            }
+                          </div>
                         </div>
                         <div className="text-[10px] text-purple-700 font-medium">Score: {simulationData.evaluation?.score || 0}/100</div>
                         

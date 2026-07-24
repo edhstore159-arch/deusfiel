@@ -570,6 +570,44 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
 
       const professionalResponse = simResult.data?.choices?.[0]?.message?.content || "";
 
+      // 1b. Identificar estratégias usadas na resposta (para cores inline)
+      const tagInstruction = `Analise a resposta do profissional abaixo e identifique quais estratégias de atendimento foram utilizadas em CADA PARÁGRAFO.
+
+Estratégias disponíveis:
+- saudacao: Abertura e boas-vindas
+- identificacao: Coleta de dados pessoais
+- diagnostico: Identificação do problema
+- direcionamento: Encaminhamento para ministério/área
+- encerramento: Finalização e follow-up
+- urgencia: Situação urgente
+- oracao: Momento de oração/acolhimento
+- agendamento: Marcação de reunião
+- pos_atendimento: Verificação e acompanhamento
+
+Responda APENAS em JSON: {"paragraphs": [{"text": "texto do parágrafo", "strategy": "nome_da_estrategia"}]}
+
+Separados por linha em branco no original. Mantenha o texto EXATAMENTE como está.`;
+
+      const tagResult = await chatCompletion({
+        messages: [
+          { role: "system", content: tagInstruction },
+          { role: "user", content: professionalResponse },
+        ],
+        temperature: 0.1, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
+      });
+
+      let taggedResponse = professionalResponse;
+      let strategyTags: Array<{ text: string; strategy: string }> = [];
+      if (tagResult.ok) {
+        const tagParsed = parseJsonResponse(tagResult.data?.choices?.[0]?.message?.content || "");
+        if (tagParsed?.paragraphs && Array.isArray(tagParsed.paragraphs)) {
+          strategyTags = tagParsed.paragraphs.map((p: any) => ({
+            text: String(p.text || ""),
+            strategy: String(p.strategy || "saudacao"),
+          }));
+        }
+      }
+
       // 2. Avaliar a resposta com estratégias da secretaria
       const evalInstruction = mode === "lawyer"
         ? `Avalie a resposta do ADVOGADO considerando as estratégias de atendimento ao cliente. Responda APENAS em JSON: {"score": 0-100, "feedback": "texto", "strengths": ["..."], "weaknesses": ["..."]}
@@ -662,6 +700,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           client_message: clientMessage,
           client_name: clientName,
           professional_response: professionalResponse,
+          strategy_tags: strategyTags,
           evaluation,
           improved_prompt: improvedPrompt,
           mode,
