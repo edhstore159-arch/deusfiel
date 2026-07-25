@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { API, HAS_BACKEND } from "@/kenia/lib/api";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
@@ -355,6 +356,29 @@ export default function LegalTraining() {
   const loadWaConversations = useCallback(async () => {
     setWaLoading(true);
     try {
+      if (HAS_BACKEND) {
+        const res = await fetch(`${API}/whatsapp/contacts`);
+        if (res.ok) {
+          const contacts = await res.json();
+          if (Array.isArray(contacts) && contacts.length) {
+            const mapped = contacts.map((c) => ({
+              id: c.jid || c.id || c.phone,
+              phone: c.phone || "",
+              member_name: c.name || c.phone || "",
+              status: "active",
+              current_strategy: "abordagem_inicial",
+              updated_at: c.last_message_at || new Date().toISOString(),
+              _jid: c.jid || c.id,
+            }));
+            setWaConversations(mapped);
+            setWaDataSource("backend");
+            setWaLoading(false);
+            return;
+          }
+        }
+      }
+    } catch {}
+    try {
       const { data, error } = await supabase.from("wa_conversations").select("*").order("updated_at", { ascending: false });
       if (error || !data?.length) {
         setWaConversations(DEMO_CONVERSATIONS);
@@ -383,6 +407,26 @@ export default function LegalTraining() {
     const conv = waConversations.find((c) => c.id === convId);
     if (conv?.messages) {
       setWaMessages(conv.messages.map((m, i) => ({ ...m, id: `demo-${i}` })));
+      return;
+    }
+    if (waDataSource === "backend" && conv) {
+      const jid = conv._jid || convId;
+      fetch(`${API}/whatsapp/messages/${encodeURIComponent(jid)}`)
+        .then((r) => r.json())
+        .then((msgs) => {
+          if (Array.isArray(msgs) && msgs.length) {
+            setWaMessages(msgs.map((m) => ({
+              id: m.id || `msg-${Math.random()}`,
+              content: m.text || m.content || "",
+              direction: m.from_me ? "outgoing" : "incoming",
+              strategy_name: "abordagem_inicial",
+              created_at: m.created_at || new Date().toISOString(),
+            })));
+          } else {
+            setWaMessages([]);
+          }
+        })
+        .catch(() => setWaMessages([]));
       return;
     }
     if (waDataSource === "supabase") {
@@ -2129,6 +2173,9 @@ export default function LegalTraining() {
               </h2>
               {waDataSource === "demo" && (
                 <span className="text-[9px] text-amber-600 font-medium">Demonstração</span>
+              )}
+              {waDataSource === "backend" && (
+                <span className="text-[9px] text-green-600 font-medium">WhatsApp Real</span>
               )}
             </div>
             <div className="flex-1 overflow-y-auto">
