@@ -1246,6 +1246,39 @@ export default function LegalTraining() {
                   {mode === "secretary" ? "Iniciar Treino Secretaria" : useRealCase && selectedCaseId ? "Carregar Caso Real" : "Gerar Caso para Treino"}
                 </Button>
 
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={autoCorrect}
+                    disabled={correcting || !currentSession}
+                    className="flex-1 text-xs h-9"
+                  >
+                    {correcting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+                    Corrigir Auto
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={improveArgument}
+                    disabled={improving || !currentSession}
+                    className="flex-1 text-xs h-9"
+                  >
+                    {improving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Lightbulb className="w-4 h-4 mr-1" />}
+                    Melhorar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={improvePrompt}
+                    disabled={improvingPrompt || !currentSession}
+                    className="flex-1 text-xs h-9"
+                  >
+                    {improvingPrompt ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Target className="w-4 h-4 mr-1" />}
+                    Melhorar Prompt
+                  </Button>
+                </div>
+
                 {sessions.length > 0 && (
                   <div>
                     <label className="text-sm font-semibold text-foreground mb-3 block">Histórico Recente</label>
