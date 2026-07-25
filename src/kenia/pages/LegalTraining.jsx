@@ -1340,6 +1340,40 @@ export default function LegalTraining() {
                   )}
                 </div>
 
+                {/* Action buttons - always visible below session info */}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={autoCorrect}
+                    disabled={correcting}
+                    className="flex-1 text-xs h-9"
+                  >
+                    {correcting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+                    Corrigir Auto
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={improveArgument}
+                    disabled={improving}
+                    className="flex-1 text-xs h-9"
+                  >
+                    {improving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Lightbulb className="w-4 h-4 mr-1" />}
+                    Melhorar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={improvePrompt}
+                    disabled={improvingPrompt}
+                    className="flex-1 text-xs h-9"
+                  >
+                    {improvingPrompt ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Target className="w-4 h-4 mr-1" />}
+                    Melhorar Prompt
+                  </Button>
+                </div>
+
                 {currentSession.score != null && (
                   <div className="p-4 rounded-lg border border-gold-200 bg-gold-50/50">
                     <div className="flex items-center gap-4 mb-3">
@@ -1370,40 +1404,6 @@ export default function LegalTraining() {
                         ))}
                       </div>
                     )}
-
-                    {/* Action buttons */}
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={autoCorrect}
-                        disabled={correcting}
-                        className="flex-1 text-xs h-9"
-                      >
-                        {correcting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
-                        Corrigir Auto
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={improveArgument}
-                        disabled={improving}
-                        className="flex-1 text-xs h-9"
-                      >
-                        {improving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Lightbulb className="w-4 h-4 mr-1" />}
-                        Melhorar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={improvePrompt}
-                        disabled={improvingPrompt}
-                        className="flex-1 text-xs h-9"
-                      >
-                        {improvingPrompt ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Target className="w-4 h-4 mr-1" />}
-                        Melhorar Prompt
-                      </Button>
-                    </div>
 
                     {/* Secretary-specific: Efficiency & Effectiveness */}
                     {currentSession.mode === "secretary" && secEval && (
