@@ -48,7 +48,7 @@ COMUNICAÇÃO AO CLIENTE:
 const SECRETARY_STRATEGIES = [
   { id: "abordagem_inicial", name: "Abordagem Inicial", desc: "Primeira impressão e quebra de gelo" },
   { id: "identificacao_dor", name: "Identificação de Dor", desc: "Mapear a necessidade real do cliente" },
-  { id: "demonstracao_valor", desc: "Mostrar diferenciais do escritório" },
+  { id: "demonstracao_valor", name: "Demonstração de Valor", desc: "Mostrar diferenciais do escritório" },
   { id: "tratamento_objecao", name: "Tratamento de Objeções", desc: "Superar resistências comuns" },
   { id: "fechamento", name: "Fechar o Lead", desc: "Converter orientação em agendamento" },
   { id: "follow_up", name: "Follow-up Estratégico", desc: "Manter contato após primeira interação" },

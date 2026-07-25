@@ -1036,7 +1036,7 @@ export default function LegalTraining() {
         {/* Desktop layout */}
         <div className="flex-1 min-h-0 hidden lg:flex gap-3">
         {/* Left: Config or History */}
-        <Card className="flex flex-col w-[280px] shrink-0">
+        <Card className="flex flex-col w-[320px] shrink-0">
           <div className="px-3 py-2 border-b flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-gold-600" />
             <span className="text-xs font-medium">
@@ -1091,19 +1091,22 @@ export default function LegalTraining() {
                 {mode === "secretary" && (
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-2 block">Estratégia de Treinamento</label>
-                    <div className="space-y-1 max-h-[25vh] overflow-auto">
+                    <div className="space-y-1 max-h-[35vh] overflow-auto">
                       {SEC_STRATEGIES.map((s) => (
                         <button
                           key={s.id}
                           onClick={() => { setSecStrategy(s); setSecScenario(null); setSecEval(null); setSecImprovedPrompt(null); }}
-                          className={`w-full text-left px-2 py-1.5 rounded text-[11px] flex items-center gap-2 transition-colors ${
+                          className={`w-full text-left px-3 py-2 rounded-md text-xs flex items-center gap-2.5 transition-colors ${
                             secStrategy?.id === s.id
-                              ? "bg-purple-100 text-purple-800 font-medium border border-purple-300"
+                              ? "bg-purple-100 text-purple-800 font-medium border border-purple-300 shadow-sm"
                               : "hover:bg-muted border border-transparent"
                           }`}
                         >
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                          <span className="truncate">{s.name}</span>
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium truncate">{s.name}</div>
+                            <div className="text-[10px] text-muted-foreground truncate">{s.desc}</div>
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -1122,7 +1125,22 @@ export default function LegalTraining() {
                             if (error) throw error;
                             if (data?.error) throw new Error(data.error);
                             setSecScenario(data.strategy);
+                            const session = {
+                              id: Date.now().toString(),
+                              mode: "secretary",
+                              area: "secretaria",
+                              difficulty: "medio",
+                              case_data: { title: secStrategy.name, description: data.strategy.scenario, strategy: secStrategy },
+                              messages: [
+                                { role: "assistant", content: `📋 **CENÁRIO — ${secStrategy.name}**\n\n${data.strategy.scenario}\n\n👤 Perfil: ${data.strategy.client_profile}\n\n💬 Script sugerido:\n${data.strategy.script || "Nenhum script sugerido."}` },
+                              ],
+                              score: null,
+                              evaluation: null,
+                              created_at: new Date().toISOString(),
+                            };
+                            setCurrentSession(session);
                             setShowConfig(false);
+                            saveSessionToDb(session);
                             toast.success(`Cenário gerado: ${secStrategy.name}`);
                           } catch (e) {
                             toast.error("Erro: " + (e?.message || e));
@@ -1249,14 +1267,21 @@ export default function LegalTraining() {
                 )}
               </div>
             ) : currentSession ? (
-              <div className="space-y-3">
-                <div className="p-3 rounded-lg bg-muted/50">
-                  <div className="text-[10px] uppercase text-muted-foreground mb-1 font-medium">
-                    {currentSession.mode === "lawyer" ? "📋 Caso para Advocacia" : "⚖️ Caso para Julgamento"}
+                <div className="space-y-3">
+                <div className={`p-4 rounded-lg ${currentSession.mode === "secretary" ? "bg-purple-50 border border-purple-200" : "bg-muted/50"}`}>
+                  <div className="text-[10px] uppercase text-muted-foreground mb-1.5 font-medium">
+                    {currentSession.mode === "lawyer" ? "📋 Caso para Advocacia" : currentSession.mode === "secretary" ? "📞 Treinamento Secretaria" : "⚖️ Caso para Julgamento"}
                   </div>
-                  <div className="text-xs font-semibold mb-1">{currentSession.case_data?.title}</div>
+                  {currentSession.mode === "secretary" && currentSession.case_data?.strategy && (
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: currentSession.case_data.strategy.color }} />
+                      <span className="text-xs font-semibold text-purple-800">{currentSession.case_data.strategy.name}</span>
+                    </div>
+                  )}
+                  <div className="text-sm font-semibold mb-1">{currentSession.case_data?.title}</div>
                   <div className="text-xs text-muted-foreground leading-relaxed">
-                    {currentSession.case_data?.description}
+                    {currentSession.case_data?.description?.slice(0, 500)}
+                    {currentSession.case_data?.description?.length > 500 && "..."}
                   </div>
                   {currentSession.case_data?.parties && (
                     <div className="mt-2 text-[10px] text-muted-foreground">
@@ -1280,11 +1305,11 @@ export default function LegalTraining() {
                 </div>
 
                 {currentSession.score != null && (
-                  <div className="p-3 rounded-lg border border-gold-200 bg-gold-50/50">
-                    <div className="flex items-center gap-3 mb-2">
+                  <div className="p-4 rounded-lg border border-gold-200 bg-gold-50/50">
+                    <div className="flex items-center gap-4 mb-3">
                       <ScoreGauge score={currentSession.score} label="Acertabilidade" />
                       <div className="flex-1">
-                        <div className="text-xs font-semibold text-gold-800">Avaliação</div>
+                        <div className="text-sm font-semibold text-gold-800">Avaliação</div>
                         <div className="text-[10px] text-muted-foreground">
                           {currentSession.score >= 80 ? "Excelente!" : currentSession.score >= 60 ? "Bom trabalho" : "Precisa melhorar"}
                         </div>
@@ -1347,24 +1372,45 @@ export default function LegalTraining() {
                     {/* Secretary-specific: Efficiency & Effectiveness */}
                     {currentSession.mode === "secretary" && secEval && (
                       <div className="mt-3 space-y-2">
-                        <div className="p-2 rounded bg-purple-50 border border-purple-200">
-                          <div className="text-[10px] font-medium text-purple-800 mb-1">Eficiência & Efetividade</div>
-                          <div className="flex gap-3">
-                            <div className="flex-1 text-center">
-                              <div className="text-lg font-bold text-purple-700">{secEval.score}%</div>
-                              <div className="text-[9px] text-muted-foreground">Score Geral</div>
+                        <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
+                          <div className="text-xs font-medium text-purple-800 mb-1.5">Eficiência & Efetividade</div>
+                          <div className="flex gap-4 mb-2">
+                            <div className="flex-1 text-center p-2 rounded bg-white/60">
+                              <div className="text-2xl font-bold text-purple-700">{secEval.score}%</div>
+                              <div className="text-[10px] text-muted-foreground">Score Geral</div>
                             </div>
                           </div>
-                          {secEval.tips?.length > 0 && (
+                          {secEval.strengths?.length > 0 && (
                             <div className="mt-2">
-                              <div className="text-[9px] font-medium text-purple-700 mb-0.5">Dicas:</div>
-                              {secEval.tips.map((t, i) => (
-                                <div key={i} className="text-[9px] text-purple-600">• {t}</div>
+                              <div className="text-[10px] font-medium text-green-700 mb-0.5">Pontos Fortes:</div>
+                              {secEval.strengths.map((s, i) => (
+                                <div key={i} className="text-[10px] text-green-600">• {s}</div>
                               ))}
                             </div>
                           )}
+                          {secEval.weaknesses?.length > 0 && (
+                            <div className="mt-2">
+                              <div className="text-[10px] font-medium text-red-700 mb-0.5">Melhorar:</div>
+                              {secEval.weaknesses.map((w, i) => (
+                                <div key={i} className="text-[10px] text-red-600">• {w}</div>
+                              ))}
+                            </div>
+                          )}
+                          {secEval.tips?.length > 0 && (
+                            <div className="mt-2">
+                              <div className="text-[10px] font-medium text-purple-700 mb-0.5">Dicas:</div>
+                              {secEval.tips.map((t, i) => (
+                                <div key={i} className="text-[10px] text-purple-600">• {t}</div>
+                              ))}
+                            </div>
+                          )}
+                          {secEval.feedback && (
+                            <div className="mt-2 text-[10px] text-muted-foreground italic p-2 rounded bg-white/40">
+                              {secEval.feedback}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="outline"
@@ -1392,7 +1438,7 @@ export default function LegalTraining() {
                               }
                             }}
                             disabled={secImprovingPrompt}
-                            className="flex-1 text-[10px] h-7"
+                            className="flex-1 text-xs h-8"
                           >
                             {secImprovingPrompt ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Target className="w-3 h-3 mr-1" />}
                             Melhorar Prompt
@@ -1431,7 +1477,7 @@ export default function LegalTraining() {
                               }
                             }}
                             disabled={secCorrecting}
-                            className="flex-1 text-[10px] h-7"
+                            className="flex-1 text-xs h-8"
                           >
                             {secCorrecting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
                             Corrigir Auto
@@ -1470,7 +1516,7 @@ export default function LegalTraining() {
                               }
                             }}
                             disabled={secImprovingArg}
-                            className="flex-1 text-[10px] h-7"
+                            className="flex-1 text-xs h-8"
                           >
                             {secImprovingArg ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Lightbulb className="w-3 h-3 mr-1" />}
                             Melhorar
@@ -1485,7 +1531,7 @@ export default function LegalTraining() {
                               setSecImprovementData(null);
                               toast.success("Pronto para nova resposta!");
                             }}
-                            className="flex-1 text-[10px] h-7"
+                            className="flex-1 text-xs h-8"
                           >
                             <RefreshCw className="w-3 h-3 mr-1" />
                             Nova Resposta
@@ -1670,7 +1716,9 @@ export default function LegalTraining() {
               {currentSession
                 ? currentSession.mode === "lawyer"
                   ? "Sua Argumentação"
-                  : "Sua Sentença"
+                  : currentSession.mode === "secretary"
+                    ? "Simulação de Atendimento"
+                    : "Sua Sentença"
                 : "Chat de Treino"}
             </span>
             {currentSession?.score != null && (
@@ -1691,6 +1739,7 @@ export default function LegalTraining() {
               <div className="space-y-3">
                 {currentSession.messages.map((m, i) => {
                   const isLawyerRef = m.role === "assistant" && m.content?.startsWith("📋 **ARGUMENTAÇÃO DO ADVOGADO");
+                  const isScenario = m.role === "assistant" && m.content?.startsWith("📋 **CENÁRIO");
                   return (
                     <div key={i} className={`text-sm ${m.role === "user" ? "text-right" : ""}`}>
                       {isLawyerRef ? (
@@ -1703,11 +1752,17 @@ export default function LegalTraining() {
                             {m.content.replace("📋 **ARGUMENTAÇÃO DO ADVOGADO (Referência):**\n\n", "")}
                           </div>
                         </div>
+                      ) : isScenario ? (
+                        <div className="p-4 rounded-lg border border-purple-200 bg-purple-50/80 text-left">
+                          <div className="whitespace-pre-wrap break-words text-sm leading-relaxed text-purple-900">
+                            {m.content}
+                          </div>
+                        </div>
                       ) : (
-                        <div className={`inline-block max-w-[90%] rounded-lg px-3 py-2 ${
+                        <div className={`inline-block max-w-[85%] rounded-lg px-4 py-2.5 ${
                           m.role === "user" ? "bg-gold-100 text-gold-900" : "bg-muted text-foreground"
                         }`}>
-                          <div className="whitespace-pre-wrap break-words text-xs leading-relaxed">{m.content}</div>
+                          <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{m.content}</div>
                         </div>
                       )}
                     </div>
@@ -1716,7 +1771,7 @@ export default function LegalTraining() {
                 {sending && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    {currentSession.mode === "lawyer" ? "Analisando argumentação..." : "Avaliando sentença..."}
+                    {currentSession.mode === "lawyer" ? "Analisando argumentação..." : currentSession.mode === "secretary" ? "Simulando atendimento..." : "Avaliando sentença..."}
                   </div>
                 )}
                 {correcting && (
@@ -2061,7 +2116,7 @@ export default function LegalTraining() {
                 </div>
               </ScrollArea>
               <div className="p-3 border-t flex gap-2">
-                <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Sua resposta..." disabled={sending || !currentSession} />
+                <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={currentSession?.mode === "secretary" ? "Digite sua resposta como secretária..." : "Sua resposta..."} disabled={sending || !currentSession} className="flex-1" />
                 <Button size="sm" onClick={sendResponse} disabled={sending || !input.trim() || !currentSession}>
                   <Send className="w-3 h-3" />
                 </Button>
