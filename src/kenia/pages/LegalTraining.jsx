@@ -1036,7 +1036,7 @@ export default function LegalTraining() {
         {/* Desktop layout */}
         <div className="flex-1 min-h-0 hidden lg:flex gap-3 w-full">
         {/* Left: Config or History */}
-        <Card className="flex flex-col w-[320px] shrink-0">
+        <Card className="flex flex-col flex-1 min-w-0 shrink-0">
           <div className="px-4 py-3 border-b flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-gold-600" />
             <span className="text-sm font-bold">
@@ -1345,9 +1345,9 @@ export default function LegalTraining() {
                         variant="outline"
                         onClick={autoCorrect}
                         disabled={correcting}
-                        className="flex-1 text-[10px] h-7"
+                        className="flex-1 text-xs h-9"
                       >
-                        {correcting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                        {correcting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
                         Corrigir Auto
                       </Button>
                       <Button
@@ -1355,9 +1355,9 @@ export default function LegalTraining() {
                         variant="outline"
                         onClick={improveArgument}
                         disabled={improving}
-                        className="flex-1 text-[10px] h-7"
+                        className="flex-1 text-xs h-9"
                       >
-                        {improving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Lightbulb className="w-3 h-3 mr-1" />}
+                        {improving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Lightbulb className="w-4 h-4 mr-1" />}
                         Melhorar
                       </Button>
                       <Button
@@ -1365,9 +1365,9 @@ export default function LegalTraining() {
                         variant="outline"
                         onClick={improvePrompt}
                         disabled={improvingPrompt}
-                        className="flex-1 text-[10px] h-7"
+                        className="flex-1 text-xs h-9"
                       >
-                        {improvingPrompt ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Target className="w-3 h-3 mr-1" />}
+                        {improvingPrompt ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Target className="w-4 h-4 mr-1" />}
                         Melhorar Prompt
                       </Button>
                     </div>
@@ -1441,7 +1441,7 @@ export default function LegalTraining() {
                               }
                             }}
                             disabled={secImprovingPrompt}
-                            className="flex-1 text-xs h-8"
+                            className="flex-1 text-xs h-9"
                           >
                             {secImprovingPrompt ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Target className="w-3 h-3 mr-1" />}
                             Melhorar Prompt
@@ -1480,7 +1480,7 @@ export default function LegalTraining() {
                               }
                             }}
                             disabled={secCorrecting}
-                            className="flex-1 text-xs h-8"
+                            className="flex-1 text-xs h-9"
                           >
                             {secCorrecting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
                             Corrigir Auto
@@ -1519,7 +1519,7 @@ export default function LegalTraining() {
                               }
                             }}
                             disabled={secImprovingArg}
-                            className="flex-1 text-xs h-8"
+                            className="flex-1 text-xs h-9"
                           >
                             {secImprovingArg ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Lightbulb className="w-3 h-3 mr-1" />}
                             Melhorar
@@ -1534,7 +1534,7 @@ export default function LegalTraining() {
                               setSecImprovementData(null);
                               toast.success("Pronto para nova resposta!");
                             }}
-                            className="flex-1 text-xs h-8"
+                            className="flex-1 text-xs h-9"
                           >
                             <RefreshCw className="w-3 h-3 mr-1" />
                             Nova Resposta
