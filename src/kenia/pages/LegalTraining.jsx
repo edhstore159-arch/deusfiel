@@ -829,6 +829,7 @@ export default function LegalTraining() {
       const { data, error } = await supabase.functions.invoke("training-ai", {
         body: {
           action: "improve_prompt",
+          mode: currentSession.mode || mode,
           current_prompt: currentPrompt || `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`,
           evaluation_summary: feedback.slice(0, 2000),
           weaknesses,

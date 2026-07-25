@@ -986,10 +986,38 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
         );
       }
 
+      const isSecretary = mode === "secretary";
+      const improveSystemPrompt = isSecretary ? SECRETARY_IMPROVE_PROMPT_PROMPT : `Você é um consultor de prompts jurídicos especialista em otimização de prompts para profissionais de ${mode === "lawyer" ? "advocacia" : "magistratura"}. Sua tarefa é MELHORAR o prompt do profissional com base nos feedbacks de treinamento.
+
+FORMATO — SEMPRE retorne JSON válido:
+{
+  "improved_prompt": "O prompt completo melhorado (mínimo 300 palavras). Deve ser uma instrução completa e acionável.",
+  "changes": [
+    {
+      "area": "Área alterada",
+      "before": "Como estava antes",
+      "after": "Como ficou depois",
+      "reason": "Motivo da melhoria"
+    }
+  ],
+  "reasoning": "Resumo das principais melhorias aplicadas e por quê"
+}
+
+REGRAS OBRIGATÓRIAS:
+- O prompt melhorado deve ser COMPLETO e AUTOCONTIDO
+- Mantenha a identidade profissional e tom adequado ao modo
+- ADICIONE instruções específicas para os pontos fracos identificados
+- MANTENHA o que já funcionava bem
+- Inclua exemplos práticos de como responder`;
+
+      const userMessage = isSecretary
+        ? `PROMPT ATUAL DA SECRETÁRIA:\n${currentPrompt.slice(0, 3000)}\n\nRESUMO DA AVALIAÇÃO:\n${evaluationSummary.slice(0, 1500)}\n\nPONTOS FRACOS:\n${weaknesses.map((w, i) => `${i + 1}. ${w}`).join("\n") || "Nenhum identificado"}\n\nDICAS:\n${tips.map((t, i) => `${i + 1}. ${t}`).join("\n") || "Nenhuma identificada"}\n\nMELHORE o prompt da secretária para que ela responda melhor nos próximos treinos. O prompt deve ser completo e autocontido.`
+        : `PROMPT ATUAL DO ${mode === "lawyer" ? "ADVOGADO" : "JUIZ"}:\n${currentPrompt.slice(0, 3000)}\n\nRESUMO DA AVALIAÇÃO:\n${evaluationSummary.slice(0, 1500)}\n\nPONTOS FRACOS:\n${weaknesses.map((w, i) => `${i + 1}. ${w}`).join("\n") || "Nenhum identificado"}\n\nDICAS:\n${tips.map((t, i) => `${i + 1}. ${t}`).join("\n") || "Nenhuma identificada"}\n\nMELHORE o prompt do profissional para que ele responda melhor nos próximos treinos. O prompt deve ser completo e autocontido.`;
+
       const improveResult = await chatCompletion({
         messages: [
-          { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
-          { role: "user", content: `PROMPT ATUAL DA SECRETÁRIA:\n${currentPrompt.slice(0, 3000)}\n\nRESUMO DA AVALIAÇÃO:\n${evaluationSummary.slice(0, 1500)}\n\nPONTOS FRACOS:\n${weaknesses.map((w, i) => `${i + 1}. ${w}`).join("\n") || "Nenhum identificado"}\n\nDICAS:\n${tips.map((t, i) => `${i + 1}. ${t}`).join("\n") || "Nenhuma identificada"}\n\nMELHORE o prompt da secretária para que ela responda melhor nos próximos treinos. O prompt deve ser completo e autocontido.` },
+          { role: "system", content: improveSystemPrompt },
+          { role: "user", content: userMessage },
         ],
         temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini", preferFastProvider: true,
       });
@@ -1004,17 +1032,19 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
       const parsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
       const improvedPrompt = String(parsed?.improved_prompt || currentPrompt);
 
-      // Salvar prompt melhorado no banco para que chat-ai (WhatsApp) use
+      // Salvar prompt melhorado no banco
+      const saveMode = isSecretary ? "secretary" : (mode === "lawyer" ? "lawyer" : "judge");
+      const saveArea = isSecretary ? "general" : area;
       if (improvedPrompt && improvedPrompt !== currentPrompt && improvedPrompt.trim().length > 100) {
-        await saveEvolvedPrompt("secretary", "general", improvedPrompt, 0, {
-          source: "secretary_improve_prompt",
+        await saveEvolvedPrompt(saveMode, saveArea, improvedPrompt, 0, {
+          source: `${saveMode}_improve_prompt`,
           weaknesses_count: weaknesses.length,
           tips_count: tips.length,
         });
-        console.log(`[training-ai] improve_prompt: prompt salvo no agent_prompts para WhatsApp`);
+        console.log(`[training-ai] improve_prompt: prompt salvo para ${saveMode}/${saveArea}`);
       }
 
-      console.log(`[training-ai] improve_prompt: ${weaknesses.length} weaknesses addressed`);
+      console.log(`[training-ai] improve_prompt (${mode}): ${weaknesses.length} weaknesses addressed`);
       return new Response(
         JSON.stringify({
           improved_prompt: improvedPrompt,
