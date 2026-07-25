@@ -1034,7 +1034,7 @@ export default function LegalTraining() {
       </div>
 
         {/* Desktop layout */}
-        <div className="flex-1 min-h-0 hidden lg:flex gap-3">
+        <div className="flex-1 min-h-0 hidden lg:flex gap-3 w-full">
         {/* Left: Config or History */}
         <Card className="flex flex-col w-[320px] shrink-0">
           <div className="px-4 py-3 border-b flex items-center gap-2">
@@ -1701,10 +1701,10 @@ export default function LegalTraining() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                <div className="text-center">
-                  <GraduationCap className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p>Configure e inicie um treino.</p>
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <div className="text-center py-12">
+                  <GraduationCap className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm font-medium">Configure e inicie um treino.</p>
                 </div>
               </div>
             )}
@@ -1712,7 +1712,7 @@ export default function LegalTraining() {
         </Card>
 
         {/* Right: Chat */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col flex-1 min-w-0">
           <div className="px-4 py-3 border-b flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-gold-600" />
             <span className="text-sm font-bold">
@@ -1725,44 +1725,45 @@ export default function LegalTraining() {
                 : "Chat de Treino"}
             </span>
             {currentSession?.score != null && (
-              <Badge variant="secondary" className="ml-auto text-[10px]">
+              <Badge variant="secondary" className="ml-auto text-sm px-3 py-1">
                 {currentSession.score}/100
               </Badge>
             )}
           </div>
-          <ScrollArea className="flex-1 p-3">
+          <ScrollArea className="flex-1 p-5">
             {!currentSession ? (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                <div className="text-center">
-                  <Target className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p>Gere um caso para começar.</p>
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <div className="text-center py-12">
+                  <GraduationCap className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                  <p className="text-lg font-medium mb-1">Configure e inicie um treino</p>
+                  <p className="text-sm text-muted-foreground">Escolha o modo à esquerda e clique em Gerar</p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {currentSession.messages.map((m, i) => {
                   const isLawyerRef = m.role === "assistant" && m.content?.startsWith("📋 **ARGUMENTAÇÃO DO ADVOGADO");
                   const isScenario = m.role === "assistant" && m.content?.startsWith("📋 **CENÁRIO");
                   return (
-                    <div key={i} className={`text-sm ${m.role === "user" ? "text-right" : ""}`}>
+                    <div key={i} className={`${m.role === "user" ? "flex justify-end" : ""}`}>
                       {isLawyerRef ? (
-                        <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/80 text-left">
+                        <div className="w-full p-4 rounded-xl border border-blue-200 bg-blue-50/80 text-left">
                           <div className="flex items-center gap-2 mb-2">
                             <Scale className="w-4 h-4 text-blue-600" />
-                            <span className="text-[11px] font-semibold text-blue-800">ARGUMENTAÇÃO DO ADVOGADO (Referência)</span>
+                            <span className="text-xs font-semibold text-blue-800">ARGUMENTAÇÃO DO ADVOGADO (Referência)</span>
                           </div>
-                          <div className="whitespace-pre-wrap break-words text-xs leading-relaxed text-blue-900">
+                          <div className="whitespace-pre-wrap break-words text-sm leading-relaxed text-blue-900">
                             {m.content.replace("📋 **ARGUMENTAÇÃO DO ADVOGADO (Referência):**\n\n", "")}
                           </div>
                         </div>
                       ) : isScenario ? (
-                        <div className="p-4 rounded-lg border border-purple-200 bg-purple-50/80 text-left">
+                        <div className="w-full p-5 rounded-xl border border-purple-200 bg-purple-50/80 text-left">
                           <div className="whitespace-pre-wrap break-words text-sm leading-relaxed text-purple-900">
                             {m.content}
                           </div>
                         </div>
                       ) : (
-                        <div className={`inline-block max-w-[85%] rounded-lg px-4 py-2.5 ${
+                        <div className={`max-w-[80%] rounded-xl px-5 py-3 ${
                           m.role === "user" ? "bg-gold-100 text-gold-900" : "bg-muted text-foreground"
                         }`}>
                           <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{m.content}</div>
@@ -1772,31 +1773,31 @@ export default function LegalTraining() {
                   );
                 })}
                 {sending && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    {currentSession.mode === "lawyer" ? "Analisando argumentação..." : currentSession.mode === "secretary" ? "Simulando atendimento..." : "Avaliando sentença..."}
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
+                    <Loader2 className="w-5 h-5 animate-spin text-gold-600" />
+                    <span className="text-sm font-medium">{currentSession.mode === "lawyer" ? "Analisando argumentação..." : currentSession.mode === "secretary" ? "Simulando atendimento..." : "Avaliando sentença..."}</span>
                   </div>
                 )}
                 {correcting && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <Sparkles className="w-3 h-3 text-blue-500" />
-                    Corrigindo resposta automaticamente...
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Sparkles className="w-5 h-5 text-blue-500" />
+                    <span className="text-sm font-medium">Corrigindo resposta automaticamente...</span>
                   </div>
                 )}
                 {improving && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <Lightbulb className="w-3 h-3 text-yellow-500" />
-                    Gerando sugestões de melhoria...
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Lightbulb className="w-5 h-5 text-yellow-500" />
+                    <span className="text-sm font-medium">Gerando sugestões de melhoria...</span>
                   </div>
                 )}
                 <div ref={chatEndRef} />
               </div>
             )}
           </ScrollArea>
-          <div className="p-3 border-t">
-            <div className="flex gap-2">
+          <div className="p-4 border-t">
+            <div className="flex gap-3">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -1811,9 +1812,10 @@ export default function LegalTraining() {
                         : "Escreva sua sentença/decisão..."
                 }
                 disabled={sending || !currentSession}
+                className="flex-1 h-11 text-sm"
               />
-              <Button size="sm" onClick={sendResponse} disabled={sending || !input.trim() || !currentSession}>
-                <Send className="w-3 h-3" />
+              <Button size="default" onClick={sendResponse} disabled={sending || !input.trim() || !currentSession} className="h-11 px-5">
+                <Send className="w-4 h-4" />
               </Button>
             </div>
           </div>
