@@ -21,6 +21,8 @@ services:
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6emJnandwZnhva2FncnZtZG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDk2NzgsImV4cCI6MjA5OTgyNTY3OH0.4lX8OydcmKTx_U2A0MvMCs1-ZBKpQUcKFjSFsNfBttc
       - key: VITE_SUPABASE_PROJECT_ID
         value: uzzbgjwpfxokagrvmdoa
+      - key: VITE_BACKEND_URL
+        value: https://kenia-whatsapp-backend.onrender.com
   - type: web
     name: kenia-whatsapp-backend
     runtime: node
