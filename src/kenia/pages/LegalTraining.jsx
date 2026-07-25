@@ -319,6 +319,10 @@ export default function LegalTraining() {
   const [secImprovingPrompt, setSecImprovingPrompt] = useState(false);
   const [secImprovedPrompt, setSecImprovedPrompt] = useState(null);
   const [secAutoGenerating, setSecAutoGenerating] = useState(false);
+  const [secCorrecting, setSecCorrecting] = useState(false);
+  const [secCorrectedData, setSecCorrectedData] = useState(null);
+  const [secImprovingArg, setSecImprovingArg] = useState(false);
+  const [secImprovementData, setSecImprovementData] = useState(null);
 
   const SEC_STRATEGIES = [
     { id: "abordagem_inicial", name: "Abordagem Inicial", desc: "Primeira impressão e quebra de gelo", color: "#22c55e" },
@@ -696,6 +700,68 @@ export default function LegalTraining() {
         setSending(false);
         return;
       }
+
+      // === Secretary-specific: Corrigir Auto ===
+      const secretaryAutoCorrect = async () => {
+        if (!currentSession || currentSession.score == null || secCorrecting) return;
+        setSecCorrecting(true);
+        setSecCorrectedData(null);
+        setSecImprovementData(null);
+        try {
+          const lastUserMsg = [...currentSession.messages].reverse().find((m) => m.role === "user")?.content || "";
+          const { data, error } = await supabase.functions.invoke("training-ai", {
+            body: {
+              action: "evaluate_and_correct",
+              mode: "lawyer",
+              area: "familia",
+              case_data: currentSession.case_data,
+              user_response: lastUserMsg,
+              score: currentSession.score,
+              evaluation: currentSession.evaluation,
+              history: currentSession.messages.slice(-10),
+            },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          setSecCorrectedData(data);
+          toast.success("Resposta corrigida com sucesso!");
+        } catch (e) {
+          toast.error("Erro na correção: " + (e?.message || e));
+        } finally {
+          setSecCorrecting(false);
+        }
+      };
+
+      // === Secretary-specific: Melhorar Argumentação ===
+      const secretaryImproveArgument = async () => {
+        if (!currentSession || currentSession.score == null || secImprovingArg) return;
+        setSecImprovingArg(true);
+        setSecCorrectedData(null);
+        setSecImprovementData(null);
+        try {
+          const lastUserMsg = [...currentSession.messages].reverse().find((m) => m.role === "user")?.content || "";
+          const { data, error } = await supabase.functions.invoke("training-ai", {
+            body: {
+              action: "improve_argument",
+              mode: "lawyer",
+              area: "familia",
+              case_data: currentSession.case_data,
+              user_response: lastUserMsg,
+              score: currentSession.score,
+              evaluation: currentSession.evaluation,
+              history: currentSession.messages.slice(-10),
+            },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          setSecImprovementData(data);
+          toast.success("Sugestões geradas!");
+        } catch (e) {
+          toast.error("Erro: " + (e?.message || e));
+        } finally {
+          setSecImprovingArg(false);
+        }
+      };
 
       const { data, error } = await supabase.functions.invoke("training-ai", {
         body: {
@@ -1382,9 +1448,87 @@ export default function LegalTraining() {
                           <Button
                             size="sm"
                             variant="outline"
+                            onClick={async () => {
+                              if (!secEval || secCorrecting) return;
+                              setSecCorrecting(true);
+                              setSecCorrectedData(null);
+                              setSecImprovementData(null);
+                              try {
+                                const lastUserMsg = [...currentSession.messages].reverse().find((m) => m.role === "user")?.content || "";
+                                const { data, error } = await supabase.functions.invoke("training-ai", {
+                                  body: {
+                                    action: "evaluate_and_correct",
+                                    mode: "lawyer",
+                                    area: "familia",
+                                    case_data: currentSession.case_data,
+                                    user_response: lastUserMsg,
+                                    score: currentSession.score,
+                                    evaluation: currentSession.evaluation,
+                                    history: currentSession.messages.slice(-10),
+                                  },
+                                });
+                                if (error) throw error;
+                                if (data?.error) throw new Error(data.error);
+                                setSecCorrectedData(data);
+                                toast.success("Resposta corrigida com sucesso!");
+                              } catch (e) {
+                                toast.error("Erro na correção: " + (e?.message || e));
+                              } finally {
+                                setSecCorrecting(false);
+                              }
+                            }}
+                            disabled={secCorrecting}
+                            className="flex-1 text-[10px] h-7"
+                          >
+                            {secCorrecting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                            Corrigir Auto
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              if (!secEval || secImprovingArg) return;
+                              setSecImprovingArg(true);
+                              setSecCorrectedData(null);
+                              setSecImprovementData(null);
+                              try {
+                                const lastUserMsg = [...currentSession.messages].reverse().find((m) => m.role === "user")?.content || "";
+                                const { data, error } = await supabase.functions.invoke("training-ai", {
+                                  body: {
+                                    action: "improve_argument",
+                                    mode: "lawyer",
+                                    area: "familia",
+                                    case_data: currentSession.case_data,
+                                    user_response: lastUserMsg,
+                                    score: currentSession.score,
+                                    evaluation: currentSession.evaluation,
+                                    history: currentSession.messages.slice(-10),
+                                  },
+                                });
+                                if (error) throw error;
+                                if (data?.error) throw new Error(data.error);
+                                setSecImprovementData(data);
+                                toast.success("Sugestões geradas!");
+                              } catch (e) {
+                                toast.error("Erro: " + (e?.message || e));
+                              } finally {
+                                setSecImprovingArg(false);
+                              }
+                            }}
+                            disabled={secImprovingArg}
+                            className="flex-1 text-[10px] h-7"
+                          >
+                            {secImprovingArg ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Lightbulb className="w-3 h-3 mr-1" />}
+                            Melhorar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => {
                               setSecEval(null);
                               setSecImprovedPrompt(null);
+                              setSecCorrectedData(null);
+                              setSecImprovementData(null);
                               toast.success("Pronto para nova resposta!");
                             }}
                             className="flex-1 text-[10px] h-7"
@@ -1409,6 +1553,66 @@ export default function LegalTraining() {
                             <Button size="sm" onClick={() => { setCurrentPrompt(secImprovedPrompt.improved_prompt); toast.success("Prompt aplicado!"); setSecImprovedPrompt(null); }} className="w-full mt-1 text-[10px] h-6 bg-amber-600 hover:bg-amber-700">
                               <CheckCircle2 className="w-3 h-3 mr-1" /> Aplicar Prompt
                             </Button>
+                          </div>
+                        )}
+
+                        {/* Corrected Response */}
+                        {secCorrectedData && (
+                          <div className="p-2 rounded border border-green-200 bg-green-50/50 mt-2">
+                            <div className="text-[10px] font-medium text-green-800 mb-1 flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" /> Resposta Corrigida
+                            </div>
+                            {secCorrectedData.changes?.length > 0 && (
+                              <div className="mb-1 space-y-0.5">
+                                {secCorrectedData.changes.map((c, i) => (
+                                  <div key={i} className="text-[9px] text-green-700">
+                                    <span className="font-medium">Original:</span> {c.original}
+                                    <br />
+                                    <span className="font-medium">Corrigido:</span> {c.corrected}
+                                    <br />
+                                    <span className="text-green-600 italic">{c.reason}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <pre className="text-[9px] bg-green-100 rounded p-1.5 whitespace-pre-wrap max-h-[20vh] overflow-auto border border-green-200">{secCorrectedData.corrected_response}</pre>
+                            {secCorrectedData.summary && (
+                              <div className="text-[9px] text-green-600 italic mt-1">{secCorrectedData.summary}</div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Improvement Suggestions */}
+                        {secImprovementData && (
+                          <div className="p-2 rounded border border-blue-200 bg-blue-50/50 mt-2">
+                            <div className="text-[10px] font-medium text-blue-800 mb-1 flex items-center gap-1">
+                              <Lightbulb className="w-3 h-3" /> Sugestões de Melhoria
+                            </div>
+                            {secImprovementData.suggestions?.length > 0 && (
+                              <div className="mb-1 space-y-1">
+                                {secImprovementData.suggestions.map((s, i) => (
+                                  <div key={i} className="text-[9px] text-blue-700">
+                                    <span className="font-medium">{s.area}:</span> {s.suggestion}
+                                    {s.example && (
+                                      <div className="text-[8px] text-blue-600 italic mt-0.5 ml-2">Exemplo: {s.example}</div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {secImprovementData.priority_suggestion && (
+                              <div className="text-[9px] text-blue-800 font-medium mt-1 p-1 bg-blue-100 rounded">
+                                Prioridade: {secImprovementData.priority_suggestion}
+                              </div>
+                            )}
+                            {secImprovementData.quick_wins?.length > 0 && (
+                              <div className="mt-1">
+                                <div className="text-[8px] font-medium text-blue-700 mb-0.5">Ganhos Rápidos:</div>
+                                {secImprovementData.quick_wins.map((w, i) => (
+                                  <div key={i} className="text-[8px] text-blue-600">• {w}</div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
