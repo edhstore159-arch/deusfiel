@@ -37,62 +37,6 @@ const WA_STRATEGIES = [
   { name: "saudacao", label: "Saudação", color: "#10b981", group: "atendimento", description: "Abertura e boas-vindas" },
 ];
 
-const DEMO_CONVERSATIONS = [
-  {
-    id: "demo-conv-1",
-    phone: "+5511999887766",
-    member_name: "Maria Silva",
-    status: "active",
-    current_strategy: "identificacao_dor",
-    updated_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    messages: [
-      { direction: "incoming", content: "Olá, boa tarde! Vim à igreja no domingo e gostaria de saber mais sobre os ministérios.", strategy_name: "abordagem_inicial", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Olá Maria! Que bom ter você conosco! Seja muito bem-vinda! 😊 Posso te ajudar a conhecer nossos ministérios. Me conta, qual sua idade?", strategy_name: "abordagem_inicial", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 2 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Tenho 28 anos, sou professora.", strategy_name: "identificacao_dor", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 5 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Que lindo! Profissão tão bonita! Maria, você tem filhos? E como foi sua experiência no domingo?", strategy_name: "escuta_ativa", created_at: new Date(Date.now() - 2 * 60 * 60 * 1000 + 7 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Não tenho filhos ainda. Achei a igreja muito acolhedora, a música me emocionou muito.", strategy_name: "identificacao_dor", created_at: new Date(Date.now() - 60 * 60 * 1000 - 50 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Fico muito feliz em ouvir isso! Parece que o coração de Deus tocou o seu. Você tem algum ministério que te desperta interesse? Temos jovens, louvor, infantil...", strategy_name: "demonstracao_valor", created_at: new Date(Date.now() - 60 * 60 * 1000 - 48 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Adoraria participar do ministério de louvor! Canto na escola.", strategy_name: "fechamento", created_at: new Date(Date.now() - 60 * 60 * 1000 - 35 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Perfeito, Maria! Vou direcionar você para nosso coordenador de louvor. Ele faz uma avaliação musical toda quinta às 19h. Pode vir?", strategy_name: "captação_whatsapp", created_at: new Date(Date.now() - 60 * 60 * 1000 - 33 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Sim, posso! Muito obrigada pela atenção!", strategy_name: "follow_up", created_at: new Date(Date.now() - 60 * 60 * 1000 - 25 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Tudo bem, Maria! Vou te mandar o endereço e o contato do coordenador. Que Deus te abençoe! 🙏", strategy_name: "follow_up", created_at: new Date(Date.now() - 60 * 60 * 1000 - 23 * 60 * 1000).toISOString() },
-    ],
-  },
-  {
-    id: "demo-conv-2",
-    phone: "+5521988776655",
-    member_name: "João Santos",
-    status: "active",
-    current_strategy: "lead_divorcio",
-    updated_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString(),
-    messages: [
-      { direction: "incoming", content: "Preciso de ajuda. Meu casamento está desmoronando. Minha esposa quer separar.", strategy_name: "lead_urgencia", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "João, sinto muito pelo que está passando. Quero que saiba que Deus pode restaurar tudo. Você e sua esposa são da igreja?", strategy_name: "abordagem_inicial", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 1 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Sim, frequentamos há 5 anos. Mas nos afastamos nos últimos meses.", strategy_name: "identificacao_dor", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 5 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Entendo. Às vezes a distância nos afasta. João, posso orar por você agora mesmo? A oração pode ser o primeiro passo para a restauração.", strategy_name: "demonstracao_valor", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 10 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Sim, por favor. Preciso muito de oração.", strategy_name: "gatilhos_psicológicos", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 12 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "🙏 Pai celestial, que restauras o que está quebrado... abençoa o casamento de João. Dá sabedoria e reconciliação. Amém.\n\nJoão, temos um ministério de casais muito forte. Posso marcar uma conversa com o pastor? É sigiloso e gratuito.", strategy_name: "fechamento", created_at: new Date(Date.now() - 3 * 60 * 60 * 1000 + 15 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Isso seria ótimo. Obrigado, de verdade.", strategy_name: "follow_up", created_at: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString() },
-    ],
-  },
-  {
-    id: "demo-conv-3",
-    phone: "+5531977665544",
-    member_name: "Ana Oliveira",
-    status: "active",
-    current_strategy: "após_dúvida_jurídica",
-    updated_at: new Date(Date.now() - 33 * 60 * 1000).toISOString(),
-    messages: [
-      { direction: "incoming", content: "Igreja, minha filha de 7 anos está no hospital. Pedi oração no grupo mas queria falar com alguém.", strategy_name: "lead_urgencia", created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Ana, estamos contigo! Qual o nome da sua filha e o que aconteceu?", strategy_name: "abordagem_inicial", created_at: new Date(Date.now() - 43 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Elena. Ela teve uma crise de asma forte. Está internada desde ontem.", strategy_name: "identificacao_dor", created_at: new Date(Date.now() - 40 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Vamos orar pela Elena agora! 🙏\n\nAna, nossos líderes de intercessão já foram acionados. Você gostaria que alguém fosse ao hospital para orar presencialmente com vocês?", strategy_name: "demonstracao_valor", created_at: new Date(Date.now() - 38 * 60 * 1000).toISOString() },
-      { direction: "incoming", content: "Sim, por favor! Estamos no Hospital São Lucas, quarto 204.", strategy_name: "captação_whatsapp", created_at: new Date(Date.now() - 35 * 60 * 1000).toISOString() },
-      { direction: "outgoing", content: "Anotado! Vou acionar a equipe de visitação. Ana, fique firme na fé — Deus é fiel! Vamos te atualizar em breve. ❤️", strategy_name: "follow_up", created_at: new Date(Date.now() - 33 * 60 * 1000).toISOString() },
-    ],
-  },
-];
-
 const LEGAL_AREAS = [
   { value: "penal", label: "Penal", icon: "⚖️" },
   { value: "civel", label: "Cível", icon: "📜" },
@@ -418,8 +362,8 @@ export default function LegalTraining() {
         return;
       }
     } catch {}
-    setWaConversations(DEMO_CONVERSATIONS);
-    setWaDataSource("demo");
+    setWaConversations([]);
+    setWaDataSource("none");
     setWaLoading(false);
   }, []);
 
@@ -434,10 +378,6 @@ export default function LegalTraining() {
   function loadWaMessages(convId) {
     setWaSelectedId(convId);
     const conv = waConversations.find((c) => c.id === convId);
-    if (conv?.messages) {
-      setWaMessages(conv.messages.map((m, i) => ({ ...m, id: `demo-${i}` })));
-      return;
-    }
     if (conv?._messages) {
       setWaMessages(conv._messages.map((m, i) => ({ ...m, id: `sb-${i}`, strategy_name: "abordagem_inicial" })));
       return;
@@ -2141,8 +2081,8 @@ export default function LegalTraining() {
               <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Conversas ({waConversations.length})
               </h2>
-              {waDataSource === "demo" && (
-                <span className="text-[9px] text-amber-600 font-medium">Demonstração</span>
+              {waDataSource === "none" && (
+                <span className="text-[9px] text-muted-foreground font-medium">Sem dados reais</span>
               )}
               {waDataSource === "supabase" && (
                 <span className="text-[9px] text-green-600 font-medium">Conversas Reais</span>
