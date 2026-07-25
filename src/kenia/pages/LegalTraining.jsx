@@ -773,68 +773,6 @@ export default function LegalTraining() {
         return;
       }
 
-      // === Secretary-specific: Corrigir Auto ===
-      const secretaryAutoCorrect = async () => {
-        if (!currentSession || currentSession.score == null || secCorrecting) return;
-        setSecCorrecting(true);
-        setSecCorrectedData(null);
-        setSecImprovementData(null);
-        try {
-          const lastUserMsg = [...currentSession.messages].reverse().find((m) => m.role === "user")?.content || "";
-          const { data, error } = await supabase.functions.invoke("training-ai", {
-            body: {
-              action: "evaluate_and_correct",
-              mode: "lawyer",
-              area: "familia",
-              case_data: currentSession.case_data,
-              user_response: lastUserMsg,
-              score: currentSession.score,
-              evaluation: currentSession.evaluation,
-              history: currentSession.messages.slice(-10),
-            },
-          });
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-          setSecCorrectedData(data);
-          toast.success("Resposta corrigida com sucesso!");
-        } catch (e) {
-          toast.error("Erro na correção: " + (e?.message || e));
-        } finally {
-          setSecCorrecting(false);
-        }
-      };
-
-      // === Secretary-specific: Melhorar Argumentação ===
-      const secretaryImproveArgument = async () => {
-        if (!currentSession || currentSession.score == null || secImprovingArg) return;
-        setSecImprovingArg(true);
-        setSecCorrectedData(null);
-        setSecImprovementData(null);
-        try {
-          const lastUserMsg = [...currentSession.messages].reverse().find((m) => m.role === "user")?.content || "";
-          const { data, error } = await supabase.functions.invoke("training-ai", {
-            body: {
-              action: "improve_argument",
-              mode: "lawyer",
-              area: "familia",
-              case_data: currentSession.case_data,
-              user_response: lastUserMsg,
-              score: currentSession.score,
-              evaluation: currentSession.evaluation,
-              history: currentSession.messages.slice(-10),
-            },
-          });
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-          setSecImprovementData(data);
-          toast.success("Sugestões geradas!");
-        } catch (e) {
-          toast.error("Erro: " + (e?.message || e));
-        } finally {
-          setSecImprovingArg(false);
-        }
-      };
-
       const { data, error } = await supabase.functions.invoke("training-ai", {
         body: {
           action: "evaluate",
@@ -1029,7 +967,9 @@ export default function LegalTraining() {
       const session = {
         id: Date.now().toString(),
         title: `Simulação WhatsApp - ${simulationData.client_name}`,
-        area: simulationData.area,
+        mode: simulationData.mode || "lawyer",
+        area: simulationData.area || "civel",
+        difficulty: simulationData.difficulty || "intermediario",
         case_data: simulationData.case_data,
         messages: [
           { role: "user", content: simulationData.client_message },
@@ -1147,7 +1087,7 @@ export default function LegalTraining() {
             <Sparkles className="w-3.5 h-3.5 text-purple-600" />
             <div className="text-[10px] text-muted-foreground uppercase">Loop</div>
             <div className="text-xs font-bold ml-auto">
-              {autoLoopProgress ? `${autoLoopProgress.currentScore}/100` : autoLoopResults?.final_score ? `${autoLoopResults.final_score}/100 ✓` : "—"}
+              {autoLoopProgress ? `${autoLoopProgress.score}/100` : autoLoopResults?.final_score ? `${autoLoopResults.final_score}/100 ✓` : "—"}
             </div>
           </div>
         </Card>
@@ -1360,7 +1300,7 @@ export default function LegalTraining() {
                             {s.score ?? "-"}
                           </span>
                           <span className="truncate">
-                            {s.mode === "lawyer" ? "Advogado" : "Juiz"} — {LEGAL_AREAS.find((a) => a.value === s.area)?.label}
+                            {s.mode === "lawyer" ? "Advogado" : s.mode === "secretary" ? "Secretaria" : "Juiz"} — {LEGAL_AREAS.find((a) => a.value === s.area)?.label || s.strategy_name || s.area}
                           </span>
                         </button>
                       ))}
@@ -1530,8 +1470,9 @@ export default function LegalTraining() {
                                 const { data, error } = await supabase.functions.invoke("training-ai", {
                                   body: {
                                     action: "evaluate_and_correct",
-                                    mode: "lawyer",
-                                    area: "familia",
+                                    mode: currentSession.mode || "secretary",
+                                    area: currentSession.area || "secretaria",
+                                    strategy_id: currentSession.strategy_id || currentSession.strategy_name,
                                     case_data: currentSession.case_data,
                                     user_response: lastUserMsg,
                                     score: currentSession.score,
@@ -1568,8 +1509,9 @@ export default function LegalTraining() {
                                 const { data, error } = await supabase.functions.invoke("training-ai", {
                                   body: {
                                     action: "improve_argument",
-                                    mode: "lawyer",
-                                    area: "familia",
+                                    mode: currentSession.mode || "secretary",
+                                    area: currentSession.area || "secretaria",
+                                    strategy_id: currentSession.strategy_id || currentSession.strategy_name,
                                     case_data: currentSession.case_data,
                                     user_response: lastUserMsg,
                                     score: currentSession.score,
