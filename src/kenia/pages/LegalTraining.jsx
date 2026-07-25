@@ -1037,75 +1037,75 @@ export default function LegalTraining() {
         <div className="flex-1 min-h-0 hidden lg:flex gap-3">
         {/* Left: Config or History */}
         <Card className="flex flex-col w-[320px] shrink-0">
-          <div className="px-3 py-2 border-b flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-gold-600" />
-            <span className="text-xs font-medium">
+          <div className="px-4 py-3 border-b flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-gold-600" />
+            <span className="text-sm font-bold">
               {showConfig ? "Configurar Treino" : "Análise de Argumentação"}
             </span>
           </div>
-          <ScrollArea className="flex-1 p-3">
+          <ScrollArea className="flex-1 p-4">
             {showConfig ? (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-2 block">Modo de Treinamento</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <label className="text-sm font-semibold text-foreground mb-3 block">Modo de Treinamento</label>
+                  <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => setMode("lawyer")}
-                      className={`p-2 rounded-lg border text-left transition-all ${
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
                         mode === "lawyer"
-                          ? "border-gold-300 bg-gold-50 text-gold-800"
-                          : "border-nude-200 hover:border-gold-200"
+                          ? "border-gold-400 bg-gold-50 text-gold-800 shadow-md"
+                          : "border-border hover:border-gold-300 hover:bg-muted/50"
                       }`}
                     >
-                      <Scale className="w-4 h-4 mb-1" />
-                      <div className="text-[11px] font-semibold">Advogado</div>
-                      <div className="text-[9px] text-muted-foreground">Argumente a favor</div>
+                      <Scale className="w-5 h-5 mb-2" />
+                      <div className="text-sm font-bold">Advogado</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Argumente a favor</div>
                     </button>
                     <button
                       onClick={() => setMode("judge")}
-                      className={`p-2 rounded-lg border text-left transition-all ${
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
                         mode === "judge"
-                          ? "border-gold-300 bg-gold-50 text-gold-800"
-                          : "border-nude-200 hover:border-gold-200"
+                          ? "border-gold-400 bg-gold-50 text-gold-800 shadow-md"
+                          : "border-border hover:border-gold-300 hover:bg-muted/50"
                       }`}
                     >
-                      <Star className="w-4 h-4 mb-1" />
-                      <div className="text-[11px] font-semibold">Juiz</div>
-                      <div className="text-[9px] text-muted-foreground">Analise e julgue</div>
+                      <Star className="w-5 h-5 mb-2" />
+                      <div className="text-sm font-bold">Juiz</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Analise e julgue</div>
                     </button>
                     <button
                       onClick={() => { setMode("secretary"); setSecStrategy(null); setSecScenario(null); setSecEval(null); setSecImprovedPrompt(null); }}
-                      className={`p-2 rounded-lg border text-left transition-all ${
+                      className={`p-4 rounded-xl border-2 text-left transition-all ${
                         mode === "secretary"
-                          ? "border-purple-300 bg-purple-50 text-purple-800"
-                          : "border-nude-200 hover:border-purple-200"
+                          ? "border-purple-400 bg-purple-50 text-purple-800 shadow-md"
+                          : "border-border hover:border-purple-300 hover:bg-muted/50"
                       }`}
                     >
-                      <Phone className="w-4 h-4 mb-1" />
-                      <div className="text-[11px] font-semibold">Secretaria</div>
-                      <div className="text-[9px] text-muted-foreground">Treino com estratégias</div>
+                      <Phone className="w-5 h-5 mb-2" />
+                      <div className="text-sm font-bold">Secretaria</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Treino com estratégias</div>
                     </button>
                   </div>
                 </div>
 
                 {mode === "secretary" && (
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Estratégia de Treinamento</label>
-                    <div className="space-y-1 max-h-[35vh] overflow-auto">
+                    <label className="text-sm font-semibold text-foreground mb-3 block">Estratégia de Treinamento</label>
+                    <div className="space-y-2 max-h-[40vh] overflow-auto pr-1">
                       {SEC_STRATEGIES.map((s) => (
                         <button
                           key={s.id}
                           onClick={() => { setSecStrategy(s); setSecScenario(null); setSecEval(null); setSecImprovedPrompt(null); }}
-                          className={`w-full text-left px-3 py-2 rounded-md text-xs flex items-center gap-2.5 transition-colors ${
+                          className={`w-full text-left px-4 py-3 rounded-xl text-sm flex items-center gap-3 transition-all ${
                             secStrategy?.id === s.id
-                              ? "bg-purple-100 text-purple-800 font-medium border border-purple-300 shadow-sm"
-                              : "hover:bg-muted border border-transparent"
+                              ? "bg-purple-100 text-purple-800 font-semibold border-2 border-purple-300 shadow-sm"
+                              : "hover:bg-muted border-2 border-transparent hover:border-border"
                           }`}
                         >
-                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                          <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                           <div className="min-w-0 flex-1">
-                            <div className="font-medium truncate">{s.name}</div>
-                            <div className="text-[10px] text-muted-foreground truncate">{s.desc}</div>
+                            <div className="font-semibold">{s.name}</div>
+                            <div className="text-xs text-muted-foreground truncate">{s.desc}</div>
                           </div>
                         </button>
                       ))}
@@ -1149,9 +1149,9 @@ export default function LegalTraining() {
                           }
                         }}
                         disabled={secLoading}
-                        className="w-full mt-2"
+                        className="w-full mt-3 h-11 text-sm font-semibold"
                       >
-                        {secLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Target className="w-3 h-3 mr-1" />}
+                        {secLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Target className="w-4 h-4 mr-2" />}
                         Gerar Cenário
                       </Button>
                     )}
@@ -1159,44 +1159,47 @@ export default function LegalTraining() {
                 )}
 
                 {mode !== "secretary" && <>
-                  <label className="text-xs font-medium text-muted-foreground mb-2 block">Área do Direito</label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {LEGAL_AREAS.map((a) => (
-                      <button
-                        key={a.value}
-                        onClick={() => { setArea(a.value); setSelectedCaseId(null); }}
-                        className={`px-2 py-1.5 rounded text-[11px] text-left transition-colors ${
-                          area === a.value
-                            ? "bg-gold-100 text-gold-700 font-medium"
-                            : "text-muted-foreground hover:bg-muted"
-                        }`}
-                      >
-                        {a.icon} {a.label}
-                      </button>
-                    ))}
+                  <div>
+                    <label className="text-sm font-semibold text-foreground mb-3 block">Área do Direito</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {LEGAL_AREAS.map((a) => (
+                        <button
+                          key={a.value}
+                          onClick={() => { setArea(a.value); setSelectedCaseId(null); }}
+                          className={`px-3 py-2.5 rounded-xl text-sm text-left transition-all ${
+                            area === a.value
+                              ? "bg-gold-100 text-gold-700 font-semibold border-2 border-gold-300"
+                              : "text-muted-foreground hover:bg-muted border-2 border-transparent hover:border-border"
+                          }`}
+                        >
+                          {a.icon} {a.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-2 block">Dificuldade</label>
-                  <div className="flex gap-2">
+                  <label className="text-sm font-semibold text-foreground mb-3 block">Dificuldade</label>
+                  <div className="flex gap-3">
                     {DIFFICULTY_LEVELS.map((d) => (
                       <button
                         key={d.value}
                         onClick={() => { setDifficulty(d.value); setSelectedCaseId(null); }}
-                        className={`flex-1 px-2 py-2 rounded text-[11px] text-center transition-colors ${
+                        className={`flex-1 px-3 py-3 rounded-xl text-sm text-center transition-all ${
                           difficulty === d.value
-                            ? "bg-gold-100 text-gold-700 font-medium"
-                            : "text-muted-foreground hover:bg-muted border border-transparent hover:border-nude-200"
+                            ? "bg-gold-100 text-gold-700 font-semibold border-2 border-gold-300"
+                            : "text-muted-foreground hover:bg-muted border-2 border-transparent hover:border-border"
                         }`}
                       >
-                        {d.label}
+                        <div className="font-medium">{d.label}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{d.desc}</div>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="p-2 rounded bg-muted/50 border">
-                  <label className="flex items-center gap-2 text-[11px] cursor-pointer">
+                <div className="p-3 rounded-xl bg-muted/50 border-2 border-border">
+                  <label className="flex items-center gap-3 text-sm cursor-pointer">
                     <input
                       type="checkbox"
                       checked={useRealCase}
@@ -1205,21 +1208,21 @@ export default function LegalTraining() {
                         if (e.target.checked) fetchRealCases();
                         setSelectedCaseId(null);
                       }}
-                      className="rounded"
+                      className="rounded w-4 h-4"
                     />
-                    <span className="font-medium">Usar caso real de jurisprudência</span>
+                    <span className="font-semibold">Usar caso real de jurisprudência</span>
                   </label>
                   {useRealCase && (
-                    <div className="mt-2">
+                    <div className="mt-3">
                       {loadingCases ? (
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <div className="text-xs text-muted-foreground flex items-center gap-2">
                           <Loader2 className="w-3 h-3 animate-spin" /> Carregando casos...
                         </div>
                       ) : filteredCases.length > 0 ? (
                         <select
                           value={selectedCaseId || ""}
                           onChange={(e) => setSelectedCaseId(e.target.value || null)}
-                          className="w-full text-[11px] p-1.5 rounded border bg-background"
+                          className="w-full text-sm p-2.5 rounded-lg border-2 bg-background border-border"
                         >
                           <option value="">Selecione um caso...</option>
                           {filteredCases.map((c) => (
@@ -1229,7 +1232,7 @@ export default function LegalTraining() {
                           ))}
                         </select>
                       ) : (
-                        <div className="text-[10px] text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                           Nenhum caso real para esta área/dificuldade.
                         </div>
                       )}
@@ -1238,22 +1241,22 @@ export default function LegalTraining() {
                 </div>
                 </>}
 
-                <Button onClick={startTraining} disabled={sending || (useRealCase && !selectedCaseId) || (mode === "secretary" && !secStrategy)} className="w-full">
+                <Button onClick={startTraining} disabled={sending || (useRealCase && !selectedCaseId) || (mode === "secretary" && !secStrategy)} className="w-full h-12 text-sm font-bold mt-2">
                   {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Target className="w-4 h-4 mr-2" />}
                   {mode === "secretary" ? "Iniciar Treino Secretaria" : useRealCase && selectedCaseId ? "Carregar Caso Real" : "Gerar Caso para Treino"}
                 </Button>
 
                 {sessions.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-2 block">Histórico Recente</label>
-                    <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-foreground mb-3 block">Histórico Recente</label>
+                    <div className="space-y-2">
                       {sessions.slice(0, 5).map((s) => (
                         <button
                           key={s.id}
                           onClick={() => { setCurrentSession(s); setShowConfig(false); setCorrectedData(null); setImprovementData(null); }}
-                          className="w-full text-left px-2 py-1.5 rounded text-[11px] hover:bg-muted flex items-center gap-2"
+                          className="w-full text-left px-3 py-2.5 rounded-xl text-sm hover:bg-muted flex items-center gap-3 transition-all border-2 border-transparent hover:border-border"
                         >
-                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                          <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
                             style={{ backgroundColor: s.score >= 80 ? "#dcfce7" : s.score >= 60 ? "#fef9c3" : "#fee2e2" }}>
                             {s.score ?? "-"}
                           </span>
@@ -1710,9 +1713,9 @@ export default function LegalTraining() {
 
         {/* Right: Chat */}
         <Card className="flex flex-col">
-          <div className="px-3 py-2 border-b flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-gold-600" />
-            <span className="text-xs font-medium">
+          <div className="px-4 py-3 border-b flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-gold-600" />
+            <span className="text-sm font-bold">
               {currentSession
                 ? currentSession.mode === "lawyer"
                   ? "Sua Argumentação"
