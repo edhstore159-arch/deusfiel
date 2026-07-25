@@ -379,18 +379,47 @@ export default function LegalTraining() {
       }
     } catch {}
     try {
-      const { data, error } = await supabase.from("wa_conversations").select("*").order("updated_at", { ascending: false });
-      if (error || !data?.length) {
-        setWaConversations(DEMO_CONVERSATIONS);
-        setWaDataSource("demo");
-      } else {
-        setWaConversations(data);
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("session_id, message, response, created_at")
+        .like("session_id", "whatsapp:%")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (!error && data?.length) {
+        const bySession = {};
+        for (const row of data) {
+          const sid = row.session_id;
+          if (!bySession[sid]) bySession[sid] = { rows: [], last: row.created_at };
+          bySession[sid].rows.push(row);
+          if (row.created_at > bySession[sid].last) bySession[sid].last = row.created_at;
+        }
+        const mapped = Object.entries(bySession).map(([sid, info]) => {
+          const phone = sid.replace("whatsapp:", "").split("@")[0];
+          const allMsgs = info.rows.reverse().flatMap((r) => {
+            const msgs = [];
+            if (r.message) msgs.push({ direction: "incoming", content: r.message, created_at: r.created_at });
+            if (r.response) msgs.push({ direction: "outgoing", content: r.response, created_at: r.created_at });
+            return msgs;
+          });
+          return {
+            id: sid,
+            phone: `+${phone}`,
+            member_name: `+${phone}`,
+            status: "active",
+            current_strategy: "abordagem_inicial",
+            updated_at: info.last,
+            _messages: allMsgs,
+            _session_id: sid,
+          };
+        }).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+        setWaConversations(mapped);
         setWaDataSource("supabase");
+        setWaLoading(false);
+        return;
       }
-    } catch {
-      setWaConversations(DEMO_CONVERSATIONS);
-      setWaDataSource("demo");
-    }
+    } catch {}
+    setWaConversations(DEMO_CONVERSATIONS);
+    setWaDataSource("demo");
     setWaLoading(false);
   }, []);
 
@@ -407,6 +436,10 @@ export default function LegalTraining() {
     const conv = waConversations.find((c) => c.id === convId);
     if (conv?.messages) {
       setWaMessages(conv.messages.map((m, i) => ({ ...m, id: `demo-${i}` })));
+      return;
+    }
+    if (conv?._messages) {
+      setWaMessages(conv._messages.map((m, i) => ({ ...m, id: `sb-${i}`, strategy_name: "abordagem_inicial" })));
       return;
     }
     if (waDataSource === "backend" && conv) {
@@ -427,11 +460,6 @@ export default function LegalTraining() {
           }
         })
         .catch(() => setWaMessages([]));
-      return;
-    }
-    if (waDataSource === "supabase") {
-      supabase.from("wa_messages").select("*").eq("conversation_id", convId).order("created_at", { ascending: true })
-        .then(({ data }) => setWaMessages(data || []));
     }
   }
 
@@ -2173,6 +2201,9 @@ export default function LegalTraining() {
               </h2>
               {waDataSource === "demo" && (
                 <span className="text-[9px] text-amber-600 font-medium">Demonstração</span>
+              )}
+              {waDataSource === "supabase" && (
+                <span className="text-[9px] text-green-600 font-medium">Conversas Reais</span>
               )}
               {waDataSource === "backend" && (
                 <span className="text-[9px] text-green-600 font-medium">WhatsApp Real</span>
