@@ -1240,8 +1240,27 @@ async function autoReply(jid, userText, contactName) {
   const antiRepetitionContext = lastReplies.length
     ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
     : "";
+  let fallbackPrompt = AI_SYSTEM_PROMPT;
+  try {
+    if (supabaseDb) {
+      const { data: evolvedRow } = await supabaseDb
+        .from("agent_prompts")
+        .select("prompt")
+        .eq("agent_type", "secretary")
+        .eq("is_active", true)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (evolvedRow?.prompt && evolvedRow.prompt.trim().length > 100) {
+        fallbackPrompt = evolvedRow.prompt;
+        console.log("[fallback] Using evolved secretary prompt from agent_prompts");
+      }
+    }
+  } catch (e) {
+    console.warn("[fallback] Failed to load evolved prompt:", e?.message);
+  }
   const messagesPayload = [
-    { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nNome do contato: ${contactName || "Cliente"}.${antiRepetitionContext}` },
+    { role: "system", content: `${fallbackPrompt}\n${saoPauloTemporalContext()}\nNome do contato: ${contactName || "Cliente"}.${antiRepetitionContext}` },
     ...history,
     { role: "user", content: userText },
   ];
@@ -1260,7 +1279,7 @@ async function autoReply(jid, userText, contactName) {
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
   if (!usedFallback && (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history))) {
     const retry = await callAI([
-      { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
+      { role: "system", content: `${fallbackPrompt}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...history,
       { role: "user", content: userText },
     ], { temperature: 0.9, userText });
@@ -2022,6 +2041,22 @@ app.post("/api/chat/message", async (req, res) => {
     ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
     : "";
   const firstNameWeb = String(req.body?.visitor_name || "Cliente").split(" ")[0] || "Cliente";
+  let webPrompt = AI_SYSTEM_PROMPT;
+  try {
+    if (supabaseDb) {
+      const { data: evolvedRow } = await supabaseDb
+        .from("agent_prompts")
+        .select("prompt")
+        .eq("agent_type", "secretary")
+        .eq("is_active", true)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (evolvedRow?.prompt && evolvedRow.prompt.trim().length > 100) {
+        webPrompt = evolvedRow.prompt;
+      }
+    }
+  } catch (e) { /* use default */ }
   let result = isThanksMessage(message)
     ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(normalizedHistory, firstNameWeb) }
     : userAskedOfficeInfo(message)
@@ -2031,14 +2066,14 @@ app.post("/api/chat/message", async (req, res) => {
     : isResumeRequest(message)
     ? { ok: true, provider: "resume-rule", reply: buildResumeReply(normalizedHistory, firstNameWeb) }
     : await callAI([
-      { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}${antiRepetitionContext}` },
+      { role: "system", content: `${webPrompt}\n${saoPauloTemporalContext()}${antiRepetitionContext}` },
       ...normalizedHistory,
       { role: "user", content: message },
     ], { temperature: 0.72, userText: message });
   let rawReply = result.ok ? result.reply : buildLocalLegalReply(req.body?.session_id || "web", message, req.body?.visitor_name || "Cliente");
   if (result.ok && (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, normalizedHistory))) {
     const retry = await callAI([
-      { role: "system", content: `${AI_SYSTEM_PROMPT}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
+      { role: "system", content: `${webPrompt}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
       ...normalizedHistory,
       { role: "user", content: message },
     ], { temperature: 0.9, userText: message });

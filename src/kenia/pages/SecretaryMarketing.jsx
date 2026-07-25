@@ -173,6 +173,7 @@ export default function SecretaryMarketing() {
       const { data, error } = await supabase.functions.invoke("training-ai", {
         body: {
           action: "improve_prompt",
+          mode: "secretary",
           current_prompt: currentPrompt,
           evaluation_summary: feedback.slice(0, 2000),
           weaknesses,
