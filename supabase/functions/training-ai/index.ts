@@ -1395,6 +1395,52 @@ REGRAS OBRIGATÓRIAS:
       );
     }
 
+    if (!action && !caseData) {
+      const clientMessage: string = String(body.message ?? body.client_message ?? "").trim();
+      if (!clientMessage) {
+        return new Response(
+          JSON.stringify({ error: "action ou message obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const isSecretary = mode === "secretary";
+      const secretarySystem = `Você é a secretária jurídica da Dra. Kênia Garcia Advocacia.
+Responda de forma profissional, empática ejurídica em português brasileiro.
+Não invente informações jurídicas — apenas oriente sobre procedimentos e agendamentos.
+Seja breve e direta.`;
+
+      const messages = [
+        { role: "system", content: isSecretary ? secretarySystem : systemPrompt },
+        ...history.map((m) => ({ role: m.role, content: m.content })),
+        { role: "user", content: clientMessage },
+      ];
+
+      const aiResult = await chatCompletion({
+        messages,
+        temperature: 0.5,
+        maxTokens: 1500,
+        model: "gpt-4o-mini",
+        preferFastProvider: true,
+      });
+
+      if (!aiResult.ok) {
+        return new Response(
+          JSON.stringify({ error: "Nenhum provider de IA disponível", details: String(aiResult.error || "").slice(0, 200) }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const reply = aiResult.data?.choices?.[0]?.message?.content || "Desculpe, não consegui processar.";
+      return new Response(
+        JSON.stringify({
+          response: reply,
+          provider: aiResult.provider || "unknown",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const messages = [
       { role: "system", content: systemPrompt },
       ...history.map((m) => ({ role: m.role, content: m.content })),
