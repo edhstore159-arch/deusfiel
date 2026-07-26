@@ -98,7 +98,7 @@ export default function AdminCases() {
           apikey: anonKey || "",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ case: caseText, model: "openai/gpt-5.5" }),
+        body: JSON.stringify({ case: caseText, model: "claude-fcc" }),
       });
       const ct = resp.headers.get("Content-Type") || "";
       if (!resp.ok || !resp.body) {

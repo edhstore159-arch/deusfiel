@@ -147,7 +147,12 @@ async function chatClaudeFCC(opts: ChatOptions) {
 }
 
 export async function chatCompletion(opts: ChatOptions) {
-  // Order: Lovable → Gemini (direct) → Emergent → Claude FCC
+  // Order: Claude FCC (priority) → Lovable → Gemini (direct) → Emergent
+  if (FCC_BASE_URL) {
+    const r = await chatClaudeFCC(opts);
+    if (r.ok) return r;
+    console.warn("⚠️ Claude FCC falhou, tentando Lovable:", r.status, r.error?.slice?.(0, 200));
+  }
   if (LOVABLE_KEY) {
     const r = await chatLovable(opts);
     if (r.ok) return r;

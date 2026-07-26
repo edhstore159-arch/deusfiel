@@ -460,7 +460,7 @@ export default function Dstboard() {
           apikey: anonKey || "",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ case: caseText, model: "gpt-4o-mini" }),
+        body: JSON.stringify({ case: caseText, model: "claude-fcc" }),
       });
       const ct = resp.headers.get("Content-Type") || "";
       if (!resp.ok) {

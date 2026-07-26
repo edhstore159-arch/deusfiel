@@ -160,7 +160,7 @@ IMPORTANTE: Retorne APENAS o JSON, sem nenhum texto antes ou depois. Todos os n√
           apikey: anonKey || "",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ case: prompt, model: "openai/gpt-5.5" }),
+        body: JSON.stringify({ case: prompt, model: "claude-fcc" }),
       });
 
       const ct = resp.headers.get("Content-Type") || "";

@@ -52,15 +52,18 @@ const PROVIDER_COLORS: Record<string, string> = {
   openai: "bg-emerald-50 text-emerald-700 border-emerald-200",
   google: "bg-blue-50 text-blue-700 border-blue-200",
   anthropic: "bg-violet-50 text-violet-700 border-violet-200",
+  "claude-fcc": "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   google: "Google",
   anthropic: "Anthropic",
+  "claude-fcc": "Claude FCC",
 };
 
 const AGENTS = [
+  { id: "claude-fcc", label: "Claude FCC", desc: "Gratuito, sem Emergent, prioridade", provider: "claude-fcc" },
   { id: "openai/gpt-5.5", label: "GPT-5.5", desc: "Máximo rigor técnico", provider: "openai" },
   { id: "openai/gpt-5.4", label: "GPT-5.4", desc: "Raciocínio previdenciário avançado", provider: "openai" },
   { id: "openai/gpt-5.2", label: "GPT-5.2", desc: "Análise complexa", provider: "openai" },

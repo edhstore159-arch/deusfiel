@@ -23,6 +23,7 @@ const AREAS = [
 const TONES = ["Cordial", "Formal", "Empática", "Objetiva", "Consultiva"];
 
 const MODELS = [
+  { id: "claude-fcc", label: "Claude FCC (Gratuito)", group: "Claude" },
   { id: "openai/gpt-5.5", label: "GPT-5.5", group: "OpenAI" },
   { id: "openai/gpt-5.4", label: "GPT-5.4", group: "OpenAI" },
   { id: "openai/gpt-5.2", label: "GPT-5.2", group: "OpenAI" },
@@ -63,7 +64,7 @@ const DEFAULT_AGENT = {
   name: "Juiz Virtual — Geral",
   area: "Cível",
   tone: "Formal",
-  model: MODELS[0].id,
+  model: "claude-fcc",
   greeting: "Olá, sou o Juiz Virtual. Posso ajudar com orientações jurídicas e simulações de decisões em todas as áreas do direito.",
   goal: "Simular a atuação de um magistrado brasileiro, produzindo decisões fundamentadas com base na legislação vigente e jurisprudência consolidada.",
   instructions: "Analise o caso, fundamente com artigos de lei, súmulas e jurisprudência. Sempre informe que se trata de simulação jurídica e não substitui decisão judicial.",

@@ -9,7 +9,7 @@ import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
 import { Send, Loader2, Bot, Trash2, Server, Sparkles, Brain, Zap } from "lucide-react";
 
-// Modelos oferecidos: rodam via Emergent API; Ollama roda local no navegador do usuário.
+// Modelos oferecidos: rodam via Emergent API; Ollama roda local; Claude FCC roda via ngrok direto.
 const MODELS = [
   {
     id: "google/gemini-2.5-pro",
@@ -31,12 +31,21 @@ const MODELS = [
   },
   {
     id: "anthropic/claude-sonnet-4-20250514",
-    label: "Claude",
+    label: "Claude (Emergent)",
     provider: "gateway",
     tag: "Anthropic · Claude Sonnet 4",
     icon: Bot,
     color: "from-orange-500 to-amber-600",
-    desc: "Análise profunda e raciocínio avançado.",
+    desc: "Via Emergent — pode falhar sem saldo.",
+  },
+  {
+    id: "claude-fcc",
+    label: "Claude FCC",
+    provider: "claude-fcc",
+    tag: "Claude · Gratuito via FCC",
+    icon: Zap,
+    color: "from-yellow-500 to-orange-600",
+    desc: "Claude direto, sem Emergent, sem custo.",
   },
   {
     id: "ollama:local",
