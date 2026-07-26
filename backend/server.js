@@ -1543,6 +1543,50 @@ async function startSock() {
           recordAutoReply({ step: "audio_error", jid, error: e?.stack || e?.message || String(e) });
         }
       }
+      // --- Download e armazenamento de documentos/imagens/vídeos ---
+      if (!text && !fromMe) {
+        const docMsg = m?.message?.documentMessage || m?.message?.ephemeralMessage?.message?.documentMessage;
+        const imgMsg = m?.message?.imageMessage || m?.message?.ephemeralMessage?.message?.imageMessage;
+        const vidMsg = m?.message?.videoMessage || m?.message?.ephemeralMessage?.message?.videoMessage;
+        const mediaMsg = docMsg || imgMsg || vidMsg;
+        if (mediaMsg) {
+          try {
+            recordAutoReply({ step: "media_download_start", jid, type: docMsg ? "document" : imgMsg ? "image" : "video" });
+            const buf = await downloadMediaMessage(m, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
+            if (buf && buf.length) {
+              const mimeType = mediaMsg.mimetype || "application/octet-stream";
+              const ext = (mimeType.split("/")[1] || "bin").replace("jpeg", "jpg");
+              const fileName = mediaMsg.fileName || `arquivo_${Date.now()}.${ext}`;
+              const b64 = Buffer.from(buf).toString("base64");
+              const dataUrl = `data:${mimeType};base64,${b64}`;
+              // Salvar no Supabase documents
+              if (supabaseDb) {
+                const phone = jidToPhone(jid);
+                const docName = mediaMsg.caption || fileName;
+                try {
+                  await supabaseDb.from("documents").insert({
+                    name: docName,
+                    type: mimeType,
+                    size: buf.length,
+                    url: dataUrl,
+                    content: `[${docMsg ? "Documento" : imgMsg ? "Imagem" : "Vídeo"}: ${fileName} (${(buf.length / 1024).toFixed(1)}KB)]`,
+                    session_id: `whatsapp:${phone}`,
+                  });
+                  console.log(`[media] Documento salvo: ${docName} (${(buf.length / 1024).toFixed(1)}KB)`);
+                  recordAutoReply({ step: "media_saved", jid, name: docName, size: buf.length });
+                } catch (e) {
+                  console.error("[media] Erro ao salvar documento:", e?.message);
+                }
+              }
+              // Usar caption como texto, ou criar placeholder
+              text = mediaMsg.caption || `[Cliente enviou ${docMsg ? "um documento" : imgMsg ? "uma imagem" : "um vídeo"}: ${fileName}]`;
+            }
+          } catch (e) {
+            console.error("[media] Erro ao baixar mídia:", e?.message);
+            recordAutoReply({ step: "media_error", jid, error: e?.message });
+          }
+        }
+      }
       if (!text) continue;
       const created_at = m?.messageTimestamp
         ? new Date(Number(m.messageTimestamp) * 1000).toISOString()

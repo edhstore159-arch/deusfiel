@@ -566,10 +566,48 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
   }
 }
 
+async function callOpenRouterClaude(messages: Array<{ role: string; content: string }>): Promise<string> {
+  const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
+  if (!OPENROUTER_KEY) throw new Error("OPENROUTER_API_KEY não configurado");
+  const systemMsg = messages.find((m) => m.role === "system")?.content || "";
+  const apiMessages = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role === "assistant" ? "assistant" as const : "user" as const, content: String(m.content || "") }));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
+  try {
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENROUTER_KEY}`,
+        "HTTP-Referer": "https://deusfiel.onrender.com",
+        "X-Title": "Kenia Garcia Advocacia",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "anthropic/claude-opus-5-20250620",
+        max_tokens: 2000,
+        temperature: 0.3,
+        ...(systemMsg ? { messages: [{ role: "system", content: systemMsg }, ...apiMessages] } : { messages: apiMessages }),
+      }),
+    });
+    const raw = await resp.text();
+    if (!resp.ok) throw new Error(`OpenRouter ${resp.status}: ${raw.slice(0, 300)}`);
+    const data = JSON.parse(raw || "{}");
+    const reply = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+    if (!reply) throw new Error("OpenRouter retornou resposta vazia");
+    if (isPromptLeakage(reply)) throw new Error("OpenRouter retornou prompt leakage");
+    return reply;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function callClaudeFCC(messages: Array<{ role: string; content: string }>): Promise<string> {
   const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "";
   const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-  const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+  const FCC_MODEL = Deno.env.get("FCC_MODEL") || "openrouter/anthropic/claude-opus-5-20250620";
   if (!FCC_BASE_URL) throw new Error("FCC_BASE_URL não configurado");
   const systemMsg = messages.find((m) => m.role === "system")?.content || SECRETARIA_JURIDICA_PROMPT;
   const apiMessages = messages
@@ -610,6 +648,12 @@ async function callClaudeFCC(messages: Array<{ role: string; content: string }>)
 }
 
 async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+  try {
+    return await callOpenRouterClaude(messages);
+  } catch (err) {
+    console.warn("OpenRouter Claude indisponível, tentando Claude FCC:", err);
+  }
+
   try {
     return await callClaudeFCC(messages);
   } catch (err) {
