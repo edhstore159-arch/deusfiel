@@ -1046,19 +1046,56 @@ function LegalTraining() {
     if (simRunning) return;
     setSimRunning(true);
     setSimResults(null);
-    setSimProgress({ current: 0, total: 18, strategy: "Iniciando simulador..." });
+    const allStrategies = SEC_STRATEGIES;
+    setSimProgress({ current: 0, total: allStrategies.length, strategy: "Iniciando..." });
     try {
       const currentPrompt = loadChatConfig().prompt || CHAT_DEFAULT_PROMPT;
-      const { data, error } = await supabase.functions.invoke("training-ai", {
-        body: { action: "auto_train", current_prompt: currentPrompt, mode: "secretary" },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setSimResults(data);
-      if (data.improved_prompt && data.improved_prompt !== currentPrompt) {
-        saveChatConfig({ prompt: data.improved_prompt });
+      const results = [];
+      for (let i = 0; i < allStrategies.length; i++) {
+        const s = allStrategies[i];
+        setSimProgress({ current: i + 1, total: allStrategies.length, strategy: s.name });
+        try {
+          // 1. Gerar cenário
+          const { data: scenData } = await supabase.functions.invoke("training-ai", {
+            body: { action: "secretary_strategy", strategy_id: s.id },
+          });
+          if (scenData?.error) throw new Error(scenData.error);
+          const scenario = scenData?.strategy?.scenario || "";
+          // 2. Gerar resposta da secretária
+          const { data: respData } = await supabase.functions.invoke("training-ai", {
+            body: {
+              mode: "secretary", area: "general",
+              history: [{ role: "assistant", content: `CENÁRIO:\n${scenario}\n\nResponda como secretária jurídica.` }],
+              message: "Responda ao cenário acima",
+            },
+          });
+          const secretaryResponse = respData?.response || "";
+          // 3. Avaliar
+          const { data: evalData } = await supabase.functions.invoke("training-ai", {
+            body: {
+              action: "secretary_evaluate",
+              scenario, user_response: secretaryResponse,
+              strategy_id: s.id, current_prompt: currentPrompt,
+            },
+          });
+          results.push({
+            strategy_id: s.id,
+            strategy_name: s.name,
+            score: evalData?.evaluation?.score || 0,
+            feedback: evalData?.evaluation?.feedback || "",
+            strengths: evalData?.evaluation?.strengths || [],
+            weaknesses: evalData?.evaluation?.weaknesses || [],
+          });
+        } catch (e) {
+          results.push({ strategy_id: s.id, strategy_name: s.name, score: 0, feedback: "Erro", strengths: [], weaknesses: [String(e?.message || e)] });
+        }
       }
-      toast.success(`Simulador concluído! Média: ${data.stats?.avgScore || 0}/100`);
+      const scores = results.map((r) => r.score);
+      const total = results.length;
+      const passed = scores.filter((s) => s >= 60).length;
+      const avgScore = total > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / total) : 0;
+      setSimResults({ results, stats: { total, passed, avgScore }, improved_prompt: null });
+      toast.success(`Simulador concluído! Média: ${avgScore}/100 (${passed}/${total} aprovadas)`);
     } catch (e) {
       toast.error("Erro no simulador: " + (e?.message || e));
     } finally {
