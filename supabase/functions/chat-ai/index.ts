@@ -500,6 +500,18 @@ function isInvalidOllamaReply(text: string): boolean {
     /\b(the user|let me|i need to|i should|instructions)\b/i.test(value.slice(0, 260));
 }
 
+function isPromptLeakage(text: string): boolean {
+  const t = String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/\b(prompt|instrucao|instrucoes|sistema|configuracao|regra|regras|flujo|fluxo|exemplo|exemplos|documento)\b/.test(t.slice(0, 300))) {
+    if (/\b(prompt adequado|prompt (e|eh|é)|suas instru|seu prompt|mostra?r?\s+(o\s+)?(prompt|instru|regra|sistema|configurac))\b/i.test(t)) return true;
+    if (/^\s*["\u201c]/.test(text.trim()) && /agendar|consulta|hor[aá]rio|dispon[ií]vel/i.test(t.slice(0, 500))) return true;
+  }
+  if (/^o prompt (adequado|correto|certo|esperado)/i.test(text.trim())) return true;
+  if (/^"?ol[aá].*sou a secret[aá]ria.*hor[aá]rios dispon[ií]veis/mi.test(text.trim()) && text.length > 400) return true;
+  if (/\b(segue|abaixo|a seguir|o modelo|template|roteiro)\b.*\b(prompt|instru|sistema)\b/i.test(t.slice(0, 400))) return true;
+  return false;
+}
+
 function buildOllamaPrompt(prompt: string, fmtDate: string, fmtTime: string): string {
   return `/no_think
 CONTEXTO TEMPORAL INTERNO (America/Sao_Paulo): hoje é ${fmtDate}, agora são ${fmtTime}.
@@ -590,6 +602,7 @@ async function callClaudeFCC(messages: Array<{ role: string; content: string }>)
     const textBlock = (data?.content || []).find((b: any) => b.type === "text");
     const reply = String(textBlock?.text || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
     if (!reply) throw new Error("FCC retornou resposta vazia");
+    if (isPromptLeakage(reply)) throw new Error("FCC retornou prompt leakage");
     return reply;
   } finally {
     clearTimeout(timeout);
@@ -618,7 +631,7 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
     const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
       .replace(/<think>[\s\S]*?<\/think>/giu, "")
       .trim();
-    if (reply && !isInvalidOllamaReply(reply)) return reply;
+    if (reply && !isInvalidOllamaReply(reply) && !isPromptLeakage(reply)) return reply;
     if (!response.ok) console.warn("Gateway IA falhou:", response.error || response.status);
   } catch (err) {
     console.warn("Gateway IA indisponível:", err);
@@ -1148,6 +1161,9 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
     } catch (err) {
       console.error("Erro ao chamar Ollama qwen2.5:3b-instruct:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
+    }
+    if (isPromptLeakage(rawReply)) {
+      rawReply = "Não tenho acesso para compartilhar informações internas de configuração. Como posso ajudar com seu atendimento?";
     }
     if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) {
       try {

@@ -334,7 +334,6 @@ export default function ChatMultiModelo() {
                     <div className="font-semibold text-sm truncate">{m.label}</div>
                   </div>
                 </div>
-                <div className="text-[11px] text-nude-600 mt-2 line-clamp-2">{m.desc}</div>
                 {active && (
                   <Badge className="absolute top-2 right-2 bg-gold-600 text-white text-[9px] px-1.5 py-0">
                     ATIVO
