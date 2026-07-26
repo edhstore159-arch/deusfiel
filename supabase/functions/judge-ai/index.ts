@@ -119,9 +119,9 @@ Deno.serve(async (req) => {
       try {
         const sbAgent = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
         const { data: agent } = await sbAgent
-          .from("ai_agents" as any)
+          .from("ai_agents")
           .select("*")
-          .eq("area", area)
+          .ilike("area", area)
           .eq("active", true)
           .limit(1)
           .single();

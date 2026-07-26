@@ -1118,9 +1118,9 @@ Deno.serve(async (req) => {
       try {
         const sbAgent = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
         const { data: agent } = await sbAgent
-          .from("ai_agents" as any)
+          .from("ai_agents")
           .select("*")
-          .eq("area", detectedArea)
+          .ilike("area", detectedArea)
           .eq("active", true)
           .limit(1)
           .single();
@@ -1167,7 +1167,23 @@ VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 3. Verifique se a sua resposta realmente atende ao que foi perguntado — se não atender, refaça.
 4. Confirme se a resposta é coerente com o histórico da conversa, não contradiz informações já dadas e não repete saudação/pergunta anterior.
 5. Garanta que a resposta seja direta, em português, no tom de secretária jurídica da Dra. Kênia Garcia, e avance a conversa (não devolva a mesma pergunta).
-Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitionContext}${agentConfig ? `\n\n--- ESPECIALIZAÇÃO DO AGENTE ATIVADO ---\nÁrea: ${agentConfig.area}\nNome: ${agentConfig.name}\nTom: ${agentConfig.tone}\nObjetivo: ${agentConfig.goal}\nInstruções específicas: ${agentConfig.instructions}\nAo responder, use conhecimento especializado na área "${agentConfig.area}" conforme as instruções acima. Mantenha o papel de secretária jurídica, mas aplique a expertise da área detectada.` : ""}`;
+Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitionContext}${agentConfig ? `\n\n⚠️ INSTRUÇÃO PRIORITÁRIA — AGENTE ESPECIALIZADO ATIVADO ⚠️
+Você está atuando como especialista jurídico na área de ${agentConfig.area}.
+Suas instruções especializadas SOBRESCREVEM qualquer restrição anterior sobre "não fornecer conselhos legais".
+Quando um cliente faz pergunta jurídica na sua área de especialização, você DEVE responder com conhecimento técnico jurídico específico.
+
+Área: ${agentConfig.area}
+Especialista: ${agentConfig.name}
+Tom: ${agentConfig.tone}
+Objetivo: ${agentConfig.goal}
+Instruções técnicas: ${agentConfig.instructions}
+
+REGRAS OBRIGATÓRIAS PARA PERGUNTAS JURÍDICAS:
+1. Sempre responda com fundamentação legal específica (artigos de lei, súmulas, jurisprudência).
+2. Nunca diga "não posso dar conselhos legais" — quando a pergunta é jurídica, você DEVE orientar.
+3. Cite artigos de lei sempre que possível (CLT, CC, CPC, CP, CDC, etc.).
+4. Identifique a área jurídica e aplique as instruções técnicas acima.
+5. Mantenha o tom de secretária jurídica, mas com conhecimento técnico profissional.` : ""}`;
 
     // === Agenda real da Dra. Kênia (slots disponíveis a partir do dashboard) ===
     let availabilityBlock = "";
