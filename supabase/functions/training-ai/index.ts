@@ -1407,6 +1407,7 @@ REGRAS OBRIGATÓRIAS:
       messages,
       temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
       maxTokens: action === "generate_case" ? 8000 : 4000,
+      model: "gpt-4o-mini",
     });
 
     if (!aiResult.ok) {

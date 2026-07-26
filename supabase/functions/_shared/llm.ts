@@ -184,7 +184,28 @@ async function chatNemotronDirect(opts: ChatOptions) {
 }
 
 export async function chatCompletion(opts: ChatOptions) {
-  // Order: Nemotron NIM direto (mais rápido, sem ngrok) → Claude FCC → Lovable → Gemini → Emergent
+  const requestedModel = opts.model || "";
+  const wantsGemini = requestedModel.includes("gemini");
+  const wantsEmergent = requestedModel.includes("gpt") || requestedModel.includes("openai");
+  const wantsClaude = requestedModel.includes("claude");
+
+  // Se pediu Gemini especificamente, começa por ele
+  if (wantsGemini && GEMINI_KEY) {
+    const r = await chatGemini(opts);
+    if (r.ok) return r;
+  }
+  // Se pediu GPT/Emergent, começa por Emergent
+  if (wantsEmergent) {
+    const r = await chatEmergent(opts);
+    if (r.ok) return r;
+  }
+  // Se pediu Claude, começa por FCC
+  if (wantsClaude && FCC_BASE_URL) {
+    const r = await chatClaudeFCC(opts);
+    if (r.ok) return r;
+  }
+
+  // Fallback chain padrão: Nemotron → FCC → Lovable → Gemini → Emergent
   if (NVIDIA_NIM_API_KEY) {
     const r = await chatNemotronDirect(opts);
     if (r.ok) return r;
@@ -253,6 +274,16 @@ export interface PipelineResult {
 }
 
 export async function chatPipeline(opts: ChatOptions): Promise<PipelineResult> {
+  const requestedModel = opts.model || "";
+  const wantsNonNemotron = requestedModel.includes("gpt") || requestedModel.includes("gemini") || requestedModel.includes("claude") || requestedModel.includes("openai");
+
+  // Se pediu modelo específico que não é Nemotron, pula direto pro chatCompletion
+  if (wantsNonNemotron) {
+    console.log("[pipeline] Modelo específico solicitado, usando chatCompletion direto");
+    const fallback = await chatCompletion(opts);
+    return { ...fallback, reviewApplied: false };
+  }
+
   // Step 1: Nemotron (free) generates — tenta direto via NIM, senão via FCC
   console.log("[pipeline] Step 1: Gerando com Nemotron (free)...");
   let genResult = await chatNemotronDirect(opts);
