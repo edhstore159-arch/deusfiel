@@ -17,7 +17,7 @@ fi
 echo "🤖 Verificando FCC (Claude)..."
 if ! curl -s http://127.0.0.1:8082/health > /dev/null 2>&1; then
   echo "   Iniciando FCC..."
-  fcc-server > /tmp/fcc.log 2>&1 &
+  cd ~/.fcc && node server.mjs > /tmp/fcc.log 2>&1 &
   sleep 3
 else
   echo "   FCC já rodando"

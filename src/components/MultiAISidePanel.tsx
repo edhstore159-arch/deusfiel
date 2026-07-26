@@ -152,11 +152,12 @@ interface AIProv {
   color: string;
   border: string;
   send: (msg: string, history: { role: string; content: string }[]) => Promise<string>;
+  avatar?: string;
 }
 
 const PROVIDERS: AIProv[] = [
   { id: "ollama", name: "Ollama Local", icon: "\u{1F3E0}", color: "#10b981", border: "#059669", send: callOllama },
-  { id: "claude-fcc", name: "Claude FCC", icon: "\u{1F9E0}", color: "#d97706", border: "#b45309", send: callClaudeFCC },
+  { id: "claude-fcc", name: "Claude", icon: "", color: "#d97706", border: "#b45309", send: callClaudeFCC, avatar: "https://www.anthropic.com/images/icons/claude-app.svg" },
   { id: "gemini", name: "Gemini", icon: "\u2728", color: "#3b82f6", border: "#2563eb", send: callGeminiFree },
   { id: "groq", name: "Groq/Llama", icon: "\u26A1", color: "#f97316", border: "#ea580c", send: callGroqFree },
   { id: "openrouter", name: "OpenRouter", icon: "\u{1F310}", color: "#8b5cf6", border: "#7c3aed", send: callOpenRouterFree },

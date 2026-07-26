@@ -10,7 +10,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/
 import {
   Send, Loader2, GraduationCap, Scale, MessageSquare,
   Trophy, Target, BookOpen, RefreshCw, ChevronDown, ChevronUp, Star,
-  Sparkles, Lightbulb, CheckCircle2, ArrowRight, Phone, Users
+  Sparkles, Lightbulb, CheckCircle2, ArrowRight, Phone, Users,
+  Copy, Printer
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -144,7 +145,39 @@ function CriteriaList({ criteria }) {
 }
 
 function DiffView({ original, corrected, changes }) {
+  const [copied, setCopied] = useState(false);
+
   if (!corrected) return null;
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(corrected);
+      setCopied(true);
+      toast.success("Resposta corrigida copiada!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Não foi possível copiar.");
+    }
+  };
+
+  const printResponse = () => {
+    const win = window.open("", "_blank", "width=800,height=600");
+    win.document.write(`
+      <html><head><title>Resposta Corrigida</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+        h1 { font-size: 18px; color: #166534; }
+        .content { white-space: pre-wrap; }
+      </style></head><body>
+      <h1>Resposta Corrigida</h1>
+      <div class="content">${corrected.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+      <br><hr><p style="font-size:11px;color:#666;">Gerado por DeusFiel - Dra. Kênia Garcia</p>
+      </body></html>
+    `);
+    win.document.close();
+    setTimeout(() => win.print(), 400);
+  };
+
   return (
     <div className="space-y-3">
       <div className="text-[10px] font-medium text-green-700 flex items-center gap-1">
@@ -159,6 +192,15 @@ function DiffView({ original, corrected, changes }) {
           <div className="text-[10px] font-medium text-green-600 mb-1">Corrigida</div>
           <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">{corrected}</div>
         </div>
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={copyToClipboard} className="h-7 text-[10px]">
+          {copied ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+          {copied ? "Copiado!" : "Copiar"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={printResponse} className="h-7 text-[10px]">
+          <Printer className="w-3 h-3 mr-1" /> Imprimir
+        </Button>
       </div>
       {changes?.length > 0 && (
         <div className="space-y-1.5">

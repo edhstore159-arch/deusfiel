@@ -76,3 +76,5 @@ services:
         value: freecc
       - key: FCC_MODEL
         value: claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+      - key: NVIDIA_NIM_API_KEY
+        sync: false

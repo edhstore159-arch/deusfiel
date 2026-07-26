@@ -9,8 +9,26 @@ import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
 import { Send, Loader2, Bot, Trash2, Server, Sparkles, Brain, Zap } from "lucide-react";
 
-// Modelos oferecidos: rodam via Emergent API; Ollama roda local; Claude FCC roda via ngrok direto.
+// Modelos oferecidos: Nemotron (NVIDIA, gratuito), Claude FCC, Emergent, Ollama local.
 const MODELS = [
+  {
+    id: "nemotron",
+    label: "Nemotron",
+    provider: "nemotron",
+    tag: "NVIDIA · Nemotron 3 Super 120B",
+    icon: Zap,
+    color: "from-green-500 to-emerald-600",
+    desc: "Gratuito via NVIDIA NIM. Rápido e sem custo.",
+  },
+  {
+    id: "claude-fcc",
+    label: "Claude FCC",
+    provider: "claude-fcc",
+    tag: "Nemotron via Claude FCC",
+    icon: Bot,
+    color: "from-yellow-500 to-orange-600",
+    desc: "Nemotron via proxy Claude. Gratuito.",
+  },
   {
     id: "google/gemini-2.5-pro",
     label: "Gemini",
@@ -37,15 +55,6 @@ const MODELS = [
     icon: Bot,
     color: "from-orange-500 to-amber-600",
     desc: "Via Emergent — pode falhar sem saldo.",
-  },
-  {
-    id: "claude-fcc",
-    label: "Claude FCC",
-    provider: "claude-fcc",
-    tag: "Claude · Gratuito via FCC",
-    icon: Zap,
-    color: "from-yellow-500 to-orange-600",
-    desc: "Claude direto, sem Emergent, sem custo.",
   },
   {
     id: "ollama:local",
@@ -150,8 +159,20 @@ export default function ChatMultiModelo() {
       signal: abortRef.current?.signal,
     });
     if (!res.ok || !res.body) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP ${res.status}`);
+      // Tenta ler o erro como JSON; se vier SSE (caso do FCC), extrai o campo error
+      let msg = `HTTP ${res.status}`;
+      try {
+        const ct = res.headers.get("content-type") || "";
+        if (ct.includes("text/event-stream")) {
+          const text = await res.text();
+          const m = text.match(/data:\s*({[^}]*"error"[^}]*})/);
+          if (m) msg = JSON.parse(m[1]).error || msg;
+        } else {
+          const err = await res.json();
+          msg = err.error || msg;
+        }
+      } catch {}
+      throw new Error(msg);
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -169,9 +190,15 @@ export default function ChatMultiModelo() {
         if (data === "[DONE]") continue;
         try {
           const json = JSON.parse(data);
+          if (json?.error) {
+            throw new Error(json.error);
+          }
           const delta = json?.choices?.[0]?.delta?.content;
           if (delta) appendAssistantChunk(delta);
-        } catch {}
+        } catch (e) {
+          // Re-throw se for erro real (não JSON malformado)
+          if (e instanceof Error && e.message && !e.message.includes("JSON")) throw e;
+        }
       }
     }
     finalizeAssistant();
@@ -280,7 +307,7 @@ export default function ChatMultiModelo() {
             <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold">
               Chat Multi-Modelo
             </div>
-            <h1 className="font-display font-bold text-2xl">Converse com várias IAs</h1>
+            <h1 className="font-display font-bold text-2xl">Chat Multi-Modelo</h1>
           </div>
           <Button variant="outline" size="sm" onClick={clearChat}>
             <Trash2 className="w-4 h-4 mr-2" /> Limpar
@@ -290,7 +317,7 @@ export default function ChatMultiModelo() {
 
       {/* Seletor de modelo */}
       <div className="px-6 py-4 bg-white border-b border-nude-200 shrink-0">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {MODELS.map((m) => {
             const Icon = m.icon;
             const active = selected.id === m.id;

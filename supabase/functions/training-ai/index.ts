@@ -1,4 +1,4 @@
-import { chatCompletion } from "../_shared/llm.ts";
+import { chatCompletion, chatPipeline, chatEmergent, EMERGENT_KEY } from "../_shared/llm.ts";
 import { saveEvolvedPrompt, getEvolvedPrompt } from "../_shared/prompts.ts";
 
 const corsHeaders: Record<string, string> = {
@@ -26,6 +26,32 @@ ESTRATÉGIAS DE ATENDIMENTO AO CLIENTE:
 - Tratamento de Objeções: "Não tenho dinheiro" → "A Dra. Kênia oferece consulta inicial"
 - Gatilhos Psicológicos: Reciprocidade, Prova Social, Autoridade, Afinidade
 - Personalização: Use o nome do cliente, refira-se a detalhes específicos`;
+
+const LEGAL_REVIEW_PROMPT = `Atue como um advogado previdenciarista brasileiro com experiência em ações contra o INSS e como revisor jurídico especializado.
+
+Sua tarefa é revisar a resposta abaixo e corrigi-la integralmente, observando as seguintes regras:
+
+1. Verifique rigorosamente todas as citações legais, súmulas, temas repetitivos, precedentes e dispositivos legais.
+2. Nunca invente ou cite súmulas, precedentes ou entendimentos jurisprudenciais inexistentes.
+3. Se houver alguma referência incorreta, substitua por fundamentação jurídica verdadeira, baseada na legislação vigente ou em jurisprudência consolidada.
+4. Não faça afirmações categóricas sobre o resultado do processo. Substitua expressões como "forte chance de vitória", "basta provar" ou "certamente será concedido" por linguagem técnica e prudente.
+5. Diferencie corretamente os requisitos do auxílio por incapacidade temporária e da aposentadoria por incapacidade permanente previstos na Lei 8.213/91.
+6. Explique que o laudo administrativo do INSS não vincula o Poder Judiciário, fundamentando essa afirmação corretamente, sem inventar súmulas.
+7. Considere que a análise judicial leva em conta:
+   - perícia judicial;
+   - documentos médicos;
+   - histórico clínico;
+   - profissão habitual;
+   - idade;
+   - escolaridade;
+   - possibilidade real de reabilitação profissional.
+8. Preserve o tom acolhedor, humano e empático da resposta.
+9. Mantenha linguagem simples, acessível e voltada ao cliente leigo.
+10. Ao final, inclua um convite para agendamento, mas sem criar expectativas indevidas quanto ao resultado da ação.
+11. Caso algum argumento utilizado não possua respaldo jurídico suficiente, remova-o em vez de criar outro sem fundamento.
+12. Antes de entregar a versão final, faça uma checagem interna de consistência para garantir que não existam citações, súmulas ou precedentes inexistentes.
+
+Entregue apenas a versão final revisada, pronta para ser enviada ao cliente.`;
 
 const JUDGE_PRODUCTION_PROMPT = `IDENTIDADE
 Você é um Juiz Virtual Brasileiro especializado em análise técnico-jurídica.
@@ -420,9 +446,30 @@ Deno.serve(async (req: Request) => {
         temperature: 0.5, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
-      const response = lawyerResult.ok
+      let response = lawyerResult.ok
         ? (lawyerResult.data?.choices?.[0]?.message?.content || "Resposta não disponível.")
         : "Erro ao gerar resposta.";
+
+      // Revisão jurídica: usar Emergent (Claude) diretamente para revisão
+      if (lawyerResult.ok && mode === "lawyer" && EMERGENT_KEY) {
+        console.log("[training-ai] Aplicando revisão jurídica com Claude...");
+        const reviewResult = await chatEmergent({
+          messages: [
+            { role: "system", content: LEGAL_REVIEW_PROMPT },
+            { role: "user", content: `Texto para revisão:\n\n${response}` },
+          ],
+          temperature: 0.3,
+          maxTokens: 2000,
+        });
+
+        if (reviewResult.ok) {
+          const reviewed = reviewResult.data?.choices?.[0]?.message?.content;
+          if (reviewed && reviewed.length > 50) {
+            console.log("[training-ai] Revisão jurídica aplicada com sucesso");
+            response = reviewed;
+          }
+        }
+      }
 
       return new Response(
         JSON.stringify({ response, provider: lawyerResult.provider || "gpt-4o-mini" }),
@@ -1327,11 +1374,10 @@ REGRAS OBRIGATÓRIAS:
 
     console.log("[training-ai] Calling AI, action:", action);
 
-    const aiResult = await chatCompletion({
+    const aiResult = await chatPipeline({
       messages,
       temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
-      maxTokens: 4000,
-      model: "gpt-4o-mini",
+      maxTokens: action === "generate_case" ? 8000 : 4000,
     });
 
     if (!aiResult.ok) {

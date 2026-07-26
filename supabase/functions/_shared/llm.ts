@@ -1,4 +1,4 @@
-// Shared LLM helpers with fallback chain: Lovable → Google Gemini (direct) → Emergent.
+// Shared LLM helpers with fallback chain: Nemotron (NVIDIA NIM direto) → Claude FCC → Lovable → Gemini → Emergent.
 
 type ChatMessage = { role: string; content: any };
 
@@ -7,6 +7,8 @@ export interface ChatOptions {
   messages: ChatMessage[];
   response_format?: any;
   temperature?: number;
+  maxTokens?: number;
+  preferFastProvider?: boolean;
 }
 
 export interface ImageOptions {
@@ -17,10 +19,15 @@ export interface ImageOptions {
 
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
-const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
+export const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
 const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "";
 const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
 const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+
+// NVIDIA NIM direto
+const NVIDIA_NIM_API_KEY = Deno.env.get("NVIDIA_NIM_API_KEY") || "";
+const NVIDIA_NIM_BASE = "https://integrate.api.nvidia.com/v1";
+const NEMOTRON_MODEL = "nvidia/nemotron-3-super-120b-a12b";
 
 // ---------- chat completions ----------
 
@@ -90,7 +97,7 @@ async function chatGemini(opts: ChatOptions) {
   }
 }
 
-async function chatEmergent(opts: ChatOptions) {
+export async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
   try {
     const resp = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
@@ -130,7 +137,7 @@ async function chatClaudeFCC(opts: ChatOptions) {
       },
       body: JSON.stringify({
         model: FCC_MODEL,
-        max_tokens: 500,
+        max_tokens: opts.maxTokens || 4000,
         stream: false,
         system: systemMsg,
         messages: apiMessages,
@@ -146,8 +153,43 @@ async function chatClaudeFCC(opts: ChatOptions) {
   }
 }
 
+// NVIDIA NIM direto — sem ngrok, streaming nativo
+async function chatNemotronDirect(opts: ChatOptions) {
+  if (!NVIDIA_NIM_API_KEY) return { ok: false as const, status: 0, error: "NVIDIA_NIM_API_KEY ausente" };
+  try {
+    const resp = await fetch(`${NVIDIA_NIM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${NVIDIA_NIM_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: NEMOTRON_MODEL,
+        messages: opts.messages.map((m) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: String(m.content || ""),
+        })),
+        max_tokens: opts.maxTokens || 4096,
+        stream: false,
+        temperature: typeof opts.temperature === "number" ? opts.temperature : 0.7,
+      }),
+    });
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    const data = await resp.json();
+    const text = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+    return { ok: true as const, data: { choices: [{ message: { role: "assistant", content: text } }] }, provider: "nemotron" };
+  } catch (e) {
+    return { ok: false as const, status: 0, error: `Nemotron NIM erro: ${(e as Error)?.message || e}` };
+  }
+}
+
 export async function chatCompletion(opts: ChatOptions) {
-  // Order: Claude FCC (priority) → Lovable → Gemini (direct) → Emergent
+  // Order: Nemotron NIM direto (mais rápido, sem ngrok) → Claude FCC → Lovable → Gemini → Emergent
+  if (NVIDIA_NIM_API_KEY) {
+    const r = await chatNemotronDirect(opts);
+    if (r.ok) return r;
+    console.warn("⚠️ Nemotron NIM direto falhou, tentando Claude FCC:", r.status, r.error?.slice?.(0, 200));
+  }
   if (FCC_BASE_URL) {
     const r = await chatClaudeFCC(opts);
     if (r.ok) return r;
@@ -169,6 +211,101 @@ export async function chatCompletion(opts: ChatOptions) {
   const r4 = await chatClaudeFCC(opts);
   if (r4.ok) return r4;
   return { ok: false as const, status: r4.status || r3.status || 502, error: r4.error || r3.error || "Nenhum provider disponível", provider: "none" };
+}
+
+// ---------- Pipeline: Nemotron gera → Claude (Emergent) revisa ----------
+
+const REVIEW_SYSTEM_PROMPT = `Você é um REVISOR JURÍDICO DE ALTO NÍVEL brasileiro.
+
+Analise o documento/texto jurídico abaixo e:
+
+1. VERIFIQUE:
+   - Se os artigos de lei citados EXISTEM e estão corretos
+   - Se as súmulas citadas EXISTEM e estão corretas
+   - Se há erros jurídicos ou de lógica
+   - Se há texto em inglês (remova)
+   - Se falta decisão em algum ponto
+
+2. CORRIJA:
+   - Fundamentação fraca → reforce
+   - Erros de lógica → corrija
+   - Aplicação incorreta da lei → ajuste
+   - Artigo inexistente → remova ou substitua pelo correto
+
+3. REGRAS:
+   - NÃO reescreva tudo — apenas MELHORE e CORRIJA
+   - Se houver erro grave → reescreva apenas a parte afetada
+   - Se faltar prova → ajuste decisão com base no ônus da prova (art. 818 CLT / art. 373 CPC)
+   - mantenha o formato original
+
+4. SAÍDA:
+   - Retorne o texto VERSÃO FINAL corrigida
+   - Não inclua explicações fora do documento
+   - Se o documento estiver correto, retorne EXATAMENTE igual`;
+
+export interface PipelineResult {
+  ok: boolean;
+  data?: { choices: [{ message: { role: string; content: string } }] };
+  provider: string;
+  reviewApplied: boolean;
+  error?: string;
+  status?: number;
+}
+
+export async function chatPipeline(opts: ChatOptions): Promise<PipelineResult> {
+  // Step 1: Nemotron (free) generates — tenta direto via NIM, senão via FCC
+  console.log("[pipeline] Step 1: Gerando com Nemotron (free)...");
+  let genResult = await chatNemotronDirect(opts);
+  if (!genResult.ok) {
+    console.log("[pipeline] Nemotron NIM direto falhou, tentando via FCC...");
+    genResult = await chatClaudeFCC(opts);
+  }
+  if (!genResult.ok) {
+    // Fallback to full chain
+    console.log("[pipeline] Nemotron falhou, usando chatCompletion completo");
+    const fallback = await chatCompletion(opts);
+    return { ...fallback, reviewApplied: false };
+  }
+
+  const generatedText = genResult.data?.choices?.[0]?.message?.content || "";
+  console.log("[pipeline] Nemotron gerou", generatedText.length, "chars");
+
+  // Step 2: If Emergent key available, Claude reviews
+  if (EMERGENT_KEY) {
+    console.log("[pipeline] Step 2: Revisando com Claude (Emergent)...");
+    const reviewResult = await chatEmergent({
+      messages: [
+        { role: "system", content: REVIEW_SYSTEM_PROMPT },
+        { role: "user", content: generatedText },
+      ],
+      temperature: 0.2,
+      maxTokens: opts.maxTokens || 4000,
+    });
+
+    if (reviewResult.ok) {
+      const reviewedText = reviewResult.data?.choices?.[0]?.message?.content || generatedText;
+      // Only use reviewed version if it's substantially different and valid
+      if (reviewedText.length > generatedText.length * 0.5) {
+        console.log("[pipeline] Claude revisou:", reviewedText.length, "chars");
+        return {
+          ok: true,
+          data: { choices: [{ message: { role: "assistant", content: reviewedText } }] },
+          provider: "nemotron+claude",
+          reviewApplied: true,
+        };
+      }
+    }
+    console.warn("[pipeline] Review falhou ou resultado inválido, usando Nemotron direto");
+  } else {
+    console.log("[pipeline] Emergent não configurado, pulando review");
+  }
+
+  return {
+    ok: true,
+    data: genResult.data,
+    provider: "nemotron",
+    reviewApplied: false,
+  };
 }
 
 // ---------- text-to-image ----------

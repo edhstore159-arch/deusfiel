@@ -1,6 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getEvolvedPrompt } from "../_shared/prompts.ts";
+import { chatPipeline } from "../_shared/llm.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -150,15 +151,37 @@ Deno.serve(async (req) => {
       }];
     }
 
-    // Stream response via SSE
+    // Stream response via SSE — usa pipeline Nemotron → Claude
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          await streamClaudeFCC(finalMessages, systemPrompt, controller);
+          const systemMsg = systemPrompt;
+          const userMsg = finalMessages.map((m) => m.content).join("\n\n");
+
+          const pipelineResult = await chatPipeline({
+            messages: [
+              { role: "system", content: systemMsg },
+              { role: "user", content: userMsg },
+            ],
+            temperature: 0.3,
+            maxTokens: 4000,
+          });
+
+          const reply = pipelineResult.ok
+            ? (pipelineResult.data?.choices?.[0]?.message?.content || "Sem resposta.")
+            : `Erro: ${pipelineResult.error}`;
+
+          console.log("[judge-ai] Pipeline provider:", pipelineResult.provider, "review:", pipelineResult.reviewApplied);
+
+          // Send as SSE chunks
+          const chunkSize = 20;
+          for (let i = 0; i < reply.length; i += chunkSize) {
+            controller.enqueue(sseChunk(reply.slice(i, i + chunkSize)));
+          }
+          controller.enqueue(sseDone());
         } catch (err) {
-          console.error("[judge-ai] Claude FCC falhou:", err);
-          // Fallback: send error as SSE
-          controller.enqueue(sseChunk(`Erro ao conectar com Claude: ${(err as Error)?.message || err}`));
+          console.error("[judge-ai] Pipeline falhou:", err);
+          controller.enqueue(sseChunk(`Erro ao processar: ${(err as Error)?.message || err}`));
           controller.enqueue(sseDone());
         }
         controller.close();

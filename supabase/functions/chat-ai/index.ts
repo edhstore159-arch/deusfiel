@@ -578,7 +578,7 @@ async function callClaudeFCC(messages: Array<{ role: string; content: string }>)
       signal: controller.signal,
       body: JSON.stringify({
         model: FCC_MODEL,
-        max_tokens: 500,
+        max_tokens: 2000,
         stream: false,
         system: systemMsg,
         messages: apiMessages,

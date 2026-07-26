@@ -9,9 +9,23 @@ import { toast } from "sonner";
 import {
   MessageSquare, Image, Loader2, CheckCircle2, XCircle,
   Sparkles, Save, Info, Mic, RotateCcw, RefreshCcw, KeyRound,
+  Zap, CreditCard,
 } from "lucide-react";
 import { loadKeniaPrompt, saveKeniaPrompt, DEFAULT_KENIA_PROMPT } from "@/kenia/lib/keniaPrompt";
 import SystemReportCard from "@/kenia/components/SystemReportCard";
+
+const PROVIDER_STORAGE_KEY = "kenia:ai-provider";
+
+export type AIProviderMode = "free" | "paid";
+
+export function getAIProviderMode(): AIProviderMode {
+  try { return (localStorage.getItem(PROVIDER_STORAGE_KEY) as AIProviderMode) || "free"; }
+  catch { return "free"; }
+}
+
+export function setAIProviderMode(mode: AIProviderMode) {
+  try { localStorage.setItem(PROVIDER_STORAGE_KEY, mode); } catch {}
+}
 
 type SecretMap = { lovable: boolean; openai: boolean; emergent: boolean; gemini: boolean };
 type TestResult = { ok: boolean; error?: string; model?: string; reply?: string } | null;
@@ -31,6 +45,11 @@ export default function Settings() {
   const [textResult, setTextResult] = useState<TestResult>(null);
   const [imageResult, setImageResult] = useState<TestResult>(null);
   const [keniaPrompt, setKeniaPrompt] = useState("");
+  const [aiProvider, setAiProvider] = useState<AIProviderMode>(getAIProviderMode);
+  const [testingProvider, setTestingProvider] = useState(false);
+  const [providerResult, setProviderResult] = useState<TestResult>(null);
+  const [emergentKey, setEmergentKey] = useState("");
+  const [savingKey, setSavingKey] = useState(false);
 
   const loadStatus = async () => {
     setLoadingStatus(true);
@@ -49,6 +68,48 @@ export default function Settings() {
     setKeniaPrompt(loadKeniaPrompt());
     loadStatus();
   }, []);
+
+  const switchProvider = async (mode: AIProviderMode) => {
+    setAiProvider(mode);
+    setAIProviderMode(mode);
+    setTestingProvider(true);
+    setProviderResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("settings-test", { body: { action: "test_provider", provider: mode } });
+      if (error) throw error;
+      setProviderResult(data);
+      data?.ok
+        ? toast.success(`Provider "${mode === "free" ? "Claude Free" : "Claude Pago"}" funcionando!`)
+        : toast.error(`Provider "${mode === "free" ? "Claude Free" : "Claude Pago"}" falhou`);
+    } catch (e: any) {
+      setProviderResult({ ok: false, error: e?.message || String(e) });
+      toast.error("Erro ao testar provider");
+    } finally {
+      setTestingProvider(false);
+    }
+  };
+
+  const saveEmergentKey = async () => {
+    if (!emergentKey.trim()) { toast.error("Digite uma chave válida"); return; }
+    setSavingKey(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("settings-test", {
+        body: { action: "save_emergent_key", key: emergentKey.trim() },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast.success("Chave Emergent salva! Provider Pago ativo.");
+        setEmergentKey("");
+        loadStatus();
+      } else {
+        toast.error(data?.error || "Erro ao salvar chave");
+      }
+    } catch (e: any) {
+      toast.error("Erro: " + (e?.message || e));
+    } finally {
+      setSavingKey(false);
+    }
+  };
 
   const runTest = async (kind: "text" | "image") => {
     if (kind === "text") { setTestingText(true); setTextResult(null); }
@@ -100,6 +161,129 @@ export default function Settings() {
 
         {/* Relatório completo do sistema (restrito) */}
         <SystemReportCard />
+
+        {/* Toggle Free vs Paid */}
+        <Card className="border-nude-200 p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <Zap className="w-5 h-5 text-gold-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-display font-semibold text-lg">Provider de IA — Free vs Pago</div>
+              <div className="text-xs text-nude-600 mt-1">
+                Escolha entre <strong>Claude Free</strong> (Nemotron gratuito via ngrok) ou <strong>Claude Pago</strong> (Claude via Emergent). Quando no modo Pago, o Nemotron gera e o Claude revisa automaticamente.
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {/* Free */}
+            <button
+              onClick={() => switchProvider("free")}
+              disabled={testingProvider}
+              className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                aiProvider === "free"
+                  ? "border-emerald-500 bg-emerald-50 shadow-lg shadow-emerald-100"
+                  : "border-nude-200 bg-white hover:border-emerald-300"
+              }`}
+            >
+              {aiProvider === "free" && (
+                <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                  <CheckCircle2 className="w-3 h-3 text-white" />
+                </div>
+              )}
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                <span className="text-lg font-bold text-emerald-600">N</span>
+              </div>
+              <div className="font-bold text-sm">Claude Free</div>
+              <div className="text-[11px] text-nude-500 text-center">Nemotron (NVIDIA)<br/>Gratuito, sem revisão</div>
+              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]">Sem custo</Badge>
+            </button>
+
+            {/* Paid */}
+            <button
+              onClick={() => switchProvider("paid")}
+              disabled={testingProvider}
+              className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                aiProvider === "paid"
+                  ? "border-violet-500 bg-violet-50 shadow-lg shadow-violet-100"
+                  : "border-nude-200 bg-white hover:border-violet-300"
+              }`}
+            >
+              {aiProvider === "paid" && (
+                <div className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-violet-500 flex items-center justify-center">
+                  <CheckCircle2 className="w-3 h-3 text-white" />
+                </div>
+              )}
+              <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center">
+                <span className="text-lg font-bold text-violet-600">C</span>
+              </div>
+              <div className="font-bold text-sm">Claude Pago</div>
+              <div className="text-[11px] text-nude-500 text-center">Claude via Emergent<br/>Nemotron + Claude revisa</div>
+              <Badge className="bg-violet-100 text-violet-700 border-violet-200 text-[10px]">Pipeline duplo</Badge>
+            </button>
+          </div>
+
+          {testingProvider && (
+            <div className="flex items-center gap-2 text-sm text-nude-500 justify-center">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Testando provider...
+            </div>
+          )}
+
+          {providerResult && (
+            <div className={`mt-2 text-sm ${providerResult.ok ? "text-emerald-700" : "text-rose-700"}`}>
+              <div className="flex items-center gap-2">
+                {providerResult.ok ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                {providerResult.ok
+                  ? <>Funcionando — modelo <code className="text-xs">{providerResult.model}</code></>
+                  : <>Erro: {providerResult.error}</>}
+              </div>
+              {providerResult.ok && providerResult.reply && (
+                <div className="mt-1 text-xs text-nude-600 bg-nude-50 border border-nude-200 rounded p-2 font-mono max-h-24 overflow-auto">
+                  {providerResult.reply}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {/* Chave Emergent */}
+        <Card className="border-nude-200 p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <KeyRound className="w-5 h-5 text-violet-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-display font-semibold text-lg">Chave Emergent (Claude Pago)</div>
+              <div className="text-xs text-nude-600 mt-1">
+                Adicione sua chave da Emergent API para ativar o <strong>Claude Pago</strong>. 
+                O Nemotron gera e o Claude revisa automaticamente.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={emergentKey}
+              onChange={(e) => setEmergentKey(e.target.value)}
+              placeholder="sk-emergent-..."
+              className="flex-1 text-sm border border-nude-200 rounded-md px-3 py-2 bg-white text-nude-800 focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono"
+            />
+            <Button
+              size="sm"
+              onClick={saveEmergentKey}
+              disabled={savingKey || !emergentKey.trim()}
+              className="bg-violet-600 hover:bg-violet-700 text-white"
+            >
+              {savingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            </Button>
+          </div>
+
+          {secrets?.emergent && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-emerald-600">
+              <CheckCircle2 className="w-3 h-3" />
+              Chave configurada no backend
+            </div>
+          )}
+        </Card>
 
         {/* Secrets do backend — gated by password */}
         <SecretsDebugCard secrets={secrets} loadingStatus={loadingStatus} totalWorking={totalWorking} />
