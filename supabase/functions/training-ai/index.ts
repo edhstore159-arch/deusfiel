@@ -668,15 +668,24 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
       const tagInstruction = `Analise a resposta do profissional abaixo e identifique quais estratégias de atendimento foram utilizadas em CADA PARÁGRAFO.
 
 Estratégias disponíveis:
+- abordagem_inicial: Abertura e primeira impressão
+- identificacao_dor: Mapear a necessidade real do cliente
+- demonstracao_valor: Mostrar diferenciais do escritório
+- tratamento_objecao: Superar resistências comuns
+- fechamento: Converter orientação em agendamento
+- follow_up: Manter contato após primeira interação
+- captura_whatsapp: Estratégias específicas para WhatsApp
+- indicacao: Pedir e receber indicações
+- escuta_ativa: Coletar dados com perguntas estratégicas
+- urgencia_etica: Motivar ação imediata de forma ética
+- gatilhos_psicologicos: Reciprocidade, prova social, escassez
+- pos_duvida_juridica: Converter orientação em contrato
+- lead_divorcio: Atendimento para casos de família
+- lead_previdenciario: Atendimento para aposentadorias e INSS
+- lead_bancario: Atendimento para questões bancárias
+- lead_hesitante: Cliente indeciso que precisa de incentivo
+- lead_urgencia: Cliente em situação urgente
 - saudacao: Abertura e boas-vindas
-- identificacao: Coleta de dados pessoais
-- diagnostico: Identificação do problema
-- direcionamento: Encaminhamento para ministério/área
-- encerramento: Finalização e follow-up
-- urgencia: Situação urgente
-- oracao: Momento de oração/acolhimento
-- agendamento: Marcação de reunião
-- pos_atendimento: Verificação e acompanhamento
 
 Responda APENAS em JSON: {"paragraphs": [{"text": "texto do parágrafo", "strategy": "nome_da_estrategia"}]}
 

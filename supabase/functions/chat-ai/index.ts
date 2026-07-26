@@ -721,7 +721,7 @@ const DEFAULT_PROMPT = SECRETARIA_JURIDICA_PROMPT;
 
 function stripAppointmentBlock(text: string): string {
   return String(text || "")
-    .replace(/<AGENDAMENTO>[\s\S]*?<\/AGENDAMENTO>/g, "")
+    .replace(/<\s*AGENDAMENTO\s*>[\s\S]*?<\s*\/\s*AGENDAMENTO\s*>/gi, "")
     .replace(/<?\/?\s*HANDOFF[_\s-]*K[EÊ]NIA\s*\/?>?/giu, "")
     .replace(/`{1,3}\s*HANDOFF[_\s-]*K[EÊ]NIA\s*`{1,3}/giu, "")
     .trim();
@@ -905,7 +905,7 @@ function removeAssistantMetaPreamble(reply: string): string {
 }
 
 function parseAppointmentBlock(text: string) {
-  const match = String(text || "").match(/<AGENDAMENTO>([\s\S]*?)<\/AGENDAMENTO>/);
+  const match = String(text || "").match(/<\s*AGENDAMENTO\s*>([\s\S]*?)<\s*\/\s*AGENDAMENTO\s*>/i);
   if (!match) return null;
   try {
     const payload = JSON.parse(match[1].trim());
@@ -991,16 +991,23 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
     const history: Array<{ role: string; content: string }> = compactHistory(Array.isArray(body.history) ? body.history : []);
-    // Tenta usar prompt evoluído do treinamento; senão, usa o padrão hardcoded
+    // Tenta usar prompt evoluído do treinamento; senão, usa body.prompt; senão, usa o padrão hardcoded
     let extraPrompt: string = DEFAULT_PROMPT;
     try {
       const evolved = await getEvolvedPrompt("secretary");
       if (evolved && evolved.trim().length > 100) {
         extraPrompt = evolved;
         console.log("[chat-ai] Usando prompt evoluído do treinamento (agent_type=secretary)");
+      } else if (body.prompt && String(body.prompt).trim().length > 100) {
+        extraPrompt = String(body.prompt).trim();
+        console.log("[chat-ai] Usando prompt do body (fallback)");
       }
     } catch (e) {
       console.warn("[chat-ai] Falha ao buscar prompt evoluído, usando padrão:", e);
+      if (body.prompt && String(body.prompt).trim().length > 100) {
+        extraPrompt = String(body.prompt).trim();
+        console.log("[chat-ai] Usando prompt do body (fallback após erro DB)");
+      }
     }
 
     // Buscar também prompt evoluído do advogado para enriquecer conhecimento jurídico
