@@ -598,15 +598,15 @@ async function callClaudeFCC(messages: Array<{ role: string; content: string }>)
 
 async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
   try {
-    return await callOllama(messages, fmtDate, fmtTime);
+    return await callClaudeFCC(messages);
   } catch (err) {
-    console.warn("Ollama indisponível, tentando Claude FCC:", err);
+    console.warn("Claude FCC indisponível, tentando Ollama:", err);
   }
 
   try {
-    return await callClaudeFCC(messages);
+    return await callOllama(messages, fmtDate, fmtTime);
   } catch (err) {
-    console.warn("Claude FCC indisponível, usando Gateway IA:", err);
+    console.warn("Ollama indisponível, usando Gateway IA:", err);
   }
 
   try {

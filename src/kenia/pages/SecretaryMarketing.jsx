@@ -184,7 +184,12 @@ export default function SecretaryMarketing() {
       if (data?.error) throw new Error(data.error);
       setImproveModal({ open: true, improved_prompt: data.improved_prompt || "", changes: data.changes || [], reasoning: data.reasoning || "" });
     } catch (e) {
-      toast.error("Erro ao melhorar prompt: " + (e?.message || e));
+      console.error("[improvePrompt] error:", e);
+      const rawMsg = e?.message || String(e || "Erro desconhecido");
+      const msg = rawMsg.includes("non-2xx")
+        ? "Falha ao conectar com IA. Verifique sua conexão e tente novamente."
+        : rawMsg;
+      toast.error("Erro ao melhorar prompt: " + String(msg));
     } finally {
       setImproving(false);
     }
@@ -777,7 +782,7 @@ export default function SecretaryMarketing() {
                 <div>
                   <h4 className="text-xs font-medium text-muted-foreground mb-1">Mudanças feitas:</h4>
                   <ul className="text-xs space-y-1">
-                    {improveModal.changes.map((c, i) => <li key={i} className="flex items-start gap-1"><span className="text-purple-600">•</span> {c}</li>)}
+                    {improveModal.changes.map((c, i) => <li key={i} className="flex items-start gap-1"><span className="text-purple-600">•</span> {typeof c === "string" ? c : c.reason || c.area || JSON.stringify(c)}</li>)}
                   </ul>
                 </div>
               )}

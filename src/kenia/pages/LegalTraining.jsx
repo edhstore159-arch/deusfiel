@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Component } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { API, HAS_BACKEND } from "@/kenia/lib/api";
 import { Card } from "@/kenia/components/ui/card";
@@ -215,7 +215,7 @@ function SuggestionsPanel({ suggestions, priority, quickWins }) {
   );
 }
 
-export default function LegalTraining() {
+function LegalTraining() {
   const saved = loadState();
   const [mode, setMode] = useState("lawyer");
   const [area, setArea] = useState("civel");
@@ -824,13 +824,17 @@ export default function LegalTraining() {
       const evaluation = currentSession.evaluation || {};
       const weaknesses = evaluation.weaknesses || [];
       const tips = [];
-      const feedback = currentSession.messages.find((m) => m.content?.includes("Avaliação"))?.content || "";
+      const feedback = currentSession.messages.find((m) => m.content?.includes("Avaliação") || m.content?.includes("feedback") || m.content?.includes("Score"))?.content || "";
+
+      const promptFallback = currentSession.mode === "secretary"
+        ? (currentPrompt || "Você é uma secretária jurídica experiente do escritório da Dra. Kênia Garcia. Responda de forma humanizada, empática e profissional.")
+        : (currentPrompt || `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`);
 
       const { data, error } = await supabase.functions.invoke("training-ai", {
         body: {
           action: "improve_prompt",
           mode: currentSession.mode || mode,
-          current_prompt: currentPrompt || `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`,
+          current_prompt: promptFallback,
           evaluation_summary: feedback.slice(0, 2000),
           weaknesses,
           tips,
@@ -843,7 +847,12 @@ export default function LegalTraining() {
       setShowImprovePrompt(true);
       toast.success("Prompt melhorado gerado!");
     } catch (e) {
-      toast.error("Erro ao melhorar prompt: " + (e?.message || e));
+      console.error("[improvePrompt] error:", e);
+      const rawMsg = e?.message || String(e || "Erro desconhecido");
+      const msg = rawMsg.includes("non-2xx")
+        ? "Falha ao conectar com IA. Verifique sua conexão e tente novamente."
+        : rawMsg;
+      toast.error("Erro ao melhorar prompt: " + String(msg));
     } finally {
       setImprovingPrompt(false);
     }
@@ -1341,7 +1350,7 @@ export default function LegalTraining() {
                   )}
                 </div>
 
-                {/* Action buttons - always visible below session info */}
+                {/* Action buttons */}
                 <div className="flex gap-2">
                   <Button
                     size="sm"
@@ -1458,6 +1467,7 @@ export default function LegalTraining() {
                                 const { data, error } = await supabase.functions.invoke("training-ai", {
                                   body: {
                                     action: "improve_prompt",
+                                    mode: "secretary",
                                     current_prompt: currentPrompt || "",
                                     evaluation_summary: secEval.feedback || "",
                                     weaknesses: secEval.weaknesses || [],
@@ -1469,7 +1479,12 @@ export default function LegalTraining() {
                                 setSecImprovedPrompt(data);
                                 toast.success("Prompt melhorado!");
                               } catch (e) {
-                                toast.error("Erro: " + (e?.message || e));
+                                console.error("[secImprovePrompt] error:", e);
+                                const rawMsg = e?.message || String(e || "Erro desconhecido");
+                                const msg = rawMsg.includes("non-2xx")
+                                  ? "Falha ao conectar com IA. Tente novamente em alguns instantes."
+                                  : rawMsg;
+                                toast.error("Erro ao melhorar prompt: " + String(msg));
                               } finally {
                                 setSecImprovingPrompt(false);
                               }
@@ -1582,7 +1597,9 @@ export default function LegalTraining() {
                             {secImprovedPrompt.changes?.length > 0 && (
                               <div className="mb-1 space-y-0.5">
                                 {secImprovedPrompt.changes.map((c, i) => (
-                                  <div key={i} className="text-[9px] text-amber-700">• {c}</div>
+                                  <div key={i} className="text-[9px] text-amber-700">
+                                    • {typeof c === "string" ? c : c.reason || c.area || JSON.stringify(c)}
+                                  </div>
                                 ))}
                               </div>
                             )}
@@ -1677,7 +1694,9 @@ export default function LegalTraining() {
                         {improvePromptData.changes?.length > 0 && (
                           <div className="mb-2 space-y-1">
                             {improvePromptData.changes.map((c, i) => (
-                              <div key={i} className="text-[10px] text-amber-700">• {c}</div>
+                              <div key={i} className="text-[10px] text-amber-700">
+                                • {typeof c === "string" ? c : c.reason || c.area || JSON.stringify(c)}
+                              </div>
                             ))}
                           </div>
                         )}
@@ -2383,5 +2402,42 @@ export default function LegalTraining() {
       </TabsContent>
     </Tabs>
     </div>
+  );
+}
+
+class LegalTrainingErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("[LegalTraining] render error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center">
+          <h2 className="text-lg font-semibold text-red-600 mb-2">Erro no Treinamento</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Ocorreu um erro ao renderizar o treinamento. Tente recarregar a página.
+          </p>
+          <Button onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}>
+            Recarregar Página
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function LegalTrainingWrapper() {
+  return (
+    <LegalTrainingErrorBoundary>
+      <LegalTraining />
+    </LegalTrainingErrorBoundary>
   );
 }

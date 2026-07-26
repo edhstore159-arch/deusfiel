@@ -1068,24 +1068,7 @@ async function callAI(messagesPayload, options = {}) {
 
   const attempts = [];
 
-  // 1) Ollama primeiro
-  try {
-    const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`, systemPrompt);
-    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
-  } catch (e) {
-    const timedOut = e?.name === "AbortError";
-    const failed = {
-      ok: false,
-      provider: "ollama",
-      endpoint: OLLAMA_URL,
-      model: OLLAMA_MODEL,
-      error: timedOut ? `Tempo esgotado após ${AI_REQUEST_TIMEOUT_MS}ms aguardando resposta do Ollama.` : e?.message || String(e),
-    };
-    attempts.push(failed);
-    recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
-  }
-
-  // 2) Claude via FCC como fallback
+  // 1) Claude FCC primeiro
   if (FCC_ENABLED) {
     try {
       const reply = await callClaudeFCC(messagesPayload, systemPrompt);
@@ -1105,7 +1088,24 @@ async function callAI(messagesPayload, options = {}) {
     }
   }
 
-  return { ok: false, error: "Ollama e Claude FCC falharam.", attempts, ...attempts[attempts.length - 1] };
+  // 2) Ollama como fallback
+  try {
+    const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`, systemPrompt);
+    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
+  } catch (e) {
+    const timedOut = e?.name === "AbortError";
+    const failed = {
+      ok: false,
+      provider: "ollama",
+      endpoint: OLLAMA_URL,
+      model: OLLAMA_MODEL,
+      error: timedOut ? `Tempo esgotado após ${AI_REQUEST_TIMEOUT_MS}ms aguardando resposta do Ollama.` : e?.message || String(e),
+    };
+    attempts.push(failed);
+    recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
+  }
+
+  return { ok: false, error: "Claude FCC e Ollama falharam.", attempts, ...attempts[attempts.length - 1] };
 }
 
 async function generateCreativeImage(prompt) {

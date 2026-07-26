@@ -1014,7 +1014,8 @@ REGRAS OBRIGATÓRIAS:
         ? `PROMPT ATUAL DA SECRETÁRIA:\n${currentPrompt.slice(0, 3000)}\n\nRESUMO DA AVALIAÇÃO:\n${evaluationSummary.slice(0, 1500)}\n\nPONTOS FRACOS:\n${weaknesses.map((w, i) => `${i + 1}. ${w}`).join("\n") || "Nenhum identificado"}\n\nDICAS:\n${tips.map((t, i) => `${i + 1}. ${t}`).join("\n") || "Nenhuma identificada"}\n\nMELHORE o prompt da secretária para que ela responda melhor nos próximos treinos. O prompt deve ser completo e autocontido.`
         : `PROMPT ATUAL DO ${mode === "lawyer" ? "ADVOGADO" : "JUIZ"}:\n${currentPrompt.slice(0, 3000)}\n\nRESUMO DA AVALIAÇÃO:\n${evaluationSummary.slice(0, 1500)}\n\nPONTOS FRACOS:\n${weaknesses.map((w, i) => `${i + 1}. ${w}`).join("\n") || "Nenhum identificado"}\n\nDICAS:\n${tips.map((t, i) => `${i + 1}. ${t}`).join("\n") || "Nenhuma identificada"}\n\nMELHORE o prompt do profissional para que ele responda melhor nos próximos treinos. O prompt deve ser completo e autocontido.`;
 
-      const improveResult = await chatCompletion({
+      // Retry: até 2 tentativas para improve_prompt
+      let improveResult = await chatCompletion({
         messages: [
           { role: "system", content: improveSystemPrompt },
           { role: "user", content: userMessage },
@@ -1023,8 +1024,21 @@ REGRAS OBRIGATÓRIAS:
       });
 
       if (!improveResult.ok) {
+        console.warn(`[training-ai] improve_prompt tentativa 1 falhou: ${improveResult.error}, tentando retry...`);
+        await new Promise((r) => setTimeout(r, 1500));
+        improveResult = await chatCompletion({
+          messages: [
+            { role: "system", content: improveSystemPrompt },
+            { role: "user", content: userMessage },
+          ],
+          temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini", preferFastProvider: true,
+        });
+      }
+
+      if (!improveResult.ok) {
+        console.error(`[training-ai] improve_prompt falhou em todas as tentativas: ${improveResult.error}`);
         return new Response(
-          JSON.stringify({ error: "Falha ao melhorar prompt" }),
+          JSON.stringify({ error: `Falha ao melhorar prompt: ${String(improveResult.error || "providers indisponíveis").slice(0, 200)}` }),
           { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
@@ -1036,21 +1050,25 @@ REGRAS OBRIGATÓRIAS:
       const saveMode = isSecretary ? "secretary" : (mode === "lawyer" ? "lawyer" : "judge");
       const saveArea = isSecretary ? "general" : area;
       if (improvedPrompt && improvedPrompt !== currentPrompt && improvedPrompt.trim().length > 100) {
-        await saveEvolvedPrompt(saveMode, saveArea, improvedPrompt, 0, {
-          source: `${saveMode}_improve_prompt`,
-          weaknesses_count: weaknesses.length,
-          tips_count: tips.length,
-        });
-        console.log(`[training-ai] improve_prompt: prompt salvo para ${saveMode}/${saveArea}`);
+        try {
+          await saveEvolvedPrompt(saveMode, saveArea, improvedPrompt, 0, {
+            source: `${saveMode}_improve_prompt`,
+            weaknesses_count: weaknesses.length,
+            tips_count: tips.length,
+          });
+          console.log(`[training-ai] improve_prompt: prompt salvo para ${saveMode}/${saveArea}`);
+        } catch (saveErr) {
+          console.error("[training-ai] improve_prompt: falha ao salvar prompt:", saveErr);
+        }
       }
 
-      console.log(`[training-ai] improve_prompt (${mode}): ${weaknesses.length} weaknesses addressed`);
+      console.log(`[training-ai] improve_prompt (${mode}): ${weaknesses.length} weaknesses addressed, provider: ${improveResult.provider}`);
       return new Response(
         JSON.stringify({
           improved_prompt: improvedPrompt,
           changes: Array.isArray(parsed?.changes) ? parsed.changes : [],
           reasoning: String(parsed?.reasoning || "Prompt melhorado com base no feedback."),
-          provider: "gpt-4o-mini",
+          provider: improveResult.provider || "unknown",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
@@ -1386,7 +1404,7 @@ REGRAS OBRIGATÓRIAS:
   } catch (err) {
     console.error("[training-ai] fatal:", err);
     return new Response(
-      JSON.stringify({ error: String(err) }),
+      JSON.stringify({ error: `Erro interno: ${String(err?.message || err).slice(0, 300)}` }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
