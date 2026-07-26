@@ -34,6 +34,7 @@ const STRATEGIES = [
   { id: "lead_hesitante", name: "Lead Hesitante", icon: MessageSquare, desc: "Cliente indeciso que precisa de incentivo", color: "text-slate-600" },
   { id: "lead_urgencia", name: "Lead com Urgência", icon: CheckCircle2, desc: "Cliente em situação urgente", color: "text-red-600" },
   { id: "pos_duvida_juridica", name: "Após Dúvida Jurídica", icon: Star, desc: "Converter orientação em agendamento", color: "text-gold-600" },
+  { id: "saudacao", name: "Saudação", icon: Handshake, desc: "Abertura e boas-vindas", color: "text-green-600" },
 ];
 
 function loadState() {

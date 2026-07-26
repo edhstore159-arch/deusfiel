@@ -11,9 +11,11 @@ import {
   Send, Loader2, GraduationCap, Scale, MessageSquare,
   Trophy, Target, BookOpen, RefreshCw, ChevronDown, ChevronUp, Star,
   Sparkles, Lightbulb, CheckCircle2, ArrowRight, Phone, Users,
-  Copy, Printer
+  Copy, Printer, FileDown
 } from "lucide-react";
 import { toast } from "sonner";
+import { CHAT_DEFAULT_PROMPT, loadChatConfig, saveChatConfig } from "@/kenia/storage/chatSecretary";
+import { jsPDF } from "jspdf";
 
 const STORAGE_KEY = "legal-training:state";
 
@@ -319,6 +321,9 @@ function LegalTraining() {
   const [secCorrectedData, setSecCorrectedData] = useState(null);
   const [secImprovingArg, setSecImprovingArg] = useState(false);
   const [secImprovementData, setSecImprovementData] = useState(null);
+  const [simRunning, setSimRunning] = useState(false);
+  const [simProgress, setSimProgress] = useState({ current: 0, total: 0, strategy: "" });
+  const [simResults, setSimResults] = useState(null);
 
   const SEC_STRATEGIES = [
     { id: "abordagem_inicial", name: "Abordagem Inicial", desc: "Primeira impressão e quebra de gelo", color: "#22c55e" },
@@ -1037,6 +1042,96 @@ function LegalTraining() {
     }
   };
 
+  const runSimulator = async () => {
+    if (simRunning) return;
+    setSimRunning(true);
+    setSimResults(null);
+    setSimProgress({ current: 0, total: 18, strategy: "Iniciando simulador..." });
+    try {
+      const currentPrompt = loadChatConfig().prompt || CHAT_DEFAULT_PROMPT;
+      const { data, error } = await supabase.functions.invoke("training-ai", {
+        body: { action: "auto_train", current_prompt: currentPrompt, mode: "secretary" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setSimResults(data);
+      if (data.improved_prompt && data.improved_prompt !== currentPrompt) {
+        saveChatConfig({ prompt: data.improved_prompt });
+      }
+      toast.success(`Simulador concluído! Média: ${data.stats?.avgScore || 0}/100`);
+    } catch (e) {
+      toast.error("Erro no simulador: " + (e?.message || e));
+    } finally {
+      setSimRunning(false);
+      setSimProgress({ current: 18, total: 18, strategy: "Concluído" });
+    }
+  };
+
+  const generateSimPDF = () => {
+    if (!simResults) return;
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 20;
+
+      doc.setFontSize(18);
+      doc.text("Relatório de Treinamento — Secretaria", pageWidth / 2, y, { align: "center" });
+      y += 10;
+      doc.setFontSize(10);
+      doc.text(`Data: ${new Date().toLocaleDateString("pt-BR")} | Média: ${simResults.stats?.avgScore || 0}/100 | Aprovadas: ${simResults.stats?.passed || 0}/${simResults.stats?.total || 0}`, pageWidth / 2, y, { align: "center" });
+      y += 15;
+
+      doc.setFontSize(12);
+      doc.text("Resultados por Estratégia", 20, y);
+      y += 8;
+
+      (simResults.results || []).forEach((r, i) => {
+        if (y > 270) { doc.addPage(); y = 20; }
+        const score = r.score || 0;
+        const strat = WA_STRATEGIES.find((s) => s.name === r.strategy_id) || SEC_STRATEGIES.find((s) => s.id === r.strategy_id);
+        doc.setFontSize(9);
+        doc.setFont(undefined, "bold");
+        doc.text(`${i + 1}. ${r.strategy_name || r.strategy_id}`, 20, y);
+        doc.setFont(undefined, "normal");
+        doc.text(`${score}/100`, 170, y);
+        y += 5;
+        if (r.weaknesses?.length > 0) {
+          doc.setFontSize(8);
+          doc.text(`Pontos fracos: ${r.weaknesses.slice(0, 3).join("; ")}`, 25, y);
+          y += 5;
+        }
+        if (r.strengths?.length > 0) {
+          doc.setFontSize(8);
+          doc.text(`Pontos fortes: ${r.strengths.slice(0, 2).join("; ")}`, 25, y);
+          y += 5;
+        }
+        y += 2;
+      });
+
+      if (simResults.improved_prompt) {
+        if (y > 240) { doc.addPage(); y = 20; }
+        y += 5;
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text("Prompt Melhorado (salvo automaticamente)", 20, y);
+        y += 7;
+        doc.setFontSize(8);
+        doc.setFont(undefined, "normal");
+        const lines = doc.splitTextToSize(simResults.improved_prompt, pageWidth - 40);
+        lines.slice(0, 30).forEach((line) => {
+          if (y > 270) { doc.addPage(); y = 20; }
+          doc.text(line, 20, y);
+          y += 4;
+        });
+      }
+
+      doc.save("treinamento-secretaria.pdf");
+      toast.success("PDF gerado!");
+    } catch (e) {
+      toast.error("Erro ao gerar PDF");
+    }
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -1217,6 +1312,67 @@ function LegalTraining() {
                         {secLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Target className="w-4 h-4 mr-2" />}
                         Gerar Cenário
                       </Button>
+                    )}
+                  </div>
+
+                  {/* Simulador Completo */}
+                  <div className="mt-4 p-3 rounded-xl border-2 border-dashed border-purple-200 bg-purple-50/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      <span className="text-sm font-bold text-purple-800">Simulador Completo</span>
+                    </div>
+                    <p className="text-[10px] text-purple-600 mb-3">
+                      Testa todas as 18 estratégias automaticamente, gera relatório por estratégia e melhora o prompt.
+                    </p>
+                    <Button
+                      onClick={runSimulator}
+                      disabled={simRunning}
+                      className="w-full h-10 text-sm font-semibold bg-purple-600 hover:bg-purple-700"
+                    >
+                      {simRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                      {simRunning ? `${simProgress.current}/${simProgress.total} — ${simProgress.strategy}` : "Rodar Simulador (18 estratégias)"}
+                    </Button>
+                    {simRunning && (
+                      <div className="mt-2">
+                        <div className="w-full bg-purple-200 rounded-full h-1.5">
+                          <div className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${(simProgress.current / simProgress.total) * 100}%` }} />
+                        </div>
+                      </div>
+                    )}
+                    {simResults && !simRunning && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex gap-3 text-xs items-center">
+                          <span className="text-green-600 font-bold">✓ {simResults.stats?.passed || 0} aprovadas</span>
+                          <span className="text-red-600 font-bold">✗ {(simResults.stats?.total || 0) - (simResults.stats?.passed || 0)} reprovadas</span>
+                          <span className="text-purple-700 font-bold">Média: {simResults.stats?.avgScore || 0}/100</span>
+                          <Button size="sm" variant="outline" onClick={generateSimPDF}
+                            className="text-[10px] gap-1 border-blue-200 hover:bg-blue-50 text-blue-700 ml-auto h-6">
+                            <FileDown className="w-3 h-3" /> PDF
+                          </Button>
+                        </div>
+                        {simResults.improved_prompt && (
+                          <p className="text-[10px] text-green-600 font-medium">✓ Prompt melhorado e salvo automaticamente</p>
+                        )}
+                        <div className="max-h-[30vh] overflow-auto space-y-1">
+                          {(simResults.results || []).map((r, i) => {
+                            const strat = WA_STRATEGIES.find((s) => s.name === r.strategy_id) || SEC_STRATEGIES.find((s) => s.id === r.strategy_id);
+                            const score = r.score || 0;
+                            const scoreColor = score >= 80 ? "text-green-600" : score >= 60 ? "text-yellow-600" : "text-red-600";
+                            const scoreBg = score >= 80 ? "bg-green-100" : score >= 60 ? "bg-yellow-100" : "bg-red-100";
+                            return (
+                              <div key={i} className="flex items-center gap-2 p-1.5 rounded-lg bg-white border text-[10px]">
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: strat?.color || "#94a3b8" }} />
+                                <span className="flex-1 font-medium truncate">{r.strategy_name || r.strategy_id}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${scoreBg} ${scoreColor}`}>{score}</span>
+                                {r.weaknesses?.length > 0 && (
+                                  <span className="text-[8px] text-red-500" title={r.weaknesses.join("; ")}>⚠{r.weaknesses.length}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
