@@ -102,6 +102,49 @@ const callOpenRouterFree = async (msg: string, history: { role: string; content:
   }
 };
 
+const FCC_URL = (
+  import.meta.env.VITE_FCC_URL || "http://127.0.0.1:8082"
+).replace(/\/$/, "");
+const FCC_AUTH_TOKEN = import.meta.env.VITE_FCC_AUTH_TOKEN || "freecc";
+const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+
+const callClaudeFCC = async (msg: string, history: { role: string; content: string }[]): Promise<string> => {
+  const systemPrompt = "Voce e um assistente juridico inteligente. Responda de forma clara, objetiva e profissional em portugues do Brasil.";
+  const apiMessages = [
+    ...history.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
+    { role: "user", content: msg },
+  ];
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
+  try {
+    const res = await fetch(`${FCC_URL}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": FCC_AUTH_TOKEN,
+        "Authorization": `Bearer ${FCC_AUTH_TOKEN}`,
+        "anthropic-version": "2023-06-01",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: FCC_MODEL,
+        max_tokens: 500,
+        stream: false,
+        system: systemPrompt,
+        messages: apiMessages,
+      }),
+    });
+    if (!res.ok) throw new Error(`FCC HTTP ${res.status}`);
+    const data = await res.json();
+    const textBlock = (data?.content || []).find((b: any) => b.type === "text");
+    return textBlock?.text || "Sem resposta do Claude FCC.";
+  } catch (e: any) {
+    throw new Error(e?.name === "AbortError" ? "Timeout Claude FCC" : e?.message || "Erro Claude FCC");
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 interface AIProv {
   id: string;
   name: string;
@@ -113,6 +156,7 @@ interface AIProv {
 
 const PROVIDERS: AIProv[] = [
   { id: "ollama", name: "Ollama Local", icon: "\u{1F3E0}", color: "#10b981", border: "#059669", send: callOllama },
+  { id: "claude-fcc", name: "Claude FCC", icon: "\u{1F9E0}", color: "#d97706", border: "#b45309", send: callClaudeFCC },
   { id: "gemini", name: "Gemini", icon: "\u2728", color: "#3b82f6", border: "#2563eb", send: callGeminiFree },
   { id: "groq", name: "Groq/Llama", icon: "\u26A1", color: "#f97316", border: "#ea580c", send: callGroqFree },
   { id: "openrouter", name: "OpenRouter", icon: "\u{1F310}", color: "#8b5cf6", border: "#7c3aed", send: callOpenRouterFree },
@@ -260,7 +304,7 @@ const Panel = ({ onClose }: { onClose: () => void }) => {
 
 export const MultiAISidePanel = () => {
   const [open, setOpen] = useState(false);
-  const activeCount = 4;
+  const activeCount = PROVIDERS.length;
 
   const bubble = (
     <button

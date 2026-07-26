@@ -346,6 +346,13 @@ const EMERGENT_MODEL = process.env.EMERGENT_MODEL || "gpt-4o-mini";
 const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY || process.env.VITE_LOVABLE_API_KEY || "";
 const AI_MODEL = process.env.AI_MODEL || "google/gemini-3-flash-preview";
 const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS || 90000);
+
+// ---- Claude via FCC Proxy (Free Claude Code) ----
+const FCC_BASE_URL = process.env.FCC_BASE_URL || "http://127.0.0.1:8082";
+const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "freecc";
+const FCC_MODEL = process.env.FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+const FCC_ENABLED = process.env.FCC_ENABLED !== "false";
+const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 const AUTO_REPLY_SEND_TIMEOUT_MS = Number(process.env.AUTO_REPLY_SEND_TIMEOUT_MS || 20000);
 const AUTO_REPLY_RETRY_EVERY_MS = Number(process.env.AUTO_REPLY_RETRY_EVERY_MS || 10000);
 const AUTO_REPLY_QUEUE_MAX = Number(process.env.AUTO_REPLY_QUEUE_MAX || 50);
@@ -1008,6 +1015,43 @@ function removeTemporalLeaks(reply, userText) {
     .trim();
 }
 
+async function callClaudeFCC(messages, systemPrompt) {
+  if (!FCC_ENABLED) throw new Error("FCC desativado");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FCC_TIMEOUT_MS);
+  try {
+    const apiMessages = messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+    const resp = await fetch(`${FCC_BASE_URL}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": FCC_AUTH_TOKEN,
+        "Authorization": `Bearer ${FCC_AUTH_TOKEN}`,
+        "anthropic-version": "2023-06-01",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: FCC_MODEL,
+        max_tokens: 500,
+        stream: false,
+        system: systemPrompt,
+        messages: apiMessages,
+      }),
+    });
+    const raw = await resp.text();
+    if (!resp.ok) throw new Error(`FCC ${resp.status}: ${raw.slice(0, 300)}`);
+    const data = JSON.parse(raw || "{}");
+    const textBlock = (data?.content || []).find((b) => b.type === "text");
+    const reply = String(textBlock?.text || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+    if (!reply) throw new Error("FCC retornou resposta vazia");
+    return reply;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function callAI(messagesPayload, options = {}) {
   if (userAskedTemporalInfo(options.userText)) {
     return { ok: true, provider: "ollama-temporal", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: buildTemporalAnswer(), attempts: [] };
@@ -1023,6 +1067,8 @@ async function callAI(messagesPayload, options = {}) {
     .join("\n\n");
 
   const attempts = [];
+
+  // 1) Ollama primeiro
   try {
     const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`, systemPrompt);
     return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
@@ -1039,7 +1085,27 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
   }
 
-  return { ok: false, error: "Ollama qwen2.5:3b-instruct falhou e o chat não usa outro modelo de IA.", attempts, ...attempts[attempts.length - 1] };
+  // 2) Claude via FCC como fallback
+  if (FCC_ENABLED) {
+    try {
+      const reply = await callClaudeFCC(messagesPayload, systemPrompt);
+      const cleaned = sanitizeOllamaReply(reply, options.userText);
+      return { ok: true, provider: "claude-fcc", endpoint: FCC_BASE_URL, model: FCC_MODEL, reply: cleaned, attempts };
+    } catch (e) {
+      const timedOut = e?.name === "AbortError";
+      const failed = {
+        ok: false,
+        provider: "claude-fcc",
+        endpoint: FCC_BASE_URL,
+        model: FCC_MODEL,
+        error: timedOut ? `FCC timeout ${FCC_TIMEOUT_MS}ms` : e?.message || String(e),
+      };
+      attempts.push(failed);
+      recordAutoReply({ step: "ai_provider_fail", provider: "claude-fcc", error: failed.error });
+    }
+  }
+
+  return { ok: false, error: "Ollama e Claude FCC falharam.", attempts, ...attempts[attempts.length - 1] };
 }
 
 async function generateCreativeImage(prompt) {

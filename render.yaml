@@ -68,3 +68,9 @@ services:
         value: "15000"
       - key: RECONNECT_MAX_DELAY_MS
         value: "300000"
+      - key: FCC_BASE_URL
+        value: https://unabashed-vertical-crispness.ngrok-free.dev
+      - key: FCC_AUTH_TOKEN
+        value: freecc
+      - key: FCC_MODEL
+        value: claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b
