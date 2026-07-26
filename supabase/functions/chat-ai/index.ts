@@ -554,11 +554,59 @@ async function callOllama(messages: Array<{ role: string; content: string }>, fm
   }
 }
 
+async function callClaudeFCC(messages: Array<{ role: string; content: string }>): Promise<string> {
+  const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "";
+  const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
+  const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+  if (!FCC_BASE_URL) throw new Error("FCC_BASE_URL não configurado");
+  const systemMsg = messages.find((m) => m.role === "system")?.content || SECRETARIA_JURIDICA_PROMPT;
+  const apiMessages = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "") }));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+  try {
+    const resp = await fetch(`${FCC_BASE_URL}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": FCC_AUTH_TOKEN,
+        "Authorization": `Bearer ${FCC_AUTH_TOKEN}`,
+        "anthropic-version": "2023-06-01",
+        "ngrok-skip-browser-warning": "true",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: FCC_MODEL,
+        max_tokens: 500,
+        stream: false,
+        system: systemMsg,
+        messages: apiMessages,
+      }),
+    });
+    const raw = await resp.text();
+    if (!resp.ok) throw new Error(`FCC ${resp.status}: ${raw.slice(0, 300)}`);
+    const data = JSON.parse(raw || "{}");
+    const textBlock = (data?.content || []).find((b: any) => b.type === "text");
+    const reply = String(textBlock?.text || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+    if (!reply) throw new Error("FCC retornou resposta vazia");
+    return reply;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
   try {
     return await callOllama(messages, fmtDate, fmtTime);
   } catch (err) {
-    console.warn("Ollama indisponível, usando Gateway IA:", err);
+    console.warn("Ollama indisponível, tentando Claude FCC:", err);
+  }
+
+  try {
+    return await callClaudeFCC(messages);
+  } catch (err) {
+    console.warn("Claude FCC indisponível, usando Gateway IA:", err);
   }
 
   try {
