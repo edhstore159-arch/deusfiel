@@ -18,6 +18,9 @@ export interface ImageOptions {
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
 const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
+const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "";
+const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
+const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
 
 // ---------- chat completions ----------
 
@@ -109,8 +112,42 @@ async function chatEmergent(opts: ChatOptions) {
   }
 }
 
+async function chatClaudeFCC(opts: ChatOptions) {
+  if (!FCC_BASE_URL) return { ok: false as const, status: 0, error: "FCC_BASE_URL ausente" };
+  try {
+    const systemMsg = opts.messages.find((m) => m.role === "system")?.content || "";
+    const apiMessages = opts.messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role === "assistant" ? "assistant" as const : "user" as const, content: String(m.content || "") }));
+    const resp = await fetch(`${FCC_BASE_URL}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": FCC_AUTH_TOKEN,
+        "Authorization": `Bearer ${FCC_AUTH_TOKEN}`,
+        "anthropic-version": "2023-06-01",
+        "ngrok-skip-browser-warning": "true",
+      },
+      body: JSON.stringify({
+        model: FCC_MODEL,
+        max_tokens: 500,
+        stream: false,
+        system: systemMsg,
+        messages: apiMessages,
+      }),
+    });
+    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+    const data = await resp.json();
+    const textBlock = (data?.content || []).find((b: any) => b.type === "text");
+    const text = String(textBlock?.text || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+    return { ok: true as const, data: { choices: [{ message: { role: "assistant", content: text } }] }, provider: "claude-fcc" };
+  } catch (e) {
+    return { ok: false as const, status: 0, error: `Claude FCC erro: ${(e as Error)?.message || e}` };
+  }
+}
+
 export async function chatCompletion(opts: ChatOptions) {
-  // Order: Lovable → Gemini (direct) → Emergent
+  // Order: Lovable → Gemini (direct) → Emergent → Claude FCC
   if (LOVABLE_KEY) {
     const r = await chatLovable(opts);
     if (r.ok) return r;
@@ -123,7 +160,10 @@ export async function chatCompletion(opts: ChatOptions) {
   }
   const r3 = await chatEmergent(opts);
   if (r3.ok) return r3;
-  return { ok: false as const, status: r3.status || 502, error: r3.error || "Nenhum provider disponível", provider: "none" };
+  console.warn("⚠️ Emergent falhou, tentando Claude FCC:", r3.status, r3.error?.slice?.(0, 200));
+  const r4 = await chatClaudeFCC(opts);
+  if (r4.ok) return r4;
+  return { ok: false as const, status: r4.status || r3.status || 502, error: r4.error || r3.error || "Nenhum provider disponível", provider: "none" };
 }
 
 // ---------- text-to-image ----------
