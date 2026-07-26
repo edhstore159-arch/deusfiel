@@ -1183,7 +1183,12 @@ REGRAS OBRIGATÓRIAS PARA PERGUNTAS JURÍDICAS:
 2. Nunca diga "não posso dar conselhos legais" — quando a pergunta é jurídica, você DEVE orientar.
 3. Cite artigos de lei sempre que possível (CLT, CC, CPC, CP, CDC, etc.).
 4. Identifique a área jurídica e aplique as instruções técnicas acima.
-5. Mantenha o tom de secretária jurídica, mas com conhecimento técnico profissional.` : ""}`;
+5. Mantenha o tom de secretária jurídica, mas com conhecimento técnico profissional.
+6. Use termos jurídicos CORRETOS da área. Exemplos:
+   - Trabalhista: aviso prévio, férias proporcionais + 1/3, 13º proporcional, multa 40% FGTS, saque FGTS, seguro-desemprego, verbas rescisórias
+   - Família: execução de alimentos, pensão alimentícia, guarda compartilhada, divórcio consensual/judicial, inventário
+   - Penal: inquérito policial, representação criminal, audiência de custódia, medidas cautelares, defesa técnica
+   - Consumidor: CDC, inversão do ônus da prova, vício/conhecimento do produto, direito de arrependimento, cláusula abusiva` : ""}`;
 
     // === Agenda real da Dra. Kênia (slots disponíveis a partir do dashboard) ===
     let availabilityBlock = "";
@@ -1262,8 +1267,28 @@ REGRAS OBRIGATÓRIAS PARA PERGUNTAS JURÍDICAS:
       );
     }
 
+    const agentSystemMsg = agentConfig ? {
+      role: "system",
+      content: `⚠️ MODO ESPECIALIZADO ATIVADO — AGENTE JURÍDICO: ${agentConfig.name}
+ÁREA: ${agentConfig.area}
+VOCÊ É UM ESPECIALISTA EM ${agentConfig.area.toUpperCase()}.
+
+INSTRUÇÕES OBRIGATÓRIAS:
+- Responda SEMPRE com conhecimento técnico jurídico específico da área de ${agentConfig.area}.
+- Cite artigos de lei, súmulas e jurisprudência relevantes.
+- Nunca diga "não posso dar conselhos jurídicos" — isso é OBRIGATÓRIO quando a pergunta é da sua área.
+- Use termos técnicos corretos: ${agentConfig.instructions}
+- Mantenha o tom de secretária jurídica da Dra. Kênia Garcia, mas com autoridade técnica.
+
+EXEMPLO DE RESPOSTA CORRETA para "${agentConfig.area}":
+"Em relação à sua situação, com base na legislação de ${agentConfig.area}, você tem direito a [direito específico]. Conforme [artigo/lei aplicável], [fundamentação]. Recomendo [próximo passo jurídico]."
+
+NUNCA responda com informações genéricas ou de outros países. Sempre use a legislação brasileira.`
+    } : null;
+
     const messages = [
       { role: "system", content: systemContent + availabilityBlock },
+      ...(agentSystemMsg ? [agentSystemMsg] : []),
       ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
       { role: "user", content: userMessage },
     ];
