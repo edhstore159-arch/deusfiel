@@ -1289,6 +1289,7 @@ async function autoReply(jid, userText, contactName) {
       history.push({ role: "user", content: userText });
       history.push({ role: "assistant", content: reply });
       aiHistory.set(jid, trimAiHistory(history));
+      persistAiTurn(jid, userText, reply).catch(() => {});
       try {
         const sent = await sendBotText(jid, reply, { source: "chat_ai" });
         recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: "chat_ai", appointment: Boolean(data?.appointment), reply: reply.slice(0, 200) });
