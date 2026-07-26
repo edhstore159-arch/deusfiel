@@ -22,7 +22,9 @@ services:
       - key: VITE_SUPABASE_PROJECT_ID
         value: uzzbgjwpfxokagrvmdoa
       - key: VITE_BACKEND_URL
-        value: https://kenia-whatsapp-backend.onrender.com
+        value: https://minimal-arch-muse-384-bak.onrender.com
+      - key: VITE_FCC_URL
+        value: https://unabashed-vertical-crispness.ngrok-free.dev
   - type: web
     name: kenia-whatsapp-backend
     runtime: node
