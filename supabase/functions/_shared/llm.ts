@@ -206,7 +206,8 @@ export async function chatCompletion(opts: ChatOptions) {
   }
 
   // Fallback chain padrão: Nemotron → FCC → Lovable → Gemini → Emergent
-  if (NVIDIA_NIM_API_KEY) {
+  // Se pediu modelo específico (GPT/Gemini/Claude), NÃO cai no Nemotron como fallback
+  if (NVIDIA_NIM_API_KEY && !wantsEmergent && !wantsGemini && !wantsClaude) {
     const r = await chatNemotronDirect(opts);
     if (r.ok) return r;
     console.warn("⚠️ Nemotron NIM direto falhou, tentando Claude FCC:", r.status, r.error?.slice?.(0, 200));
