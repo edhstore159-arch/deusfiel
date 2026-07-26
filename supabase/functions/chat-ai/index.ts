@@ -1211,7 +1211,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
       await supabase.from("conversations").insert({
         user_id: userId,
-        session_id: sessionId,
+        session_id: sessionId && !String(sessionId).startsWith("whatsapp:") ? `whatsapp:${sessionId}` : sessionId,
         message: userMessage,
         response: reply,
       });

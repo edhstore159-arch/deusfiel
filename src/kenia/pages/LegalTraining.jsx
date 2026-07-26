@@ -368,19 +368,21 @@ function LegalTraining() {
       const { data, error } = await supabase
         .from("conversations")
         .select("session_id, message, response, created_at")
-        .like("session_id", "whatsapp:%")
+        .not("session_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(500);
       if (!error && data?.length) {
         const bySession = {};
         for (const row of data) {
-          const sid = row.session_id;
-          if (!bySession[sid]) bySession[sid] = { rows: [], last: row.created_at };
-          bySession[sid].rows.push(row);
-          if (row.created_at > bySession[sid].last) bySession[sid].last = row.created_at;
+          const rawSid = row.session_id || "";
+          const phone = rawSid.replace("whatsapp:", "").split("@")[0].replace(/^\+/, "");
+          if (!phone || phone.length < 8 || phone === "test" || rawSid.startsWith("test")) continue;
+          const key = phone;
+          if (!bySession[key]) bySession[key] = { rows: [], last: row.created_at, phone };
+          bySession[key].rows.push(row);
+          if (row.created_at > bySession[key].last) bySession[key].last = row.created_at;
         }
-        const mapped = Object.entries(bySession).map(([sid, info]) => {
-          const phone = sid.replace("whatsapp:", "").split("@")[0];
+        const mapped = Object.entries(bySession).map(([key, info]) => {
           const allMsgs = info.rows.reverse().flatMap((r) => {
             const msgs = [];
             if (r.message) msgs.push({ direction: "incoming", content: r.message, created_at: r.created_at });
@@ -388,14 +390,14 @@ function LegalTraining() {
             return msgs;
           });
           return {
-            id: sid,
-            phone: `+${phone}`,
-            member_name: `+${phone}`,
+            id: key,
+            phone: `+${info.phone}`,
+            member_name: `+${info.phone}`,
             status: "active",
             current_strategy: "abordagem_inicial",
             updated_at: info.last,
             _messages: allMsgs,
-            _session_id: sid,
+            _session_id: info.rows[0]?.session_id || key,
           };
         }).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
         setWaConversations(mapped);
@@ -403,7 +405,7 @@ function LegalTraining() {
         setWaLoading(false);
         return;
       }
-    } catch {}
+    } catch (e) { console.warn("[conversas] supabase error:", e); }
     setWaConversations([]);
     setWaDataSource("none");
     setWaLoading(false);

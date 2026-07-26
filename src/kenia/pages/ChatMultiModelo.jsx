@@ -338,7 +338,6 @@ export default function ChatMultiModelo() {
                   </div>
                   <div className="min-w-0">
                     <div className="font-semibold text-sm truncate">{m.label}</div>
-                    <div className="text-[10px] text-nude-500 truncate">{m.tag}</div>
                   </div>
                 </div>
                 <div className="text-[11px] text-nude-600 mt-2 line-clamp-2">{m.desc}</div>
@@ -435,7 +434,7 @@ export default function ChatMultiModelo() {
           )}
         </div>
         <div className="max-w-3xl mx-auto mt-2 text-[10px] text-nude-400 text-center">
-          Enter para enviar · Shift+Enter para nova linha · Modelo atual: <b>{selected.tag}</b>
+          Enter para enviar · Shift+Enter para nova linha · Modelo atual: <b>{selected.label}</b>
         </div>
       </div>
     </div>
