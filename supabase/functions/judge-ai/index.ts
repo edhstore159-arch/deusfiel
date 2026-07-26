@@ -113,6 +113,34 @@ Deno.serve(async (req) => {
       systemPrompt += `\n\n${AREA_PROMPTS[area]}`;
     }
 
+    // Buscar configuração do agente na tabela ai_agents
+    let agentConfig: any = null;
+    if (area) {
+      try {
+        const sbAgent = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const { data: agent } = await sbAgent
+          .from("ai_agents" as any)
+          .select("*")
+          .eq("area", area)
+          .eq("active", true)
+          .limit(1)
+          .single();
+        if (agent) {
+          agentConfig = agent;
+          console.log(`[judge-ai] Agente carregado: ${agent.name} (área: ${area})`);
+          // Usar instruções do agente se disponíveis
+          if (agent.instructions) {
+            systemPrompt += `\n\nINSTRUÇÕES ESPECÍFICAS DO AGENTE (${agent.name}):\n${agent.instructions}`;
+          }
+          if (agent.goal) {
+            systemPrompt += `\n\nObjetivo do agente: ${agent.goal}`;
+          }
+        }
+      } catch (e) {
+        console.warn("[judge-ai] Falha ao buscar agente:", e);
+      }
+    }
+
     try {
       const evolved = await getEvolvedPrompt("judge", area || "*");
       if (evolved && evolved.trim().length > 100) {
@@ -163,6 +191,7 @@ Deno.serve(async (req) => {
               { role: "system", content: systemMsg },
               { role: "user", content: userMsg },
             ],
+            model: agentConfig?.model || model,
             temperature: 0.3,
             maxTokens: 4000,
           });

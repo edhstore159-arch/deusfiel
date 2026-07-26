@@ -647,7 +647,25 @@ async function callClaudeFCC(messages: Array<{ role: string; content: string }>)
   }
 }
 
-async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string): Promise<string> {
+async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string, agentModel?: string): Promise<string> {
+  // Se o agente tem modelo específico, usar chatCompletion diretamente
+  if (agentModel && agentModel !== "claude-fcc") {
+    try {
+      const response = await chatCompletion({
+        model: agentModel,
+        messages,
+        temperature: 0.3,
+      });
+      const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
+        .replace(/<think>[\s\S]*?<\/think>/giu, "")
+        .trim();
+      if (reply && !isInvalidOllamaReply(reply) && !isPromptLeakage(reply)) return reply;
+      console.warn(`[chat-ai] Modelo ${agentModel} falhou, usando fallback`);
+    } catch (err) {
+      console.warn(`[chat-ai] Modelo ${agentModel} falhou:`, err);
+    }
+  }
+
   try {
     return await callOpenRouterClaude(messages);
   } catch (err) {
@@ -1067,6 +1085,54 @@ Deno.serve(async (req) => {
       ? `\n\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\n- Use o histórico apenas para saber o que já foi dito.\n- Não copie, liste ou recite respostas anteriores.\n- Responda somente à última mensagem do cliente, avançando a conversa.`
       : "";
 
+    // Detectar área jurídica e buscar agente correspondente
+    let detectedArea = "";
+    let agentConfig: any = null;
+    const areaKeywords: Record<string, string[]> = {
+      penal: ["crime", "criminal", "penal", "roubo", "furto", "estupro", "homicídio", "mandado", "prisão", "delegacia", "inquérito", "CPP", "CP", "criminal"],
+      civel: ["contrato", "cível", "civil", "dano moral", "dano material", "indenização", "responsabilidade civil", "propriedade", "usufruto", "CC", "CPC"],
+      trabalhista: ["trabalho", "trabalhista", "CLT", "emprego", "demissão", "horas extras", "fgts", "rescisão", "patrão", "empregador", "chefe"],
+      familia: ["divórcio", "guarda", "pensão alimentícia", "filhos", "casamento", "união estável", "família", "herança", "inventário", "alimentos"],
+      previdenciario: ["INSS", "aposentadoria", "previdenciário", "benefício", "BPC", "LOAS", "tempo de contribuição", "auxílio", "doença", "incapacidade"],
+      tributario: ["imposto", "tributo", "ICMS", "ISS", "IR", "IPTU", "multa tributária", "execução fiscal", "CTN", "fiscal"],
+      administrativo: ["servidor público", "licitação", "improbidade", "administrativo", "concurso", "estabilidade", "processo disciplinar", "Lei 8.112"],
+      constitucional: ["constitucional", "CF", "direito fundamental", "ADI", "ADC", "ADPF", "habeas corpus", "mandado de segurança", "STF"],
+      consumidor: ["consumidor", "CDC", "compra", "produto defeituoso", "cláusula abusiva", "reclamação", "loja", "garantia"],
+      ambiental: ["ambiental", "licenciamento", "APP", "passivo ambiental", "poluição", "ICMBio", "Lei 6.938"],
+      eleitoral: ["eleitoral", "candidato", "propaganda eleitoral", "Ficha Limpa", "TSE", "urna", "voto"],
+      internacional: ["internacional", "tratado", "extradição", "cooperação", "embaixada", "passaporte"],
+      sucessões: ["sucessão", "inventário", "testamento", "herdeiro", "partilha", "doação", "legado"],
+    };
+
+    const normalizedMsg = userMessage.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    for (const [area, keywords] of Object.entries(areaKeywords)) {
+      if (keywords.some(kw => normalizedMsg.includes(kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) {
+        detectedArea = area;
+        break;
+      }
+    }
+
+    if (detectedArea) {
+      try {
+        const sbAgent = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const { data: agent } = await sbAgent
+          .from("ai_agents" as any)
+          .select("*")
+          .eq("area", detectedArea)
+          .eq("active", true)
+          .limit(1)
+          .single();
+        if (agent) {
+          agentConfig = agent;
+          console.log(`[chat-ai] Agente detectado: ${agent.name} (área: ${detectedArea})`);
+        }
+      } catch (e) {
+        console.warn("[chat-ai] Falha ao buscar agente:", e);
+      }
+    }
+
     const systemContent = `${extraPrompt}
 
 CONTEXTO TEMPORAL INTERNO (fuso America/Sao_Paulo):
@@ -1101,7 +1167,7 @@ VALIDAÇÃO OBRIGATÓRIA DA RESPOSTA (processo interno antes de enviar):
 3. Verifique se a sua resposta realmente atende ao que foi perguntado — se não atender, refaça.
 4. Confirme se a resposta é coerente com o histórico da conversa, não contradiz informações já dadas e não repete saudação/pergunta anterior.
 5. Garanta que a resposta seja direta, em português, no tom de secretária jurídica da Dra. Kênia Garcia, e avance a conversa (não devolva a mesma pergunta).
-Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitionContext}`;
+Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitionContext}${agentConfig ? `\n\n--- ESPECIALIZAÇÃO DO AGENTE ATIVADO ---\nÁrea: ${agentConfig.area}\nNome: ${agentConfig.name}\nTom: ${agentConfig.tone}\nObjetivo: ${agentConfig.goal}\nInstruções específicas: ${agentConfig.instructions}\nAo responder, use conhecimento especializado na área "${agentConfig.area}" conforme as instruções acima. Mantenha o papel de secretária jurídica, mas aplique a expertise da área detectada.` : ""}`;
 
     // === Agenda real da Dra. Kênia (slots disponíveis a partir do dashboard) ===
     let availabilityBlock = "";
@@ -1208,7 +1274,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ? buildHandoffReply()
         : isResumeRequest(userMessage)
           ? buildResumeReply(history)
-        : await callAssistantLLM(messages, fmtDate, fmtTime);
+        : await callAssistantLLM(messages, fmtDate, fmtTime, agentConfig?.model);
     } catch (err) {
       console.error("Erro ao chamar Ollama qwen2.5:3b-instruct:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
@@ -1223,7 +1289,7 @@ Só envie a resposta depois que os 5 itens estiverem satisfeitos.${antiRepetitio
           ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
           { role: "user", content: userMessage },
         ];
-        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime);
+        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime, agentConfig?.model);
         if (retryReply && !isHistoryDumpReply(retryReply) && !isNearDuplicateReply(retryReply, history)) {
           rawReply = retryReply;
         } else {

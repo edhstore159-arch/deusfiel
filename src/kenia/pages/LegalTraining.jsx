@@ -675,6 +675,10 @@ function LegalTraining() {
         ambiental: "Estou sofrendo com poluição vizinha ao meu imóvel.",
       };
       const autoClientMsg = sampleMessages[area] || "Olá, preciso de orientação jurídica. " + (data.case_data?.description?.slice(0, 150) || "Tenho um caso para analisar.");
+      // Usar o prompt melhorado pelo loop (ou o antigo se loop não melhorou)
+      const improvedPromptForSim = loopRes?.data?.final_prompt && loopRes.data.final_prompt !== autoLoopPrompt
+        ? loopRes.data.final_prompt
+        : autoLoopPrompt;
       setSimulating(true);
       try {
         const simRes = await supabase.functions.invoke("training-ai", {
@@ -684,7 +688,7 @@ function LegalTraining() {
             area,
             client_message: autoClientMsg,
             client_name: "Cliente Automático",
-            custom_prompt: autoLoopPrompt,
+            custom_prompt: improvedPromptForSim,
           },
         });
         if (!simRes.error && simRes.data) {
@@ -1283,7 +1287,7 @@ function LegalTraining() {
                   </div>
                 </div>
 
-                {mode === "secretary" && (
+                {mode === "secretary" && (<>
                   <div>
                     <label className="text-sm font-semibold text-foreground mb-3 block">Estratégia de Treinamento</label>
                     <div className="space-y-2 max-h-[40vh] overflow-auto pr-1">
@@ -1412,7 +1416,7 @@ function LegalTraining() {
                       </div>
                     )}
                   </div>
-                )}
+                </>)}
 
                 {mode !== "secretary" && <>
                   <div>

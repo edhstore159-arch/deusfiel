@@ -812,7 +812,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
-    } else if (action === "auto_train_loop") {
+    } else if (action === "auto_train_loop" && mode !== "secretary") {
       const initialPrompt: string = String(body.current_prompt ?? "").trim();
       const targetImprovement: number = Number(body.target_improvement ?? 20);
       const maxIterations: number = Math.min(Number(body.max_iterations ?? 3), 3);

@@ -11,6 +11,7 @@ import { Bot, Plus, Save, Trash2, Sparkles, Copy, Upload, X, User, Clock } from 
 import AreaAvatar from "@/kenia/components/AreaAvatar";
 import { LAWYERS, LAWYER_COLORS } from "@/kenia/data/lawyers";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "kenia_ai_agents_v1";
 
@@ -261,12 +262,24 @@ const SPECIALIZED_AGENTS = [
 
 const SEED_AGENTS = [DEFAULT_AGENT, ...SPECIALIZED_AGENTS];
 
-const readAgents = () => {
+const readAgents = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("ai_agents")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error && data && data.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return data;
+    }
+  } catch (e) {
+    console.warn("[Agents] Falha ao ler do Supabase:", e);
+  }
+  // Fallback: localStorage
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
     if (Array.isArray(parsed)) {
-      // Check if specialized agents are present; if not, merge them in
       const existingIds = new Set(parsed.map(a => a.id));
       const missingSpecialized = SEED_AGENTS.filter(a => !existingIds.has(a.id));
       if (missingSpecialized.length > 0) {
@@ -276,14 +289,38 @@ const readAgents = () => {
       }
       return parsed;
     }
-    // No agents saved at all — seed with all specialized agents
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_AGENTS)); } catch {}
     return SEED_AGENTS;
   } catch {
     return SEED_AGENTS;
   }
 };
-const writeAgents = (list) => localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+
+const writeAgents = async (list) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  try {
+    for (const agent of list) {
+      const { error } = await supabase
+        .from("ai_agents")
+        .upsert({
+          id: agent.id,
+          name: agent.name,
+          area: agent.area,
+          tone: agent.tone,
+          model: agent.model,
+          greeting: agent.greeting || "",
+          goal: agent.goal || "",
+          instructions: agent.instructions || "",
+          avatar: agent.avatar || "",
+          active: agent.active !== false,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "id" });
+      if (error) console.warn("[Agents] Erro ao salvar agente:", agent.id, error);
+    }
+  } catch (e) {
+    console.warn("[Agents] Falha ao salvar no Supabase:", e);
+  }
+};
 
 export default function Agents() {
   const [agents, setAgents] = useState([]);
@@ -293,15 +330,16 @@ export default function Agents() {
   const avatarInputRef = useRef(null);
 
   useEffect(() => {
-    const list = readAgents();
-    setAgents(list);
-    if (list.length) {
-      setSelectedId(list[0].id);
-      setDraft(list[0]);
-    } else {
-      const a = blankAgent();
-      setDraft(a);
-    }
+    readAgents().then((list) => {
+      setAgents(list);
+      if (list.length) {
+        setSelectedId(list[0].id);
+        setDraft(list[0]);
+      } else {
+        const a = blankAgent();
+        setDraft(a);
+      }
+    });
   }, []);
 
   const selected = useMemo(
@@ -315,7 +353,7 @@ export default function Agents() {
     setDraft(a);
   };
 
-  const saveDraft = () => {
+  const saveDraft = async () => {
     if (!draft?.name?.trim()) {
       toast.error("Dê um nome ao agente");
       return;
@@ -327,15 +365,16 @@ export default function Agents() {
       next = [draft, ...agents];
     }
     setAgents(next);
-    writeAgents(next);
+    await writeAgents(next);
     setSelectedId(draft.id);
     toast.success("Agente salvo");
   };
 
-  const removeAgent = (id) => {
+  const removeAgent = async (id) => {
     const next = agents.filter((a) => a.id !== id);
     setAgents(next);
-    writeAgents(next);
+    await writeAgents(next);
+    try { await supabase.from("ai_agents").delete().eq("id", id); } catch {}
     if (selectedId === id) {
       const first = next[0];
       setSelectedId(first?.id || null);
@@ -344,19 +383,19 @@ export default function Agents() {
     toast.success("Agente removido");
   };
 
-  const duplicate = (a) => {
+  const duplicate = async (a) => {
     const copy = { ...a, id: `agent-${Date.now()}`, name: `${a.name} (cópia)`, createdAt: new Date().toISOString() };
     const next = [copy, ...agents];
     setAgents(next);
-    writeAgents(next);
+    await writeAgents(next);
     setSelectedId(copy.id);
     setDraft(copy);
   };
 
-  const toggleActive = (id, value) => {
+  const toggleActive = async (id, value) => {
     const next = agents.map((a) => (a.id === id ? { ...a, active: value } : a));
     setAgents(next);
-    writeAgents(next);
+    await writeAgents(next);
     if (draft?.id === id) setDraft({ ...draft, active: value });
     toast.success(value ? "Agente ativado" : "Agente desativado");
   };

@@ -25,7 +25,20 @@ import CompetitorAnalysis from "@/kenia/pages/CompetitorAnalysis";
 
 const AGENTS_STORAGE_KEY = "kenia_ai_agents_v1";
 
-const readAgents = () => {
+const readAgents = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("ai_agents")
+      .select("*")
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+    if (!error && data && data.length > 0) {
+      localStorage.setItem(AGENTS_STORAGE_KEY, JSON.stringify(data));
+      return data;
+    }
+  } catch (e) {
+    console.warn("[Dstboard] Falha ao ler agentes do Supabase:", e);
+  }
   try {
     return JSON.parse(localStorage.getItem(AGENTS_STORAGE_KEY) || "[]");
   } catch {
@@ -352,7 +365,7 @@ export default function Dstboard() {
     if (loaded.length > 0 && !activeProcess) {
       setActiveProcess(loaded[0].id);
     }
-    setAgents(readAgents());
+    readAgents().then(setAgents);
   }, []);
 
   useEffect(() => {
