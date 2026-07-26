@@ -1449,15 +1449,31 @@ async function startSock() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       reconnectTimer = null;
       processAutoReplyQueue().catch((e) => recordAutoReply({ step: "queue_process_error", error: e?.message || String(e) }));
-      // Keep-alive: ping WhatsApp servers every 30s to prevent idle disconnection
+      // Keep-alive: ping WhatsApp servers every 25s to prevent idle disconnection
       try { clearInterval(globalThis.__waKeepAlive); } catch {}
       globalThis.__waKeepAlive = setInterval(() => {
         try {
           if (sock && connectionState === "open") {
             sock.sendPresenceUpdate("available").catch(() => {});
+            // Protocol-level ping to detect half-open connections
+            sock.query({ tag: "iq", attrs: { id: "keepalive-" + Date.now(), type: "get", xmlns: "w:p" } }).catch(() => {});
           }
         } catch {}
-      }, 30000);
+      }, 25000);
+      // Watchdog: detect stuck connections and force reconnect
+      try { clearInterval(globalThis.__waWatchdog); } catch {}
+      globalThis.__waWatchdog = setInterval(() => {
+        try {
+          if (connectionState === "connecting" && reconnectingSince) {
+            const stuckFor = Date.now() - reconnectingSince;
+            if (stuckFor > 120000) {
+              console.warn("[watchdog] Conexão presa por", Math.round(stuckFor / 1000), "s — forçando restart");
+              reconnectingSince = Date.now();
+              restartSock({ resetAuth: false }).catch(() => {});
+            }
+          }
+        } catch {}
+      }, 60000);
     }
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode || new Boom(lastDisconnect?.error)?.output?.statusCode;
@@ -1474,7 +1490,9 @@ async function startSock() {
       if (recoverLoggedOut) {
         lastError = `${lastError || "WhatsApp fechou a sessão"} — tentando reconectar (tentativa ${reconnectAttempts}/10).`;
       }
-      const delay = code === DisconnectReason.restartRequired ? 250 : replaced ? 15000 : Math.min(backoff, 30000);
+      const baseDelay = code === DisconnectReason.restartRequired ? 250 : replaced ? 15000 : Math.min(backoff, RECONNECT_MAX_DELAY_MS);
+      const jitter = Math.floor(Math.random() * 2000);
+      const delay = baseDelay + jitter;
       await closeSock();
       starting = false;
       connectionState = shouldReconnect ? "disconnected" : "logged_out";
@@ -1580,6 +1598,7 @@ async function restartSock({ resetAuth = false } = {}) {
       currentQR = null;
       currentQRAt = null;
       try { clearInterval(globalThis.__waKeepAlive); } catch {}
+      try { clearInterval(globalThis.__waWatchdog); } catch {}
   lastError = null;
   lastDisconnectCode = null;
   reconnectAttempts = 0;

@@ -390,17 +390,46 @@ REGRAS OBRIGATÓRIAS:
 - O resultado deve ser um prompt que, quando lido pela IA, faça a secretária agir como uma profissional humana experiente`;
 
 function parseJsonResponse(raw: string): Record<string, unknown> | null {
-  const text = (raw || "").trim();
+  let text = (raw || "").trim();
   if (!text) return null;
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    try {
-      const jsonStr = jsonMatch[1] || jsonMatch[0];
-      return JSON.parse(jsonStr);
-    } catch (e) {
-      console.error("[training-ai] JSON parse error:", e);
+  // Remove<think>...</think> tags do Nemotron
+  text = text.replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+  // Tenta extrair JSON de bloco de código
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    try { return JSON.parse(codeBlockMatch[1].trim()); } catch {}
+  }
+  // Tenta encontrar o primeiro { ... } ou [ ... ]
+  const braceStart = text.indexOf("{");
+  const bracketStart = text.indexOf("[");
+  let jsonStart = -1;
+  if (braceStart >= 0 && bracketStart >= 0) jsonStart = Math.min(braceStart, bracketStart);
+  else if (braceStart >= 0) jsonStart = braceStart;
+  else if (bracketStart >= 0) jsonStart = bracketStart;
+  if (jsonStart >= 0) {
+    const candidate = text.slice(jsonStart);
+    // Tenta parse direto
+    try { return JSON.parse(candidate); } catch {}
+    // Tenta encontrar o fim do JSON balanceando chaves
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    const endChar = candidate[0] === "{" ? "}" : "]";
+    for (let i = 0; i < candidate.length; i++) {
+      const c = candidate[i];
+      if (escape) { escape = false; continue; }
+      if (c === "\\") { escape = true; continue; }
+      if (c === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (c === "{" || c === "[") depth++;
+      if (c === "}" || c === "]") depth--;
+      if (depth === 0) {
+        try { return JSON.parse(candidate.slice(0, i + 1)); } catch {}
+        break;
+      }
     }
   }
+  console.error("[training-ai] JSON parse failed, raw:", text.slice(0, 300));
   return null;
 }
 
