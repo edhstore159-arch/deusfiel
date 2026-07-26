@@ -103,7 +103,7 @@ const callOpenRouterFree = async (msg: string, history: { role: string; content:
 };
 
 const FCC_URL = (
-  import.meta.env.VITE_FCC_URL || "http://127.0.0.1:8082"
+  import.meta.env.VITE_FCC_URL || "https://unabashed-vertical-crispness.ngrok-free.dev"
 ).replace(/\/$/, "");
 const FCC_AUTH_TOKEN = import.meta.env.VITE_FCC_AUTH_TOKEN || "freecc";
 const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
