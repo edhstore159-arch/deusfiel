@@ -145,7 +145,19 @@ export async function chatOpenRouter(opts: ChatOptions) {
       });
       clearTimeout(timeout);
       if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-      return { ok: true as const, data: await resp.json(), provider: `openrouter/${model}` };
+      const raw = await resp.json();
+      const rawText = String(raw?.choices?.[0]?.message?.content || "").trim();
+      // Strip thinking tags and chain-of-thought leaking
+      let cleaned = rawText.replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+      // Strip leading reasoning patterns from models that leak CoT
+      cleaned = cleaned.replace(/^(Okay|Let me|So|Now|Right|Well|Hmm|I need|I should|First|The user)[,.]?\s+(the user|said|says|mentioned|wants|needs|is|wants me|said ")[\s\S]*/i, "").trim();
+      // If after stripping it's empty, try to get the last paragraph
+      if (!cleaned && rawText) {
+        const lines = rawText.split(/\n+/).filter((l: string) => !l.match(/^(Okay|Let me|So|Now|Right|Well|I need|I should|First|The user)/i));
+        cleaned = lines.join("\n").trim();
+      }
+      if (!cleaned) cleaned = rawText;
+      return { ok: true as const, data: { choices: [{ message: { role: "assistant", content: cleaned } }] }, provider: `openrouter/${model}` };
     } catch (e) {
       clearTimeout(timeout);
       return { ok: false as const, status: 0, error: `OpenRouter erro: ${(e as Error)?.message || e}` };

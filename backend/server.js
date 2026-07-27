@@ -1186,7 +1186,14 @@ async function callOpenRouter(messagesPayload, options = {}) {
       clearTimeout(timeout);
       if (resp.ok) {
         const data = await resp.json();
-        const reply = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+        let reply = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+        // Strip chain-of-thought leaking from free models
+        reply = reply.replace(/^(Okay|Let me|So|Now|Right|Well|Hmm|I need|I should|First|The user)[,.]?\s+(the user|said|says|mentioned|wants|needs|is|wants me|said ")[\s\S]*/i, "").trim();
+        if (!reply) {
+          const raw = String(data?.choices?.[0]?.message?.content || "");
+          const lines = raw.split(/\n+/).filter((l) => !l.match(/^(Okay|Let me|So|Now|Right|Well|I need|I should|First|The user)/i));
+          reply = lines.join("\n").trim();
+        }
         if (reply) {
           attempts.push({ ok: true, provider: "openrouter", model, reply: reply.slice(0, 200) });
           return { ok: true, provider: "openrouter", endpoint: OPENROUTER_BASE, model, reply: sanitizeOllamaReply(reply, options.userText), attempts };
