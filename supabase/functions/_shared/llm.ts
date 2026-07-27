@@ -126,6 +126,8 @@ async function chatClaudeFCC(opts: ChatOptions) {
     const apiMessages = opts.messages
       .filter((m) => m.role !== "system")
       .map((m) => ({ role: m.role === "assistant" ? "assistant" as const : "user" as const, content: String(m.content || "") }));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     const resp = await fetch(`${FCC_BASE_URL}/v1/messages`, {
       method: "POST",
       headers: {
@@ -135,6 +137,7 @@ async function chatClaudeFCC(opts: ChatOptions) {
         "anthropic-version": "2023-06-01",
         "ngrok-skip-browser-warning": "true",
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: opts.model || FCC_MODEL,
         max_tokens: opts.maxTokens || 4000,
@@ -143,6 +146,7 @@ async function chatClaudeFCC(opts: ChatOptions) {
         messages: apiMessages,
       }),
     });
+    clearTimeout(timeout);
     if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
     const data = await resp.json();
     const textBlock = (data?.content || []).find((b: any) => b.type === "text");

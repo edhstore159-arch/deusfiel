@@ -1088,7 +1088,32 @@ async function callAI(messagesPayload, options = {}) {
     }
   }
 
-  // 2) Ollama como fallback
+  // 2) Emergent API como fallback cloud (sem depender de ngrok/Ollama)
+  if (EMERGENT_API_KEY) {
+    try {
+      const controller2 = new AbortController();
+      const timeout2 = setTimeout(() => controller2.abort(), 45000);
+      const apiMessages2 = messagesPayload
+        .filter((m) => m.role !== "system")
+        .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+      const resp2 = await fetch(`https://integrations.emergentagent.com/llm/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_API_KEY}` },
+        signal: controller2.signal,
+        body: JSON.stringify({ model: EMERGENT_MODEL, messages: [{ role: "system", content: systemPrompt }, ...apiMessages2], temperature: 0.7, max_tokens: 1500 }),
+      });
+      clearTimeout(timeout2);
+      if (resp2.ok) {
+        const data2 = await resp2.json();
+        const reply2 = String(data2?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+        if (reply2) return { ok: true, provider: "emergent", endpoint: EMERGENT_BASE_URL, model: EMERGENT_MODEL, reply: sanitizeOllamaReply(reply2, options.userText), attempts };
+      }
+    } catch (e) {
+      attempts.push({ ok: false, provider: "emergent", error: e?.message || String(e) });
+    }
+  }
+
+  // 3) Ollama como último recurso (só se PC ligado)
   try {
     const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`, systemPrompt);
     return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
@@ -1105,7 +1130,7 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
   }
 
-  return { ok: false, error: "Claude FCC e Ollama falharam.", attempts, ...attempts[attempts.length - 1] };
+  return { ok: false, error: "Claude FCC, Emergent e Ollama falharam.", attempts, ...attempts[attempts.length - 1] };
 }
 
 async function generateCreativeImage(prompt) {
