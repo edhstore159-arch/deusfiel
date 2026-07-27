@@ -764,59 +764,11 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
 
       const professionalResponse = simResult.data?.choices?.[0]?.message?.content || "";
 
-      // 1b. Identificar estratégias usadas na resposta (para cores inline)
-      const tagInstruction = `Analise a resposta do profissional abaixo e identifique quais estratégias de atendimento foram utilizadas em CADA PARÁGRAFO.
-
-Estratégias disponíveis:
-- abordagem_inicial: Abertura e primeira impressão
-- identificacao_dor: Mapear a necessidade real do cliente
-- demonstracao_valor: Mostrar diferenciais do escritório
-- tratamento_objecao: Superar resistências comuns
-- fechamento: Converter orientação em agendamento
-- follow_up: Manter contato após primeira interação
-- captura_whatsapp: Estratégias específicas para WhatsApp
-- indicacao: Pedir e receber indicações
-- escuta_ativa: Coletar dados com perguntas estratégicas
-- urgencia_etica: Motivar ação imediata de forma ética
-- gatilhos_psicologicos: Reciprocidade, prova social, escassez
-- pos_duvida_juridica: Converter orientação em contrato
-- lead_divorcio: Atendimento para casos de família
-- lead_previdenciario: Atendimento para aposentadorias e INSS
-- lead_bancario: Atendimento para questões bancárias
-- lead_hesitante: Cliente indeciso que precisa de incentivo
-- lead_urgencia: Cliente em situação urgente
-- saudacao: Abertura e boas-vindas
-
-Responda APENAS em JSON: {"paragraphs": [{"text": "texto do parágrafo", "strategy": "nome_da_estrategia"}]}
-
-Separados por linha em branco no original. Mantenha o texto EXATAMENTE como está.`;
-
-      let tagResult = await chatCompletion({
-        messages: [
-          { role: "system", content: tagInstruction },
-          { role: "user", content: professionalResponse },
-        ],
-        temperature: 0.1, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
-      });
+      // Client-side detection handles strategy tagging
 
       let taggedResponse = professionalResponse;
       let strategyTags: Array<{ text: string; strategy: string }> = [];
-      if (tagResult.ok) {
-        const rawContent = tagResult.data?.choices?.[0]?.message?.content || "";
-        console.log("[training-ai] tagResult raw (first 300):", rawContent.slice(0, 300));
-        const tagParsed = parseJsonResponse(rawContent);
-        if (tagParsed?.paragraphs && Array.isArray(tagParsed.paragraphs) && tagParsed.paragraphs.length > 0) {
-          strategyTags = tagParsed.paragraphs.map((p: any) => ({
-            text: String(p.text || professionalResponse.slice(0, 200)),
-            strategy: String(p.strategy || "abordagem_inicial"),
-          })).filter((t) => t.text.length > 0);
-          console.log(`[training-ai] tagResult: ${strategyTags.length} tags parsed`);
-        } else {
-          console.log("[training-ai] tagResult: no paragraphs array found, raw:", rawContent.slice(0, 500));
-        }
-      } else {
-        console.log("[training-ai] tagResult failed:", tagResult.error);
-      }
+      // Client-side detection will handle strategy tagging
 
       // 2. Avaliar a resposta com estratégias da secretaria
       const evalInstruction = mode === "lawyer"
