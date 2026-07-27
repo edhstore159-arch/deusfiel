@@ -524,6 +524,14 @@ Deno.serve(async (req: Request) => {
     const area: string = String(body.area ?? "civel").trim();
     const difficulty: string = String(body.difficulty ?? "medio").trim();
     const caseData = body.case_data || null;
+    if (caseData) {
+      if (!Array.isArray(caseData.applicable_laws) && caseData.applicable_laws) {
+        caseData.applicable_laws = [caseData.applicable_laws];
+      }
+      if (!Array.isArray(caseData.key_issues) && caseData.key_issues) {
+        caseData.key_issues = [caseData.key_issues];
+      }
+    }
     const userResponse: string = String(body.user_response ?? "").trim();
     const correctedResponse: string = String(body.corrected_response ?? "").trim();
     const score: number = typeof body.score === "number" ? body.score : 0;
@@ -541,34 +549,46 @@ Deno.serve(async (req: Request) => {
       userContent = `Gere um caso simulado para treinamento de ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"} na área de ${areaLabel} com dificuldade ${diffLabel}. Use nomes fictícios. Caso realista.`;
     } else if (action === "generate_lawyer_response") {
       // Apenas gera a resposta do advogado/juiz production para referência
-      const lawList = caseData?.applicable_laws?.join(", ") || "N/A";
-      const issuesList = caseData?.key_issues?.join("; ") || "N/A";
+      const lawList = Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A");
+      const issuesList = Array.isArray(caseData?.key_issues) ? caseData.key_issues.join("; ") : (caseData?.key_issues || "N/A");
       const clientName = caseData?.parties?.split(" vs")[0]?.trim() || "Cliente";
       const lawyerPrompt = mode === "lawyer" ? LAWYER_PRODUCTION_PROMPT : JUDGE_PRODUCTION_PROMPT;
 
-      const lawyerResult = await chatGemini({
-        messages: [
-          { role: "system", content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
-          { role: "user", content: `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nCLIENTE: ${clientName}\n\nResponda ao cliente como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento. Use o nome do cliente, seja empático e fundamentado. Máximo 400 palavras.` },
-        ],
-        temperature: 0.5, maxTokens: 1500,
-      });
+      const msgUser = `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nCLIENTE: ${clientName}\n\nResponda ao cliente como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento. Use o nome do cliente, seja empático e fundamentado. Máximo 400 palavras.`;
+      const lawyerMessages = [
+        { role: "system" as const, content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
+        { role: "user" as const, content: msgUser },
+      ];
+
+      let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1500 });
+      if (!lawyerResult.ok) {
+        console.log("[training-ai] Gemini falhou para generate_lawyer_response, usando fallback...");
+        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true });
+      }
 
       let response = lawyerResult.ok
         ? (lawyerResult.data?.choices?.[0]?.message?.content || "Resposta não disponível.")
         : "Erro ao gerar resposta.";
 
-      // Revisão jurídica: usar Gemini Flash (rápido)
+      // Revisão jurídica: Gemini → fallback Emergent
       if (lawyerResult.ok && mode === "lawyer") {
-        console.log("[training-ai] Aplicando revisão jurídica com Gemini...");
-        const reviewResult = await chatGemini({
+        console.log("[training-ai] Aplicando revisão jurídica...");
+        let reviewResult = await chatGemini({
           messages: [
             { role: "system", content: LEGAL_REVIEW_PROMPT },
             { role: "user", content: `Texto para revisão:\n\n${response}` },
           ],
-          temperature: 0.3,
-          maxTokens: 2000,
+          temperature: 0.3, maxTokens: 2000,
         });
+        if (!reviewResult.ok) {
+          reviewResult = await chatCompletion({
+            messages: [
+              { role: "system", content: LEGAL_REVIEW_PROMPT },
+              { role: "user", content: `Texto para revisão:\n\n${response}` },
+            ],
+            temperature: 0.3, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
+          });
+        }
 
         if (reviewResult.ok) {
           const reviewed = reviewResult.data?.choices?.[0]?.message?.content;
@@ -580,23 +600,24 @@ Deno.serve(async (req: Request) => {
       }
 
       return new Response(
-        JSON.stringify({ response, provider: lawyerResult.provider || "gpt-4o-mini" }),
+        JSON.stringify({ response, provider: lawyerResult.provider || "fallback" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     } else if (action === "evaluate") {
       const modeLabel = mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO";
-      const lawList = caseData?.applicable_laws?.join(", ") || "N/A";
-      const issuesList = caseData?.key_issues?.join("; ") || "N/A";
+      const lawList = Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A");
+      const issuesList = Array.isArray(caseData?.key_issues) ? caseData.key_issues.join("; ") : (caseData?.key_issues || "N/A");
 
-      // 1. Advogado production responde ao caso (Gemini Flash — rápido)
+      // 1. Advogado production responde ao caso (Gemini → fallback chatCompletion)
       const lawyerPrompt = mode === "lawyer" ? LAWYER_PRODUCTION_PROMPT : JUDGE_PRODUCTION_PROMPT;
-      const lawyerResult = await chatGemini({
-        messages: [
-          { role: "system", content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
-          { role: "user", content: `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nResponda ao cliente como advogado. Máximo 400 palavras.` },
-        ],
-        temperature: 0.5, maxTokens: 1500,
-      });
+      const lawyerMessages = [
+        { role: "system" as const, content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
+        { role: "user" as const, content: `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nResponda ao cliente como advogado. Máximo 400 palavras.` },
+      ];
+      let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1500 });
+      if (!lawyerResult.ok) {
+        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true });
+      }
 
       lawyerFeedback = "Análise não disponível.";
       if (lawyerResult.ok) {
@@ -629,7 +650,7 @@ INSTRUÇÕES DE AVALIAÇÃO:
     } else if (action === "evaluate_and_correct") {
       systemPrompt = EVALUATE_AND_CORRECT_PROMPT;
       const modeLabel = mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO";
-      const lawList = caseData?.applicable_laws?.join(", ") || "N/A";
+      const lawList = Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A");
       userContent = `Profissional no modo ${modeLabel}. Score obtido: ${score}/100.
 
 CASO:
@@ -653,7 +674,7 @@ Mínimo 300 palavras na versão corrigida.`;
     } else if (action === "improve_argument") {
       systemPrompt = IMPROVE_ARGUMENT_PROMPT + "\n\n" + STRATEGIES_CONTEXT;
       const modeLabel = mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO";
-      const lawList = caseData?.applicable_laws?.join(", ") || "N/A";
+      const lawList = Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A");
       userContent = `Profissional no modo ${modeLabel}. Score atual: ${score}/100.
 
 CASO:
@@ -948,7 +969,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
             const evalResult = await chatCompletion({
               messages: [
                 { role: "system", content: EVALUATE_PROMPT },
-                { role: "user", content: `Avalie RIGOROSAMENTE a resposta do profissional no modo ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"}.\n\nCASO:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS AO CASO: ${caseData.applicable_laws?.join(", ") || "N/A"}\nQUESTÕES JURÍDICAS CENTRAIS: ${caseData.key_issues?.join("; ") || "N/A"}\n\nRESPOSTA DO PROFISSIONAL:\n${secretaryResponse}\n\nScore deve ser RIGOROSO: respostas genéricas sem artigos específicos devem receber abaixo de 50.` },
+                { role: "user", content: `Avalie RIGOROSAMENTE a resposta do profissional no modo ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"}.\n\nCASO:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS AO CASO: ${Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A")}\nQUESTÕES JURÍDICAS CENTRAIS: ${Array.isArray(caseData?.key_issues) ? caseData.key_issues.join("; ") : (caseData?.key_issues || "N/A")}\n\nRESPOSTA DO PROFISSIONAL:\n${secretaryResponse}\n\nScore deve ser RIGOROSO: respostas genéricas sem artigos específicos devem receber abaixo de 50.` },
               ],
               temperature: 0.3, maxTokens: 1500, model: "gpt-4o-mini",
             });
