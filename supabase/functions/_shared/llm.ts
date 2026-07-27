@@ -65,7 +65,7 @@ function messagesToGeminiContents(messages: ChatMessage[]) {
   return { system: system.join("\n\n"), contents };
 }
 
-async function chatGemini(opts: ChatOptions) {
+export async function chatGemini(opts: ChatOptions) {
   if (!GEMINI_KEY) return { ok: false as const, status: 0, error: "GEMINI_API_KEY ausente" };
   try {
     const { system, contents } = messagesToGeminiContents(opts.messages);

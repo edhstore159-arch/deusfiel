@@ -1,4 +1,4 @@
-import { chatCompletion, chatEmergent, EMERGENT_KEY } from "../_shared/llm.ts";
+import { chatCompletion, chatEmergent, chatGemini, EMERGENT_KEY } from "../_shared/llm.ts";
 import { saveEvolvedPrompt, getEvolvedPrompt } from "../_shared/prompts.ts";
 
 const corsHeaders: Record<string, string> = {
@@ -546,22 +546,22 @@ Deno.serve(async (req: Request) => {
       const clientName = caseData?.parties?.split(" vs")[0]?.trim() || "Cliente";
       const lawyerPrompt = mode === "lawyer" ? LAWYER_PRODUCTION_PROMPT : JUDGE_PRODUCTION_PROMPT;
 
-      const lawyerResult = await chatCompletion({
+      const lawyerResult = await chatGemini({
         messages: [
           { role: "system", content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
           { role: "user", content: `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nCLIENTE: ${clientName}\n\nResponda ao cliente como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento. Use o nome do cliente, seja empático e fundamentado. Máximo 400 palavras.` },
         ],
-        temperature: 0.5, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.5, maxTokens: 1500,
       });
 
       let response = lawyerResult.ok
         ? (lawyerResult.data?.choices?.[0]?.message?.content || "Resposta não disponível.")
         : "Erro ao gerar resposta.";
 
-      // Revisão jurídica: usar Emergent (Claude) diretamente para revisão
-      if (lawyerResult.ok && mode === "lawyer" && EMERGENT_KEY) {
-        console.log("[training-ai] Aplicando revisão jurídica com Claude...");
-        const reviewResult = await chatEmergent({
+      // Revisão jurídica: usar Gemini Flash (rápido)
+      if (lawyerResult.ok && mode === "lawyer") {
+        console.log("[training-ai] Aplicando revisão jurídica com Gemini...");
+        const reviewResult = await chatGemini({
           messages: [
             { role: "system", content: LEGAL_REVIEW_PROMPT },
             { role: "user", content: `Texto para revisão:\n\n${response}` },
