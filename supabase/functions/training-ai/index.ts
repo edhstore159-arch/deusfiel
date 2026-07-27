@@ -610,10 +610,10 @@ Deno.serve(async (req: Request) => {
         { role: "user" as const, content: msgUser },
       ];
 
-      let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1500 });
+      let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 3000 });
       if (!lawyerResult.ok) {
         console.log("[training-ai] Gemini falhou para generate_lawyer_response, usando fallback...");
-        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true });
+        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 3000, model: "gpt-4o-mini", preferFastProvider: true });
       }
 
       let response = lawyerResult.ok
@@ -802,7 +802,7 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
           { role: "system", content: systemInstruction },
           { role: "user", content: userInstruction },
         ],
-        temperature: 0.7, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.7, maxTokens: 3000, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       if (!simResult.ok) {
@@ -820,36 +820,13 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
       let strategyTags: Array<{ text: string; strategy: string }> = [];
       // Client-side detection will handle strategy tagging
 
-      // 2. Avaliar a resposta com estratégias da secretaria
-      const evalInstruction = mode === "lawyer"
-        ? `Avalie a resposta do ADVOGADO considerando as estratégias de atendimento ao cliente. Responda APENAS em JSON: {"score": 0-100, "feedback": "texto", "strengths": ["..."], "weaknesses": ["..."]}
-
-${STRATEGIES_CONTEXT}
-
-Critérios obrigatórios:
-- Escuta ativa e empatia com o cliente
-- Tratamento de objeções (custo, demora, complexidade)
-- Gatilhos psicológicos: reciprocidade, prova social, autoridade
-- Personalização: uso do nome do cliente, detalhes específicos
-- Fechamento: orientação sobre próximos passos concretos
-- Fundamentação legal com artigos específicos`
-        : `Avalie a análise do JUIZ. Responda APENAS em JSON: {"score": 0-100, "feedback": "texto", "strengths": ["..."], "weaknesses": ["..."]}
-
-${STRATEGIES_CONTEXT}
-
-Critérios obrigatórios:
-- Análise técnica completa e fundamentada
-- Probabilidade de êxito realista
-- Jurisprudência relevante citada
-- Orientação sobre riscos e chances reais
-- Avaliação se advogado bem orientado acertaria`;
-
+      // 2. Avaliar a resposta com EVALUATE_PROMPT completo
       const evalResult = await chatCompletion({
         messages: [
-          { role: "system", content: evalInstruction },
-          { role: "user", content: `Mensagem do cliente: "${clientMessage}"\nResposta do profissional:\n${professionalResponse}\n\nAvalie considerando as estratégias de atendimento ao cliente. Score 0-100.` },
+          { role: "system", content: EVALUATE_PROMPT },
+          { role: "user", content: `Mensagem do cliente: "${clientMessage}"\nÁREA: ${area}\n\nResposta do profissional:\n${professionalResponse}\n\nAvalie considerando fundamentação jurídica, argumentação, conclusão, jurisprudência, atendimento ao cliente e persuasão. Score 0-100.` },
         ],
-        temperature: 0.3, maxTokens: 500, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.3, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       let evaluation = { score: 50, feedback: "Avaliação não disponível", strengths: [] as string[], weaknesses: [] as string[] };
@@ -953,7 +930,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
               { role: "system", content: `${systemPromptBase}\n\n${STRATEGIES_CONTEXT}\n\nÁREA: ${areaLabel}\nESTRATÉGIA FOCAL: ${sc.strategy}` },
               { role: "user", content: `CLIENTE: ${clientName}\nÁREA: ${areaLabel}\nMENSAGEM: "${sc.client_message}"\n\nResponda como advogado especialista, aplicando TODAS as estratégias de captação e conversão. Use o nome do cliente, seja empático, fundamentado juridicamente e termine com convite para agendamento. Máximo 500 palavras.` },
             ],
-            temperature: 0.7, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
+            temperature: 0.7, maxTokens: 3000, model: "gpt-4o-mini", preferFastProvider: true,
           });
 
           if (!simResult.ok) continue;

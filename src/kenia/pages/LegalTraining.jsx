@@ -2336,7 +2336,17 @@ function LegalTraining() {
                               </span>
                             </div>
                             <div className="text-gray-600 italic">"{sc.client_message}"</div>
-                            <div className="text-blue-800 whitespace-pre-wrap leading-relaxed max-h-[120px] overflow-y-auto">{sc.professional_response?.slice(0, 500)}{sc.professional_response?.length > 500 ? "..." : ""}</div>
+                            <div className="relative group">
+                              <div className="text-blue-800 whitespace-pre-wrap leading-relaxed max-h-[120px] overflow-y-auto pr-10">{sc.professional_response?.slice(0, 500)}{sc.professional_response?.length > 500 ? "..." : ""}</div>
+                              <div className="absolute top-0 right-0 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => { navigator.clipboard.writeText(sc.professional_response || ""); toast.success("Copiado!"); }} className="p-0.5 rounded hover:bg-white" title="Copiar">
+                                  <Copy className="w-3 h-3 text-blue-500" />
+                                </button>
+                                <button onClick={() => { const w = window.open("","_blank"); w.document.write(`<html><head><title>${sc.client_name} - ${sc.strategy}</title><style>body{font-family:serif;max-width:700px;margin:40px auto;padding:20px;line-height:1.8;color:#333}h1{font-size:16px;border-bottom:2px solid #1e40af;padding-bottom:8px}.meta{font-size:11px;color:#666}</style></head><body><h1>Dra. Kênia Garcia Advocacia — ${sc.area}</h1><div class="meta">Cliente: ${sc.client_name} | Estratégia: ${sc.strategy} | Score: ${sc.score}/100</div><hr><p style="font-style:italic;color:#666">Mensagem do cliente: "${sc.client_message}"</p><hr><div style="white-space:pre-wrap;font-size:13px">${sc.professional_response||""}</div><hr><div class="meta" style="margin-top:20px;font-style:italic">Orientação preliminar — não substitui consulta jurídica presencial.</div></body></html>`); w.document.close(); w.print(); }} className="p-0.5 rounded hover:bg-white" title="Imprimir">
+                                  <Printer className="w-3 h-3 text-blue-500" />
+                                </button>
+                              </div>
+                            </div>
                             {sc.evaluation?.strengths?.length > 0 && (
                               <div className="text-green-700">+ {sc.evaluation.strengths[0]}</div>
                             )}
@@ -2371,7 +2381,30 @@ function LegalTraining() {
                     {simulationData && (
                       <div className="mt-2 space-y-2">
                         <div className="p-2 rounded bg-blue-50 border border-blue-200">
-                          <div className="text-[10px] font-medium text-blue-800 mb-1">Resposta do {mode === "lawyer" ? "Advogado" : "Juiz"}</div>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="text-[10px] font-medium text-blue-800">Resposta do {mode === "lawyer" ? "Advogado" : "Juiz"}</div>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => { navigator.clipboard.writeText(simulationData.professional_response || ""); toast.success("Copiado!"); }}
+                                className="p-1 rounded hover:bg-blue-100 transition-colors"
+                                title="Copiar resposta"
+                              >
+                                <Copy className="w-3 h-3 text-blue-600" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const w = window.open("", "_blank");
+                                  w.document.write(`<html><head><title>Resposta - Kenia Garcia Advocacia</title><style>body{font-family:serif;max-width:700px;margin:40px auto;padding:20px;line-height:1.8;color:#333}h1{font-size:18px;border-bottom:2px solid #1e40af;padding-bottom:8px}h2{font-size:14px;color:#1e40af;margin-top:20px}.meta{font-size:12px;color:#666;margin-bottom:20px}</style></head><body><h1>Dra. Kênia Garcia Advocacia</h1><div class="meta">Área: ${area} | Cliente: ${simulationClientName} | Modo: ${mode === "lawyer" ? "Advogado" : "Juiz"}</div><hr><div style="white-space:pre-wrap;font-size:13px">${simulationData.professional_response || ""}</div><hr><div class="meta" style="margin-top:20px;font-style:italic">Orientação preliminar — não substitui consulta jurídica presencial.</div></body></html>`);
+                                  w.document.close();
+                                  w.print();
+                                }}
+                                className="p-1 rounded hover:bg-blue-100 transition-colors"
+                                title="Imprimir resposta"
+                              >
+                                <Printer className="w-3 h-3 text-blue-600" />
+                              </button>
+                            </div>
+                          </div>
                           <div className="text-[10px] text-blue-700 whitespace-pre-wrap">
                             {(() => {
                               let tags = simulationData.strategy_tags || [];
