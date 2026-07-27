@@ -820,24 +820,28 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
       let strategyTags: Array<{ text: string; strategy: string }> = [];
       // Client-side detection will handle strategy tagging
 
-      // 2. Avaliar a resposta com EVALUATE_PROMPT completo
-      const evalResult = await chatCompletion({
+      // 2. Avaliar a resposta — prompt simples e focado
+      let evalResult = await chatCompletion({
         messages: [
-          { role: "system", content: EVALUATE_PROMPT },
-          { role: "user", content: `Mensagem do cliente: "${clientMessage}"\nÁREA: ${area}\n\nResposta do profissional:\n${professionalResponse}\n\nAvalie considerando fundamentação jurídica, argumentação, conclusão, jurisprudência, atendimento ao cliente e persuasão. Score 0-100.` },
+          { role: "system", content: `Você é um avaliador de atendimento jurídico. Avalie a resposta do advogado e retorne APENAS JSON válido:
+{"score": 0-100, "feedback": "feedback com 2-3 frases", "strengths": ["ponto forte 1", "ponto forte 2"], "weaknesses": ["ponto fraco 1", "ponto fraco 2"]}
+
+Critérios: fundamentação legal (artigos citados), argumentação lógica, conclusão clara, empatia, personalização (nome do cliente), persuasão, tratamento de objeções, convite para agendamento.` },
+          { role: "user", content: `Mensagem do cliente: "${clientMessage}"\n\nResposta do advogado:\n${professionalResponse}\n\nAvalie. Score 0-100.` },
         ],
-        temperature: 0.3, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.3, maxTokens: 1000, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       let evaluation = { score: 50, feedback: "Avaliação não disponível", strengths: [] as string[], weaknesses: [] as string[] };
       if (evalResult.ok) {
         const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
         if (evalParsed) {
+          const ev = (evalParsed as any).evaluation || evalParsed;
           evaluation = {
             score: typeof evalParsed.score === "number" ? evalParsed.score : 50,
-            feedback: String(evalParsed.feedback || "Avaliação concluída"),
-            strengths: Array.isArray(evalParsed.strengths) ? evalParsed.strengths : [],
-            weaknesses: Array.isArray(evalParsed.weaknesses) ? evalParsed.weaknesses : [],
+            feedback: String(evalParsed.feedback || ev.feedback || "Avaliação concluída"),
+            strengths: Array.isArray(ev.strengths) ? ev.strengths : Array.isArray(evalParsed.strengths) ? evalParsed.strengths : [],
+            weaknesses: Array.isArray(ev.weaknesses) ? ev.weaknesses : Array.isArray(evalParsed.weaknesses) ? evalParsed.weaknesses : [],
           };
         }
       }
