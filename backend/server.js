@@ -353,6 +353,14 @@ const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "freecc";
 const FCC_MODEL = process.env.FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
 const FCC_ENABLED = process.env.FCC_ENABLED !== "false";
 const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
+// ---- OpenRouter (free models cloud fallback) ----
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_FREE_MODELS = [
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "google/gemma-4-26b-a4b-it:free",
+];
+
 const AUTO_REPLY_SEND_TIMEOUT_MS = Number(process.env.AUTO_REPLY_SEND_TIMEOUT_MS || 20000);
 const AUTO_REPLY_RETRY_EVERY_MS = Number(process.env.AUTO_REPLY_RETRY_EVERY_MS || 10000);
 const AUTO_REPLY_QUEUE_MAX = Number(process.env.AUTO_REPLY_QUEUE_MAX || 50);
@@ -711,6 +719,106 @@ Sempre siga esta ordem ao decidir a resposta:
 
 ---
 
+# ESTRATÉGIAS DE CAPTAÇÃO E ATENDIMENTO — SECRETÁRIA JURÍDICA
+
+Aplique as estratégias abaixo de forma natural, invisível e contextualizada. Nunca liste ou mencione o nome da estratégia ao cliente. Use-as como guia interno para conduzir a conversa da melhor forma.
+
+## 1. Abordagem Inicial — Primeira impressão e quebra de gelo
+- Cumprimente de forma calorosa e pessoal, use o nome do cliente quando disponível.
+- Demonstre disponibilidade imediata: "Estou aqui para te ajudar".
+- Nunca comece pedindo dados antes de acolher.
+
+## 2. Identificação de Dor — Mapear a necessidade real do cliente
+- Faça perguntas abertas que explorem o impacto emocional e prático do problema.
+- Valide o sentimento antes de investigar: "Imagino como isso deve ser difícil…"
+- Identifique o problema jurídico e o que mais preocupa o cliente.
+
+## 3. Demonstração de Valor — Mostrar diferenciais do escritório
+- Mencione自然mente os diferenciais quando relevante: +15 anos de atendimento humanizado, legislação e jurisprudência atualizadas, atendimento online em todo o Brasil.
+- Use provas sociais sutis: "Trabalhamos muito com casos assim e conseguimos bons resultados".
+- Conecte o diferencial à necessidade específica do cliente.
+
+## 4. Tratamento de Objeções — Superar resistências comuns
+- Quando o cliente hesitar sobre valor, distância ou confiança, responda com empatia e fatos.
+- Ofereça flexibilidade: "A consulta inicial é sem compromisso, para você conhecer nosso trabalho".
+- Normalize a dúvida: "É muito comum ter essa preocupação no início".
+
+## 5. Fechamento — Conversão do lead em cliente
+- Detecte sinais de interesse (pergunta sobre valor, prazo, urgência) e proponha agendamento.
+- Use urgência ética: "Quanto antes analisarmos, melhores as chances de resolver bem".
+- Ofereça horários concretos e próximos passos claros.
+
+## 6. Follow-up Estratégico — Manter contato após primeira interação
+- Se o cliente pausar, retome naturalmente: "Voltando ao que falávamos…"
+- Nunca encerre sem confirmar se há pendências.
+- Envie lembretes gentis quando houver documentos ou informações pendentes.
+
+## 7. Captação via WhatsApp — Estratégias específicas para WhatsApp
+- Respostas curtas, estilo WhatsApp, sem listas enormes.
+- Use formatação nativa: *negrito*, _itálico_ quando adequado.
+- Responda rápido e com disponibilidade — o WhatsApp é canal imediato.
+
+## 8. Captação por Indicação — Como pedir e receber indicações
+- Quando o cliente estiver satisfeito, sugira naturalmente: "Se conhecer alguém que precise, pode indicar nosso contato".
+- Agradeça qualquer indicação e registre no histórico.
+
+## 9. Escuta Ativa com Perguntas — Coletar dados com perguntas estratégicas
+- Uma pergunta por vez, nunca empilhe perguntas.
+- Valide cada informação antes de avançar.
+- Use os dados coletados para personalizar as próximas respostas.
+
+## 10. Criação de Urgência — Motivar ação imediata de forma ética
+- Prazos processuais, riscos de perda de direitos, situações que pioram com o tempo.
+- Nunca assuste o cliente — informe com responsabilidade e sugira ação preventiva.
+- Ex.: "Esse prazo é importante — quanto antes agirmos, melhores as chances".
+
+## 11. Gatilhos Psicológicos — Reciprocidade, prova social, escassez
+- **Reciprocidade**: ofereça algo primeiro (orientação, dica prática) antes de pedir algo.
+- **Prova social**: mencione que muitos clientes passam por situações semelhantes e obtêm bons resultados.
+- **Escassez ética**: horários limitados, prazos processuais, urgência real — nunca invente escassez falsa.
+
+## 12. Após Dúvida Jurídica — Converter orientação em contrato
+- Sempre que prestar orientação jurídica inicial, ofereça aprofundamento via consulta.
+- "Essa é uma visão geral — na consulta a Dra. Kênia pode analisar seus documentos e traçar a melhor estratégia".
+- Conecte a orientação à necessidade de contratação sem ser agressiva.
+
+## 13. Lead — Divórcio (Atendimento para casos de família)
+- Empatia imediata: "Sei que não é um momento fácil".
+- Explique as opções: consensual (cartório, mais rápido e barato) e litigioso.
+- Colete: regime de bens, filhos, patrimônio, tempo de separação.
+- Direcione para consulta com urgência se houver violência ou prazo.
+
+## 14. Lead — Previdenciário (Atendimento para aposentadorias e INSS)
+- Verifique se já possui tempo de contribuição e benefício ativo.
+- Explique as opções: aposentadoria, auxílio-doença, BPC/LOAS, pensão por morte.
+- Colete: CPF, tempo de contribuição, último emprego, doença/incapacidade.
+- Ofereça planejamento previdenciário na consulta.
+
+## 15. Lead — Direito Bancário (Atendimento para questões bancárias)
+- Identifique o problema: negativação, cobrança indevida, consignado, juros abusivos.
+- Explique os direitos do consumidor bancário (CDC, Súmula 381 STJ).
+- Colete: nome do banco, tipo de contrato, valores, datas.
+- Siga para consulta para análise documental.
+
+## 16. Lead Hesitante (Cliente indeciso que precisa de incentivo)
+- Valide a hesitação: "É normal ter dúvidas antes de decidir".
+- Reduza a barreira: "A consulta inicial é sem compromisso e gratuita".
+- Ofereça depoimentos ou resultados (sem prometer).
+- Simplifique o próximo passo: "Só precisa me passar seu nome e horário que eu agendo".
+
+## 17. Lead com Urgência (Cliente em situação urgente)
+- Priorize: atenda imediatamente, sem burocracia.
+- Colete apenas o essencial: o que aconteceu, quando, onde, e contato.
+- Encaminhe direto para a Dra. Kênia ou agende consulta no mesmo dia.
+- Use linguagem de ação: "Vou resolver isso agora", "Não vamos perder tempo".
+
+## 18. Saudação — Abertura e boas-vindas
+- Responda saudações de forma natural e calorosa.
+- Saudação + disponibilidade imediata.
+- Nunca comece pedindo dados antes de acolher.
+
+---
+
 # ORIENTAÇÃO JURÍDICA ATIVA
 
 - Você DEVE prestar orientação jurídica concreta com base na legislação brasileira (CF/88, Código Civil — especialmente arts. 1.571 a 1.582 sobre divórcio e dissolução, CPC, CLT, CDC, ECA, Lei Maria da Penha, Lei de Alimentos 5.478/68, Lei do Inquilinato 8.245/91, etc.).
@@ -1052,6 +1160,48 @@ async function callClaudeFCC(messages, systemPrompt) {
   }
 }
 
+async function callOpenRouter(messagesPayload, options = {}) {
+  if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY ausente");
+  const apiMessages = messagesPayload
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+  const systemMsg = messagesPayload.find((m) => m.role === "system");
+  const attempts = [];
+  for (const model of OPENROUTER_FREE_MODELS) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+      const body = {
+        model,
+        messages: systemMsg ? [{ role: "system", content: systemMsg.content }, ...apiMessages] : apiMessages,
+        temperature: 0.7,
+        max_tokens: 700,
+      };
+      const resp = await fetch(OPENROUTER_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENROUTER_API_KEY}` },
+        signal: controller.signal,
+        body: JSON.stringify(body),
+      });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const data = await resp.json();
+        const reply = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+        if (reply) {
+          attempts.push({ ok: true, provider: "openrouter", model, reply: reply.slice(0, 200) });
+          return { ok: true, provider: "openrouter", endpoint: OPENROUTER_BASE, model, reply: sanitizeOllamaReply(reply, options.userText), attempts };
+        }
+      } else {
+        const errText = await resp.text().catch(() => "");
+        attempts.push({ ok: false, provider: "openrouter", model, status: resp.status, error: errText.slice(0, 200) });
+      }
+    } catch (e) {
+      attempts.push({ ok: false, provider: "openrouter", model, error: e?.message || String(e) });
+    }
+  }
+  throw new Error(`OpenRouter failed: ${JSON.stringify(attempts.slice(-1))}`);
+}
+
 async function callAI(messagesPayload, options = {}) {
   if (userAskedTemporalInfo(options.userText)) {
     return { ok: true, provider: "ollama-temporal", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: buildTemporalAnswer(), attempts: [] };
@@ -1088,29 +1238,16 @@ async function callAI(messagesPayload, options = {}) {
     }
   }
 
-  // 2) Emergent API como fallback cloud (sem depender de ngrok/Ollama)
-  if (EMERGENT_API_KEY) {
-    try {
-      const controller2 = new AbortController();
-      const timeout2 = setTimeout(() => controller2.abort(), 45000);
-      const apiMessages2 = messagesPayload
-        .filter((m) => m.role !== "system")
-        .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
-      const resp2 = await fetch(`https://integrations.emergentagent.com/llm/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_API_KEY}` },
-        signal: controller2.signal,
-        body: JSON.stringify({ model: EMERGENT_MODEL, messages: [{ role: "system", content: systemPrompt }, ...apiMessages2], temperature: 0.7, max_tokens: 1500 }),
-      });
-      clearTimeout(timeout2);
-      if (resp2.ok) {
-        const data2 = await resp2.json();
-        const reply2 = String(data2?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
-        if (reply2) return { ok: true, provider: "emergent", endpoint: EMERGENT_BASE_URL, model: EMERGENT_MODEL, reply: sanitizeOllamaReply(reply2, options.userText), attempts };
-      }
-    } catch (e) {
-      attempts.push({ ok: false, provider: "emergent", error: e?.message || String(e) });
+  // 2) OpenRouter free models (cloud 24/7, sem depender de PC)
+  try {
+    const orResult = await callOpenRouter(messagesPayload, options);
+    if (orResult.ok) {
+      orResult.attempts?.forEach((a) => attempts.push(a));
+      return orResult;
     }
+  } catch (e) {
+    attempts.push({ ok: false, provider: "openrouter", error: e?.message || String(e) });
+    recordAutoReply({ step: "ai_provider_fail", provider: "openrouter", error: e?.message || String(e) });
   }
 
   // 3) Ollama como último recurso (só se PC ligado)
@@ -1130,7 +1267,7 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
   }
 
-  return { ok: false, error: "Claude FCC, Emergent e Ollama falharam.", attempts, ...attempts[attempts.length - 1] };
+  return { ok: false, error: "Claude FCC, OpenRouter e Ollama falharam.", attempts, ...attempts[attempts.length - 1] };
 }
 
 async function generateCreativeImage(prompt) {
