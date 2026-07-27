@@ -186,10 +186,10 @@ export async function chatOpenRouter(opts: ChatOptions) {
   }
   
   const requested = opts.maxTokens || 700;
-  // Hermes (barato, bom em PT-BR, sem CoT leak) → free models → paid backup
-  const hermesModels = ["nousresearch/hermes-4-70b", "nousresearch/hermes-3-llama-3.1-70b"];
-  const freeModels = ["nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-26b-a4b-it:free"];
-  const paidModels = ["google/gemini-3-flash-preview", "deepseek/deepseek-chat"];
+  // Hermes primeiro (barato, bom em PT-BR) → free models → paid backup
+  const hermesModels = ["nousresearch/hermes-4-70b"];
+  const freeModels = ["nvidia/nemotron-3-super-120b-a12b:free"];
+  const paidModels = ["google/gemini-3-flash-preview"];
   
   for (const model of [...hermesModels, ...freeModels, ...paidModels]) {
     const r = await tryOpenRouter(model, requested);
@@ -208,7 +208,7 @@ async function chatClaudeFCC(opts: ChatOptions) {
       .filter((m) => m.role !== "system")
       .map((m) => ({ role: m.role === "assistant" ? "assistant" as const : "user" as const, content: String(m.content || "") }));
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 60000);
     const resp = await fetch(`${FCC_BASE_URL}/v1/messages`, {
       method: "POST",
       headers: {
@@ -301,7 +301,12 @@ export async function chatCompletion(opts: ChatOptions) {
     if (r.ok) return r;
   }
 
-  // Fallback chain: OpenRouter (Hermes + free) → Nemotron → FCC → Lovable → Gemini → Emergent
+  // Fallback chain: FCC (funciona!) → OpenRouter (Hermes) → Nemotron → Lovable → Gemini → Emergent
+  if (FCC_BASE_URL) {
+    const r = await chatClaudeFCC(opts);
+    if (r.ok) return r;
+    console.warn("⚠️ Claude FCC falhou:", r.status, r.error?.slice?.(0, 200));
+  }
   if (OPENROUTER_KEY) {
     const r = await chatOpenRouter(opts);
     if (r.ok) return r;
@@ -310,22 +315,14 @@ export async function chatCompletion(opts: ChatOptions) {
   if (NVIDIA_NIM_API_KEY) {
     const r = await chatNemotronDirect(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Nemotron NIM direto falhou:", r.status, r.error?.slice?.(0, 200));
-  }
-  if (FCC_BASE_URL) {
-    const r = await chatClaudeFCC(opts);
-    if (r.ok) return r;
-    console.warn("⚠️ Claude FCC falhou:", r.status, r.error?.slice?.(0, 200));
   }
   if (LOVABLE_KEY) {
     const r = await chatLovable(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Lovable chat falhou:", r.status, r.error?.slice?.(0, 200));
   }
   if (GEMINI_KEY) {
     const r = await chatGemini(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Gemini direto falhou:", r.status, r.error?.slice?.(0, 200));
   }
   if (!wantsEmergent) {
     const r3 = await chatEmergent(opts);
