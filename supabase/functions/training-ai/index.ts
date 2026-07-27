@@ -8,8 +8,7 @@ const corsHeaders: Record<string, string> = {
 
 // --- PROMPTS DE PRODUÇÃO (lawyer-ai e judge-ai) ---
 const LAWYER_PRODUCTION_PROMPT = `IDENTIDADE
-Você é um Advogado Virtual Brasileiro especializado, trabalhando para o escritório da Dra. Kênia Garcia.
-Seu papel é analisar o caso do cliente, coletar informações adicionais quando necessário, e fornecer orientação jurídica estratégica.
+Você é o Advogado Virtual Especializado da Dra. Kênia Garcia Advocacia — um profissional experiente, empático e estrategicamente persuasivo cujo objetivo é orientar o cliente com precisão jurídica E converter a consulta em contrato de honorários.
 
 REGRAS GLOBAIS
 - Nunca invente provas, fatos, documentos ou jurisprudência.
@@ -18,6 +17,7 @@ REGRAS GLOBAIS
 - Linguagem profissional, clara e acessível ao cliente.
 - Quando faltar informação, pergunte diretamente ao cliente.
 - Ao final de toda análise: "Esta orientação é preliminar e não substitui consulta jurídica presencial."
+- SEMPRE termine com convite para agendamento presencial ou assinatura de contrato.
 
 PRECISÃO JURÍDICA OBRIGATÓRIA:
 - Cite APENAS artigos de lei que EXISTEM e pertencem ao diploma legal correto.
@@ -27,13 +27,63 @@ PRECISÃO JURÍDICA OBRIGATÓRIA:
 - Nunca invente números de processos.
 - Quando não puder confirmar uma informação jurídica, escreva: "Informação não confirmada. Recomenda-se verificar este ponto."
 
-ESTRATÉGIAS DE ATENDIMENTO AO CLIENTE:
-- Escuta Ativa: Use frases como "Entendi sua situação. Para eu analisar melhor, me conta: ..."
-- Empatia: Demonstre compreensão antes de qualquer orientação
-- Urgência Ética: "Esse tipo de situação tem prazos importantes"
-- Tratamento de Objeções: "Não tenho dinheiro" → "A Dra. Kênia oferece consulta inicial"
-- Gatilhos Psicológicos: Reciprocidade, Prova Social, Autoridade, Afinidade
-- Personalização: Use o nome do cliente, refira-se a detalhes específicos`;
+ESTRATÉGIAS DE CAPTAÇÃO E CONVERSÃO (use自然mente):
+1. ESCUTA ATIVA COM PERGUNTAS ESTRATÉGICAS:
+   - "Me conta com mais detalhes o que aconteceu..."
+   - "Para eu entender melhor, você tem algum documento ou prova?"
+   - "Quando isso começou a acontecer?"
+   - Objetivo: fazer o cliente se sentir ouvido e dependente da sua orientação
+
+2. DEMONSTRAÇÃO DE VALOR (prove que você é o melhor):
+   - "Já trabalhamos com casos similares e conseguimos [resultado genérico]"
+   - "Nossa abordagem inclui análise completa de toda a documentação"
+   - "A Dra. Kênia tem experiência comprovada nessa área"
+   - Nunca diga "somos os melhores" — prove com fatos
+
+3. IDENTIFICAÇÃO E AMPLIFICAÇÃO DA DOR:
+   - "Essa situação pode gerar prejuízos financeiros significativos"
+   - "O prazo para agir é limitado — quanto mais esperar, mais difícil fica"
+   - "Muitos clientes na sua situação não sabem que têm direito a [benefício]"
+   - Amplifique sem dramatizar — mostre consequências reais
+
+4. TRATAMENTO DE OBJEÇÕES (antes que o cliente faça):
+   - Custo: "A consulta inicial tem valor acessível e pode ser parcelada"
+   - Demora: "Nossa equipe trabalha com prazos definidos — você acompanha cada etapa"
+   - Dúvida: "Entendo sua preocupação. Por isso ofrecemos orientação inicial para você decidir com tranquilidade"
+   - Não invente preços — diga que será informado após análise
+
+5. URGÊNCIA ÉTICA (nunca falsa):
+   - "Esse tipo de ação tem prazos prescricionais — se perder, perde o direito"
+   - "A janela para reunir provas está se fechando"
+   - "Quanto antes iniciarmos, melhores as chances de um resultado favorável"
+   - Baseie-se em prazos reais (prescrição, decadência)
+
+6. GATILHOS PSICOLÓGICOS:
+   - RECIPROCIDADE: dê algo primeiro (orientação gratuita, dica prática)
+   - PROVA SOCIAL: "Muitos clientes passaram por isso e conseguiram resolver"
+   - AUTORIDADE: cite sua experiência sem arrogância
+   - ESCASSEZ: "Nossa agenda para consultas presenciais está limitada este mês"
+   - AFINDADE: "Eu entendo perfeitamente o que você está passando"
+
+7. FECHAMENTO / CONVERSÃO (SEMPRE termine com ação):
+   - "Posso agendar uma consulta presencial para analisar seus documentos?"
+   - "Vou preparar uma proposta personalizada para o seu caso"
+   - "Que tal marcarmos um horário esta semana para você conhecer o escritório?"
+   - "A Dra. Kênia pode receber você [dia] ou [dia] — qual prefere?"
+   - Ofereça 2 opções específicas (dia/hora) para facilitar o SIM
+
+8. FOLLOW-UP ESTRATÉGICO:
+   - "Vou enviar um resumo da nossa conversa por WhatsApp"
+   - "Se tiver alguma dúvida, pode me chamar a qualquer momento"
+   - "Vou ficar de olho e te atualizo se surgir algo novo"
+   - Mantenha a porta aberta para reengajamento
+
+PERSONALIZAÇÃO OBRIGATÓRIA:
+- Use o nome do cliente pelo menos 3 vezes na resposta
+- Refira-se a detalhes específicos que ele mencionou
+- Nunca dê respostas genéricas — personalize tudo
+
+Tom: profissional mas acolhedor, confiante mas não arrogante, persuasivo mas ético.`;
 
 const LEGAL_REVIEW_PROMPT = `Você é um advogado sênior, professor de Direito, pesquisador jurídico e revisor técnico especializado em Direito brasileiro. Sua missão é auditar integralmente qualquer resposta jurídica antes de ela ser entregue ao cliente.
 
@@ -867,6 +917,89 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           improved_prompt: improvedPrompt,
           mode,
           area,
+          provider: "gpt-4o-mini",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    } else if (action === "auto_simulate") {
+      // Simulação automática: gera cenários realistas e responde com melhor estratégia
+      const customPrompt: string = String(body.custom_prompt ?? "").trim();
+      const numScenarios: number = Math.min(Number(body.num_scenarios ?? 5), 8);
+
+      const scenarios = [
+        { client_message: "Oi, tudo bem? Preciso de ajuda com um problema trabalhista", strategy: "saudacao", area: "trabalhista" },
+        { client_message: "Minha empresa não pagou as horas extras, o que posso fazer?", strategy: "identificacao_dor", area: "trabalhista" },
+        { client_message: "Estou com medo de perder meu emprego depois de 10 anos", strategy: "urgencia_etica", area: "trabalhista" },
+        { client_message: "Preciso de um advogado mas não tenho dinheiro agora", strategy: "tratamento_objecao", area: "civel" },
+        { client_message: "Quero saber quanto custa para processar o INSS", strategy: "demonstracao_valor", area: "previdenciario" },
+        { client_message: "Meu ex-marido não paga pensão, preciso resolver isso urgente", strategy: "lead_urgencia", area: "familia" },
+        { client_message: "Tenho uma divida no banco e eles estão ameaçando meu imóvel", strategy: "lead_bancario", area: "civel" },
+        { client_message: "Estou pensando se vale a pena entrar com processo...", strategy: "lead_hesitante", area: "civel" },
+      ];
+
+      const selectedScenarios = scenarios.slice(0, numScenarios);
+      const results: Array<Record<string, unknown>> = [];
+      let totalScore = 0;
+
+      for (const sc of selectedScenarios) {
+        try {
+          const systemPromptBase = customPrompt || LAWYER_PRODUCTION_PROMPT;
+          const clientNames = ["Maria", "João", "Ana", "Carlos", "Fernanda", "Roberto", "Patrícia", "Lucas"];
+          const clientName = clientNames[Math.floor(Math.random() * clientNames.length)];
+          const areaLabel = sc.area.charAt(0).toUpperCase() + sc.area.slice(1);
+
+          const simResult = await chatCompletion({
+            messages: [
+              { role: "system", content: `${systemPromptBase}\n\n${STRATEGIES_CONTEXT}\n\nÁREA: ${areaLabel}\nESTRATÉGIA FOCAL: ${sc.strategy}` },
+              { role: "user", content: `CLIENTE: ${clientName}\nÁREA: ${areaLabel}\nMENSAGEM: "${sc.client_message}"\n\nResponda como advogado especialista, aplicando TODAS as estratégias de captação e conversão. Use o nome do cliente, seja empático, fundamentado juridicamente e termine com convite para agendamento. Máximo 500 palavras.` },
+            ],
+            temperature: 0.7, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
+          });
+
+          if (!simResult.ok) continue;
+          const professionalResponse = simResult.data?.choices?.[0]?.message?.content || "";
+
+          const evalResult = await chatCompletion({
+            messages: [
+              { role: "system", content: EVALUATE_PROMPT },
+              { role: "user", content: `Avalie RIGOROSAMENTE a resposta do advogado para um caso ${areaLabel} com estratégia ${sc.strategy}.\n\nCASO: ${sc.client_message}\n\nRESPOSTA DO ADVOGADO:\n${professionalResponse}\n\nCritérios de conversão:
+- Escuta ativa e personalização (usou o nome do cliente?)
+- Demonstração de valor jurídico (citou artigos corretos?)
+- Tratamento de objeções (anticipou dúvidas?)
+- Urgência ética (criou senso de urgência real?)
+- Fechamento (terminou com convite/agendamento?)
+- Gatilhos psicológicos (prova social, reciprocidade, autoridade?)
+Score deve ser RIGOROSO.` },
+            ],
+            temperature: 0.3, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
+          });
+
+          if (!evalResult.ok) continue;
+          const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
+          const score = typeof evalParsed?.score === "number" ? evalParsed.score : 50;
+          totalScore += score;
+
+          results.push({
+            client_message: sc.client_message,
+            strategy: sc.strategy,
+            area: sc.area,
+            client_name: clientName,
+            professional_response: professionalResponse,
+            evaluation: evalParsed,
+            score,
+          });
+        } catch (e) { /* skip */ }
+      }
+
+      const avgScore = results.length > 0 ? Math.round(totalScore / results.length) : 0;
+
+      console.log(`[training-ai] auto_simulate: ${results.length} scenarios, avg score: ${avgScore}`);
+
+      return new Response(
+        JSON.stringify({
+          scenarios: results,
+          total: results.length,
+          avg_score: avgScore,
           provider: "gpt-4o-mini",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },

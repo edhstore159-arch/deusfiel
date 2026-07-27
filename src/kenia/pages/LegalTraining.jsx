@@ -11,7 +11,7 @@ import {
   Send, Loader2, GraduationCap, Scale, MessageSquare,
   Trophy, Target, BookOpen, RefreshCw, ChevronDown, ChevronUp, Star,
   Sparkles, Lightbulb, CheckCircle2, ArrowRight, Phone, Users,
-  Copy, Printer, FileDown
+  Copy, Printer, FileDown, Zap
 } from "lucide-react";
 import { toast } from "sonner";
 import { CHAT_DEFAULT_PROMPT, loadChatConfig, saveChatConfig } from "@/kenia/storage/chatSecretary";
@@ -307,6 +307,9 @@ function LegalTraining() {
   const [simulationMessage, setSimulationMessage] = useState("");
   const [simulationClientName, setSimulationClientName] = useState("Cliente Teste");
   const [currentPrompt, setCurrentPrompt] = useState("");
+  const [autoSimData, setAutoSimData] = useState(null);
+  const [autoSimRunning, setAutoSimRunning] = useState(false);
+  const [autoSimProgress, setAutoSimProgress] = useState("");
 
   const [activeSection, setActiveSection] = useState("treinamento");
 
@@ -990,6 +993,34 @@ function LegalTraining() {
       toast.error("Erro na simulação: " + (e?.message || e));
     } finally {
       setSimulating(false);
+    }
+  };
+
+  const runAutoSimulate = async () => {
+    if (autoSimRunning) return;
+    setAutoSimRunning(true);
+    setAutoSimData(null);
+    setAutoSimProgress("Gerando cenários de captura...");
+    try {
+      const { data, error } = await supabase.functions.invoke("training-ai", {
+        body: {
+          action: "auto_simulate",
+          mode,
+          area,
+          custom_prompt: currentPrompt,
+          num_scenarios: 5,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAutoSimData(data);
+      setAutoSimProgress("");
+      toast.success(`Simulação automática: ${data.total} cenários, média ${data.avg_score}/100`);
+    } catch (e) {
+      toast.error("Erro na simulação automática: " + (e?.message || e));
+      setAutoSimProgress("");
+    } finally {
+      setAutoSimRunning(false);
     }
   };
 
@@ -2270,7 +2301,53 @@ function LegalTraining() {
                         <span className="text-purple-600">+{autoLoopResults.total_improvement}%</span>
                       </div>
                     </div>
-                  )}
+                   )}
+
+                  <div className="mt-3 p-2 rounded border bg-blue-50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="text-[10px] font-medium text-blue-800">Simulação Automática de Captura</span>
+                    </div>
+                    <p className="text-[9px] text-blue-700 mb-2">Gera 5 cenários reais e responde com a melhor estratégia para converter cada lead em cliente.</p>
+                    <Button size="sm" onClick={runAutoSimulate} disabled={autoSimRunning} className="w-full text-[10px] h-7 bg-blue-600 hover:bg-blue-700">
+                      {autoSimRunning ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Zap className="w-3 h-3 mr-1" />}
+                      {autoSimRunning ? autoSimProgress || "Simulando..." : "Rodar 5 Simulações Automáticas"}
+                    </Button>
+                    {autoSimData && !autoSimRunning && (
+                      <div className="mt-2 space-y-2 max-h-[400px] overflow-y-auto">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-blue-800">Média:</span>
+                          <span className={`text-[11px] font-bold ${autoSimData.avg_score >= 70 ? "text-green-600" : autoSimData.avg_score >= 50 ? "text-yellow-600" : "text-red-600"}`}>
+                            {autoSimData.avg_score}/100
+                          </span>
+                          <span className="text-[9px] text-muted-foreground">({autoSimData.total} cenários)</span>
+                        </div>
+                        {autoSimData.scenarios?.map((sc, si) => (
+                          <div key={si} className="p-2 rounded-lg bg-white border text-[9px] space-y-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-blue-900">{sc.client_name}</span>
+                              <span className="px-1 py-0.5 rounded text-[7px] font-bold uppercase text-white"
+                                style={{ backgroundColor: (WA_STRATEGIES.find(s => s.name === sc.strategy) || {}).color || "#64748b" }}>
+                                {sc.strategy}
+                              </span>
+                              <span className="px-1 py-0.5 rounded bg-gray-100 text-[7px] font-medium text-gray-600">{sc.area}</span>
+                              <span className={`ml-auto font-bold ${sc.score >= 70 ? "text-green-600" : sc.score >= 50 ? "text-yellow-600" : "text-red-600"}`}>
+                                {sc.score}/100
+                              </span>
+                            </div>
+                            <div className="text-gray-600 italic">"{sc.client_message}"</div>
+                            <div className="text-blue-800 whitespace-pre-wrap leading-relaxed max-h-[120px] overflow-y-auto">{sc.professional_response?.slice(0, 500)}{sc.professional_response?.length > 500 ? "..." : ""}</div>
+                            {sc.evaluation?.strengths?.length > 0 && (
+                              <div className="text-green-700">+ {sc.evaluation.strengths[0]}</div>
+                            )}
+                            {sc.evaluation?.weaknesses?.length > 0 && (
+                              <div className="text-red-600">- {sc.evaluation.weaknesses[0]}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="mt-3 p-2 rounded border bg-emerald-50">
                     <div className="text-[10px] font-medium text-emerald-800 mb-2">Simulação WhatsApp</div>
