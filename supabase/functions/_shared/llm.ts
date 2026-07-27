@@ -177,6 +177,10 @@ async function chatNemotronDirect(opts: ChatOptions) {
     if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
     const data = await resp.json();
     const text = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+    // Valida qualidade: rejeita se contiver <unk>, output vazio, ou lixo
+    if (!text || text.length < 10 || text.includes("<unk>") || (text.match(/<unk>/g) || []).length > 2) {
+      return { ok: false as const, status: 0, error: "Nemotron retornou output inválido (lixo/unk)" };
+    }
     return { ok: true as const, data: { choices: [{ message: { role: "assistant", content: text } }] }, provider: "nemotron" };
   } catch (e) {
     return { ok: false as const, status: 0, error: `Nemotron NIM erro: ${(e as Error)?.message || e}` };

@@ -394,6 +394,8 @@ function LegalTraining() {
           const rawSid = row.session_id || "";
           const phone = rawSid.replace("whatsapp:", "").split("@")[0].replace(/^\+/, "");
           if (!phone || phone.length < 8 || phone === "test" || rawSid.startsWith("test")) continue;
+          // Filtrar sessões de teste: phone deve conter apenas dígitos
+          if (!/^\d{8,}$/.test(phone)) continue;
           const key = phone;
           if (!bySession[key]) bySession[key] = { rows: [], last: row.created_at, phone };
           bySession[key].rows.push(row);
