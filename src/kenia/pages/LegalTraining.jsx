@@ -629,8 +629,9 @@ function LegalTraining() {
       // 1) Loop de Melhoria automático
       setAutoLoopTraining(true);
       setAutoLoopProgress({ iteration: 0, maxIterations: 3, score: 0, status: "Rodando loop de melhoria..." });
+      let loopRes = null;
       try {
-        const loopRes = await supabase.functions.invoke("training-ai", {
+        loopRes = await supabase.functions.invoke("training-ai", {
           body: {
             action: "auto_train_loop",
             current_prompt: autoLoopPrompt,
@@ -642,7 +643,6 @@ function LegalTraining() {
           },
         });
         if (!loopRes.error && loopRes.data) {
-          // Salvar prompt evoluído para próxima sessão
           if (loopRes.data.final_prompt && loopRes.data.final_prompt !== autoLoopPrompt) {
             saveEvolvedLegalPrompt(mode, loopRes.data.final_prompt);
           }

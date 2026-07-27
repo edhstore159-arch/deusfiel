@@ -588,14 +588,14 @@ Deno.serve(async (req: Request) => {
       const lawList = caseData?.applicable_laws?.join(", ") || "N/A";
       const issuesList = caseData?.key_issues?.join("; ") || "N/A";
 
-      // 1. Advogado production responde ao caso do cliente (não ao profissional)
+      // 1. Advogado production responde ao caso (Gemini Flash — rápido)
       const lawyerPrompt = mode === "lawyer" ? LAWYER_PRODUCTION_PROMPT : JUDGE_PRODUCTION_PROMPT;
-      const lawyerResult = await chatCompletion({
+      const lawyerResult = await chatGemini({
         messages: [
           { role: "system", content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
-          { role: "user", content: `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nResponda ao cliente como advogado, aplicando estratégias de atendimento. Use o nome do cliente, seja empático e fundamentado. Máximo 400 palavras.` },
+          { role: "user", content: `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nResponda ao cliente como advogado. Máximo 400 palavras.` },
         ],
-        temperature: 0.5, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.5, maxTokens: 1500,
       });
 
       lawyerFeedback = "Análise não disponível.";
