@@ -355,6 +355,10 @@ function LegalTraining() {
   const [waLoading, setWaLoading] = useState(true);
   const [waDataSource, setWaDataSource] = useState("loading");
   const waMessagesEndRef = useRef(null);
+  const [waInput, setWaInput] = useState("");
+  const [waSending, setWaSending] = useState(false);
+  const [waRefreshing, setWaRefreshing] = useState(false);
+  const waRefreshInterval = useRef(null);
 
   const loadWaConversations = useCallback(async () => {
     setWaLoading(true);
@@ -438,6 +442,52 @@ function LegalTraining() {
     waMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [waMessages]);
 
+  // Auto-refresh mensagens a cada 5 segundos quando uma conversa está selecionada
+  useEffect(() => {
+    if (activeSection !== "conversas" || !waSelectedId) {
+      if (waRefreshInterval.current) { clearInterval(waRefreshInterval.current); waRefreshInterval.current = null; }
+      return;
+    }
+    waRefreshInterval.current = setInterval(() => {
+      loadWaMessages(waSelectedId, true);
+    }, 5000);
+    return () => { if (waRefreshInterval.current) clearInterval(waRefreshInterval.current); };
+  }, [activeSection, waSelectedId, loadWaConversations]);
+
+  async function sendWaMessage(text) {
+    if (!text?.trim() || !waSelectedId || waSending) return;
+    const conv = waConversations.find((c) => c.id === waSelectedId);
+    if (!conv) return;
+    const jid = conv._jid || waSelectedId;
+    const phone = conv.phone?.replace(/\D/g, "");
+    setWaSending(true);
+    try {
+      const resp = await fetch(`${API}/whatsapp/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: jid || `${phone}@s.whatsapp.net`, text: text.trim() }),
+      });
+      const data = await resp.json();
+      if (data?.ok || data?.delivered) {
+        setWaMessages((prev) => [...prev, {
+          id: `local-${Date.now()}`,
+          content: text.trim(),
+          direction: "outgoing",
+          strategy_name: detectStrategy(text.trim(), "outgoing"),
+          created_at: new Date().toISOString(),
+        }]);
+        setWaInput("");
+        toast.success("Mensagem enviada!");
+      } else {
+        toast.error("Erro ao enviar: " + (data?.error || "desconhecido"));
+      }
+    } catch (e) {
+      toast.error("Erro de conexão: " + (e?.message || e));
+    } finally {
+      setWaSending(false);
+    }
+  }
+
   function detectStrategy(content, direction) {
     if (!content) return "abordagem_inicial";
     const t = content.toLowerCase();
@@ -468,11 +518,11 @@ function LegalTraining() {
     return "abordagem_inicial";
   }
 
-  function loadWaMessages(convId) {
-    setWaSelectedId(convId);
+  function loadWaMessages(convId, silent = false) {
+    if (!silent) setWaSelectedId(convId);
     const conv = waConversations.find((c) => c.id === convId);
     if (conv?._messages) {
-      setWaMessages(conv._messages.map((m, i) => ({ ...m, id: `sb-${i}`, strategy_name: detectStrategy(m.content, m.direction) })));
+      if (!silent) setWaMessages(conv._messages.map((m, i) => ({ ...m, id: `sb-${i}`, strategy_name: detectStrategy(m.content, m.direction) })));
       return;
     }
     if (waDataSource === "backend" && conv) {
@@ -481,15 +531,16 @@ function LegalTraining() {
         .then((r) => r.json())
         .then((msgs) => {
           if (Array.isArray(msgs) && msgs.length) {
-            setWaMessages(msgs.map((m) => ({
+            const mapped = msgs.map((m) => ({
               id: m.id || `msg-${Math.random()}`,
               content: m.text || m.content || "",
               direction: m.from_me ? "outgoing" : "incoming",
               strategy_name: detectStrategy(m.text || m.content || "", m.from_me ? "outgoing" : "incoming"),
               created_at: m.created_at || new Date().toISOString(),
-            })));
+            }));
+            if (!silent) setWaMessages(mapped);
           } else {
-            setWaMessages([]);
+            if (!silent) setWaMessages([]);
           }
         })
         .catch(() => setWaMessages([]));
@@ -2640,7 +2691,7 @@ function LegalTraining() {
             </div>
           </div>
 
-          {/* Col 2: Messages panel */}
+          {/* Col 2: Messages panel — Chat Interativo */}
           <div className="flex-1 flex flex-col border border-border rounded-xl bg-card overflow-hidden min-w-0">
             {waSelectedId ? (() => {
               const selectedConv = waConversations.find((c) => c.id === waSelectedId);
@@ -2648,42 +2699,68 @@ function LegalTraining() {
               return (
                 <>
                   <div className="p-2.5 border-b border-border flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold">{selectedConv.member_name || formatWaPhone(selectedConv.phone)}</p>
-                      <p className="text-[10px] text-muted-foreground">{selectedConv.phone}</p>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <p className="text-xs font-semibold">{selectedConv.member_name || formatWaPhone(selectedConv.phone)}</p>
+                        <p className="text-[10px] text-muted-foreground">{selectedConv.phone}</p>
+                      </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: getWaStrategyColor(selectedConv.current_strategy) + "22", color: getWaStrategyColor(selectedConv.current_strategy), border: `1px solid ${getWaStrategyColor(selectedConv.current_strategy)}44` }}>
-                      <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: getWaStrategyColor(selectedConv.current_strategy) }} />
-                      {getWaStrategyLabel(selectedConv.current_strategy)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-green-600 font-medium flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" /> Ativo
+                      </span>
+                      <button onClick={() => loadWaMessages(waSelectedId, true)} className="p-1 rounded hover:bg-muted" title="Atualizar">
+                        <RefreshCw className="w-3 h-3 text-muted-foreground" />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                    {waMessages.length === 0 && (
+                      <div className="text-center text-xs text-muted-foreground py-8">
+                        <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p>Nenhuma mensagem ainda</p>
+                        <p className="text-[10px] mt-1">As mensagens do cliente aparecerão aqui</p>
+                      </div>
+                    )}
                     {waMessages.map((msg, idx) => {
-                      const color = getWaStrategyColor(msg.strategy_name);
                       const isOut = msg.direction === "outgoing";
-                      const isSelected = waSelectedMsgIdx === idx;
                       return (
                         <div key={msg.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-                          <div
-                            onClick={() => { setWaSelectedMsgIdx(idx); setWaSelectedStrategy(msg.strategy_name); setWaCorrection(""); }}
-                            className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm cursor-pointer transition-all ${isSelected ? "ring-2 ring-gold-400" : ""}`}
-                            style={{ backgroundColor: color + "18", border: `1px solid ${color}33`, borderLeft: isOut ? undefined : `3px solid ${color}`, borderRight: isOut ? `3px solid ${color}` : undefined }}
-                          >
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="inline-block rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider" style={{ backgroundColor: color, color: "#fff" }}>
-                                {getWaStrategyLabel(msg.strategy_name)}
-                              </span>
-                              <span className="text-[9px] text-muted-foreground">{formatWaTime(msg.created_at)}</span>
-                            </div>
-                            <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                            <div className="mt-0.5">
-                              <span className="text-[9px] text-muted-foreground">{isOut ? "↗ Enviado" : "↘ Recebido"}</span>
+                          <div className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm ${isOut ? "bg-green-500 text-white" : "bg-white border border-gray-200"}`}>
+                            <p className={`text-xs leading-relaxed whitespace-pre-wrap ${isOut ? "text-white" : "text-gray-800"}`}>{msg.content}</p>
+                            <div className="mt-0.5 flex items-center justify-end gap-1">
+                              <span className={`text-[9px] ${isOut ? "text-green-100" : "text-gray-400"}`}>{formatWaTime(msg.created_at)}</span>
+                              {isOut && <span className="text-[9px] text-green-100">✓</span>}
                             </div>
                           </div>
                         </div>
                       );
                     })}
                     <div ref={waMessagesEndRef} />
+                  </div>
+                  {/* Input para enviar mensagem ao cliente */}
+                  <div className="p-2.5 border-t border-border bg-muted/30">
+                    <div className="flex gap-2">
+                      <Input
+                        value={waInput}
+                        onChange={(e) => setWaInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendWaMessage(waInput); } }}
+                        placeholder="Digite sua resposta para o cliente..."
+                        disabled={waSending}
+                        className="flex-1 text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => sendWaMessage(waInput)}
+                        disabled={waSending || !waInput.trim()}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {waSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                      </Button>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground mt-1 text-center">
+                      Enter para enviar · Resposta vai direto ao WhatsApp do cliente
+                    </p>
                   </div>
                 </>
               );
@@ -2692,20 +2769,20 @@ function LegalTraining() {
                 <div className="text-center">
                   <div className="text-3xl mb-3">💬</div>
                   <p className="text-sm font-semibold">Selecione uma conversa</p>
-                  <p className="text-[10px] mt-1 max-w-xs">Clique em uma mensagem para aplicar correções e treinar estratégias.</p>
+                  <p className="text-[10px] mt-1 max-w-xs">Clique em um contato para ver as mensagens e responder clientes em tempo real.</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Col 3: Training / Correction panel */}
-          <div className="w-[280px] shrink-0 flex flex-col border border-border rounded-xl bg-card overflow-hidden">
+          {/* Col 3: Training panel — compacto */}
+          <div className="w-[240px] shrink-0 flex flex-col border border-border rounded-xl bg-card overflow-hidden">
             <div className="p-2.5 border-b border-border">
               <div className="flex items-center gap-2">
                 <GraduationCap className="w-3.5 h-3.5 text-gold-600" />
                 <h2 className="text-[11px] font-semibold uppercase tracking-wider">Treinamento</h2>
               </div>
-              <p className="text-[9px] text-muted-foreground mt-0.5">Selecione uma mensagem para corrigir</p>
+              <p className="text-[9px] text-muted-foreground mt-0.5">Estratégias de captação</p>
             </div>
             <div className="flex-1 overflow-y-auto p-2.5 space-y-3">
               {waSelectedMsgIdx !== null ? (
