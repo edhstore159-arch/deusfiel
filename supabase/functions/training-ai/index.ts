@@ -1,4 +1,4 @@
-import { chatCompletion, chatPipeline, chatEmergent, EMERGENT_KEY } from "../_shared/llm.ts";
+import { chatCompletion, chatEmergent, EMERGENT_KEY } from "../_shared/llm.ts";
 import { saveEvolvedPrompt, getEvolvedPrompt } from "../_shared/prompts.ts";
 
 const corsHeaders: Record<string, string> = {
@@ -1458,12 +1458,23 @@ Seja breve e direta.`;
 
     console.log("[training-ai] Calling AI, action:", action);
 
-    const aiResult = await chatPipeline({
+    let aiResult = await chatCompletion({
       messages,
       temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
       maxTokens: action === "generate_case" ? 8000 : 4000,
       model: "gpt-4o-mini",
+      preferFastProvider: true,
     });
+
+    if (!aiResult.ok) {
+      console.warn("[training-ai] chatCompletion gpt-4o-mini failed, tentando sem modelo específico:", aiResult.error);
+      await new Promise((r) => setTimeout(r, 1500));
+      aiResult = await chatCompletion({
+        messages,
+        temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
+        maxTokens: action === "generate_case" ? 8000 : 4000,
+      });
+    }
 
     if (!aiResult.ok) {
       console.error("[training-ai] AI failed:", aiResult.status, aiResult.error);
@@ -1476,12 +1487,26 @@ Seja breve e direta.`;
     const rawText = aiResult.data?.choices?.[0]?.message?.content || "";
     console.log("[training-ai] Got response, length:", rawText.length, "provider:", aiResult.provider);
 
-    const parsed = parseJsonResponse(rawText);
+    let parsed = parseJsonResponse(rawText);
+
+    if (!parsed && rawText.length > 100) {
+      console.warn("[training-ai] Primeira tentativa de parse falhou, tentando com provider diferente...");
+      const retryResult = await chatCompletion({
+        messages: [...messages, { role: "user", content: "IMPORTANTE: Responda APENAS em JSON válido, sem texto adicional." }],
+        temperature: 0.2,
+        maxTokens: 4000,
+      });
+      if (retryResult.ok) {
+        const retryText = retryResult.data?.choices?.[0]?.message?.content || "";
+        parsed = parseJsonResponse(retryText);
+        if (parsed) console.log("[training-ai] Parse OK no retry");
+      }
+    }
 
     if (!parsed) {
-      console.error("[training-ai] Parse failed. Raw length:", rawText.length);
+      console.error("[training-ai] Parse failed. Raw length:", rawText.length, "provider:", aiResult.provider);
       return new Response(
-        JSON.stringify({ error: "Não foi possível parsear resposta da IA", debug: rawText.slice(0, 500) }),
+        JSON.stringify({ error: "Não foi possível parsear resposta da IA", debug: rawText.slice(0, 500), provider: aiResult.provider }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

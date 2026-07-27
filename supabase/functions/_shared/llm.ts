@@ -198,6 +198,7 @@ export async function chatCompletion(opts: ChatOptions) {
   if (wantsEmergent) {
     const r = await chatEmergent(opts);
     if (r.ok) return r;
+    console.warn("Emergent falhou, tentando fallback completo:", r.error?.slice?.(0, 200));
   }
   // Se pediu Claude, começa por FCC
   if (wantsClaude && FCC_BASE_URL) {
@@ -205,34 +206,32 @@ export async function chatCompletion(opts: ChatOptions) {
     if (r.ok) return r;
   }
 
-  // Fallback chain padrão: Nemotron → FCC → Lovable → Gemini → Emergent
-  // Se pediu modelo específico (GPT/Gemini/Claude), NÃO cai no Nemotron como fallback
-  if (NVIDIA_NIM_API_KEY && !wantsEmergent && !wantsGemini && !wantsClaude) {
+  // Fallback chain: sempre tenta todos os providers restantes
+  if (NVIDIA_NIM_API_KEY) {
     const r = await chatNemotronDirect(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Nemotron NIM direto falhou, tentando Claude FCC:", r.status, r.error?.slice?.(0, 200));
+    console.warn("⚠️ Nemotron NIM direto falhou:", r.status, r.error?.slice?.(0, 200));
   }
   if (FCC_BASE_URL) {
     const r = await chatClaudeFCC(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Claude FCC falhou, tentando Lovable:", r.status, r.error?.slice?.(0, 200));
+    console.warn("⚠️ Claude FCC falhou:", r.status, r.error?.slice?.(0, 200));
   }
   if (LOVABLE_KEY) {
     const r = await chatLovable(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Lovable chat falhou, tentando Gemini direto:", r.status, r.error?.slice?.(0, 200));
+    console.warn("⚠️ Lovable chat falhou:", r.status, r.error?.slice?.(0, 200));
   }
   if (GEMINI_KEY) {
     const r = await chatGemini(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Gemini direto falhou, tentando Emergent:", r.status, r.error?.slice?.(0, 200));
+    console.warn("⚠️ Gemini direto falhou:", r.status, r.error?.slice?.(0, 200));
   }
-  const r3 = await chatEmergent(opts);
-  if (r3.ok) return r3;
-  console.warn("⚠️ Emergent falhou, tentando Claude FCC:", r3.status, r3.error?.slice?.(0, 200));
-  const r4 = await chatClaudeFCC(opts);
-  if (r4.ok) return r4;
-  return { ok: false as const, status: r4.status || r3.status || 502, error: r4.error || r3.error || "Nenhum provider disponível", provider: "none" };
+  if (!wantsEmergent) {
+    const r3 = await chatEmergent(opts);
+    if (r3.ok) return r3;
+  }
+  return { ok: false as const, status: 502, error: "Nenhum provider disponível", provider: "none" };
 }
 
 // ---------- Pipeline: Nemotron gera → Claude (Emergent) revisa ----------
