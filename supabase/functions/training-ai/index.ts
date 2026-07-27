@@ -834,17 +834,13 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
     } else if (action === "auto_simulate") {
       // Simulação automática: gera cenários realistas e responde com melhor estratégia
       const customPrompt: string = String(body.custom_prompt ?? "").trim();
-      const numScenarios: number = Math.min(Number(body.num_scenarios ?? 5), 8);
+      const numScenarios: number = Math.min(Number(body.num_scenarios ?? 3), 4);
 
       const scenarios = [
         { client_message: "Oi, tudo bem? Preciso de ajuda com um problema trabalhista", strategy: "saudacao", area: "trabalhista" },
         { client_message: "Minha empresa não pagou as horas extras, o que posso fazer?", strategy: "identificacao_dor", area: "trabalhista" },
         { client_message: "Estou com medo de perder meu emprego depois de 10 anos", strategy: "urgencia_etica", area: "trabalhista" },
         { client_message: "Preciso de um advogado mas não tenho dinheiro agora", strategy: "tratamento_objecao", area: "civel" },
-        { client_message: "Quero saber quanto custa para processar o INSS", strategy: "demonstracao_valor", area: "previdenciario" },
-        { client_message: "Meu ex-marido não paga pensão, preciso resolver isso urgente", strategy: "lead_urgencia", area: "familia" },
-        { client_message: "Tenho uma divida no banco e eles estão ameaçando meu imóvel", strategy: "lead_bancario", area: "civel" },
-        { client_message: "Estou pensando se vale a pena entrar com processo...", strategy: "lead_hesitante", area: "civel" },
       ];
 
       const selectedScenarios = scenarios.slice(0, numScenarios);
@@ -863,31 +859,11 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
               { role: "system", content: `${systemPromptBase}\n\n${STRATEGIES_CONTEXT}\n\nÁREA: ${areaLabel}\nESTRATÉGIA FOCAL: ${sc.strategy}` },
               { role: "user", content: `CLIENTE: ${clientName}\nÁREA: ${areaLabel}\nMENSAGEM: "${sc.client_message}"\n\nResponda como advogado especialista, aplicando TODAS as estratégias de captação e conversão. Use o nome do cliente, seja empático, fundamentado juridicamente e termine com convite para agendamento. Máximo 500 palavras.` },
             ],
-            temperature: 0.7, maxTokens: 3000, model: "gpt-4o-mini", preferFastProvider: true,
+            temperature: 0.7, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
           });
 
           if (!simResult.ok) continue;
           const professionalResponse = simResult.data?.choices?.[0]?.message?.content || "";
-
-          const evalResult = await chatCompletion({
-            messages: [
-              { role: "system", content: EVALUATE_PROMPT },
-              { role: "user", content: `Avalie RIGOROSAMENTE a resposta do advogado para um caso ${areaLabel} com estratégia ${sc.strategy}.\n\nCASO: ${sc.client_message}\n\nRESPOSTA DO ADVOGADO:\n${professionalResponse}\n\nCritérios de conversão:
-- Escuta ativa e personalização (usou o nome do cliente?)
-- Demonstração de valor jurídico (citou artigos corretos?)
-- Tratamento de objeções (anticipou dúvidas?)
-- Urgência ética (criou senso de urgência real?)
-- Fechamento (terminou com convite/agendamento?)
-- Gatilhos psicológicos (prova social, reciprocidade, autoridade?)
-Score deve ser RIGOROSO.` },
-            ],
-            temperature: 0.3, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
-          });
-
-          if (!evalResult.ok) continue;
-          const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
-          const score = typeof evalParsed?.score === "number" ? evalParsed.score : 50;
-          totalScore += score;
 
           results.push({
             client_message: sc.client_message,
@@ -895,8 +871,8 @@ Score deve ser RIGOROSO.` },
             area: sc.area,
             client_name: clientName,
             professional_response: professionalResponse,
-            evaluation: evalParsed,
-            score,
+            evaluation: { score: 0, feedback: "Avaliação disponível ao analisar individualmente", strengths: [], weaknesses: [] },
+            score: 0,
           });
         } catch (e) { /* skip */ }
       }
