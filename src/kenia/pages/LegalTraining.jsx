@@ -88,10 +88,10 @@ function loadState() {
     if (typeof parsed !== "object" || parsed === null) return {};
     return {
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-      stats: parsed.stats || { lawyer: { total: 0, passed: 0 }, judge: { total: 0, passed: 0 } },
+      stats: parsed.stats || { lawyer: { total: 0, passed: 0 }, judge: { total: 0, passed: 0 }, secretary: { total: 0, passed: 0 } },
     };
   } catch {
-    return { sessions: [], stats: { lawyer: { total: 0, passed: 0 }, judge: { total: 0, passed: 0 } } };
+    return { sessions: [], stats: { lawyer: { total: 0, passed: 0 }, judge: { total: 0, passed: 0 }, secretary: { total: 0, passed: 0 } } };
   }
 }
 
@@ -1030,7 +1030,8 @@ function LegalTraining() {
     if (!simulationData?.improved_prompt) return;
     try {
       setCurrentPrompt(simulationData.improved_prompt);
-      toast.success("Prompt melhorado aplicado!");
+      saveEvolvedLegalPrompt(mode, simulationData.improved_prompt);
+      toast.success("Prompt melhorado aplicado e salvo!");
     } catch (e) {
       toast.error("Erro ao aplicar prompt");
     }
@@ -1072,9 +1073,14 @@ function LegalTraining() {
     try {
       // Usar prompt evoluído anterior ou o genérico
       const previousPrompt = loadEvolvedLegalPrompt(mode);
-      const autoLoopPrompt = previousPrompt && previousPrompt.trim().length > 50
-        ? previousPrompt
-        : `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`;
+      let autoLoopPrompt;
+      if (previousPrompt && previousPrompt.trim().length > 50) {
+        autoLoopPrompt = previousPrompt;
+      } else if (mode === "secretary") {
+        autoLoopPrompt = "Você é uma secretária jurídica experiente do escritório Dra. Kênia Garcia Advocacia. Responda de forma acolhedora, profissional e persuasiva, aplicando estratégias de captação de clientes: escuta ativa, identificação de dor, demonstração de valor, tratamento de objeções, urgência ética, fechamento com agendamento. Use o nome do cliente, seja empática e termine sempre com convite para consulta.";
+      } else {
+        autoLoopPrompt = `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`;
+      }
       const { data, error } = await supabase.functions.invoke("training-ai", {
         body: {
           action: "auto_train_loop",
@@ -1116,7 +1122,7 @@ function LegalTraining() {
     const allStrategies = SEC_STRATEGIES;
     setSimProgress({ current: 0, total: allStrategies.length, strategy: "Iniciando..." });
     try {
-      const currentPrompt = loadChatConfig().prompt || CHAT_DEFAULT_PROMPT;
+      const currentPrompt = loadEvolvedLegalPrompt(mode) || loadChatConfig().prompt || CHAT_DEFAULT_PROMPT;
       const results = [];
       for (let i = 0; i < allStrategies.length; i++) {
         const s = allStrategies[i];
@@ -1917,7 +1923,7 @@ function LegalTraining() {
                               </div>
                             )}
                             <pre className="text-[9px] bg-amber-100 rounded p-1.5 whitespace-pre-wrap max-h-[15vh] overflow-auto border border-amber-200">{secImprovedPrompt.improved_prompt}</pre>
-                            <Button size="sm" onClick={() => { setCurrentPrompt(secImprovedPrompt.improved_prompt); toast.success("Prompt aplicado!"); setSecImprovedPrompt(null); }} className="w-full mt-1 text-[10px] h-6 bg-amber-600 hover:bg-amber-700">
+                            <Button size="sm" onClick={() => { setCurrentPrompt(secImprovedPrompt.improved_prompt); saveEvolvedLegalPrompt(mode, secImprovedPrompt.improved_prompt); toast.success("Prompt aplicado e salvo!"); setSecImprovedPrompt(null); }} className="w-full mt-1 text-[10px] h-6 bg-amber-600 hover:bg-amber-700">
                               <CheckCircle2 className="w-3 h-3 mr-1" /> Aplicar Prompt
                             </Button>
                           </div>
@@ -2378,7 +2384,7 @@ function LegalTraining() {
                     />
                     <Button size="sm" onClick={simulateWhatsApp} disabled={simulating || !simulationMessage.trim()} className="w-full text-[10px] h-7">
                       {simulating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
-                      Simular {mode === "lawyer" ? "Advogado" : "Juiz"}
+                      Simular {mode === "lawyer" ? "Advogado" : mode === "secretary" ? "Secretaria" : "Juiz"}
                     </Button>
                     {simulationData && (
                       <div className="mt-2 space-y-2">
@@ -2531,7 +2537,7 @@ function LegalTraining() {
                           <div className="text-[10px] font-medium text-amber-800 mb-1">Prompt Melhorado</div>
                           <pre className="text-[10px] bg-amber-100 rounded p-2 whitespace-pre-wrap max-h-24 overflow-auto border border-amber-200">{improvePromptData.improved_prompt}</pre>
                           <div className="mt-2 flex gap-2">
-                            <Button size="sm" onClick={() => { setCurrentPrompt(improvePromptData.improved_prompt); toast.success("Prompt aplicado!"); setShowImprovePrompt(false); }} className="flex-1 text-[10px] h-7 bg-amber-600 hover:bg-amber-700">
+                          <Button size="sm" onClick={() => { setCurrentPrompt(improvePromptData.improved_prompt); saveEvolvedLegalPrompt(mode, improvePromptData.improved_prompt); toast.success("Prompt aplicado e salvo!"); setShowImprovePrompt(false); }} className="flex-1 text-[10px] h-7 bg-amber-600 hover:bg-amber-700">
                               <CheckCircle2 className="w-3 h-3 mr-1" /> Aplicar
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => setShowImprovePrompt(false)} className="text-[10px] h-7">

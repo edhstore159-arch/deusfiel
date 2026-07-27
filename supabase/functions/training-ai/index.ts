@@ -542,7 +542,7 @@ Deno.serve(async (req: Request) => {
       let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 3000 });
       if (!lawyerResult.ok) {
         console.log("[training-ai] Gemini falhou para generate_lawyer_response, usando fallback...");
-        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 3000, model: "gpt-4o-mini", preferFastProvider: true });
+        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true });
       }
 
       let response = lawyerResult.ok
@@ -565,7 +565,7 @@ Deno.serve(async (req: Request) => {
               { role: "system", content: LEGAL_REVIEW_PROMPT },
               { role: "user", content: `Texto para revisão:\n\n${response}` },
             ],
-            temperature: 0.3, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
+            temperature: 0.3, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
           });
         }
 
@@ -595,7 +595,7 @@ Deno.serve(async (req: Request) => {
       ];
       let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1500 });
       if (!lawyerResult.ok) {
-        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true });
+        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true });
       }
 
       lawyerFeedback = "Análise não disponível.";
@@ -684,7 +684,7 @@ Forneça sugestões TÉCNICAS com FRASES PRONTAS em terminologia jurídica brasi
 
       const systemPromptBase = customPrompt
         ? customPrompt.slice(0, 2000)
-        : (mode === "lawyer" ? LAWYER_PRODUCTION_PROMPT : JUDGE_PRODUCTION_PROMPT);
+        : (mode === "lawyer" ? LAWYER_PRODUCTION_PROMPT : mode === "secretary" ? "" : JUDGE_PRODUCTION_PROMPT);
 
       let systemInstruction = "";
       let userInstruction = "";
@@ -707,6 +707,23 @@ ${systemPromptBase}`;
         userInstruction = `CLIENTE: ${clientName}\nÁREA: ${area}\nMENSAGEM: "${clientMessage}"
 
 Elabore uma resposta COMPLETA e FUNDAMENTADA como advogado, aplicando as estratégias de atendimento ao cliente. Inclua artigos de lei, orientação jurídica e próximos passos. Máximo 500 palavras.`;
+      } else if (mode === "secretary") {
+        systemInstruction = `Você é uma SECRETÁRIA JURÍDICA experiente do escritório Dra. Kênia Garcia Advocacia respondendo no WhatsApp.
+
+REGRAS:
+- Use o nome do cliente várias vezes
+- Escuta ativa: demonstre preocupação genuína
+- Identifique a área jurídica rapidamente
+- Demonstre valor: experiência do escritório, casos similares
+- Trate objeções: custo, demora, complexidade
+- Urgência ética: prazos, consequências
+- Fechamento: convite para agendamento (duas opções de horário)
+- Tom acolhedor mas profissional
+- Nunca prometa resultado específico
+- Máximo 300 palavras`;
+        userInstruction = `CLIENTE: ${clientName}\nÁREA: ${area}\nMENSAGEM: "${clientMessage}"
+
+Responda como secretária jurídica, aplicando estratégias de captação. Use o nome do cliente, seja empática e termine com convite para agendamento.`;
       } else {
         systemInstruction = `Você é um JUIZ EXPERIENTE analisando um caso. Analise a situação do cliente e produza:
 1. Análise técnico-jurídica completa do caso
@@ -731,12 +748,13 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
           { role: "system", content: systemInstruction },
           { role: "user", content: userInstruction },
         ],
-        temperature: 0.7, maxTokens: 3000, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       if (!simResult.ok) {
+        console.error("[training-ai] simulate_whatsapp FAILED:", simResult.status, simResult.error?.slice?.(0, 300));
         return new Response(
-          JSON.stringify({ error: "Falha ao gerar resposta" }),
+          JSON.stringify({ error: "Falha ao gerar resposta", debug: String(simResult.error || "").slice(0, 300), provider: simResult.provider }),
           { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
@@ -750,15 +768,19 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
       // Client-side detection will handle strategy tagging
 
       // 2. Avaliar a resposta — prompt simples e focado
+      const evalRole = mode === "secretary" ? "secretária jurídica" : mode === "lawyer" ? "advogado" : "juiz";
+      const evalCriteria = mode === "secretary"
+        ? "escuta ativa, personalização (nome do cliente), demonstração de valor, tratamento de objeções, urgência ética, fechamento com agendamento, tom acolhedor, persuasão, estratégias de captação."
+        : "fundamentação legal (artigos citados), argumentação lógica, conclusão clara, empatia, personalização (nome do cliente), persuasão, tratamento de objeções, convite para agendamento.";
       let evalResult = await chatCompletion({
         messages: [
-          { role: "system", content: `Você é um avaliador de atendimento jurídico. Avalie a resposta do advogado e retorne APENAS JSON válido:
+          { role: "system", content: `Você é um avaliador de atendimento jurídico. Avalie a resposta da ${evalRole} e retorne APENAS JSON válido:
 {"score": 0-100, "feedback": "feedback com 2-3 frases", "strengths": ["ponto forte 1", "ponto forte 2"], "weaknesses": ["ponto fraco 1", "ponto fraco 2"]}
 
-Critérios: fundamentação legal (artigos citados), argumentação lógica, conclusão clara, empatia, personalização (nome do cliente), persuasão, tratamento de objeções, convite para agendamento.` },
-          { role: "user", content: `Mensagem do cliente: "${clientMessage}"\n\nResposta do advogado:\n${professionalResponse}\n\nAvalie. Score 0-100.` },
+Critérios: ${evalCriteria}` },
+          { role: "user", content: `Mensagem do cliente: "${clientMessage}"\n\nResposta do profissional:\n${professionalResponse}\n\nAvalie. Score 0-100.` },
         ],
-        temperature: 0.3, maxTokens: 1000, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.3, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       let evaluation = { score: 50, feedback: "Avaliação não disponível", strengths: [] as string[], weaknesses: [] as string[] };
@@ -800,7 +822,7 @@ Crie um prompt MELHORADO que corrija os pontos fracos. O prompt deve:
 Responda APENAS com o prompt melhorado, sem explicações extras.` },
             { role: "user", content: `Prompt atual:\n${systemPromptBase}\n\nGere o prompt melhorado aplicando as estratégias de atendimento.` },
           ],
-          temperature: 0.5, maxTokens: 1000, model: "gpt-4o-mini", preferFastProvider: true,
+          temperature: 0.5, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
         });
 
         if (improveResult.ok) {
@@ -810,7 +832,8 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
 
       // Save improved prompt to DB when score < 80
       if (improvedPrompt && evaluation.score < 80) {
-        await saveEvolvedPrompt(mode === "lawyer" ? "lawyer" : "judge", area, improvedPrompt, evaluation.score, {
+        const agentType = mode === "lawyer" ? "lawyer" : mode === "secretary" ? "secretary" : "judge";
+        await saveEvolvedPrompt(agentType, area, improvedPrompt, evaluation.score, {
           source: "simulate_whatsapp",
           client_message: clientMessage,
         });
@@ -849,17 +872,18 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
 
       for (const sc of selectedScenarios) {
         try {
-          const systemPromptBase = customPrompt || LAWYER_PRODUCTION_PROMPT;
+          const systemPromptBase = customPrompt || (mode === "secretary" ? SECRETARY_STRATEGY_PROMPT : LAWYER_PRODUCTION_PROMPT);
           const clientNames = ["Maria", "João", "Ana", "Carlos", "Fernanda", "Roberto", "Patrícia", "Lucas"];
           const clientName = clientNames[Math.floor(Math.random() * clientNames.length)];
           const areaLabel = sc.area.charAt(0).toUpperCase() + sc.area.slice(1);
+          const roleLabel = mode === "secretary" ? "secretária jurídica" : "advogado especialista";
 
           const simResult = await chatCompletion({
             messages: [
               { role: "system", content: `${systemPromptBase}\n\n${STRATEGIES_CONTEXT}\n\nÁREA: ${areaLabel}\nESTRATÉGIA FOCAL: ${sc.strategy}` },
-              { role: "user", content: `CLIENTE: ${clientName}\nÁREA: ${areaLabel}\nMENSAGEM: "${sc.client_message}"\n\nResponda como advogado especialista, aplicando TODAS as estratégias de captação e conversão. Use o nome do cliente, seja empático, fundamentado juridicamente e termine com convite para agendamento. Máximo 500 palavras.` },
+              { role: "user", content: `CLIENTE: ${clientName}\nÁREA: ${areaLabel}\nMENSAGEM: "${sc.client_message}"\n\nResponda como ${roleLabel}, aplicando TODAS as estratégias de captação e conversão. Use o nome do cliente, seja empático e termine com convite para agendamento. Máximo 500 palavras.` },
             ],
-            temperature: 0.7, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
+            temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
           });
 
           if (!simResult.ok) continue;
@@ -925,7 +949,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
                 { role: "system", content: GENERATE_CASE_PROMPT },
                 { role: "user", content: `Gere um caso simulado para treinamento de ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"} na área de ${iterArea.charAt(0).toUpperCase() + iterArea.slice(1)} com dificuldade Médio. Use nomes fictícios. Caso realista.` },
               ],
-              temperature: 0.8, maxTokens: 4000, model: "gpt-4o-mini",
+              temperature: 0.8, maxTokens: 700, model: "gpt-4o-mini",
             });
             if (!caseResult.ok) continue;
             const caseParsed = parseJsonResponse(caseResult.data?.choices?.[0]?.message?.content || "");
@@ -938,7 +962,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
                 { role: "system", content: currentPrompt + "\n\n" + STRATEGIES_CONTEXT },
                 { role: "user", content: `Caso: ${caseData.title}\n\n${caseData.description}\n\nPergunta: ${caseData.question || ""}\n\nResponda como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento ao cliente.` },
               ],
-              temperature: 0.7, maxTokens: 3000, model: "gpt-4o-mini",
+              temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini",
             });
             if (!responseResult.ok) continue;
             const secretaryResponse = responseResult.data?.choices?.[0]?.message?.content || "";
@@ -949,7 +973,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
                 { role: "system", content: EVALUATE_PROMPT },
                 { role: "user", content: `Avalie RIGOROSAMENTE a resposta do profissional no modo ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"}.\n\nCASO:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS AO CASO: ${Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A")}\nQUESTÕES JURÍDICAS CENTRAIS: ${Array.isArray(caseData?.key_issues) ? caseData.key_issues.join("; ") : (caseData?.key_issues || "N/A")}\n\nRESPOSTA DO PROFISSIONAL:\n${secretaryResponse}\n\nScore deve ser RIGOROSO: respostas genéricas sem artigos específicos devem receber abaixo de 50.` },
               ],
-              temperature: 0.3, maxTokens: 1500, model: "gpt-4o-mini",
+              temperature: 0.3, maxTokens: 700, model: "gpt-4o-mini",
             });
             if (!evalResult.ok) continue;
             const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
@@ -1006,7 +1030,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
             { role: "system", content: `Melhore o prompt do ${mode === "lawyer" ? "advogado" : "juiz"} para treinamento jurídico. JSON: {"improved_prompt": "...", "changes": []}` },
             { role: "user", content: `PROMPT ATUAL:\n${currentPrompt}\n\nWEAKNESSES:\n${allWeaknesses.slice(0, 5).join("\n")}\n\nSTRENGTHS:\n${allStrengths.slice(0, 3).join("\n")}\n\nScore atual: ${avgScore}/100. Meta: +${targetImprovement}%. Melhore o prompt para o profissional responder melhor em treinos.` },
           ],
-          temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini",
+          temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini",
         });
 
         if (improveResult.ok) {
@@ -1063,7 +1087,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           { role: "system", content: SECRETARY_STRATEGY_PROMPT },
           { role: "user", content: `Gere um cenário realista de atendimento para a estratégia: "${strategy.name}" — ${strategy.desc}.\n\nO cenário deve simular um cliente real de escritório de advocacia brasileiro. Inclua contexto emocional, urgência, objeções prováveis e detalhes que tornem o treinamento desafiador. Use nomes fictícios brasileiros.` },
         ],
-        temperature: 0.8, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.8, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       if (!stratResult.ok) {
@@ -1107,7 +1131,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           { role: "system", content: SECRETARY_EVALUATE_PROMPT },
           { role: "user", content: `CENÁRIO DE TREINAMENTO:\n${scenario}\n\nESTRATÉGIA: ${strategyId}\n\nRESPOSTA DA SECRETÁRIA:\n${userResponse}\n\nPROMPT ATUAL DA SECRETÁRIA:\n${(currentPrompt || "").slice(0, 1500)}\n\nAvalie a resposta considerando todas as estratégias de atendimento ao cliente. Score 0-100.` },
         ],
-        temperature: 0.3, maxTokens: 2000, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.3, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       if (!evalResult.ok) {
@@ -1183,7 +1207,7 @@ REGRAS OBRIGATÓRIAS:
           { role: "system", content: improveSystemPrompt },
           { role: "user", content: userMessage },
         ],
-        temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini", preferFastProvider: true,
+        temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
       });
 
       if (!improveResult.ok) {
@@ -1194,7 +1218,7 @@ REGRAS OBRIGATÓRIAS:
             { role: "system", content: improveSystemPrompt },
             { role: "user", content: userMessage },
           ],
-          temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini", preferFastProvider: true,
+          temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
         });
       }
 
@@ -1256,7 +1280,7 @@ REGRAS OBRIGATÓRIAS:
               { role: "system", content: SECRETARY_STRATEGY_PROMPT },
               { role: "user", content: `Gere um cenário para a estratégia: "${strategy.name}" — ${strategy.desc}. Use nomes fictícios brasileiros. Cenário realista.` },
             ],
-            temperature: 0.8, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
+            temperature: 0.8, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
           });
           if (!scenResult.ok) continue;
           const scenParsed = parseJsonResponse(scenResult.data?.choices?.[0]?.message?.content || "");
@@ -1268,7 +1292,7 @@ REGRAS OBRIGATÓRIAS:
               { role: "system", content: currentPrompt },
               { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica da Dra. Kênia Garcia, aplicando estratégias de atendimento.` },
             ],
-            temperature: 0.7, maxTokens: 1000, model: "gpt-4o-mini", preferFastProvider: true,
+            temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
           });
           if (!respResult.ok) continue;
           const secretaryResponse = respResult.data?.choices?.[0]?.message?.content || "";
@@ -1279,7 +1303,7 @@ REGRAS OBRIGATÓRIAS:
               { role: "system", content: SECRETARY_EVALUATE_PROMPT },
               { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nESTRATÉGIA: ${strategy.name}\n\nRESPOSTA DA SECRETÁRIA:\n${secretaryResponse}\n\nAvalie. Score 0-100.` },
             ],
-            temperature: 0.3, maxTokens: 1500, model: "gpt-4o-mini", preferFastProvider: true,
+            temperature: 0.3, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
           });
           if (!evalResult.ok) continue;
           const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
@@ -1315,7 +1339,7 @@ REGRAS OBRIGATÓRIAS:
             { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
             { role: "user", content: `PROMPT ATUAL:\n${currentPrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${[...new Set(allWeaknesses)].slice(0, 8).join("\n")}\n\nSTRENGTHS:\n${[...new Set(allStrengths)].slice(0, 5).join("\n")}\n\nScore médio: ${avgScore}/100. Melhore o prompt.` },
           ],
-          temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini", preferFastProvider: true,
+          temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
         });
         if (improveResult.ok) {
           const impParsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
@@ -1374,7 +1398,7 @@ REGRAS OBRIGATÓRIAS:
                 { role: "system", content: SECRETARY_STRATEGY_PROMPT },
                 { role: "user", content: `Cenário para: "${strategy.name}" — ${strategy.desc}. Només fictícios.` },
               ],
-              temperature: 0.8, maxTokens: 1200, model: "gpt-4o-mini", preferFastProvider: true,
+              temperature: 0.8, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
             });
             if (!scenResult.ok) continue;
             const scenParsed = parseJsonResponse(scenResult.data?.choices?.[0]?.message?.content || "");
@@ -1385,7 +1409,7 @@ REGRAS OBRIGATÓRIAS:
                 { role: "system", content: activePrompt },
                 { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica.` },
               ],
-              temperature: 0.7, maxTokens: 800, model: "gpt-4o-mini", preferFastProvider: true,
+              temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
             });
             if (!respResult.ok) continue;
             const secretaryResponse = respResult.data?.choices?.[0]?.message?.content || "";
@@ -1395,7 +1419,7 @@ REGRAS OBRIGATÓRIAS:
                 { role: "system", content: SECRETARY_EVALUATE_PROMPT },
                 { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nRESPOSTA:\n${secretaryResponse}\n\nAvalie. Score 0-100.` },
               ],
-              temperature: 0.3, maxTokens: 1200, model: "gpt-4o-mini", preferFastProvider: true,
+              temperature: 0.3, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
             });
             if (!evalResult.ok) continue;
             const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
@@ -1443,7 +1467,7 @@ REGRAS OBRIGATÓRIAS:
             { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
             { role: "user", content: `PROMPT ATUAL:\n${activePrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${allWeaknesses.slice(0, 5).join("\n")}\n\nSTRENGTHS:\n${allStrengths.slice(0, 3).join("\n")}\n\nScore: ${avgScore}/100. Meta: +${targetImprovement}%. Melhore o prompt.` },
           ],
-          temperature: 0.7, maxTokens: 4000, model: "gpt-4o-mini", preferFastProvider: true,
+          temperature: 0.7, maxTokens: 700, model: "gpt-4o-mini", preferFastProvider: true,
         });
         if (improveResult.ok) {
           const impParsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
@@ -1539,7 +1563,7 @@ Seja breve e direta.`;
     let aiResult = await chatCompletion({
       messages,
       temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
-      maxTokens: action === "generate_case" ? 8000 : 4000,
+      maxTokens: action === "generate_case" ? 700 : 4000,
       model: "gpt-4o-mini",
       preferFastProvider: true,
     });
@@ -1550,7 +1574,7 @@ Seja breve e direta.`;
       aiResult = await chatCompletion({
         messages,
         temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
-        maxTokens: action === "generate_case" ? 8000 : 4000,
+        maxTokens: action === "generate_case" ? 700 : 4000,
       });
     }
 

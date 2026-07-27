@@ -1,4 +1,4 @@
-// Shared LLM helpers with fallback chain: Nemotron (NVIDIA NIM direto) → Claude FCC → Lovable → Gemini → Emergent.
+// Shared LLM helpers with fallback chain: Nemotron (NVIDIA NIM direto) → OpenRouter (Gemini Flash) → DeepSeek (OpenRouter) → Claude FCC → Lovable → Gemini → Emergent.
 
 type ChatMessage = { role: string; content: any };
 
@@ -20,6 +20,7 @@ export interface ImageOptions {
 const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY");
 export const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
+const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
 const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "";
 const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
 const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
@@ -117,6 +118,52 @@ export async function chatEmergent(opts: ChatOptions) {
   } catch (e) {
     return { ok: false as const, status: 0, error: `Emergent erro: ${(e as Error)?.message || e}` };
   }
+}
+
+export async function chatOpenRouter(opts: ChatOptions) {
+  if (!OPENROUTER_KEY) return { ok: false as const, status: 0, error: "OPENROUTER_API_KEY ausente" };
+  
+  async function tryOpenRouter(model: string, maxTokens: number) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${OPENROUTER_KEY}`,
+          "HTTP-Referer": "https://deusfiel.onrender.com",
+          "X-Title": "Kenia Garcia Advocacia",
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages: opts.messages,
+          ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+          max_tokens: maxTokens,
+        }),
+      });
+      clearTimeout(timeout);
+      if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
+      return { ok: true as const, data: await resp.json(), provider: `openrouter/${model}` };
+    } catch (e) {
+      clearTimeout(timeout);
+      return { ok: false as const, status: 0, error: `OpenRouter erro: ${(e as Error)?.message || e}` };
+    }
+  }
+  
+  const requested = opts.maxTokens || 700;
+  // Modelos gratuitos primeiro, depois pagos
+  const freeModels = ["nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-26b-a4b-it:free"];
+  const paidModels = ["google/gemini-3-flash-preview", "deepseek/deepseek-chat"];
+  
+  for (const model of [...freeModels, ...paidModels]) {
+    const r = await tryOpenRouter(model, requested);
+    if (r.ok) return r;
+    console.warn(`⚠️ OpenRouter ${model} falhou:`, r.status, String(r.error || "").slice(0, 100));
+  }
+  
+  return { ok: false as const, status: 402, error: "OpenRouter: todos os modelos falharam" };
 }
 
 async function chatClaudeFCC(opts: ChatOptions) {
@@ -219,6 +266,12 @@ export async function chatCompletion(opts: ChatOptions) {
     const r = await chatNemotronDirect(opts);
     if (r.ok) return r;
     console.warn("⚠️ Nemotron NIM direto falhou:", r.status, r.error?.slice?.(0, 200));
+  }
+  // OpenRouter (Gemini Flash + DeepSeek) — cloud, sem depender de ngrok
+  if (OPENROUTER_KEY) {
+    const r = await chatOpenRouter(opts);
+    if (r.ok) return r;
+    console.warn("⚠️ OpenRouter falhou:", r.status, r.error?.slice?.(0, 200));
   }
   if (FCC_BASE_URL) {
     const r = await chatClaudeFCC(opts);
