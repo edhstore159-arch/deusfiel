@@ -648,56 +648,61 @@ async function callClaudeFCC(messages: Array<{ role: string; content: string }>)
 }
 
 async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string, agentModel?: string): Promise<string> {
-  // Se o agente tem modelo específico, usar chatCompletion diretamente
-  if (agentModel && agentModel !== "claude-fcc") {
+  // Se o agente tem modelo específico, SEMPRE usar chatCompletion com esse modelo
+  if (agentModel) {
     try {
       const response = await chatCompletion({
         model: agentModel,
         messages,
         temperature: 0.3,
+        maxTokens: 2000,
       });
       const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
         .replace(/<think>[\s\S]*?<\/think>/giu, "")
         .trim();
-      if (reply && !isInvalidOllamaReply(reply) && !isPromptLeakage(reply)) return reply;
-      console.warn(`[chat-ai] Modelo ${agentModel} falhou, usando fallback`);
+      if (reply && reply.length > 10 && !isPromptLeakage(reply)) return reply;
+      console.warn(`[chat-ai] Modelo ${agentModel} retornou resposta vazia/inválida, tentando fallback`);
     } catch (err) {
       console.warn(`[chat-ai] Modelo ${agentModel} falhou:`, err);
     }
   }
 
+  // Fallback: tentar os melhores modelos disponíveis
   try {
-    return await callOpenRouterClaude(messages);
+    const response = await chatCompletion({
+      model: "anthropic/claude-haiku-4-5",
+      messages,
+      temperature: 0.3,
+    });
+    const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
+      .replace(/<think>[\s\S]*?<\/think>/giu, "")
+      .trim();
+    if (reply && reply.length > 10 && !isPromptLeakage(reply)) return reply;
   } catch (err) {
-    console.warn("OpenRouter Claude indisponível, tentando Claude FCC:", err);
-  }
-
-  try {
-    return await callClaudeFCC(messages);
-  } catch (err) {
-    console.warn("Claude FCC indisponível, tentando Ollama:", err);
-  }
-
-  try {
-    return await callOllama(messages, fmtDate, fmtTime);
-  } catch (err) {
-    console.warn("Ollama indisponível, usando Gateway IA:", err);
+    console.warn("Claude Haiku indisponível:", err);
   }
 
   try {
     const response = await chatCompletion({
       model: "google/gemini-3-flash-preview",
       messages,
-      temperature: 0.2,
+      temperature: 0.3,
     });
     const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
       .replace(/<think>[\s\S]*?<\/think>/giu, "")
       .trim();
-    if (reply && !isInvalidOllamaReply(reply) && !isPromptLeakage(reply)) return reply;
-    if (!response.ok) console.warn("Gateway IA falhou:", response.error || response.status);
+    if (reply && reply.length > 10 && !isPromptLeakage(reply)) return reply;
   } catch (err) {
-    console.warn("Gateway IA indisponível:", err);
+    console.warn("Gemini indisponível:", err);
   }
+
+  // Último recurso: Ollama local
+  try {
+    return await callOllama(messages, fmtDate, fmtTime);
+  } catch (err) {
+    console.warn("Ollama indisponível:", err);
+  }
+
   return buildNonRepeatingFallback(messages.at(-1)?.content || "", fmtDate, fmtTime);
 }
 

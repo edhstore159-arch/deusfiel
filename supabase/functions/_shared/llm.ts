@@ -136,7 +136,7 @@ async function chatClaudeFCC(opts: ChatOptions) {
         "ngrok-skip-browser-warning": "true",
       },
       body: JSON.stringify({
-        model: FCC_MODEL,
+        model: opts.model || FCC_MODEL,
         max_tokens: opts.maxTokens || 4000,
         stream: false,
         system: systemMsg,
