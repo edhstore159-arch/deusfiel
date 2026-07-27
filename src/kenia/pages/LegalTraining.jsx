@@ -2296,28 +2296,34 @@ function LegalTraining() {
                         <div className="p-2 rounded bg-blue-50 border border-blue-200">
                           <div className="text-[10px] font-medium text-blue-800 mb-1">Resposta do {mode === "lawyer" ? "Advogado" : "Juiz"}</div>
                           <div className="text-[10px] text-blue-700 whitespace-pre-wrap">
-                            {simulationData.strategy_tags && simulationData.strategy_tags.length > 0
-                              ? simulationData.strategy_tags.map((tag, ti) => {
-                                  const strat = SECRETARY_STRATEGY_COLORS[tag.strategy] || { color: "#64748b", label: tag.strategy };
-                                  return (
-                                    <span key={ti} className="block mb-2">
-                                      <span
-                                        className="inline-block rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider mr-1.5 align-middle"
-                                        style={{ backgroundColor: strat.color, color: "#fff", lineHeight: "1.4" }}
-                                      >
-                                        {strat.label}
+                            {(() => {
+                              let tags = simulationData.strategy_tags || [];
+                              if (tags.length === 0 && simulationData.professional_response) {
+                                const paragraphs = simulationData.professional_response.split(/\n\n+/).filter(p => p.trim().length > 10);
+                                tags = paragraphs.map((p) => ({ text: p.trim(), strategy: detectStrategy(p, "outgoing") }));
+                              }
+                              return tags.length > 0
+                                ? tags.map((tag, ti) => {
+                                    const strat = SECRETARY_STRATEGY_COLORS[tag.strategy] || { color: "#64748b", label: tag.strategy };
+                                    return (
+                                      <span key={ti} className="block mb-2">
+                                        <span
+                                          className="inline-block rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider mr-1.5 align-middle"
+                                          style={{ backgroundColor: strat.color, color: "#fff", lineHeight: "1.4" }}
+                                        >
+                                          {strat.label}
+                                        </span>
+                                        <span
+                                          className="border-b-2 leading-relaxed"
+                                          style={{ borderColor: strat.color }}
+                                        >
+                                          {tag.text}
+                                        </span>
                                       </span>
-                                      <span
-                                        className="border-b-2 leading-relaxed"
-                                        style={{ borderColor: strat.color }}
-                                      >
-                                        {tag.text}
-                                      </span>
-                                    </span>
-                                  );
-                                })
-                              : <span>{simulationData.professional_response}</span>
-                            }
+                                    );
+                                  })
+                                : <span>{simulationData.professional_response}</span>;
+                            })()}
                           </div>
                         </div>
                         <div className="text-[10px] text-purple-700 font-medium">Score: {simulationData.evaluation?.score || 0}/100</div>

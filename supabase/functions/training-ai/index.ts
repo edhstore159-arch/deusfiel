@@ -791,7 +791,7 @@ Responda APENAS em JSON: {"paragraphs": [{"text": "texto do parágrafo", "strate
 
 Separados por linha em branco no original. Mantenha o texto EXATAMENTE como está.`;
 
-      const tagResult = await chatCompletion({
+      let tagResult = await chatCompletion({
         messages: [
           { role: "system", content: tagInstruction },
           { role: "user", content: professionalResponse },
@@ -802,13 +802,20 @@ Separados por linha em branco no original. Mantenha o texto EXATAMENTE como est�
       let taggedResponse = professionalResponse;
       let strategyTags: Array<{ text: string; strategy: string }> = [];
       if (tagResult.ok) {
-        const tagParsed = parseJsonResponse(tagResult.data?.choices?.[0]?.message?.content || "");
-        if (tagParsed?.paragraphs && Array.isArray(tagParsed.paragraphs)) {
+        const rawContent = tagResult.data?.choices?.[0]?.message?.content || "";
+        console.log("[training-ai] tagResult raw (first 300):", rawContent.slice(0, 300));
+        const tagParsed = parseJsonResponse(rawContent);
+        if (tagParsed?.paragraphs && Array.isArray(tagParsed.paragraphs) && tagParsed.paragraphs.length > 0) {
           strategyTags = tagParsed.paragraphs.map((p: any) => ({
-            text: String(p.text || ""),
-            strategy: String(p.strategy || "saudacao"),
-          }));
+            text: String(p.text || professionalResponse.slice(0, 200)),
+            strategy: String(p.strategy || "abordagem_inicial"),
+          })).filter((t) => t.text.length > 0);
+          console.log(`[training-ai] tagResult: ${strategyTags.length} tags parsed`);
+        } else {
+          console.log("[training-ai] tagResult: no paragraphs array found, raw:", rawContent.slice(0, 500));
         }
+      } else {
+        console.log("[training-ai] tagResult failed:", tagResult.error);
       }
 
       // 2. Avaliar a resposta com estratégias da secretaria
