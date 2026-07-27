@@ -1213,6 +1213,36 @@ async function callOpenRouter(messagesPayload, options = {}) {
   throw new Error(`OpenRouter failed: ${JSON.stringify(attempts.slice(-1))}`);
 }
 
+function detectStrategy(content, direction) {
+  if (!content) return "abordagem_inicial";
+  const t = content.toLowerCase();
+  if (direction === "incoming") {
+    if (/urgente|ajuda|socorro|preciso|imediato|agora/.test(t)) return "lead_urgencia";
+    if (/div[oó]rcio|fam[ií]lia|cust[oó]dia|pens[aã]o|filho/.test(t)) return "lead_divorcio";
+    if (/inss|aposentad|previd[eê]nc|benef[ií]cio|aux[ií]lio/.test(t)) return "lead_previdenciario";
+    if (/banco|financ|empr[eé]stimo|d[ií]vida|cart[aã]o|cheque/.test(t)) return "lead_bancario";
+    if (/n[aã]o sei|talvez|ainda estou|d[uú]vida|pensando/.test(t)) return "lead_hesitante";
+    if (/obrigad|valeu|agradeco|brigad/.test(t)) return "follow_up";
+    return "identificacao_dor";
+  }
+  if (/ol[aá]|bom dia|boa tarde|boa noite|bem vindo|seja bem|como posso/.test(t)) return "saudacao";
+  if (/entendo|compreendo|entendi|ouvi|escuto|pode me contar/.test(t)) return "escuta_ativa";
+  if (/art\.|lei|c[oó]digo|legisla[cç][aã]o|direito|fundamento|jurisprud[êe]ncia|s[uú]mula/.test(t)) return "demonstracao_valor";
+  if (/preocupa|medo|risco|perigo|problema|dano|preju[ií]zo/.test(t)) return "urgencia_etica";
+  if (/contrat|procurat|honor[aá]rio|valor|quanto|pre[cç]o|or[cç]amento/.test(t)) return "fechamento";
+  if (/obje[cç][aã]o|mas |porem|ent[aã]o|n[aã]o acho|acho que n[aã]o/.test(t)) return "tratamento_objecao";
+  if (/indica[cç][aã]o|amigo|conhecido|fam[ií]lia indicou|recomendou/.test(t)) return "indicacao";
+  if (/after|depois|pr[oó]ximo|volto|continuamos|futuro|amanh[aã]/.test(t)) return "follow_up";
+  if (/whatsapp|n[uú]mero|telefone|contato|zap/.test(t)) return "captura_whatsapp";
+  if (/obrig|agradec|ajudou|excelent|melhor|satisf/.test(t)) return "gatilhos_psicologicos";
+  if (/orienta[cç][aã]o|d[uú]vida jur[ií]dica|consulta|an[aá]lise/.test(t)) return "pos_duvida_juridica";
+  if (direction === "outgoing") {
+    if (/posso ajud|vamos analis|vou verificar|orient[aá]/.test(t)) return "demonstracao_valor";
+    if (/entre em contato|whatsapp|n[uú]mero|lig[eé]/.test(t)) return "captura_whatsapp";
+  }
+  return "abordagem_inicial";
+}
+
 async function callAI(messagesPayload, options = {}) {
   if (userAskedTemporalInfo(options.userText)) {
     return { ok: true, provider: "ollama-temporal", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: buildTemporalAnswer(), attempts: [] };
@@ -1385,8 +1415,9 @@ async function sendBotText(jid, reply, meta = {}) {
       ]);
       console.log("[sendBotText] ENVIADO", { jid, id: providerResult?.key?.id, status: providerResult?.status });
       const out = outboundMessage(reply, jid, providerResult);
+      const strategy = detectStrategy(reply, "outgoing");
       upsertContact(jid, { last_message: out.text, last_message_at: out.created_at });
-      appendMessage(jid, { id: out.id, text: out.text, from_me: true, created_at: out.created_at });
+      appendMessage(jid, { id: out.id, text: out.text, from_me: true, created_at: out.created_at, strategy });
       return { ok: true, out, providerResult, attempt };
     } catch (e) {
       lastSendErr = e?.message || String(e);

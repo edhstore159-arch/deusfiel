@@ -535,7 +535,7 @@ function LegalTraining() {
               id: m.id || `msg-${Math.random()}`,
               content: m.text || m.content || "",
               direction: m.from_me ? "outgoing" : "incoming",
-              strategy_name: detectStrategy(m.text || m.content || "", m.from_me ? "outgoing" : "incoming"),
+              strategy_name: m.strategy || detectStrategy(m.text || m.content || "", m.from_me ? "outgoing" : "incoming"),
               created_at: m.created_at || new Date().toISOString(),
             }));
             if (!silent) setWaMessages(mapped);
@@ -2724,11 +2724,19 @@ function LegalTraining() {
                     )}
                     {waMessages.map((msg, idx) => {
                       const isOut = msg.direction === "outgoing";
+                      const stratName = msg.strategy_name || detectStrategy(msg.content, msg.direction);
+                      const stratInfo = WA_STRATEGIES.find(s => s.name === stratName);
                       return (
                         <div key={msg.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
                           <div className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm ${isOut ? "bg-green-500 text-white" : "bg-white border border-gray-200"}`}>
                             <p className={`text-xs leading-relaxed whitespace-pre-wrap ${isOut ? "text-white" : "text-gray-800"}`}>{msg.content}</p>
-                            <div className="mt-0.5 flex items-center justify-end gap-1">
+                            <div className="mt-0.5 flex items-center justify-end gap-1 flex-wrap">
+                              {stratInfo && (
+                                <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[7px] font-bold" style={{ backgroundColor: stratInfo.color + "30", color: isOut ? "#fff" : stratInfo.color, border: `1px solid ${stratInfo.color}40` }}>
+                                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: stratInfo.color }} />
+                                  {stratInfo.label}
+                                </span>
+                              )}
                               <span className={`text-[9px] ${isOut ? "text-green-100" : "text-gray-400"}`}>{formatWaTime(msg.created_at)}</span>
                               {isOut && <span className="text-[9px] text-green-100">✓</span>}
                             </div>
