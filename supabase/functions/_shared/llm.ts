@@ -127,6 +127,13 @@ export async function chatOpenRouter(opts: ChatOptions) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
+      // Inject anti-CoT instruction into system message
+      const patchedMessages = opts.messages.map((m) => {
+        if (m.role === "system") {
+          return { ...m, content: `INSTRUÇÃO CRÍGICA: Responda APENAS com a resposta final destinada ao cliente. NÃO inclua raciocínio, análise, passos de pensamento, "Okay", "Let me", "The user", "According", ou qualquer texto interno. A resposta deve parecer uma mensagem natural de WhatsApp de uma secretária jurídica.\n\n${m.content}` };
+        }
+        return m;
+      });
       const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -138,7 +145,7 @@ export async function chatOpenRouter(opts: ChatOptions) {
         signal: controller.signal,
         body: JSON.stringify({
           model,
-          messages: opts.messages,
+          messages: patchedMessages,
           ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
           max_tokens: maxTokens,
         }),
@@ -149,12 +156,26 @@ export async function chatOpenRouter(opts: ChatOptions) {
       const rawText = String(raw?.choices?.[0]?.message?.content || "").trim();
       // Strip thinking tags and chain-of-thought leaking
       let cleaned = rawText.replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
-      // Strip leading reasoning patterns from models that leak CoT
-      cleaned = cleaned.replace(/^(Okay|Let me|So|Now|Right|Well|Hmm|I need|I should|First|The user)[,.]?\s+(the user|said|says|mentioned|wants|needs|is|wants me|said ")[\s\S]*/i, "").trim();
-      // If after stripping it's empty, try to get the last paragraph
-      if (!cleaned && rawText) {
-        const lines = rawText.split(/\n+/).filter((l: string) => !l.match(/^(Okay|Let me|So|Now|Right|Well|I need|I should|First|The user)/i));
-        cleaned = lines.join("\n").trim();
+      // Aggressively strip CoT patterns from free models
+      const cotPatterns = [
+        /^(Okay|But|So|Now|Right|Well|Hmm|Wait|Let me|I need|I should|First|The user|According|Looking|Based|Checking|Under|Following|After|Before|Since|Because|If the|When the|For example|However|Actually|Also|Moreover|Furthermore|In this case|In the|On the|At the|My response|My answer|The response|The answer|The correct)[\s\S]{0,200}?(?:Olá|Bom dia|Boa tarde|Boa noite|Olá!|Oi!|Sou a|Como posso|Gostaria|Preciso|Entendo|Imagino|Entendi|Claro|Certo|Perfeito|Naturalmente|Vou|Gostaria|Vamos|Que tal|Por gentileza|Me diga|Pode me|Qual é|Como funciona|Quanto|Quando|Onde|Por que)[\s\S]*/i,
+        /^(Okay|But|So|Now|Right|Well|Hmm|Wait|Let me|I need|I should|First|The user|According|Looking|Based|Checking|Under|Following|After|Before|Since|Because)[\s\S]*/i,
+      ];
+      for (const pat of cotPatterns) {
+        const m = cleaned.match(pat);
+        if (m && m[0].length > 50) {
+          // Try to extract the actual response after the CoT
+          const afterCoT = cleaned.slice(m[0].length).trim();
+          if (afterCoT.length > 20) cleaned = afterCoT;
+          else cleaned = cleaned.replace(pat, "").trim();
+        }
+      }
+      // If still looks like CoT, try to find first natural Portuguese sentence
+      if (/^(Okay|But|So|Now|Right|Well|Wait|Let me|I need|The user|According|Looking|Based)/i.test(cleaned)) {
+        const sentences = cleaned.split(/(?<=[.!?])\s+/);
+        const naturalStart = sentences.findIndex((s: string) => !/^(Okay|But|So|Now|Right|Well|Wait|Let me|I need|I should|First|The user|According|Looking|Based|Checking|Under|Following|After|Before|Since|Because|If the|When the|For example|However|Actually|Also|Moreover|Furthermore|In this case|My response|The response|The correct|So the|But the|Okay the|Now the)/i.test(s));
+        if (naturalStart > 0) cleaned = sentences.slice(naturalStart).join(" ").trim();
+        else if (naturalStart === -1 && sentences.length > 1) cleaned = sentences.slice(-1)[0].trim();
       }
       if (!cleaned) cleaned = rawText;
       return { ok: true as const, data: { choices: [{ message: { role: "assistant", content: cleaned } }] }, provider: `openrouter/${model}` };

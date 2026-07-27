@@ -1171,9 +1171,13 @@ async function callOpenRouter(messagesPayload, options = {}) {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 45000);
+      // Inject anti-CoT instruction into system message
+      const patchedSystem = systemMsg
+        ? { role: "system", content: `INSTRUÇÃO CRÍTICA: Responda APENAS com a resposta final destinada ao cliente. NÃO inclua raciocínio, análise, passos de pensamento, "Okay", "Let me", "The user", "According", ou qualquer texto interno. A resposta deve parecer uma mensagem natural de WhatsApp de uma secretária jurídica.\n\n${systemMsg.content}` }
+        : null;
       const body = {
         model,
-        messages: systemMsg ? [{ role: "system", content: systemMsg.content }, ...apiMessages] : apiMessages,
+        messages: patchedSystem ? [patchedSystem, ...apiMessages] : apiMessages,
         temperature: 0.7,
         max_tokens: 700,
       };
