@@ -357,6 +357,8 @@ const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_FREE_MODELS = [
+  "nousresearch/hermes-4-70b",
+  "nousresearch/hermes-3-llama-3.1-70b",
   "nvidia/nemotron-3-super-120b-a12b:free",
   "google/gemma-4-26b-a4b-it:free",
 ];
@@ -1213,6 +1215,45 @@ async function callOpenRouter(messagesPayload, options = {}) {
   throw new Error(`OpenRouter failed: ${JSON.stringify(attempts.slice(-1))}`);
 }
 
+async function callHermesCloud(messagesPayload, systemPrompt) {
+  if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY ausente");
+  const hermesModels = ["nousresearch/hermes-4-70b", "nousresearch/hermes-3-llama-3.1-70b"];
+  const freeModels = ["nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-26b-a4b-it:free"];
+  const allModels = [...hermesModels, ...freeModels];
+  
+  const apiMessages = messagesPayload
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+  
+  for (const model of allModels) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const patchedSystem = `INSTRUÇÃO CRÍTICA: Responda APENAS em português do Brasil. NUNCA use inglês. NÃO inclua raciocínio interno, "Okay", "Let me", "The user", ou qualquer texto de raciocínio.\n\n${systemPrompt}`;
+      const resp = await fetch(OPENROUTER_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENROUTER_API_KEY}` },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "system", content: patchedSystem }, ...apiMessages],
+          temperature: 0.3,
+          max_tokens: 600,
+        }),
+      });
+      clearTimeout(timeout);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      let reply = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+      if (!reply || reply.length < 5) continue;
+      return reply;
+    } catch (e) {
+      clearTimeout(timeout);
+    }
+  }
+  throw new Error("Todos os modelos Hermes falharam");
+}
+
 function detectStrategy(content, direction) {
   if (!content) return "abordagem_inicial";
   const t = content.toLowerCase();
@@ -1245,18 +1286,10 @@ function detectStrategy(content, direction) {
 
 async function callAI(messagesPayload, options = {}) {
   if (userAskedTemporalInfo(options.userText)) {
-    return { ok: true, provider: "ollama-temporal", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: buildTemporalAnswer(), attempts: [] };
+    return { ok: true, provider: "hermes-temporal", endpoint: "openrouter", model: "hermes", reply: buildTemporalAnswer(), attempts: [] };
   }
 
   const systemPrompt = messagesPayload.find((message) => message.role === "system")?.content || OLLAMA_SYSTEM_PROMPT;
-  const ollamaPrompt = messagesPayload
-    .filter((message) => message.role !== "system")
-    .map((message) => {
-      const role = message.role === "system" ? "Instruções" : message.role === "assistant" ? "Atendente" : "Cliente";
-      return `${role}: ${message.content}`;
-    })
-    .join("\n\n");
-
   const attempts = [];
 
   // 1) Claude FCC primeiro
@@ -1279,7 +1312,7 @@ async function callAI(messagesPayload, options = {}) {
     }
   }
 
-  // 2) OpenRouter free models (cloud 24/7, sem depender de PC)
+  // 2) OpenRouter Hermes + free models (cloud 24/7)
   try {
     const orResult = await callOpenRouter(messagesPayload, options);
     if (orResult.ok) {
@@ -1291,24 +1324,17 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "openrouter", error: e?.message || String(e) });
   }
 
-  // 3) Ollama como último recurso (só se PC ligado)
+  // 3) Hermes via OpenRouter como último recurso (sem depender de PC local)
   try {
-    const reply = await perguntarIA(`${ollamaPrompt}\n\nAtendente:`, systemPrompt);
-    return { ok: true, provider: "ollama", endpoint: OLLAMA_URL, model: OLLAMA_MODEL, reply: sanitizeOllamaReply(reply, options.userText), attempts };
+    const hermesReply = await callHermesCloud(messagesPayload, systemPrompt);
+    return { ok: true, provider: "hermes", endpoint: "openrouter", model: "nousresearch/hermes-4-70b", reply: sanitizeOllamaReply(hermesReply, options.userText), attempts };
   } catch (e) {
-    const timedOut = e?.name === "AbortError";
-    const failed = {
-      ok: false,
-      provider: "ollama",
-      endpoint: OLLAMA_URL,
-      model: OLLAMA_MODEL,
-      error: timedOut ? `Tempo esgotado após ${AI_REQUEST_TIMEOUT_MS}ms aguardando resposta do Ollama.` : e?.message || String(e),
-    };
+    const failed = { ok: false, provider: "hermes", error: e?.message || String(e) };
     attempts.push(failed);
-    recordAutoReply({ step: "ai_provider_fail", provider: "ollama", error: failed.error });
+    recordAutoReply({ step: "ai_provider_fail", provider: "hermes", error: failed.error });
   }
 
-  return { ok: false, error: "Claude FCC, OpenRouter e Ollama falharam.", attempts, ...attempts[attempts.length - 1] };
+  return { ok: false, error: "Claude FCC, OpenRouter e Hermes falharam.", attempts, ...attempts[attempts.length - 1] };
 }
 
 async function generateCreativeImage(prompt) {

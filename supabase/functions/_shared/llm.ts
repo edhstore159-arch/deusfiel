@@ -186,11 +186,12 @@ export async function chatOpenRouter(opts: ChatOptions) {
   }
   
   const requested = opts.maxTokens || 700;
-  // Modelos gratuitos primeiro, depois pagos
+  // Hermes (barato, bom em PT-BR, sem CoT leak) → free models → paid backup
+  const hermesModels = ["nousresearch/hermes-4-70b", "nousresearch/hermes-3-llama-3.1-70b"];
   const freeModels = ["nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-26b-a4b-it:free"];
   const paidModels = ["google/gemini-3-flash-preview", "deepseek/deepseek-chat"];
   
-  for (const model of [...freeModels, ...paidModels]) {
+  for (const model of [...hermesModels, ...freeModels, ...paidModels]) {
     const r = await tryOpenRouter(model, requested);
     if (r.ok) return r;
     console.warn(`⚠️ OpenRouter ${model} falhou:`, r.status, String(r.error || "").slice(0, 100));
@@ -276,7 +277,13 @@ export async function chatCompletion(opts: ChatOptions) {
   const wantsGemini = requestedModel.includes("gemini");
   const wantsEmergent = requestedModel.includes("gpt") || requestedModel.includes("openai");
   const wantsClaude = requestedModel.includes("claude");
+  const wantsHermes = requestedModel.includes("hermes");
 
+  // Se pediu Hermes especificamente, começa por ele
+  if (wantsHermes && OPENROUTER_KEY) {
+    const r = await chatOpenRouter(opts);
+    if (r.ok) return r;
+  }
   // Se pediu Gemini especificamente, começa por ele
   if (wantsGemini && GEMINI_KEY) {
     const r = await chatGemini(opts);
@@ -294,17 +301,16 @@ export async function chatCompletion(opts: ChatOptions) {
     if (r.ok) return r;
   }
 
-  // Fallback chain: sempre tenta todos os providers restantes
-  if (NVIDIA_NIM_API_KEY) {
-    const r = await chatNemotronDirect(opts);
-    if (r.ok) return r;
-    console.warn("⚠️ Nemotron NIM direto falhou:", r.status, r.error?.slice?.(0, 200));
-  }
-  // OpenRouter (Gemini Flash + DeepSeek) — cloud, sem depender de ngrok
+  // Fallback chain: OpenRouter (Hermes + free) → Nemotron → FCC → Lovable → Gemini → Emergent
   if (OPENROUTER_KEY) {
     const r = await chatOpenRouter(opts);
     if (r.ok) return r;
     console.warn("⚠️ OpenRouter falhou:", r.status, r.error?.slice?.(0, 200));
+  }
+  if (NVIDIA_NIM_API_KEY) {
+    const r = await chatNemotronDirect(opts);
+    if (r.ok) return r;
+    console.warn("⚠️ Nemotron NIM direto falhou:", r.status, r.error?.slice?.(0, 200));
   }
   if (FCC_BASE_URL) {
     const r = await chatClaudeFCC(opts);
