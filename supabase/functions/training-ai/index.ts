@@ -7,7 +7,9 @@ const corsHeaders: Record<string, string> = {
 };
 
 // --- PROMPTS DE PRODUÇÃO (lawyer-ai e judge-ai) ---
-const LAWYER_PRODUCTION_PROMPT = `IDENTIDADE
+const LAWYER_PRODUCTION_PROMPT = `IMPORTANTE: Responda APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês. NÃO inclua raciocínio interno, "Okay", "Let me", "The user", "We need" ou qualquer texto de pensamento. A resposta deve ser uma mensagem natural de WhatsApp de um advogado brasileiro.
+
+IDENTIDADE
 Você é o Advogado Virtual Especializado da Dra. Kênia Garcia Advocacia — um profissional experiente, empático e estrategicamente persuasivo cujo objetivo é orientar o cliente com precisão jurídica E converter a consulta em contrato de honorários.
 
 REGRAS GLOBAIS
@@ -103,7 +105,9 @@ REGRAS:
 
 RETORNE APENAS a resposta revisada e corrigida, pronta para enviar ao cliente. Sem explicações extras, sem relatório, sem lista de erros.`;
 
-const JUDGE_PRODUCTION_PROMPT = `IDENTIDADE
+const JUDGE_PRODUCTION_PROMPT = `IMPORTANTE: Responda APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês. NÃO inclua raciocínio interno, "Okay", "Let me", "The user" ou qualquer texto de pensamento. A resposta deve ser uma análise judicial natural em português.
+
+IDENTIDADE
 Você é um Juiz Virtual Brasileiro especializado em análise técnico-jurídica.
 Simula a atuação de um magistrado brasileiro, produzindo decisões fundamentadas.
 
@@ -167,7 +171,9 @@ Ao argumentar ou sentenciar, demonstre:
 - Fechamento: oriente sobre próximos passos processuais
 `;
 
-const GENERATE_CASE_PROMPT = `Você é um professor de direito da USP/FGV criando CASOS SIMULADOS para treinamento profissional avançado. Gere casos REALISTAS com fatos detalhados, provas, contexto processual e questões jurídicas relevantes.
+const GENERATE_CASE_PROMPT = `IMPORTANTE: Gere o caso APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês.
+
+Você é um professor de direito da USP/FGV criando CASOS SIMULADOS para treinamento profissional avançado. Gere casos REALISTAS com fatos detalhados, provas, contexto processual e questões jurídicas relevantes.
 
 FORMATO — SEMPRE retorne JSON válido:
 {
@@ -196,7 +202,9 @@ REGRAS OBRIGATÓRIAS:
 - Dificuldade MÉDIA: 2-3 questões com alguma complexidade
 - Dificuldade DIFÍCIL: 3+ questões com múltiplas teses defensáveis`;
 
-const EVALUATE_PROMPT = `Você é um examinador jurídico de tribunais superiores (STF/STJ/TST) avaliando a resposta de um advogado ou juiz em treinamento profissional. Seja RIGOROSO mas JUSTO na avaliação.
+const EVALUATE_PROMPT = `IMPORTANTE: Avalie e responda APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês. NÃO inclua raciocínio interno.
+
+Você é um examinador jurídico de tribunais superiores (STF/STJ/TST) avaliando a resposta de um advogado ou juiz em treinamento profissional. Seja RIGOROSO mas JUSTO na avaliação.
 
 FORMATO — SEMPRE retorne JSON válido:
 {
@@ -268,7 +276,9 @@ REGRAS:
 - suggested_improvement deve ter EXEMPLO de como escrever melhor
 - SEMPRE retorne JSON válido`;
 
-const EVALUATE_AND_CORRECT_PROMPT = `Você é um mentor jurídico de tribunais superiores especialista em formação profissional. Sua tarefa é REESCREVER a resposta do profissional, transformando uma resposta FRACA em uma resposta de NÍVEL PROFISSIONAL ALTO (como seria escrita por um advogado ou juiz experiente).
+const EVALUATE_AND_CORRECT_PROMPT = `IMPORTANTE: Responda APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês. NÃO inclua raciocínio interno.
+
+Você é um mentor jurídico de tribunais superiores especialista em formação profissional. Sua tarefa é REESCREVER a resposta do profissional, transformando uma resposta FRACA em uma resposta de NÍVEL PROFISSIONAL ALTO (como seria escrita por um advogado ou juiz experiente).
 
 FORMATO — SEMPRE retorne JSON válido:
 {
@@ -297,7 +307,9 @@ REGRAS OBRIGATÓRIAS:
 - NÃO apenas dê dicas — REESCREVA o texto integralmente como documento profissional
 - Inclua ao menos 3 artigos de lei e 1 jurisprudência na versão corrigida`;
 
-const IMPROVE_ARGUMENT_PROMPT = `Você é um consultor jurídico sênior de tribunais superiores. Analise a resposta do profissional e forneça sugestões TÉCNICAS e ESPECÍFICAS de como elevar a qualidade da argumentação ao nível profissional.
+const IMPROVE_ARGUMENT_PROMPT = `IMPORTANTE: Responda APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês. NÃO inclua raciocínio interno.
+
+Você é um consultor jurídico sênior de tribunais superiores. Analise a resposta do profissional e forneça sugestões TÉCNICAS e ESPECÍFICAS de como elevar a qualidade da argumentação ao nível profissional.
 
 FORMATO — SEMPRE retorne JSON válido:
 {
@@ -533,7 +545,7 @@ Deno.serve(async (req: Request) => {
       const clientName = caseData?.parties?.split(" vs")[0]?.trim() || "Cliente";
       const lawyerPrompt = mode === "lawyer" ? LAWYER_PRODUCTION_PROMPT : JUDGE_PRODUCTION_PROMPT;
 
-      const msgUser = `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nCLIENTE: ${clientName}\n\nResponda ao cliente como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento. Use o nome do cliente, seja empático e fundamentado. Máximo 400 palavras.`;
+      const msgUser = `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nCLIENTE: ${clientName}\n\nResponda ao cliente como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento. Use o nome do cliente, seja empático e fundamentado. Máximo 400 palavras.\n\nIMPORTANTE: Responda APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês. NÃO inclua raciocínio interno.`;
       const lawyerMessages = [
         { role: "system" as const, content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
         { role: "user" as const, content: msgUser },
@@ -690,7 +702,9 @@ Forneça sugestões TÉCNICAS com FRASES PRONTAS em terminologia jurídica brasi
       let userInstruction = "";
 
       if (mode === "lawyer") {
-        systemInstruction = `Você é um ADVOGADO EXPERIMENTE respondendo no WhatsApp. Elabore uma resposta COMPLETA para o cliente, incluindo:
+        systemInstruction = `IMPORTANTE: Responda APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês. NÃO inclua raciocínio interno, análise de prompt, "Okay", "Let me", "The user", "We need", "I think" ou qualquer texto de raciocínio. A resposta deve ser uma mensagem natural de WhatsApp de um advogado brasileiro.
+
+Você é um ADVOGADO EXPERIMENTE respondendo no WhatsApp. Elabore uma resposta COMPLETA para o cliente, incluindo:
 - Análise jurídica do caso com base legal
 - Artigos de lei aplicáveis (CLT, CPC, CF, etc.)
 - Jurisprudência relevante quando possível
@@ -725,7 +739,9 @@ REGRAS:
 
 Responda como secretária jurídica, aplicando estratégias de captação. Use o nome do cliente, seja empática e termine com convite para agendamento.`;
       } else {
-        systemInstruction = `Você é um JUIZ EXPERIENTE analisando um caso. Analise a situação do cliente e produza:
+        systemInstruction = `IMPORTANTE: Responda APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês. NÃO inclua raciocínio interno, "Okay", "Let me", "The user" ou qualquer texto de raciocínio. A resposta deve ser uma análise judicial natural em português.
+
+Você é um JUIZ EXPERIENTE analisando um caso. Analise a situação do cliente e produza:
 1. Análise técnico-jurídica completa do caso
 2. Artigos de lei e súmulas aplicáveis
 3. Probabilidade de êxito em eventual ação judicial (0-100%)
