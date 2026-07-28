@@ -138,13 +138,14 @@ export default function Dashboard() {
     } catch { return null; }
   });
   const AI_AGENTS = [
+    { id: "big-pickle", label: "OpenCode Zen" },
     { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
     { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
     { id: "openai/gpt-5-mini", label: "ChatGPT" },
     { id: "openai/gpt-5.5", label: "ChatGPT Pro" },
   ];
   const [aiAgent, setAiAgent] = useState(() => {
-    try { return localStorage.getItem("kenia:dashboard-ai-agent") || "claude-3-5-sonnet-20241022"; } catch { return "claude-3-5-sonnet-20241022"; }
+    try { return localStorage.getItem("kenia:dashboard-ai-agent") || "big-pickle"; } catch { return "big-pickle"; }
   });
   const changeAiAgent = (m) => {
     setAiAgent(m);

@@ -53,6 +53,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   google: "bg-blue-50 text-blue-700 border-blue-200",
   anthropic: "bg-violet-50 text-violet-700 border-violet-200",
   "claude-fcc": "bg-amber-50 text-amber-700 border-amber-200",
+  zen: "bg-yellow-50 text-yellow-700 border-yellow-200",
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -60,6 +61,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
   anthropic: "Anthropic",
   "claude-fcc": "Claude FCC",
+  zen: "OpenCode Zen",
 };
 
 const AGENTS = [
@@ -109,6 +111,8 @@ function Vote(props: React.SVGProps<SVGSVGElement>) {
 }
 
 function getProviderFromId(id: string): string {
+  if (id === "big-pickle" || id === "zen") return "zen";
+  if (id === "claude-fcc") return "claude-fcc";
   if (id.startsWith("openai/")) return "openai";
   if (id.startsWith("google/")) return "google";
   return "anthropic";

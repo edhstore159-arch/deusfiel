@@ -368,9 +368,9 @@ async function callZen(messagesPayload, options = {}) {
     .filter((m) => m.role !== "system")
     .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
   const attempts = [];
-  // Tenta big-pickle primeiro (rápido), depois fallback
+  // Tenta deepseek (rápido) primeiro para WhatsApp, depois big-pickle
   const fastMode = options.whatsapp;
-  const models = fastMode ? ["big-pickle"] : ["big-pickle", "deepseek-v4-flash-free"];
+  const models = fastMode ? ["deepseek-v4-flash-free", "big-pickle"] : ["big-pickle", "deepseek-v4-flash-free"];
   for (const model of models) {
     try {
       const controller = new AbortController();
@@ -1587,33 +1587,32 @@ async function autoReply(jid, userText, contactName) {
     return;
   }
   const history = await loadPersistedAiHistory(jid);
-  const phoneDigits = jidToPhone(jid); // CORREÇÃO 2+3: formato numérico para session_id
-  try {
-    const data = await callChatAiFunction({ message: userText, history, sessionId: phoneDigits, contact_phone: phoneDigits });
-    const reply = cleanRepeatedText(removeTemporalLeaks(String(data?.response || ""), userText));
-    if (reply) {
-      history.push({ role: "user", content: userText });
-      history.push({ role: "assistant", content: reply });
-      aiHistory.set(jid, trimAiHistory(history));
-      persistAiTurn(jid, userText, reply).catch(() => {});
-      try {
-        const sent = await sendBotText(jid, reply, { source: "chat_ai" });
-        recordAutoReply({ step: "sent", jid, attempt: sent.attempt, provider: "chat_ai", appointment: Boolean(data?.appointment), reply: reply.slice(0, 200) });
-        if (shouldScheduleWaitFollowUp(reply)) scheduleWaitFollowUp(jid, contactName);
-      } catch (e) {
-        queueAutoReply(jid, reply, { source: "chat_ai", reason: e?.message || String(e) });
-        recordAutoReply({ step: "send_queued_after_fail", jid, error: e?.message || String(e) });
-      }
-      return;
-    }
-  } catch (e) {
-    recordAutoReply({ step: "chat_ai_bridge_fail", jid, error: e?.message || String(e) });
+  const phoneDigits = jidToPhone(jid);
+
+  // Respostas rápidas sem IA
+  const firstNameCt = String(contactName || "cliente").split(" ")[0] || "cliente";
+  if (isThanksMessage(userText)) {
+    const reply = buildThanksReply(history, firstNameCt);
+    await sendBotText(jid, reply, { source: "thanks-rule" }).catch(() => {});
+    return;
   }
+  if (userAskedOfficeInfo(userText)) {
+    const reply = buildOfficeInfoReply();
+    await sendBotText(jid, reply, { source: "office-info-rule" }).catch(() => {});
+    return;
+  }
+  if (isHandoffRequest(userText)) {
+    const reply = buildHandoffReply(firstNameCt);
+    await sendBotText(jid, reply, { source: "handoff-rule" }).catch(() => {});
+    return;
+  }
+
+  // IA direta — pula edge function, vai direto pro Zen (rápido)
   const lastReplies = recentAssistantReplies(history);
   const antiRepetitionContext = lastReplies.length
-    ? `\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\nUse o histórico apenas para contexto. Não copie, liste ou recite respostas anteriores. Responda somente à última mensagem do cliente, avançando a conversa.`
+    ? `\nANTI-REPETIÇÃO: Não repita respostas anteriores. Responda apenas à última mensagem.`
     : "";
-  let fallbackPrompt = AI_SYSTEM_PROMPT;
+  let secretaryPrompt = SECRETARY_SYSTEM_PROMPT;
   try {
     if (supabaseDb) {
       const { data: evolvedRow } = await supabaseDb
@@ -1624,44 +1623,29 @@ async function autoReply(jid, userText, contactName) {
         .order("version", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (evolvedRow?.prompt && evolvedRow.prompt.trim().length > 100) {
-        fallbackPrompt = evolvedRow.prompt;
-        console.log("[fallback] Using evolved secretary prompt from agent_prompts");
+      if (evolvedRow?.prompt && evolvedRow.prompt.trim().length > 100 && evolvedRow.prompt.trim().length < 3000) {
+        secretaryPrompt = evolvedRow.prompt;
       }
     }
-  } catch (e) {
-    console.warn("[fallback] Failed to load evolved prompt:", e?.message);
-  }
+  } catch {}
+  // Prompt enxuto para WhatsApp — máximo 1500 chars
+  const shortPrompt = secretaryPrompt.length > 1500 ? secretaryPrompt.slice(0, 1500) + "\n\nResponda SEMPRE em português brasileiro. Seja curta e direta." : secretaryPrompt;
   const messagesPayload = [
-    { role: "system", content: `${fallbackPrompt}\n${saoPauloTemporalContext()}\nNome do contato: ${contactName || "Cliente"}.${antiRepetitionContext}` },
-    ...history,
+    { role: "system", content: `${shortPrompt}\nNome do contato: ${contactName || "Cliente"}.${antiRepetitionContext}` },
+    ...history.slice(-6),
     { role: "user", content: userText },
   ];
-  recordAutoReply({ step: "ai_request", jid, providers: ["ollama"], model: OLLAMA_MODEL });
-  const firstNameCt = String(contactName || "cliente").split(" ")[0] || "cliente";
-  let result = isThanksMessage(userText)
-    ? { ok: true, provider: "thanks-rule", reply: buildThanksReply(history, firstNameCt) }
-    : userAskedOfficeInfo(userText)
-    ? { ok: true, provider: "office-info-rule", reply: buildOfficeInfoReply() }
-    : isHandoffRequest(userText)
-    ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameCt) }
-    : isResumeRequest(userText)
-    ? { ok: true, provider: "resume-rule", reply: buildResumeReply(history, firstNameCt) }
-    : await callAI(messagesPayload, { temperature: 0.72, userText, whatsapp: true });
+  recordAutoReply({ step: "ai_request", jid, providers: ["zen"], model: "deepseek-v4-flash-free" });
+  let result;
+  try {
+    result = await callAI(messagesPayload, { temperature: 0.7, userText, whatsapp: true });
+  } catch (e) {
+    recordAutoReply({ step: "ai_error", jid, error: e?.message || String(e) });
+    result = { ok: false, error: e?.message || String(e) };
+  }
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
-  if (!usedFallback && (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history))) {
-    const retry = await callAI([
-      { role: "system", content: `${fallbackPrompt}\n${saoPauloTemporalContext()}\nCORREÇÃO OBRIGATÓRIA: a resposta candidata repetiu uma mensagem anterior. Gere uma resposta nova, curta, útil, sem saudação inicial e sem repetir perguntas já feitas.` },
-      ...history,
-      { role: "user", content: userText },
-    ], { temperature: 0.9, userText });
-    if (retry.ok) {
-      result = retry;
-      rawReply = retry.reply;
-    }
-    if (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history)) rawReply = buildNonRepeatingFallback(userText, contactName);
-  }
+  // Sem retry no WhatsApp — responde direto para não atrasar
   const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
   if (usedFallback) recordAutoReply({ step: "ai_fail_local_fallback", jid, result, reply: reply.slice(0, 200) });
   history.push({ role: "user", content: userText });

@@ -473,7 +473,7 @@ export default function Dstboard() {
           apikey: anonKey || "",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ case: caseText, model: "claude-fcc" }),
+        body: JSON.stringify({ case: caseText, model: "big-pickle" }),
       });
       const ct = resp.headers.get("Content-Type") || "";
       if (!resp.ok) {

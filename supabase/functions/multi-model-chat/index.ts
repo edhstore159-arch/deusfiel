@@ -55,8 +55,11 @@ async function tryEmergent(key: string, model: string, payload: any): Promise<Re
 
 async function tryZen(messages: any[], system?: string, model?: string): Promise<Response | null> {
   if (!ZEN_KEY) return null;
+  const patchedSystem = system
+    ? `INSTRUÇÃO CRÍTICA: Responda SEMPRE em português brasileiro. NUNCA responda em inglês. NÃO inclua raciocínio ou análise. Responda apenas com a resposta final.\n\n${system}`
+    : undefined;
   const apiMessages = [
-    ...(system ? [{ role: "system", content: String(system) }] : []),
+    ...(patchedSystem ? [{ role: "system", content: patchedSystem }] : []),
     ...messages.map((m: any) => ({ role: m.role, content: String(m.content || "") })),
   ];
   const zenModels = model ? [model, "big-pickle", "deepseek-v4-flash-free"] : ["big-pickle", "deepseek-v4-flash-free"];
