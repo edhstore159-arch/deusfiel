@@ -704,50 +704,20 @@ function LegalTraining() {
       setCurrentSession(session);
       setShowConfig(false);
       saveSessionToDb(session);
-      toast.success("Caso gerado! Iniciando treinamento automático...");
+      toast.success("Caso gerado! Inicie o treinamento.");
 
-      // --- PIPELINE AUTOMÁTICO ---
+      // --- PIPELINE AUTOMÁTICO (em background, não bloqueia o usuário) ---
+      // Roda auto_train_loop + simulação em paralelo enquanto o usuário já pode interagir
       const previousLoopPrompt = loadEvolvedLegalPrompt(mode);
       const autoLoopPrompt = previousLoopPrompt && previousLoopPrompt.trim().length > 50
         ? previousLoopPrompt
         : `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`;
 
-      // 1) Loop de Melhoria automático (2 iterações em vez de 3 — mais rápido)
+      // Rodar auto_train_loop (1 iteração) e simulate_whatsapp em PARALELO
       setAutoLoopTraining(true);
-      setAutoLoopProgress({ iteration: 0, maxIterations: 2, score: 0, status: "Rodando loop de melhoria..." });
-      let loopRes = null;
-      try {
-        loopRes = await supabase.functions.invoke("training-ai", {
-          body: {
-            action: "auto_train_loop",
-            current_prompt: autoLoopPrompt,
-            mode,
-            area,
-            target_improvement: 20,
-            max_iterations: 2,
-            areas: [area],
-          },
-        });
-        if (!loopRes.error && loopRes.data) {
-          if (loopRes.data.final_prompt && loopRes.data.final_prompt !== autoLoopPrompt) {
-            saveEvolvedLegalPrompt(mode, loopRes.data.final_prompt);
-          }
-          setAutoLoopResults(loopRes.data);
-          const finalScore = loopRes.data.final_score || 0;
-          const totalImprovement = loopRes.data.total_improvement || 0;
-          setAutoLoopProgress({
-            iteration: loopRes.data.iterations?.length || 0,
-            maxIterations: loopRes.data.iterations?.length || 3,
-            score: finalScore,
-            status: loopRes.data.reached_target ? `Meta atingida! +${totalImprovement}%` : `Melhoria: +${totalImprovement}%`,
-          });
-        }
-      } catch (loopErr) {
-        console.error("Auto loop error:", loopErr);
-      }
-      setAutoLoopTraining(false);
+      setAutoLoopProgress({ iteration: 0, maxIterations: 1, score: 0, status: "Rodando pipeline..." });
+      setSimulating(true);
 
-      // 2) Simulação WhatsApp automática com mensagem derivada do caso
       const sampleMessages = {
         penal: "Oi, fui acusado de algo que não fiz. Preciso de ajuda urgente!",
         civel: "Olá, tenho um problema jurídico e preciso de orientação.",
@@ -761,32 +731,59 @@ function LegalTraining() {
         ambiental: "Estou sofrendo com poluição vizinha ao meu imóvel.",
       };
       const autoClientMsg = sampleMessages[area] || "Olá, preciso de orientação jurídica. " + (data.case_data?.description?.slice(0, 150) || "Tenho um caso para analisar.");
-      // Usar o prompt melhorado pelo loop (ou o antigo se loop não melhorou)
-      const improvedPromptForSim = loopRes?.data?.final_prompt && loopRes.data.final_prompt !== autoLoopPrompt
-        ? loopRes.data.final_prompt
-        : autoLoopPrompt;
-      setSimulating(true);
-      try {
-        const simRes = await supabase.functions.invoke("training-ai", {
-          body: {
-            action: "simulate_whatsapp",
-            mode,
-            area,
-            client_message: autoClientMsg,
-            client_name: "Cliente Automático",
-            custom_prompt: improvedPromptForSim,
-          },
-        });
+
+      // Ambos rodando em paralelo — o usuário já pode interagir
+      const loopPromise = supabase.functions.invoke("training-ai", {
+        body: {
+          action: "auto_train_loop",
+          current_prompt: autoLoopPrompt,
+          mode,
+          area,
+          target_improvement: 20,
+          max_iterations: 1,
+          areas: [area],
+        },
+      }).then((loopRes) => {
+        if (!loopRes.error && loopRes.data) {
+          if (loopRes.data.final_prompt && loopRes.data.final_prompt !== autoLoopPrompt) {
+            saveEvolvedLegalPrompt(mode, loopRes.data.final_prompt);
+          }
+          setAutoLoopResults(loopRes.data);
+          const finalScore = loopRes.data.final_score || 0;
+          const totalImprovement = loopRes.data.total_improvement || 0;
+          setAutoLoopProgress({
+            iteration: loopRes.data.iterations?.length || 0,
+            maxIterations: loopRes.data.iterations?.length || 1,
+            score: finalScore,
+            status: loopRes.data.reached_target ? `Meta atingida! +${totalImprovement}%` : `Melhoria: +${totalImprovement}%`,
+          });
+        }
+        setAutoLoopTraining(false);
+        return loopRes;
+      }).catch((e) => { console.error("Auto loop error:", e); setAutoLoopTraining(false); return null; });
+
+      const simPromise = supabase.functions.invoke("training-ai", {
+        body: {
+          action: "simulate_whatsapp",
+          mode,
+          area,
+          client_message: autoClientMsg,
+          client_name: "Cliente Automático",
+          custom_prompt: autoLoopPrompt,
+        },
+      }).then((simRes) => {
         if (!simRes.error && simRes.data) {
           setSimulationData(simRes.data);
           setSimulationMessage(autoClientMsg);
-          toast.success(`Pipeline completo! Simulação score: ${simRes.data.evaluation?.score || "?"}/100`);
         }
-      } catch (simErr) {
-        console.error("Auto simulation error:", simErr);
-      }
-      setSimulating(false);
-      // --- FIM PIPELINE AUTOMÁTICO ---
+        setSimulating(false);
+        return simRes;
+      }).catch((e) => { console.error("Auto simulation error:", e); setSimulating(false); return null; });
+
+      // Ambos rodando em paralelo — não await, o usuário já pode usar o treinamento
+      Promise.allSettled([loopPromise, simPromise]).then(() => {
+        toast.success("Pipeline de treinamento concluído!");
+      });
     } catch (e) {
       toast.error("Erro: " + (e?.message || e));
     } finally {
@@ -1120,7 +1117,7 @@ function LegalTraining() {
     if (autoLoopTraining) return;
     setAutoLoopTraining(true);
     setAutoLoopResults(null);
-    setAutoLoopProgress({ iteration: 0, maxIterations: 3, score: 0, status: "Iniciando loop de melhoria..." });
+    setAutoLoopProgress({ iteration: 0, maxIterations: 2, score: 0, status: "Iniciando loop de melhoria..." });
     try {
       // Usar prompt evoluído anterior ou o genérico
       const previousPrompt = loadEvolvedLegalPrompt(mode);
@@ -1139,7 +1136,7 @@ function LegalTraining() {
           mode,
           area,
           target_improvement: 20,
-          max_iterations: 3,
+          max_iterations: 2,
           areas: [area],
         },
       });
@@ -1175,10 +1172,14 @@ function LegalTraining() {
     try {
       const currentPrompt = loadEvolvedLegalPrompt(mode) || loadChatConfig().prompt || CHAT_DEFAULT_PROMPT;
       const results = [];
-      for (let i = 0; i < allStrategies.length; i++) {
-        const s = allStrategies[i];
-        setSimProgress({ current: i + 1, total: allStrategies.length, strategy: s.name });
-        try {
+
+      // Paralelizar em batches de 3 estratégias simultâneas (3x mais rápido)
+      const BATCH_SIZE = 3;
+      for (let batchStart = 0; batchStart < allStrategies.length; batchStart += BATCH_SIZE) {
+        const batch = allStrategies.slice(batchStart, batchStart + BATCH_SIZE);
+        setSimProgress({ current: batchStart + 1, total: allStrategies.length, strategy: batch.map(s => s.name).join(", ") });
+
+        const batchResults = await Promise.allSettled(batch.map(async (s) => {
           // 1. Gerar cenário
           const { data: scenData } = await supabase.functions.invoke("training-ai", {
             body: { action: "secretary_strategy", strategy_id: s.id },
@@ -1202,16 +1203,19 @@ function LegalTraining() {
               strategy_id: s.id, current_prompt: currentPrompt,
             },
           });
-          results.push({
+          return {
             strategy_id: s.id,
             strategy_name: s.name,
             score: evalData?.evaluation?.score || 0,
             feedback: evalData?.evaluation?.feedback || "",
             strengths: evalData?.evaluation?.strengths || [],
             weaknesses: evalData?.evaluation?.weaknesses || [],
-          });
-        } catch (e) {
-          results.push({ strategy_id: s.id, strategy_name: s.name, score: 0, feedback: "Erro", strengths: [], weaknesses: [String(e?.message || e)] });
+          };
+        }));
+
+        for (const r of batchResults) {
+          if (r.status === "fulfilled") results.push(r.value);
+          else results.push({ strategy_id: "unknown", strategy_name: "Erro", score: 0, feedback: "Erro", strengths: [], weaknesses: [String(r.reason?.message || r.reason)] });
         }
       }
       const scores = results.map((r) => r.score);
