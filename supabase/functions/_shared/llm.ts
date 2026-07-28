@@ -49,7 +49,7 @@ async function chatZen(opts: ChatOptions) {
         return m;
       });
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
+      const timeout = setTimeout(() => controller.abort(), 15000);
       const resp = await fetch(ZEN_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${ZEN_KEY}` },
@@ -79,11 +79,15 @@ async function chatLovable(opts: ChatOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, status: 0, error: "LOVABLE_API_KEY ausente" };
   try {
     const { model: _, ...body } = opts;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
+      signal: controller.signal,
       body: JSON.stringify(body),
     });
+    clearTimeout(timeout);
     if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
     return { ok: true as const, data: await resp.json(), provider: "lovable" };
   } catch (e) {
@@ -123,11 +127,15 @@ export async function chatGemini(opts: ChatOptions) {
     if (typeof opts.temperature === "number") {
       body.generationConfig = { ...(body.generationConfig || {}), temperature: opts.temperature };
     }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
     const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
       body: JSON.stringify(body),
     });
+    clearTimeout(timeout);
     if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
     const data = await resp.json();
     const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || "").join("") || "";
@@ -144,9 +152,12 @@ export async function chatGemini(opts: ChatOptions) {
 export async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     const resp = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
+      signal: controller.signal,
       body: JSON.stringify({
         model: opts.model?.startsWith("openai/")
           ? opts.model.slice(6)
@@ -156,6 +167,7 @@ export async function chatEmergent(opts: ChatOptions) {
         ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
       }),
     });
+    clearTimeout(timeout);
     if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
     return { ok: true as const, data: await resp.json(), provider: "emergent" };
   } catch (e) {
@@ -168,7 +180,7 @@ export async function chatOpenRouter(opts: ChatOptions) {
   
   async function tryOpenRouter(model: string, maxTokens: number) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       // Inject anti-CoT instruction into system message
       const patchedMessages = opts.messages.map((m) => {
@@ -229,17 +241,18 @@ export async function chatOpenRouter(opts: ChatOptions) {
   }
   
   const requested = opts.maxTokens || 2000;
-  // Hermes primeiro (barato, bom em PT-BR) → free models → paid backup
-  const hermesModels = ["nousresearch/hermes-4-70b"];
-  const freeModels = ["nvidia/nemotron-3-super-120b-a12b:free"];
-  const paidModels = ["google/gemini-3-flash-preview"];
-  
-  for (const model of [...hermesModels, ...freeModels, ...paidModels]) {
-    const r = await tryOpenRouter(model, requested);
-    if (r.ok) return r;
-    console.warn(`⚠️ OpenRouter ${model} falhou:`, r.status, String(r.error || "").slice(0, 100));
+  // Race: Hermes (barato) + Nemotron free simultaneamente
+  const racePromises = [
+    tryOpenRouter("nousresearch/hermes-4-70b", requested),
+    tryOpenRouter("nvidia/nemotron-3-super-120b-a12b:free", requested),
+  ];
+  const results = await Promise.allSettled(racePromises);
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value?.ok) return r.value;
   }
-  
+  // Último recurso: Gemini paid
+  const fallback = await tryOpenRouter("google/gemini-3-flash-preview", requested);
+  if (fallback.ok) return fallback;
   return { ok: false as const, status: 402, error: "OpenRouter: todos os modelos falharam" };
 }
 
@@ -251,7 +264,7 @@ async function chatClaudeFCC(opts: ChatOptions) {
       .filter((m) => m.role !== "system")
       .map((m) => ({ role: m.role === "assistant" ? "assistant" as const : "user" as const, content: String(m.content || "") }));
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
+    const timeout = setTimeout(() => controller.abort(), 20000);
     const resp = await fetch(`${FCC_BASE_URL}/v1/messages`, {
       method: "POST",
       headers: {
@@ -285,12 +298,15 @@ async function chatClaudeFCC(opts: ChatOptions) {
 async function chatNemotronDirect(opts: ChatOptions) {
   if (!NVIDIA_NIM_API_KEY) return { ok: false as const, status: 0, error: "NVIDIA_NIM_API_KEY ausente" };
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
     const resp = await fetch(`${NVIDIA_NIM_BASE}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${NVIDIA_NIM_API_KEY}`,
       },
+      signal: controller.signal,
       body: JSON.stringify({
         model: NEMOTRON_MODEL,
         messages: opts.messages.map((m) => ({
@@ -302,10 +318,10 @@ async function chatNemotronDirect(opts: ChatOptions) {
         temperature: typeof opts.temperature === "number" ? opts.temperature : 0.7,
       }),
     });
+    clearTimeout(timeout);
     if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
     const data = await resp.json();
     const text = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
-    // Valida qualidade: rejeita se contiver <unk>, output vazio, ou lixo
     if (!text || text.length < 10 || text.includes("<unk>") || (text.match(/<unk>/g) || []).length > 2) {
       return { ok: false as const, status: 0, error: "Nemotron retornou output inválido (lixo/unk)" };
     }
@@ -322,23 +338,19 @@ export async function chatCompletion(opts: ChatOptions) {
   const wantsClaude = requestedModel.includes("claude");
   const wantsHermes = requestedModel.includes("hermes");
 
-  // Se pediu Hermes especificamente, começa por ele
+  // Se pediu modelo específico, tenta só ele
   if (wantsHermes && OPENROUTER_KEY) {
     const r = await chatOpenRouter(opts);
     if (r.ok) return r;
   }
-  // Se pediu Gemini especificamente, começa por ele
   if (wantsGemini && GEMINI_KEY) {
     const r = await chatGemini(opts);
     if (r.ok) return r;
   }
-  // Se pediu GPT/Emergent, começa por Emergent
   if (wantsEmergent) {
     const r = await chatEmergent(opts);
     if (r.ok) return r;
-    console.warn("Emergent falhou, tentando fallback completo:", r.error?.slice?.(0, 200));
   }
-  // Se pediu Claude, tenta Emergent primeiro (cloud 24/7), depois FCC
   if (wantsClaude) {
     if (EMERGENT_KEY) {
       const r = await chatEmergent(opts);
@@ -350,39 +362,48 @@ export async function chatCompletion(opts: ChatOptions) {
     }
   }
 
-  // Fallback chain: Zen (primario, gratuito) → Emergent → OpenRouter → FCC → Nemotron → Lovable → Gemini
+  // OTIMIZAÇÃO: Race providers em paralelo (15s max)
+  // Tier 1: Zen (gratuito, rápido) — tenta sozinho primeiro
   if (ZEN_KEY) {
     const r = await chatZen(opts);
     if (r.ok) return r;
-    console.warn("Zen falhou, tentando Emergent:", r.error?.slice?.(0, 200));
   }
-  if (EMERGENT_KEY) {
-    const r = await chatEmergent(opts);
-    if (r.ok) return r;
-    console.warn("Emergent falhou, tentando OpenRouter:", r.error?.slice?.(0, 200));
-  }
+
+  // Tier 2: Race Emergent + Nemotron NIM + OpenRouter simultaneamente
+  const tier2: Promise<any>[] = [];
+  if (EMERGENT_KEY) tier2.push(chatEmergent(opts));
+  if (NVIDIA_NIM_API_KEY) tier2.push(chatNemotronDirect(opts));
   if (OPENROUTER_KEY) {
-    const r = await chatOpenRouter(opts);
-    if (r.ok) return r;
-    console.warn("OpenRouter falhou, tentando FCC:", r.error?.slice?.(0, 200));
+    // Só Hermes (barato, bom em PT-BR) — paga modelos lentos
+    tier2.push(chatOpenRouter({ ...opts, model: "nousresearch/hermes-4-70b" }));
   }
-  if (FCC_BASE_URL) {
-    const r = await chatClaudeFCC(opts);
-    if (r.ok) return r;
+  if (tier2.length > 0) {
+    const winner = await Promise.race(tier2);
+    if (winner.ok) {
+      // Cancela os perdedores
+      tier2.forEach((p) => p.catch(() => {}));
+      return winner;
+    }
+    // Se race perdeu, espera todos e pega o primeiro OK
+    const results = await Promise.allSettled(tier2);
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value?.ok) return r.value;
+    }
   }
-  if (NVIDIA_NIM_API_KEY) {
-    const r = await chatNemotronDirect(opts);
-    if (r.ok) return r;
+
+  // Tier 3: Race FCC + Lovable + Gemini (mais lentos)
+  const tier3: Promise<any>[] = [];
+  if (FCC_BASE_URL) tier3.push(chatClaudeFCC(opts));
+  if (LOVABLE_KEY) tier3.push(chatLovable(opts));
+  if (GEMINI_KEY) tier3.push(chatGemini(opts));
+  if (tier3.length > 0) {
+    const results = await Promise.allSettled(tier3);
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value?.ok) return r.value;
+    }
   }
-  if (LOVABLE_KEY) {
-    const r = await chatLovable(opts);
-    if (r.ok) return r;
-  }
-  if (GEMINI_KEY) {
-    const r = await chatGemini(opts);
-    if (r.ok) return r;
-  }
-  return { ok: false as const, status: 502, error: "Nenhum provider disponivel (Emergent/OpenRouter/FCC/Nemotron/Lovable/Gemini)", provider: "none" };
+
+  return { ok: false as const, status: 502, error: "Nenhum provider disponível (Zen/Emergent/OpenRouter/FCC/Nemotron/Lovable/Gemini)", provider: "none" };
 }
 
 // ---------- Pipeline: Nemotron gera → Claude (Emergent) revisa ----------

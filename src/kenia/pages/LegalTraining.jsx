@@ -712,9 +712,9 @@ function LegalTraining() {
         ? previousLoopPrompt
         : `Você é um profissional jurídico ${mode === "lawyer" ? "advogado" : "juiz"} experiente. Responda de forma clara, fundamentada e persuasiva, aplicando estratégias de atendimento ao cliente.`;
 
-      // 1) Loop de Melhoria automático
+      // 1) Loop de Melhoria automático (2 iterações em vez de 3 — mais rápido)
       setAutoLoopTraining(true);
-      setAutoLoopProgress({ iteration: 0, maxIterations: 3, score: 0, status: "Rodando loop de melhoria..." });
+      setAutoLoopProgress({ iteration: 0, maxIterations: 2, score: 0, status: "Rodando loop de melhoria..." });
       let loopRes = null;
       try {
         loopRes = await supabase.functions.invoke("training-ai", {
@@ -724,7 +724,7 @@ function LegalTraining() {
             mode,
             area,
             target_improvement: 20,
-            max_iterations: 3,
+            max_iterations: 2,
             areas: [area],
           },
         });

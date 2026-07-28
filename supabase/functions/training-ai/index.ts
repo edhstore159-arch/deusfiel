@@ -554,7 +554,7 @@ Deno.serve(async (req: Request) => {
       let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 3000 });
       if (!lawyerResult.ok) {
         console.log("[training-ai] Gemini falhou para generate_lawyer_response, usando fallback...");
-        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 2000, preferFastProvider: false });
+        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1200 });
       }
 
       let response = lawyerResult.ok
@@ -577,7 +577,7 @@ Deno.serve(async (req: Request) => {
               { role: "system", content: LEGAL_REVIEW_PROMPT },
               { role: "user", content: `Texto para revisão:\n\n${response}` },
             ],
-            temperature: 0.3, maxTokens: 2000, preferFastProvider: false,
+            temperature: 0.3, maxTokens: 1200,
           });
         }
 
@@ -599,28 +599,21 @@ Deno.serve(async (req: Request) => {
       const lawList = Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A");
       const issuesList = Array.isArray(caseData?.key_issues) ? caseData.key_issues.join("; ") : (caseData?.key_issues || "N/A");
 
-      // 1. Advogado production responde ao caso (Gemini → fallback chatCompletion)
+      // 1+2. Geração e avaliação em PARALELO (reduz latência pela metade)
+      const lawList = Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A");
+      const issuesList = Array.isArray(caseData?.key_issues) ? caseData.key_issues.join("; ") : (caseData?.key_issues || "N/A");
       const lawyerPrompt = mode === "lawyer" ? LAWYER_PRODUCTION_PROMPT : JUDGE_PRODUCTION_PROMPT;
       const lawyerMessages = [
         { role: "system" as const, content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
         { role: "user" as const, content: `CASO DO CLIENTE:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS: ${lawList}\nQUESTÕES JURÍDICAS: ${issuesList}\n\nResponda ao cliente como advogado. Máximo 400 palavras.` },
       ];
-      let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1500 });
-      if (!lawyerResult.ok) {
-        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 2000, preferFastProvider: false });
-      }
 
-      lawyerFeedback = "Análise não disponível.";
-      if (lawyerResult.ok) {
-        lawyerFeedback = lawyerResult.data?.choices?.[0]?.message?.content || lawyerFeedback;
-      }
+      // Gera resposta do advogado em paralelo com a avaliação
+      const lawyerPromise = chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1000 });
+      const evalSystemPrompt = EVALUATE_PROMPT;
+      const evalUserContent = `Avalie RIGOROSAMENTE a resposta do profissional no modo ${modeLabel}.
 
-      // 2. Juiz avalia a argumentação do profissional
-      systemPrompt = EVALUATE_PROMPT;
-      userContent = `Avalie RIGOROSAMENTE a resposta do profissional no modo ${modeLabel}.
-
-CASO:
-${JSON.stringify(caseData, null, 2)}
+CASO:\n${JSON.stringify(caseData, null, 2)}
 
 LEIS APLICÁVEIS AO CASO: ${lawList}
 QUESTÕES JURÍDICAS CENTRAIS: ${issuesList}
@@ -628,16 +621,22 @@ QUESTÕES JURÍDICAS CENTRAIS: ${issuesList}
 ARGUMENTAÇÃO DO PROFISSIONAL:
 ${userResponse}
 
-RESPOSTA CORRETA DO ADVOGADO (referência):
-${lawyerFeedback}
-
 INSTRUÇÕES DE AVALIAÇÃO:
-- Compare a argumentação do profissional com a resposta correta do advogado
-- Verifique se citou os artigos de lei corretos (não apenas mencionou — precisa do número)
-- Verifique se a argumentação é lógica e responde à pergunta feita
-- Verifique se há jurisprudência de tribunal superior (STF, STJ, TST)
-- Verifique se a conclusão é clara e fundamentada
 - Score deve ser RIGOROSO: respostas genéricas sem artigos específicos devem receber abaixo de 50`;
+      const evalPromise = chatCompletion({
+        messages: [{ role: "system", content: evalSystemPrompt }, { role: "user", content: evalUserContent }],
+        temperature: 0.3, maxTokens: 1500,
+      });
+
+      const [lawyerResult, evalResult] = await Promise.allSettled([lawyerPromise, evalPromise]);
+
+      lawyerFeedback = "Análise não disponível.";
+      if (lawyerResult.status === "fulfilled" && lawyerResult.value.ok) {
+        lawyerFeedback = lawyerResult.value.data?.choices?.[0]?.message?.content || lawyerFeedback;
+      }
+
+      systemPrompt = evalSystemPrompt;
+      userContent = evalUserContent;
     } else if (action === "evaluate_and_correct") {
       systemPrompt = EVALUATE_AND_CORRECT_PROMPT;
       const modeLabel = mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO";
@@ -764,7 +763,7 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
           { role: "system", content: systemInstruction },
           { role: "user", content: userInstruction },
         ],
-        temperature: 0.7, maxTokens: 2000,
+        temperature: 0.7, maxTokens: 1200,
       });
 
       if (!simResult.ok) {
@@ -796,7 +795,7 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
 Critérios: ${evalCriteria}` },
           { role: "user", content: `Mensagem do cliente: "${clientMessage}"\n\nResposta do profissional:\n${professionalResponse}\n\nAvalie. Score 0-100.` },
         ],
-        temperature: 0.3, maxTokens: 2000, preferFastProvider: false,
+        temperature: 0.3, maxTokens: 1000,
       });
 
       let evaluation = { score: 50, feedback: "Avaliação não disponível", strengths: [] as string[], weaknesses: [] as string[] };
@@ -830,15 +829,13 @@ ${STRATEGIES_CONTEXT}
 Crie um prompt MELHORADO que corrija os pontos fracos. O prompt deve:
 - Manter o que funcionou (pontos fortes)
 - Corrigir os pontos fracos identificados
-- Incluir instruções específicas para melhorar os pontos fracos
-- Aplicar as estratégias de atendimento ao cliente
 - Ser claro e acionável
 - Máximo 500 palavras
 
 Responda APENAS com o prompt melhorado, sem explicações extras.` },
             { role: "user", content: `Prompt atual:\n${systemPromptBase}\n\nGere o prompt melhorado aplicando as estratégias de atendimento.` },
           ],
-          temperature: 0.5, maxTokens: 2000, preferFastProvider: false,
+          temperature: 0.5, maxTokens: 1200,
         });
 
         if (improveResult.ok) {
@@ -899,7 +896,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
               { role: "system", content: `${systemPromptBase}\n\n${STRATEGIES_CONTEXT}\n\nÁREA: ${areaLabel}\nESTRATÉGIA FOCAL: ${sc.strategy}` },
               { role: "user", content: `CLIENTE: ${clientName}\nÁREA: ${areaLabel}\nMENSAGEM: "${sc.client_message}"\n\nResponda como ${roleLabel}, aplicando TODAS as estratégias de captação e conversão. Use o nome do cliente, seja empático e termine com convite para agendamento. Máximo 500 palavras.` },
             ],
-            temperature: 0.7, maxTokens: 2000, preferFastProvider: false,
+            temperature: 0.7, maxTokens: 1200,
           });
 
           if (!simResult.ok) continue;
@@ -957,49 +954,70 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
 
         const trainResults: Array<Record<string, unknown>> = [];
 
-        for (const iterArea of areas) {
-          try {
-            // 1. Gerar caso
-            const caseResult = await chatCompletion({
-              messages: [
-                { role: "system", content: GENERATE_CASE_PROMPT },
-                { role: "user", content: `Gere um caso simulado para treinamento de ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"} na área de ${iterArea.charAt(0).toUpperCase() + iterArea.slice(1)} com dificuldade Médio. Use nomes fictícios. Caso realista.` },
-              ],
-              temperature: 0.8, maxTokens: 2000, preferFastProvider: false,
-            });
-            if (!caseResult.ok) continue;
-            const caseParsed = parseJsonResponse(caseResult.data?.choices?.[0]?.message?.content || "");
-            const caseData = (caseParsed as any)?.case_data || caseParsed;
-            if (!caseData?.description) continue;
+        // OTIMIZAÇÃO: Gerar TODOS os casos em paralelo, depois TODAS as respostas, depois TODAS as avaliações
+        // Reduz de 3×N sequencial para 3 batches paralelos
+        const casePromises = areas.map((iterArea) =>
+          chatCompletion({
+            messages: [
+              { role: "system", content: GENERATE_CASE_PROMPT },
+              { role: "user", content: `Gere um caso simulado para treinamento de ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"} na área de ${iterArea.charAt(0).toUpperCase() + iterArea.slice(1)} com dificuldade Médio. Use nomes fictícios. Caso realista.` },
+            ],
+            temperature: 0.8, maxTokens: 1200,
+          }).then((r) => ({ area: iterArea, result: r }))
+        );
+        const caseResults = await Promise.allSettled(casePromises);
 
-            // 2. Gerar resposta com prompt atual + estratégias de secretaria
-            const responseResult = await chatCompletion({
-              messages: [
-                { role: "system", content: currentPrompt + "\n\n" + STRATEGIES_CONTEXT },
-                { role: "user", content: `Caso: ${caseData.title}\n\n${caseData.description}\n\nPergunta: ${caseData.question || ""}\n\nResponda como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento ao cliente.` },
-              ],
-              temperature: 0.7, maxTokens: 2000, preferFastProvider: false,
-            });
-            if (!responseResult.ok) continue;
-            const secretaryResponse = responseResult.data?.choices?.[0]?.message?.content || "";
+        // Coleta casos válidos
+        const validCases: Array<{ area: string; caseData: any }> = [];
+        for (const cr of caseResults) {
+          if (cr.status !== "fulfilled" || !cr.value.result.ok) continue;
+          const parsed = parseJsonResponse(cr.value.result.data?.choices?.[0]?.message?.content || "");
+          const cd = (parsed as any)?.case_data || parsed;
+          if (cd?.description) validCases.push({ area: cr.value.area, caseData: cd });
+        }
+        if (validCases.length === 0) continue;
 
-            // 3. Avaliar resposta
-            const evalResult = await chatCompletion({
-              messages: [
-                { role: "system", content: EVALUATE_PROMPT },
-                { role: "user", content: `Avalie RIGOROSAMENTE a resposta do profissional no modo ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"}.\n\nCASO:\n${JSON.stringify(caseData, null, 2)}\n\nLEIS APLICÁVEIS AO CASO: ${Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A")}\nQUESTÕES JURÍDICAS CENTRAIS: ${Array.isArray(caseData?.key_issues) ? caseData.key_issues.join("; ") : (caseData?.key_issues || "N/A")}\n\nRESPOSTA DO PROFISSIONAL:\n${secretaryResponse}\n\nScore deve ser RIGOROSO: respostas genéricas sem artigos específicos devem receber abaixo de 50.` },
-              ],
-              temperature: 0.3, maxTokens: 2000, preferFastProvider: false,
-            });
-            if (!evalResult.ok) continue;
-            const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
-            trainResults.push({
-              area: iterArea,
-              score: typeof evalParsed?.score === "number" ? evalParsed.score : 50,
-              evaluation: evalParsed?.evaluation || {},
-              feedback: evalParsed?.feedback || "",
-            });
-          } catch (e) { /* skip */ }
+        // Gerar TODAS as respostas em paralelo
+        const responsePromises = validCases.map(({ area: iterArea, caseData: cd }) =>
+          chatCompletion({
+            messages: [
+              { role: "system", content: currentPrompt + "\n\n" + STRATEGIES_CONTEXT },
+              { role: "user", content: `Caso: ${cd.title}\n\n${cd.description}\n\nPergunta: ${cd.question || ""}\n\nResponda como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento ao cliente.` },
+            ],
+            temperature: 0.7, maxTokens: 1200,
+          }).then((r) => ({ area: iterArea, caseData: cd, result: r }))
+        );
+        const responseResults = await Promise.allSettled(responsePromises);
+
+        // Coleta respostas válidas
+        const validResponses: Array<{ area: string; caseData: any; response: string }> = [];
+        for (const rr of responseResults) {
+          if (rr.status !== "fulfilled" || !rr.value.result.ok) continue;
+          const resp = rr.value.result.data?.choices?.[0]?.message?.content || "";
+          if (resp) validResponses.push({ area: rr.value.area, caseData: rr.value.caseData, response: resp });
+        }
+
+        // Avaliar TODAS as respostas em paralelo
+        const evalPromises = validResponses.map(({ area: iterArea, caseData: cd, response: resp }) =>
+          chatCompletion({
+            messages: [
+              { role: "system", content: EVALUATE_PROMPT },
+              { role: "user", content: `Avalie RIGOROSAMENTE a resposta do profissional no modo ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"}.\n\nCASO:\n${JSON.stringify(cd, null, 2)}\n\nLEIS APLICÁVEIS: ${Array.isArray(cd?.applicable_laws) ? cd.applicable_laws.join(", ") : (cd?.applicable_laws || "N/A")}\nQUESTÕES JURÍDICAS: ${Array.isArray(cd?.key_issues) ? cd.key_issues.join("; ") : (cd?.key_issues || "N/A")}\n\nRESPOSTA DO PROFISSIONAL:\n${resp}\n\nScore RIGOROSO.` },
+            ],
+            temperature: 0.3, maxTokens: 1200,
+          }).then((r) => ({ area: iterArea, result: r }))
+        );
+        const evalResults = await Promise.allSettled(evalPromises);
+
+        for (const er of evalResults) {
+          if (er.status !== "fulfilled" || !er.value.result.ok) continue;
+          const ep = parseJsonResponse(er.value.result.data?.choices?.[0]?.message?.content || "");
+          trainResults.push({
+            area: er.value.area,
+            score: typeof ep?.score === "number" ? ep.score : 50,
+            evaluation: (ep as any)?.evaluation || {},
+            feedback: ep?.feedback || "",
+          });
         }
 
         // 4. Calcular média
@@ -1046,7 +1064,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
             { role: "system", content: `Melhore o prompt do ${mode === "lawyer" ? "advogado" : "juiz"} para treinamento jurídico. JSON: {"improved_prompt": "...", "changes": []}` },
             { role: "user", content: `PROMPT ATUAL:\n${currentPrompt}\n\nWEAKNESSES:\n${allWeaknesses.slice(0, 5).join("\n")}\n\nSTRENGTHS:\n${allStrengths.slice(0, 3).join("\n")}\n\nScore atual: ${avgScore}/100. Meta: +${targetImprovement}%. Melhore o prompt para o profissional responder melhor em treinos.` },
           ],
-          temperature: 0.7, maxTokens: 2000, preferFastProvider: false,
+          temperature: 0.7, maxTokens: 1200, preferFastProvider: true,
         });
 
         if (improveResult.ok) {
@@ -1103,7 +1121,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           { role: "system", content: SECRETARY_STRATEGY_PROMPT },
           { role: "user", content: `Gere um cenário realista de atendimento para a estratégia: "${strategy.name}" — ${strategy.desc}.\n\nO cenário deve simular um cliente real de escritório de advocacia brasileiro. Inclua contexto emocional, urgência, objeções prováveis e detalhes que tornem o treinamento desafiador. Use nomes fictícios brasileiros.` },
         ],
-        temperature: 0.8, maxTokens: 2000, preferFastProvider: false,
+        temperature: 0.8, maxTokens: 1200,
       });
 
       if (!stratResult.ok) {
@@ -1147,7 +1165,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           { role: "system", content: SECRETARY_EVALUATE_PROMPT },
           { role: "user", content: `CENÁRIO DE TREINAMENTO:\n${scenario}\n\nESTRATÉGIA: ${strategyId}\n\nRESPOSTA DA SECRETÁRIA:\n${userResponse}\n\nPROMPT ATUAL DA SECRETÁRIA:\n${(currentPrompt || "").slice(0, 1500)}\n\nAvalie a resposta considerando todas as estratégias de atendimento ao cliente. Score 0-100.` },
         ],
-        temperature: 0.3, maxTokens: 2000, preferFastProvider: false,
+        temperature: 0.3, maxTokens: 1200,
       });
 
       if (!evalResult.ok) {
@@ -1223,7 +1241,7 @@ REGRAS OBRIGATÓRIAS:
           { role: "system", content: improveSystemPrompt },
           { role: "user", content: userMessage },
         ],
-        temperature: 0.7, maxTokens: 2000, preferFastProvider: false,
+        temperature: 0.7, maxTokens: 1200,
       });
 
       if (!improveResult.ok) {
@@ -1233,7 +1251,7 @@ REGRAS OBRIGATÓRIAS:
             { role: "system", content: improveSystemPrompt },
             { role: "user", content: userMessage },
           ],
-          temperature: 0.7, maxTokens: 2000, preferFastProvider: false,
+          temperature: 0.7, maxTokens: 1200,
         });
       }
 
@@ -1287,51 +1305,75 @@ REGRAS OBRIGATÓRIAS:
 
       const results: Array<Record<string, unknown>> = [];
 
-      for (const strategy of SECRETARY_STRATEGIES) {
-        try {
-          // 1. Gerar cenário
-          const scenResult = await chatCompletion({
-            messages: [
-              { role: "system", content: SECRETARY_STRATEGY_PROMPT },
-              { role: "user", content: `Gere um cenário para a estratégia: "${strategy.name}" — ${strategy.desc}. Use nomes fictícios brasileiros. Cenário realista.` },
-            ],
-            temperature: 0.8, maxTokens: 2000, preferFastProvider: false,
-          });
-          if (!scenResult.ok) continue;
-          const scenParsed = parseJsonResponse(scenResult.data?.choices?.[0]?.message?.content || "");
-          const scenarioText = String(scenParsed?.scenario || "Cenário não disponível.");
+      // OTIMIZAÇÃO: Limitar a 5 estratégias e paralelizar tudo
+      const stratSlice = SECRETARY_STRATEGIES.slice(0, 5);
 
-          // 2. Gerar resposta da secretária com o prompt atual
-          const respResult = await chatCompletion({
-            messages: [
-              { role: "system", content: currentPrompt },
-              { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica da Dra. Kênia Garcia, aplicando estratégias de atendimento.` },
-            ],
-            temperature: 0.7, maxTokens: 2000, preferFastProvider: false,
-          });
-          if (!respResult.ok) continue;
-          const secretaryResponse = respResult.data?.choices?.[0]?.message?.content || "";
+      // Gerar TODOS os cenários em paralelo
+      const scenPromises = stratSlice.map((strategy) =>
+        chatCompletion({
+          messages: [
+            { role: "system", content: SECRETARY_STRATEGY_PROMPT },
+            { role: "user", content: `Gere um cenário para a estratégia: "${strategy.name}" — ${strategy.desc}. Use nomes fictícios brasileiros. Cenário realista.` },
+          ],
+          temperature: 0.8, maxTokens: 1200,
+        }).then((r) => ({ strategy, result: r }))
+      );
+      const scenResults = await Promise.allSettled(scenPromises);
 
-          // 3. Avaliar resposta
-          const evalResult = await chatCompletion({
-            messages: [
-              { role: "system", content: SECRETARY_EVALUATE_PROMPT },
-              { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nESTRATÉGIA: ${strategy.name}\n\nRESPOSTA DA SECRETÁRIA:\n${secretaryResponse}\n\nAvalie. Score 0-100.` },
-            ],
-            temperature: 0.3, maxTokens: 2000, preferFastProvider: false,
-          });
-          if (!evalResult.ok) continue;
-          const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
+      // Coleta cenários válidos
+      const validScenarios: Array<{ strategy: typeof stratSlice[0]; scenarioText: string }> = [];
+      for (const sr of scenResults) {
+        if (sr.status !== "fulfilled" || !sr.value.result.ok) continue;
+        const parsed = parseJsonResponse(sr.value.result.data?.choices?.[0]?.message?.content || "");
+        const scenarioText = String(parsed?.scenario || "Cenário não disponível.");
+        if (scenarioText && scenarioText !== "Cenário não disponível.") {
+          validScenarios.push({ strategy: sr.value.strategy, scenarioText });
+        }
+      }
 
-          results.push({
-            strategy_id: strategy.id,
-            strategy_name: strategy.name,
-            score: typeof evalParsed?.score === "number" ? evalParsed.score : 50,
-            feedback: String(evalParsed?.feedback || ""),
-            strengths: Array.isArray(evalParsed?.strengths) ? evalParsed.strengths : [],
-            weaknesses: Array.isArray(evalParsed?.weaknesses) ? evalParsed.weaknesses : [],
-          });
-        } catch { /* skip */ }
+      // Gerar TODAS as respostas em paralelo
+      const respPromises = validScenarios.map(({ strategy, scenarioText }) =>
+        chatCompletion({
+          messages: [
+            { role: "system", content: currentPrompt },
+            { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica da Dra. Kênia Garcia, aplicando estratégias de atendimento.` },
+          ],
+          temperature: 0.7, maxTokens: 1200,
+        }).then((r) => ({ strategy, scenarioText, result: r }))
+      );
+      const respResults = await Promise.allSettled(respPromises);
+
+      // Coleta respostas válidas
+      const validResponses: Array<{ strategy: typeof stratSlice[0]; scenarioText: string; response: string }> = [];
+      for (const rr of respResults) {
+        if (rr.status !== "fulfilled" || !rr.value.result.ok) continue;
+        const resp = rr.value.result.data?.choices?.[0]?.message?.content || "";
+        if (resp) validResponses.push({ strategy: rr.value.strategy, scenarioText: rr.value.scenarioText, response: resp });
+      }
+
+      // Avaliar TODAS as respostas em paralelo
+      const evalPromises = validResponses.map(({ strategy, scenarioText, response }) =>
+        chatCompletion({
+          messages: [
+            { role: "system", content: SECRETARY_EVALUATE_PROMPT },
+            { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nESTRATÉGIA: ${strategy.name}\n\nRESPOSTA DA SECRETÁRIA:\n${response}\n\nAvalie. Score 0-100.` },
+          ],
+          temperature: 0.3, maxTokens: 1200,
+        }).then((r) => ({ strategy, result: r }))
+      );
+      const evalResults = await Promise.allSettled(evalPromises);
+
+      for (const er of evalResults) {
+        if (er.status !== "fulfilled" || !er.value.result.ok) continue;
+        const ep = parseJsonResponse(er.value.result.data?.choices?.[0]?.message?.content || "");
+        results.push({
+          strategy_id: er.value.strategy.id,
+          strategy_name: er.value.strategy.name,
+          score: typeof ep?.score === "number" ? ep.score : 50,
+          feedback: String(ep?.feedback || ""),
+          strengths: Array.isArray((ep as any)?.strengths) ? (ep as any).strengths : [],
+          weaknesses: Array.isArray((ep as any)?.weaknesses) ? (ep as any).weaknesses : [],
+        });
       }
 
       const scores = results.map((r) => r.score as number || 0);
@@ -1354,7 +1396,7 @@ REGRAS OBRIGATÓRIAS:
             { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
             { role: "user", content: `PROMPT ATUAL:\n${currentPrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${[...new Set(allWeaknesses)].slice(0, 8).join("\n")}\n\nSTRENGTHS:\n${[...new Set(allStrengths)].slice(0, 5).join("\n")}\n\nScore médio: ${avgScore}/100. Melhore o prompt.` },
           ],
-          temperature: 0.7, maxTokens: 2000, preferFastProvider: false,
+          temperature: 0.7, maxTokens: 1200, preferFastProvider: true,
         });
         if (improveResult.ok) {
           const impParsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
@@ -1406,46 +1448,69 @@ REGRAS OBRIGATÓRIAS:
 
         const iterResults: Array<Record<string, unknown>> = [];
 
-        for (const strategy of SECRETARY_STRATEGIES.slice(0, 5)) {
-          try {
-            const scenResult = await chatCompletion({
-              messages: [
-                { role: "system", content: SECRETARY_STRATEGY_PROMPT },
-                { role: "user", content: `Cenário para: "${strategy.name}" — ${strategy.desc}. Només fictícios.` },
-              ],
-              temperature: 0.8, maxTokens: 2000, preferFastProvider: false,
-            });
-            if (!scenResult.ok) continue;
-            const scenParsed = parseJsonResponse(scenResult.data?.choices?.[0]?.message?.content || "");
-            const scenarioText = String(scenParsed?.scenario || "");
+        // OTIMIZAÇÃO: Gerar TODOS os cenários em paralelo
+        const stratSlice = SECRETARY_STRATEGIES.slice(0, 5);
+        const scenPromises = stratSlice.map((strategy) =>
+          chatCompletion({
+            messages: [
+              { role: "system", content: SECRETARY_STRATEGY_PROMPT },
+              { role: "user", content: `Cenário para: "${strategy.name}" — ${strategy.desc}. Només fictícios.` },
+            ],
+            temperature: 0.8, maxTokens: 1200,
+          }).then((r) => ({ strategy, result: r }))
+        );
+        const scenResults = await Promise.allSettled(scenPromises);
 
-            const respResult = await chatCompletion({
-              messages: [
-                { role: "system", content: activePrompt },
-                { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica.` },
-              ],
-              temperature: 0.7, maxTokens: 2000, preferFastProvider: false,
-            });
-            if (!respResult.ok) continue;
-            const secretaryResponse = respResult.data?.choices?.[0]?.message?.content || "";
+        // Coleta cenários válidos
+        const validScenarios: Array<{ strategy: typeof stratSlice[0]; scenarioText: string }> = [];
+        for (const sr of scenResults) {
+          if (sr.status !== "fulfilled" || !sr.value.result.ok) continue;
+          const parsed = parseJsonResponse(sr.value.result.data?.choices?.[0]?.message?.content || "");
+          const scenarioText = String(parsed?.scenario || "");
+          if (scenarioText) validScenarios.push({ strategy: sr.value.strategy, scenarioText });
+        }
 
-            const evalResult = await chatCompletion({
-              messages: [
-                { role: "system", content: SECRETARY_EVALUATE_PROMPT },
-                { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nRESPOSTA:\n${secretaryResponse}\n\nAvalie. Score 0-100.` },
-              ],
-              temperature: 0.3, maxTokens: 2000, preferFastProvider: false,
-            });
-            if (!evalResult.ok) continue;
-            const evalParsed = parseJsonResponse(evalResult.data?.choices?.[0]?.message?.content || "");
+        // Gerar TODAS as respostas em paralelo
+        const respPromises = validScenarios.map(({ strategy, scenarioText }) =>
+          chatCompletion({
+            messages: [
+              { role: "system", content: activePrompt },
+              { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica.` },
+            ],
+            temperature: 0.7, maxTokens: 1200,
+          }).then((r) => ({ strategy, scenarioText, result: r }))
+        );
+        const respResults = await Promise.allSettled(respPromises);
 
-            iterResults.push({
-              strategy_id: strategy.id,
-              score: typeof evalParsed?.score === "number" ? evalParsed.score : 50,
-              weaknesses: Array.isArray(evalParsed?.weaknesses) ? evalParsed.weaknesses : [],
-              strengths: Array.isArray(evalParsed?.strengths) ? evalParsed.strengths : [],
-            });
-          } catch { /* skip */ }
+        // Coleta respostas válidas
+        const validResponses: Array<{ strategy: typeof stratSlice[0]; scenarioText: string; response: string }> = [];
+        for (const rr of respResults) {
+          if (rr.status !== "fulfilled" || !rr.value.result.ok) continue;
+          const resp = rr.value.result.data?.choices?.[0]?.message?.content || "";
+          if (resp) validResponses.push({ strategy: rr.value.strategy, scenarioText: rr.value.scenarioText, response: resp });
+        }
+
+        // Avaliar TODAS as respostas em paralelo
+        const evalPromises = validResponses.map(({ strategy, scenarioText, response }) =>
+          chatCompletion({
+            messages: [
+              { role: "system", content: SECRETARY_EVALUATE_PROMPT },
+              { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nRESPOSTA:\n${response}\n\nAvalie. Score 0-100.` },
+            ],
+            temperature: 0.3, maxTokens: 1200,
+          }).then((r) => ({ strategy, result: r }))
+        );
+        const evalResults = await Promise.allSettled(evalPromises);
+
+        for (const er of evalResults) {
+          if (er.status !== "fulfilled" || !er.value.result.ok) continue;
+          const ep = parseJsonResponse(er.value.result.data?.choices?.[0]?.message?.content || "");
+          iterResults.push({
+            strategy_id: er.value.strategy.id,
+            score: typeof ep?.score === "number" ? ep.score : 50,
+            weaknesses: Array.isArray((ep as any)?.weaknesses) ? (ep as any).weaknesses : [],
+            strengths: Array.isArray((ep as any)?.strengths) ? (ep as any).strengths : [],
+          });
         }
 
         const scores = iterResults.map((r) => r.score as number || 0);
@@ -1482,7 +1547,7 @@ REGRAS OBRIGATÓRIAS:
             { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
             { role: "user", content: `PROMPT ATUAL:\n${activePrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${allWeaknesses.slice(0, 5).join("\n")}\n\nSTRENGTHS:\n${allStrengths.slice(0, 3).join("\n")}\n\nScore: ${avgScore}/100. Meta: +${targetImprovement}%. Melhore o prompt.` },
           ],
-          temperature: 0.7, maxTokens: 2000, preferFastProvider: false,
+          temperature: 0.7, maxTokens: 1200, preferFastProvider: true,
         });
         if (improveResult.ok) {
           const impParsed = parseJsonResponse(improveResult.data?.choices?.[0]?.message?.content || "");
@@ -1546,7 +1611,7 @@ Seja breve e direta.`;
         messages,
         temperature: 0.5,
         maxTokens: 1500,
-        preferFastProvider: false,
+        preferFastProvider: true,
       });
 
       if (!aiResult.ok) {
@@ -1578,7 +1643,7 @@ Seja breve e direta.`;
       messages,
       temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
       maxTokens: action === "generate_case" ? 2000 : 4000,
-      preferFastProvider: false,
+      preferFastProvider: true,
     });
 
     if (!aiResult.ok) {
