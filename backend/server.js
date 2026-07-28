@@ -376,7 +376,7 @@ async function callZen(messagesPayload, options = {}) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), fastMode ? 12000 : 20000);
       const patchedSystem = systemMsg
-        ? { role: "system", content: `INSTRUÇÃO CRÍTICA: Responda APENAS com a resposta final destinada ao cliente. NÃO inclua raciocínio, análise, passos de pensamento. Resposta curta (máx 3 frases). A resposta deve parecer uma mensagem natural de WhatsApp de uma secretária jurídica.\n\n${systemMsg.content}` }
+        ? { role: "system", content: `INSTRUÇÃO CRÍTICA: Responda SEMPRE em português brasileiro. NUNCA responda em inglês. NÃO inclua raciocínio, análise ou passos de pensamento. Resposta curta (máx 3 frases). A resposta deve parecer uma mensagem natural de WhatsApp de uma secretária jurídica.\n\n${systemMsg.content}` }
         : null;
       const body = {
         model,

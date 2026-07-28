@@ -41,15 +41,22 @@ async function chatZen(opts: ChatOptions) {
   if (!ZEN_KEY) return { ok: false as const, status: 0, error: "ZEN_API_KEY ausente" };
   for (const model of ZEN_MODELS) {
     try {
+      // Injeta instrução anti-inglês e anti-CoT no system prompt
+      const patchedMessages = opts.messages.map((m) => {
+        if (m.role === "system") {
+          return { ...m, content: `INSTRUÇÃO CRÍTICA: Responda SEMPRE em português brasileiro. NUNCA responda em inglês. NÃO inclua raciocínio, análise, passos de pensamento. Responda apenas com a resposta final.\n\n${m.content}` };
+        }
+        return m;
+      });
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), 20000);
       const resp = await fetch(ZEN_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${ZEN_KEY}` },
         signal: controller.signal,
         body: JSON.stringify({
           model,
-          messages: opts.messages,
+          messages: patchedMessages,
           ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
           max_tokens: opts.maxTokens || 4096,
           reasoning_effort: "low",
