@@ -54,9 +54,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Text-to-image: try Lovable Gateway gpt-image-2, fallback to Emergent (gpt-image-1).
+    // Text-to-image: try Lovable Gateway gpt-image-2, fallback to Emergent, then Pollinations (free).
     const img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "high" });
     if (!img.ok) {
+      // Pollinations.ai (gratuito, sem API key)
+      try {
+        const pollinationsPrompt = encodeURIComponent(fullPrompt);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 45000);
+        const pollResp = await fetch(`https://image.pollinations.ai/prompt/${pollinationsPrompt}?width=1024&height=1024&nologo=true&seed=${Date.now()}`, {
+          signal: controller.signal,
+          redirect: "follow",
+        });
+        clearTimeout(timeout);
+        if (pollResp.ok) {
+          const arrBuf = await pollResp.arrayBuffer();
+          if (arrBuf.byteLength > 5000) {
+            const b64 = btoa(String.fromCharCode(...new Uint8Array(arrBuf)));
+            return new Response(JSON.stringify({ b64_json: b64, image_data_url: `data:image/png;base64,${b64}`, provider: "pollinations" }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+      } catch (pollErr) {
+        console.warn("[generate-cover-image] Pollinations erro:", pollErr);
+      }
       // Local SVG fallback so the client never sees a 502 / blank screen.
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#g)"/><circle cx="512" cy="420" r="160" fill="rgba(255,255,255,0.08)"/><rect x="312" y="640" width="400" height="14" rx="7" fill="rgba(255,255,255,0.35)"/><rect x="372" y="680" width="280" height="10" rx="5" fill="rgba(255,255,255,0.22)"/></svg>`;
       const b64 = btoa(unescape(encodeURIComponent(svg)));

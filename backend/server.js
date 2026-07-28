@@ -1524,7 +1524,29 @@ async function generateCreativeImage(prompt) {
     }
   }
 
-  // 4) SVG fallback local (nunca retorna vazio)
+  // 4) Pollinations.ai (gratuito, sem API key)
+  try {
+    const pollinationsPrompt = encodeURIComponent(themedPrompt);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+    const resp = await fetch(`https://image.pollinations.ai/prompt/${pollinationsPrompt}?width=1024&height=1024&nologo=true&seed=${Date.now()}`, {
+      signal: controller.signal,
+      redirect: "follow",
+    });
+    clearTimeout(timeout);
+    if (resp.ok) {
+      const arrBuf = await resp.arrayBuffer();
+      if (arrBuf.byteLength > 5000) {
+        const b64 = Buffer.from(arrBuf).toString("base64");
+        return { ok: true, b64_json: b64 };
+      }
+    }
+    console.warn("[generateCreativeImage] Pollinations falhou:", resp.status);
+  } catch (e) {
+    console.warn("[generateCreativeImage] Pollinations erro:", e?.message);
+  }
+
+  // 5) SVG fallback local (nunca retorna vazio)
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
     <defs>
       <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
