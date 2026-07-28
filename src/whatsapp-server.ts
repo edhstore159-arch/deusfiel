@@ -14,6 +14,21 @@ import fs from "fs";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+const ZEN_API_KEY = process.env.ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
+const ZEN_BASE_URL = "https://opencode.ai/zen";
+const ZEN_MODEL = "big-pickle";
+
+const SECRETARY_SYSTEM = `Você é a secretaria virtual da Dra. Kenia Garcia, advogada especialista em Direito de Família e Sucessões.
+
+Diretrizes:
+- Seja profissional, acolhedora e empática
+- Responda sempre em português
+- Ofereça orientação jurídica inicial quando perguntado
+- Agende consultas quando solicitado
+- Para urgências, direcione para atendimento imediato
+- Nunca dê parecer definitivo, sempre sugira consulta presencial
+- Use linguagem acessível, sem jargão excessivo
+- Em orações, seja respeitosa e acolhedora`;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error("❌ Missing SUPABASE_URL or SUPABASE_KEY");
@@ -108,9 +123,58 @@ async function storeMessage(
   });
 }
 
-async function generateReply(strategy: string, message: string): Promise<string> {
+async function generateReply(strategy: string, message: string, history: { role: string; content: string }[] = []): Promise<string> {
+  const strategyContext: Record<string, string> = {
+    saudacao: "O cliente está cumprimentando. Dê boas-vindas calorosamente.",
+    identificacao: "O cliente quer se identificar. Peça nome e dados de contato.",
+    diagnostico: "O cliente descreve um problema jurídico. Demonstre empatia e pergunte mais detalhes.",
+    direcionamento: "O cliente busca um ministério ou líder. Ofereça encaminhamento.",
+    encerramento: "O cliente está se despedindo. Agradeça e deseje bênçãos.",
+    urgencia: "Situação urgente! Demonstre agilidade e direcione para atendimento imediato.",
+    oracao: "O cliente quer oração. Seja respeitoso e acolhedor.",
+    agendamento: "O cliente quer agendar. Pergunte dia e horário preferido.",
+    pos_atendimento: "Follow-up com cliente. Pergunte como foi o atendimento.",
+  };
+
+  const contextMsg = strategyContext[strategy] || "Responda de forma profissional e acolhedora.";
+
+  try {
+    const res = await fetch(`${ZEN_BASE_URL}/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ZEN_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: ZEN_MODEL,
+        messages: [
+          { role: "system", content: SECRETARY_SYSTEM },
+          { role: "system", content: `Contexto da estratégia: ${contextMsg}` },
+          ...history.slice(-10),
+          { role: "user", content: message },
+        ],
+        max_tokens: 300,
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`[Zen] HTTP ${res.status}`);
+      return fallbackReply(strategy);
+    }
+
+    const data = await res.json() as any;
+    const content = data?.choices?.[0]?.message?.content;
+    if (content) return content.trim();
+    return fallbackReply(strategy);
+  } catch (err) {
+    console.error("[Zen] Error:", err);
+    return fallbackReply(strategy);
+  }
+}
+
+function fallbackReply(strategy: string): string {
   const replies: Record<string, string> = {
-    saudacao: "Olá! Bem-vindo(a) à Secretaria da Missão Evangélica Lusitana. Como posso ajudar?",
+    saudacao: "Olá! Bem-vindo(a) à Secretaria da Dra. Kenia Garcia. Como posso ajudar?",
     identificacao: "Para melhor atendê-lo(a), poderia me informar seu nome completo?",
     diagnostico: "Entendo. Pode me descrever melhor sua necessidade?",
     direcionamento: "Vou encaminhar sua solicitação para o ministério adequado. Um momento.",

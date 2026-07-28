@@ -9,7 +9,7 @@ import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
 import { Send, Loader2, Bot, Trash2, Server, Sparkles, Brain, Zap } from "lucide-react";
 
-// Modelos oferecidos: Nemotron (NVIDIA, gratuito), Claude FCC, Emergent, Ollama local.
+// Modelos oferecidos: Nemotron (NVIDIA, gratuito), Claude FCC, Emergent, Ollama local, OpenCode Zen.
 const MODELS = [
   {
     id: "nemotron",
@@ -52,6 +52,13 @@ const MODELS = [
     provider: "ollama",
     icon: Server,
     color: "from-purple-500 to-fuchsia-600",
+  },
+  {
+    id: "big-pickle",
+    label: "ZEN",
+    provider: "zen",
+    icon: Zap,
+    color: "from-cyan-500 to-blue-600",
   },
 ];
 
@@ -192,6 +199,55 @@ export default function ChatMultiModelo() {
     finalizeAssistant();
   };
 
+  const streamZen = async (allMessages) => {
+    const apiKey = import.meta.env.VITE_ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
+    const res = await fetch("https://opencode.ai/zen/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: selected.id,
+        messages: [
+          ...(system ? [{ role: "system", content: system }] : []),
+          ...allMessages,
+        ],
+        stream: true,
+      }),
+      signal: abortRef.current?.signal,
+    });
+    if (!res.ok || !res.body) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`OpenCode Zen HTTP ${res.status}: ${t || "sem corpo"}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith("data:")) continue;
+        const data = t.slice(5).trim();
+        if (data === "[DONE]") continue;
+        try {
+          const json = JSON.parse(data);
+          if (json?.error) throw new Error(json.error);
+          const delta = json?.choices?.[0]?.delta?.content;
+          if (delta) appendAssistantChunk(delta);
+        } catch (e) {
+          if (e instanceof Error && e.message && !e.message.includes("JSON")) throw e;
+        }
+      }
+    }
+    finalizeAssistant();
+  };
+
   const streamOllama = async (allMessages) => {
     const base = ollamaUrl.replace(/\/+$/, "");
     let res;
@@ -257,6 +313,8 @@ export default function ChatMultiModelo() {
         .map((m) => ({ role: m.role, content: m.content }));
       if (selected.provider === "ollama") {
         await streamOllama(modelMessages);
+      } else if (selected.provider === "zen") {
+        await streamZen(modelMessages);
       } else {
         await streamGateway(modelMessages);
       }
@@ -305,7 +363,7 @@ export default function ChatMultiModelo() {
 
       {/* Seletor de modelo */}
       <div className="px-6 py-4 bg-white border-b border-nude-200 shrink-0">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           {MODELS.map((m) => {
             const Icon = m.icon;
             const active = selected.id === m.id;

@@ -1,130 +1,100 @@
 import { useState } from "react";
 import { Card } from "@/kenia/components/ui/card";
-import { Button } from "@/kenia/components/ui/button";
 import { Badge } from "@/kenia/components/ui/badge";
-import { Lock, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { FileText, ChevronDown, ChevronUp, Settings, Zap } from "lucide-react";
 
-const PASSWORD = "DeusFiel,08";
+const AI_PROVIDERS = [
+  {
+    id: "zen",
+    name: "OpenCode Zen (Principal)",
+    icon: "⚡",
+    description: "OpenCode Zen - Modelos otimizados (big-pickle, Claude, GPT, Gemini)",
+    color: "#00d9ff",
+    models: ["Big Pickle (Free)", "Claude Sonnet 4", "GPT-5.5", "Gemini 3.5 Flash", "DeepSeek V4 (Free)"],
+    status: "ativo",
+  },
+  {
+    id: "emergent",
+    name: "Emergent (Fallback)",
+    icon: "🔑",
+    description: "Multi-modelo: GPT, Claude, Gemini via API Emergent",
+    color: "#10b981",
+    models: ["GPT-5.5", "GPT-5 Mini", "Claude Sonnet 4", "Gemini 2.5 Pro", "Gemini 2.5 Flash"],
+    status: "configurado",
+  },
+  {
+    id: "openrouter",
+    name: "OpenRouter (Fallback)",
+    icon: "🌐",
+    description: "Quando Emergent acabar credito, usa OpenRouter automaticamente",
+    color: "#6366f1",
+    models: ["Hermes 4 70B", "Nemotron (Free)", "Gemma 4 26B (Free)"],
+    status: "configurado",
+  },
+  {
+    id: "fcc",
+    name: "Claude FCC (Local)",
+    icon: "💻",
+    description: "Servidor local - funciona quando PC estiver ligado",
+    color: "#f59e0b",
+    models: ["Claude Sonnet 4", "Nemotron 120B"],
+    status: "rodando",
+  },
+];
+
+const FALLBACK_ORDER = ["OpenCode Zen (Principal)", "Emergent (Fallback)", "OpenRouter (Fallback)", "Claude FCC (Local)"];
 
 const SECTIONS = [
   {
-    title: "Secretária Virtual (WhatsApp)",
-    stack: "Ollama (LLM local) + Twilio WhatsApp + edge function whatsapp-twilio-webhook",
+    title: "Secretaria Virtual (WhatsApp)",
+    stack: "OpenCode Zen (big-pickle) + Supabase Edge Functions",
     items: [
-      "Recepção 24/7 de mensagens no WhatsApp via webhook Twilio.",
-      "Persona fixa: Kênia Garcia — nunca revela ser IA.",
-      "Detecção automática de estilo do lead (visual/auditivo/cinestésico) e adaptação da linguagem.",
-      "Classificação de área jurídica, urgência e score do lead a cada mensagem.",
-      "Agendamento automático: trigger create_appointment_from_whatsapp extrai data/hora e cria appointments.",
-      "Envio de áudios (voz) via voicemagic-tts + Watzzap Audio API.",
+      "Recepcao 24/7 de mensagens no WhatsApp.",
+      "Persona fixa: Kenia Garcia — nunca revela ser IA.",
+      "Fallback automatico: Zen → Emergent → OpenRouter → FCC.",
+      "Roteamento por modelo: big-pickle, GPT, Claude, Gemini.",
     ],
   },
   {
-    title: "Copiloto Jurídico / Chat IA",
-    stack: "Lovable AI Gateway → openai/gpt-5.5 (padrão) + fallback OpenAI direto e Emergent (Claude)",
+    title: "Chaves Configuradas",
+    stack: "Supabase Secrets + Dashboard Local",
     items: [
-      "Reescreve respostas como parecer jurídico técnico (Direito Civil, Previdenciário, Processo).",
-      "Cita legislação e jurisprudência majoritária, sem inventar acórdãos.",
-      "Roteamento com fallback automático: LOVABLE_API_KEY → OPENAI_API_KEY → EMERGENT_API_KEY.",
-      "Edge function: chat-ai.",
-    ],
-  },
-  {
-    title: "Juiz Virtual",
-    stack: "judge-ai edge function → Claude 3.5 Sonnet (via Emergent) + fallback GPT",
-    items: [
-      "Atua como magistrado brasileiro de Direito Previdenciário.",
-      "Transforma respostas técnicas em PARECER JURÍDICO estruturado.",
-      "Complementa com jurisprudência do STF/STJ/TNU quando aplicável.",
-    ],
-  },
-  {
-    title: "Gerador de Imagens / Criativos",
-    stack: "generate-cover-image + edit-creative + fuse-images (Nano Banana / Gemini 3 Pro Image / GPT-Image-2)",
-    items: [
-      "Template obrigatório para animais: [quantidade] + [nome em inglês/científico] + [descrição visual] + [estilo].",
-      "SUBJECT LOCK por espécie: sabiá, tucano, arara, beija-flor, coruja, flamingo, penguin etc. — sem substituir espécie.",
-      "OBJECT_FIDELITY_LOCK: anatomia correta (bico, penas, patas) e proporções reais.",
-      "Dimensões corretas por formato: 1024x1792 (Reels/9:16), 1792x1024 (Banner/16:9), 1024x1024 (Feed).",
-      "Deduplicação por id + storage_path + hash da imagem na galeria.",
-    ],
-  },
-  {
-    title: "Vídeo & Voz",
-    stack: "emergent-video + enhance-video-prompt + transcribe-audio + voicemagic-tts",
-    items: [
-      "Geração de vídeo viral com prompt enhancer.",
-      "Transcrição de áudios recebidos no WhatsApp.",
-      "TTS com voz personalizada da secretária (sem emojis, sem rosto).",
-    ],
-  },
-  {
-    title: "Segurança & Infra",
-    stack: "Lovable Cloud (Supabase) — RLS + user_roles + has_role SECURITY DEFINER",
-    items: [
-      "RLS habilitada em todas as tabelas públicas.",
-      "Roles em tabela separada (user_roles) — sem escalada de privilégio.",
-      "Secrets no backend: LAK, OAK, EAK, GAK (acesso restrito por senha em /app/settings).",
-      "Debug Tool oculto — ativado por keyword secreta.",
+      "ZEN_API_KEY — sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8",
+      "EMERGENT_API_KEY — sk-emergent-e69E465EfCaEa16C2A",
+      "Claude FCC — localhost:8082 (auto-start no boot)",
     ],
   },
 ];
 
 export default function SystemReportCard() {
-  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem("system_report_unlocked") === "1");
-  const [pwd, setPwd] = useState("");
-  const [err, setErr] = useState("");
   const [open, setOpen] = useState(true);
-
-  const tryUnlock = (e) => {
-    e.preventDefault();
-    if (pwd === PASSWORD) {
-      sessionStorage.setItem("system_report_unlocked", "1");
-      setUnlocked(true);
-      setErr("");
-      setPwd("");
-    } else {
-      setErr("Senha incorreta.");
-    }
-  };
-
-  if (!unlocked) {
-    return (
-      <Card className="mx-4 mt-4 p-4 border-nude-200">
-        <div className="flex items-center gap-2 mb-2">
-          <Lock className="w-4 h-4 text-gold-600" />
-          <h3 className="font-display font-semibold text-sm">Relatório do Sistema (restrito)</h3>
-          <Badge variant="outline" className="ml-auto text-[10px]">Admin</Badge>
-        </div>
-        <p className="text-xs text-nude-500 mb-3">Informe a senha para visualizar o relatório completo das funcionalidades.</p>
-        <form onSubmit={tryUnlock} className="flex items-center gap-2 max-w-sm">
-          <input
-            type="password"
-            value={pwd}
-            onChange={(e) => setPwd(e.target.value)}
-            placeholder="Senha"
-            className="flex-1 border border-nude-300 rounded px-3 py-2 text-sm"
-            autoComplete="off"
-          />
-          <Button type="submit" size="sm">Acessar</Button>
-        </form>
-        {err && <div className="text-xs text-rose-600 mt-2">{err}</div>}
-      </Card>
-    );
-  }
+  const [activeTab, setActiveTab] = useState("report");
 
   return (
     <Card className="mx-4 mt-4 p-4 border-nude-200">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 mb-3"
-      >
-        <FileText className="w-4 h-4 text-gold-600" />
-        <h3 className="font-display font-semibold text-sm">Relatório do Sistema — Funcionalidades</h3>
-        <Badge className="ml-auto bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-[10px]">Desbloqueado</Badge>
+      <div className="flex items-center gap-2 mb-3">
+        <Settings className="w-4 h-4 text-gold-600" />
+        <h3 className="font-display font-semibold text-sm">Painel Administrativo</h3>
+        <Badge className="ml-auto bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-[10px]">Ativo</Badge>
         {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-      </button>
-      {open && (
+      </div>
+
+      <div className="flex gap-2 mb-3">
+        <button
+          onClick={() => setActiveTab("report")}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${activeTab === "report" ? "bg-gold-100 text-gold-800" : "bg-nude-100 text-nude-600 hover:bg-nude-200"}`}
+        >
+          <FileText className="w-3 h-3 inline mr-1" /> Relatorio
+        </button>
+        <button
+          onClick={() => setActiveTab("config")}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${activeTab === "config" ? "bg-violet-100 text-violet-800" : "bg-nude-100 text-nude-600 hover:bg-nude-200"}`}
+        >
+          <Zap className="w-3 h-3 inline mr-1" /> Configuracoes IA
+        </button>
+      </div>
+
+      {open && activeTab === "report" && (
         <div className="grid md:grid-cols-2 gap-3">
           {SECTIONS.map((s) => (
             <div key={s.title} className="border border-nude-200 rounded-md p-3 bg-nude-50/40">
@@ -135,6 +105,45 @@ export default function SystemReportCard() {
               </ul>
             </div>
           ))}
+        </div>
+      )}
+
+      {open && activeTab === "config" && (
+        <div className="space-y-3">
+          <div className="border border-nude-200 rounded-md p-3 bg-nude-50/40">
+            <div className="font-semibold text-sm text-nude-900 mb-2 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-gold-600" /> Fallback Automatico
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {FALLBACK_ORDER.map((step, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  <span className="bg-violet-100 text-violet-800 px-2 py-1 rounded font-medium">{i + 1}. {step}</span>
+                  {i < FALLBACK_ORDER.length - 1 && <span className="text-nude-400">→</span>}
+                </span>
+              ))}
+            </div>
+            <p className="text-[11px] text-nude-500 mt-2">OpenCode Zen e o provedor principal (big-pickle, gratuito). Se falhar, muda para Emergent → OpenRouter → Claude FCC local.</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-2">
+            {AI_PROVIDERS.map((p) => (
+              <div key={p.id} className="border rounded-md p-3 bg-white" style={{ borderColor: p.color + "40" }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">{p.icon}</span>
+                  <span className="font-semibold text-xs text-nude-900">{p.name}</span>
+                </div>
+                <p className="text-[11px] text-nude-600 mb-2">{p.description}</p>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {p.models.map((m) => (
+                    <span key={m} className="text-[10px] bg-nude-100 text-nude-700 px-1.5 py-0.5 rounded">{m}</span>
+                  ))}
+                </div>
+                <Badge variant="outline" className="text-[10px]" style={{ borderColor: p.color, color: p.color }}>
+                  {p.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </Card>
