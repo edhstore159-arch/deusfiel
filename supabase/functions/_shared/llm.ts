@@ -301,16 +301,20 @@ export async function chatCompletion(opts: ChatOptions) {
     if (r.ok) return r;
   }
 
-  // Fallback chain: FCC (funciona!) → OpenRouter (Hermes) → Nemotron → Lovable → Gemini → Emergent
-  if (FCC_BASE_URL) {
-    const r = await chatClaudeFCC(opts);
+  // Fallback chain: Emergent (primario) → OpenRouter (acabou credito) → FCC → Nemotron → Lovable → Gemini
+  if (EMERGENT_KEY) {
+    const r = await chatEmergent(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Claude FCC falhou:", r.status, r.error?.slice?.(0, 200));
+    console.warn("Emergent falhou, tentando OpenRouter:", r.error?.slice?.(0, 200));
   }
   if (OPENROUTER_KEY) {
     const r = await chatOpenRouter(opts);
     if (r.ok) return r;
-    console.warn("⚠️ OpenRouter falhou:", r.status, r.error?.slice?.(0, 200));
+    console.warn("OpenRouter falhou, tentando FCC:", r.error?.slice?.(0, 200));
+  }
+  if (FCC_BASE_URL) {
+    const r = await chatClaudeFCC(opts);
+    if (r.ok) return r;
   }
   if (NVIDIA_NIM_API_KEY) {
     const r = await chatNemotronDirect(opts);
@@ -324,11 +328,7 @@ export async function chatCompletion(opts: ChatOptions) {
     const r = await chatGemini(opts);
     if (r.ok) return r;
   }
-  if (!wantsEmergent) {
-    const r3 = await chatEmergent(opts);
-    if (r3.ok) return r3;
-  }
-  return { ok: false as const, status: 502, error: "Nenhum provider disponível", provider: "none" };
+  return { ok: false as const, status: 502, error: "Nenhum provider disponivel (Emergent/OpenRouter/FCC/Nemotron/Lovable/Gemini)", provider: "none" };
 }
 
 // ---------- Pipeline: Nemotron gera → Claude (Emergent) revisa ----------

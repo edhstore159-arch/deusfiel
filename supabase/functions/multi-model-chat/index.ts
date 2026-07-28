@@ -1,11 +1,22 @@
-// Multi-model chat: Nemotron (NVIDIA NIM direto), Claude FCC (via ngrok), Emergent API.
-// Suporta Nemotron, ChatGPT, Gemini e Claude via Emergent. Ollama é chamado direto pelo cliente.
+// Multi-model chat: Emergent API (primario) → OpenRouter (fallback) → Claude FCC (ultimo recurso).
+// Fallback automatico: quando Emergent acabar credito, usa OpenRouter.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const EMERGENT_BASE = "https://integrations.emergentagent.com/llm/chat/completions";
+
+const ZEN_BASE = "https://opencode.ai/zen/v1/chat/completions";
+const ZEN_KEY = Deno.env.get("ZEN_API_KEY") || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
+
+const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
+const OPENROUTER_FALLBACK_MODELS = [
+  "nousresearch/hermes-4-70b",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "google/gemma-4-26b-a4b-it:free",
+];
 
 const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev";
 const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
@@ -18,15 +29,15 @@ const NEMOTRON_MODEL = "nvidia/nemotron-3-super-120b-a12b";
 
 // Maps frontend model IDs to Emergent candidate model names (tries each in order)
 const MODEL_CANDIDATES: Record<string, string[]> = {
-  "openai/gpt-5.5": ["openai/gpt-5.5", "gpt-5.5", "gpt-4o-mini"],
-  "openai/gpt-5-mini": ["openai/gpt-5-mini", "gpt-5-mini", "gpt-4o-mini"],
-  "google/gemini-2.5-pro": ["google/gemini-2.5-pro", "gemini-2.5-pro", "gpt-4o-mini"],
-  "google/gemini-2.5-flash": ["google/gemini-2.5-flash", "gemini-2.5-flash", "gpt-4o-mini"],
+  "big-pickle": ["big-pickle", "deepseek-v4-flash-free", "nemotron-3-ultra-free"],
+  "openai/gpt-5.5": ["gpt-5.5", "gpt-5.4", "gpt-4o-mini"],
+  "openai/gpt-5-mini": ["gpt-5-mini", "gpt-5-nano", "gpt-4o-mini"],
+  "google/gemini-2.5-pro": ["gemini/gemini-2.5-pro", "gemini-3.1-pro-preview", "gpt-4o-mini"],
+  "google/gemini-2.5-flash": ["gemini/gemini-2.5-flash", "gemini/gemini-3.5-flash", "gpt-4o-mini"],
   "anthropic/claude-sonnet-4-20250514": [
-    "anthropic/claude-sonnet-4-20250514",
     "claude-sonnet-4-20250514",
-    "claude-sonnet-4-5",
     "claude-sonnet-4-5-20250929",
+    "claude-sonnet-4-6",
     "claude-haiku-4-5",
     "gpt-4o-mini",
   ],
@@ -40,6 +51,65 @@ async function tryEmergent(key: string, model: string, payload: any): Promise<Re
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify({ ...payload, model }),
   });
+}
+
+async function tryZen(messages: any[], system?: string, model?: string): Promise<Response | null> {
+  if (!ZEN_KEY) return null;
+  const apiMessages = [
+    ...(system ? [{ role: "system", content: String(system) }] : []),
+    ...messages.map((m: any) => ({ role: m.role, content: String(m.content || "") })),
+  ];
+  const zenModels = model ? [model, "big-pickle", "deepseek-v4-flash-free"] : ["big-pickle", "deepseek-v4-flash-free"];
+  for (const candidate of zenModels) {
+    try {
+      const resp = await fetch(ZEN_BASE, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ZEN_KEY}`,
+        },
+        body: JSON.stringify({ model: candidate, messages: apiMessages, max_tokens: 4096, stream: true }),
+      });
+      if (resp.ok && resp.body) {
+        console.log(`OpenCode Zen OK com ${candidate}`);
+        return resp;
+      }
+      console.warn(`OpenCode Zen ${candidate} falhou: ${resp.status}`);
+    } catch (e) {
+      console.warn(`OpenCode Zen ${candidate} erro:`, (e as Error)?.message);
+    }
+  }
+  return null;
+}
+
+async function tryOpenRouter(messages: any[], system?: string): Promise<Response | null> {
+  if (!OPENROUTER_KEY) return null;
+  const apiMessages = [
+    ...(system ? [{ role: "system", content: String(system) }] : []),
+    ...messages.map((m: any) => ({ role: m.role, content: String(m.content || "") })),
+  ];
+  for (const candidate of OPENROUTER_FALLBACK_MODELS) {
+    try {
+      const resp = await fetch(OPENROUTER_BASE, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENROUTER_KEY}`,
+          "HTTP-Referer": "https://deusfiel.onrender.com",
+          "X-Title": "Kenia Garcia Advocacia",
+        },
+        body: JSON.stringify({ model: candidate, messages: apiMessages, max_tokens: 4096 }),
+      });
+      if (resp.ok && resp.body) {
+        console.log(`OpenRouter fallback OK com ${candidate}`);
+        return resp;
+      }
+      console.warn(`OpenRouter ${candidate} falhou: ${resp.status}`);
+    } catch (e) {
+      console.warn(`OpenRouter ${candidate} erro:`, (e as Error)?.message);
+    }
+  }
+  return null;
 }
 
 async function tryClaudeFCC(messages: any[], system?: string): Promise<Response> {
@@ -175,6 +245,18 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Rota dedicada: OpenCode Zen (big-pickle, gratuito)
+    if (model === "big-pickle" || model === "zen") {
+      console.log("Rota direta: OpenCode Zen");
+      try {
+        const zenResp = await tryZen(messages, system, "big-pickle");
+        if (zenResp && zenResp.ok) return zenResp;
+        console.warn("Zen falhou, tentando Emergent...");
+      } catch (e) {
+        console.warn("Zen erro:", (e as Error)?.message);
+      }
+    }
+
     // Rota dedicada: Nemotron via NVIDIA NIM direto (sem ngrok)
     if (model === "nemotron") {
       console.log("Rota direta: Nemotron via NVIDIA NIM");
@@ -226,13 +308,10 @@ Deno.serve(async (req) => {
     }
 
     const emergentKey = Deno.env.get("EMERGENT_API_KEY") || Deno.env.get("EMERGENT_LLM_KEY") || "";
-    if (!emergentKey) {
-      return new Response(JSON.stringify({ error: "Chave EMERGENT_API_KEY ausente nas secrets." }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
-    const candidates = MODEL_CANDIDATES[model] || [...(model ? [model] : []), ...FALLBACK_CANDIDATES];
+    const candidates = emergentKey
+      ? (MODEL_CANDIDATES[model] || [...(model ? [model] : []), ...FALLBACK_CANDIDATES])
+      : [];
 
     const payload = {
       stream: true,
@@ -245,6 +324,17 @@ Deno.serve(async (req) => {
     let lastError = "";
     let lastStatus = 0;
 
+    // 0) OpenCode Zen — primeiro recurso (gratuito)
+    const zenResp = await tryZen(messages, system, model);
+    if (zenResp && zenResp.ok && zenResp.body) {
+      return new Response(zenResp.body, {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+      });
+    }
+    console.warn("Zen indisponível, tentando Emergent...");
+
+    // 1) Emergent — tenta todos os candidatos
     for (const candidate of candidates) {
       const upstream = await tryEmergent(emergentKey, candidate, payload);
 
@@ -252,52 +342,46 @@ Deno.serve(async (req) => {
         const text = await upstream.text().catch(() => "");
         lastStatus = upstream.status;
         lastError = text || `HTTP ${upstream.status}`;
-        // If 400/404 (model not found), try next candidate
         if (upstream.status === 400 || upstream.status === 404) {
-          console.warn(`Emergent rejeitou modelo ${candidate}, tentando próximo...`);
+          console.warn(`Emergent rejeitou modelo ${candidate}, tentando proximo...`);
           continue;
         }
-        // Budget exceeded or other errors — try Claude FCC fallback
-        console.warn(`Emergent falhou (${upstream.status}), tentando Claude FCC...`);
-        try {
-          const claudeResp = await tryClaudeFCC(messages, system);
-          if (claudeResp.ok) return claudeResp;
-          console.warn("Claude FCC também falhou:", await claudeResp.text().catch(() => ""));
-        } catch (claudeErr) {
-          console.warn("Claude FCC erro:", claudeErr);
-        }
-        // Return the original Emergent error
-        let msg = lastError;
-        if (upstream.status === 429) msg = "Limite de requisições excedido. Tente em instantes.";
-        if (upstream.status === 401) msg = "Chave de API inválida. Verifique EMERGENT_API_KEY.";
-        return new Response(JSON.stringify({ error: msg }), {
-          status: upstream.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        // 401/402/429 = chave invalida ou credito esgotado → cai para OpenRouter
+        console.warn(`Emergent falhou (${upstream.status}), tentando OpenRouter...`);
+        break;
       }
 
-      // Success — stream the response
+      // Success
       return new Response(upstream.body, {
         status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
-        },
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
       });
     }
 
-    // All Emergent candidates exhausted — try Claude FCC as last resort
-    console.warn("Todos os modelos Emergent falharam, tentando Claude FCC como último recurso...");
+    // 2) OpenRouter — fallback automatico quando Emergent acabar
+    if (OPENROUTER_KEY) {
+      const orResp = await tryOpenRouter(messages, system);
+      if (orResp && orResp.ok && orResp.body) {
+        return new Response(orResp.body, {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+        });
+      }
+      console.warn("OpenRouter falhou, tentando Claude FCC...");
+    }
+
+    // 3) Claude FCC — ultimo recurso
     try {
       const claudeResp = await tryClaudeFCC(messages, system);
       if (claudeResp.ok) return claudeResp;
-    } catch (claudeErr) {
-      console.warn("Claude FCC último recurso falhou:", claudeErr);
-    }
+    } catch {}
 
-    return new Response(JSON.stringify({ error: `Emergent e Claude FCC falharam. Último erro Emergent: ${lastError.slice(0, 200)}` }), {
-      status: lastStatus || 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Todos falharam
+    let msg = lastError || "Emergent, OpenRouter e Claude FCC falharam.";
+    if (lastStatus === 401 || lastStatus === 402) msg = "Credito Emergent esgotado e fallbacks indisponiveis.";
+    if (lastStatus === 429) msg = "Limite de requisicoes excedido em todos os provedores.";
+    return new Response(JSON.stringify({ error: msg }), {
+      status: lastStatus || 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: String((e as Error)?.message || e) }), {

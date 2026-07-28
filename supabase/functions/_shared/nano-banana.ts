@@ -139,10 +139,10 @@ async function callEmergent(opts: NanoBananaOptions): Promise<{ url: string | nu
   const key = Deno.env.get("EMERGENT_API_KEY");
   if (!key) return { url: null, error: "EMERGENT_API_KEY ausente" };
   const models = [
-    "gemini-2.5-flash-image",
-    "google/gemini-2.5-flash-image",
-    "gemini-3.1-flash-image-preview",
-    "google/gemini-3.1-flash-image-preview",
+    "gemini/gemini-2.5-flash-image",
+    "gemini/gemini-2.5-flash-image-preview",
+    "vertex_ai/gemini-2.5-flash-image",
+    "vertex_ai/gemini-3.1-flash-image-preview",
   ];
   let lastError = "";
   for (const model of models) {

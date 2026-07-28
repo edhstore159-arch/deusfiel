@@ -200,52 +200,7 @@ export default function ChatMultiModelo() {
   };
 
   const streamZen = async (allMessages) => {
-    const apiKey = import.meta.env.VITE_ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
-    const res = await fetch("https://opencode.ai/zen/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: selected.id,
-        messages: [
-          ...(system ? [{ role: "system", content: system }] : []),
-          ...allMessages,
-        ],
-        stream: true,
-      }),
-      signal: abortRef.current?.signal,
-    });
-    if (!res.ok || !res.body) {
-      const t = await res.text().catch(() => "");
-      throw new Error(`OpenCode Zen HTTP ${res.status}: ${t || "sem corpo"}`);
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-      for (const line of lines) {
-        const t = line.trim();
-        if (!t.startsWith("data:")) continue;
-        const data = t.slice(5).trim();
-        if (data === "[DONE]") continue;
-        try {
-          const json = JSON.parse(data);
-          if (json?.error) throw new Error(json.error);
-          const delta = json?.choices?.[0]?.delta?.content;
-          if (delta) appendAssistantChunk(delta);
-        } catch (e) {
-          if (e instanceof Error && e.message && !e.message.includes("JSON")) throw e;
-        }
-      }
-    }
-    finalizeAssistant();
+    await streamGateway(allMessages);
   };
 
   const streamOllama = async (allMessages) => {
