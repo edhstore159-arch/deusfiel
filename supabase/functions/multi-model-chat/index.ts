@@ -70,11 +70,72 @@ async function tryZen(messages: any[], system?: string, model?: string): Promise
         },
         body: JSON.stringify({ model: candidate, messages: apiMessages, max_tokens: 4096, stream: true }),
       });
-      if (resp.ok && resp.body) {
-        console.log(`OpenCode Zen OK com ${candidate}`);
-        return resp;
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => "");
+        console.warn(`OpenCode Zen ${candidate} falhou: ${resp.status} ${text.slice(0, 200)}`);
+        continue;
       }
-      console.warn(`OpenCode Zen ${candidate} falhou: ${resp.status}`);
+      // Verifica se o body é SSE (text/event-stream) ou JSON de erro
+      const ct = resp.headers.get("content-type") || "";
+      if (ct.includes("application/json")) {
+        const body = await resp.json().catch(() => ({}));
+        const err = (body as any)?.error?.message || (body as any)?.error || "";
+        if (err) {
+          console.warn(`OpenCode Zen ${candidate} retornou erro: ${err}`);
+          continue;
+        }
+      }
+      // SSE stream válido — converte para formato OpenAI SSE
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let hasContent = false;
+      const sseChunks: string[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t.startsWith("data:")) continue;
+          const data = t.slice(5).trim();
+          if (data === "[DONE]") {
+            sseChunks.push("data: [DONE]\n\n");
+            continue;
+          }
+          try {
+            const json = JSON.parse(data);
+            if (json?.error) {
+              console.warn(`Zen stream error: ${json.error}`);
+              continue;
+            }
+            const delta = json?.choices?.[0]?.delta?.content;
+            if (delta) {
+              hasContent = true;
+              sseChunks.push(`data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`);
+            }
+          } catch {}
+        }
+      }
+      if (hasContent && sseChunks.length > 0) {
+        console.log(`OpenCode Zen OK com ${candidate}`);
+        const stream = new ReadableStream({
+          start(controller) {
+            for (const chunk of sseChunks) {
+              controller.enqueue(new TextEncoder().encode(chunk));
+            }
+            controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
+        return new Response(stream, {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+        });
+      }
+      console.warn(`OpenCode Zen ${candidate} sem conteúdo válido`);
     } catch (e) {
       console.warn(`OpenCode Zen ${candidate} erro:`, (e as Error)?.message);
     }
@@ -250,7 +311,7 @@ Deno.serve(async (req) => {
       console.log("Rota direta: OpenCode Zen");
       try {
         const zenResp = await tryZen(messages, system, "big-pickle");
-        if (zenResp && zenResp.ok) return zenResp;
+        if (zenResp) return zenResp;
         console.warn("Zen falhou, tentando Emergent...");
       } catch (e) {
         console.warn("Zen erro:", (e as Error)?.message);
@@ -326,11 +387,8 @@ Deno.serve(async (req) => {
 
     // 0) OpenCode Zen — primeiro recurso (gratuito)
     const zenResp = await tryZen(messages, system, model);
-    if (zenResp && zenResp.ok && zenResp.body) {
-      return new Response(zenResp.body, {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
-      });
+    if (zenResp) {
+      return zenResp;
     }
     console.warn("Zen indisponível, tentando Emergent...");
 

@@ -347,6 +347,57 @@ const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY || process.env.VITE_LOVABLE_
 const AI_MODEL = process.env.AI_MODEL || "google/gemini-3-flash-preview";
 const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS || 90000);
 
+// ---- OpenCode Zen (gratuito, principal) ----
+const ZEN_API_KEY = process.env.ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
+const ZEN_BASE_URL = "https://opencode.ai/zen/v1/chat/completions";
+const ZEN_MODELS = ["big-pickle", "deepseek-v4-flash-free", "nemotron-3-ultra-free"];
+
+async function callZen(messagesPayload, options = {}) {
+  if (!ZEN_API_KEY) throw new Error("ZEN_API_KEY ausente");
+  const systemMsg = messagesPayload.find((m) => m.role === "system");
+  const apiMessages = messagesPayload
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+  const attempts = [];
+  for (const model of ZEN_MODELS) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const patchedSystem = systemMsg
+        ? { role: "system", content: `INSTRUÇÃO CRÍTICA: Responda APENAS com a resposta final destinada ao cliente. NÃO inclua raciocínio, análise, passos de pensamento. A resposta deve parecer uma mensagem natural de WhatsApp de uma secretária jurídica.\n\n${systemMsg.content}` }
+        : null;
+      const body = {
+        model,
+        messages: patchedSystem ? [patchedSystem, ...apiMessages] : apiMessages,
+        temperature: 0.7,
+        max_tokens: 700,
+      };
+      const resp = await fetch(ZEN_BASE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${ZEN_API_KEY}` },
+        signal: controller.signal,
+        body: JSON.stringify(body),
+      });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const data = await resp.json();
+        let reply = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+        reply = reply.replace(/^(Okay|Let me|So|Now|Right|Well|Hmm|I need|I should|First|The user)[,.]?\s+(the user|said|says|mentioned|wants|needs|is|wants me|said ")[\s\S]*/i, "").trim();
+        if (reply) {
+          attempts.push({ ok: true, provider: "zen", model, reply: reply.slice(0, 200) });
+          return { ok: true, provider: "zen", endpoint: ZEN_BASE_URL, model, reply: sanitizeOllamaReply(reply, options.userText), attempts };
+        }
+      } else {
+        const errText = await resp.text().catch(() => "");
+        attempts.push({ ok: false, provider: "zen", model, status: resp.status, error: errText.slice(0, 200) });
+      }
+    } catch (e) {
+      attempts.push({ ok: false, provider: "zen", model, error: e?.message || String(e) });
+    }
+  }
+  throw new Error(`Zen failed: ${JSON.stringify(attempts.slice(-1))}`);
+}
+
 // ---- Claude via FCC Proxy (Free Claude Code) ----
 const FCC_BASE_URL = process.env.FCC_BASE_URL || "http://127.0.0.1:8082";
 const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "freecc";
@@ -1292,7 +1343,19 @@ async function callAI(messagesPayload, options = {}) {
   const systemPrompt = messagesPayload.find((message) => message.role === "system")?.content || OLLAMA_SYSTEM_PROMPT;
   const attempts = [];
 
-  // 1) Claude FCC primeiro
+  // 0) OpenCode Zen primeiro (gratuito)
+  try {
+    const zenResult = await callZen(messagesPayload, options);
+    if (zenResult.ok) {
+      zenResult.attempts?.forEach((a) => attempts.push(a));
+      return zenResult;
+    }
+  } catch (e) {
+    attempts.push({ ok: false, provider: "zen", error: e?.message || String(e) });
+    recordAutoReply({ step: "ai_provider_fail", provider: "zen", error: e?.message || String(e) });
+  }
+
+  // 1) Claude FCC segundo
   if (FCC_ENABLED) {
     try {
       const reply = await callClaudeFCC(messagesPayload, systemPrompt);
