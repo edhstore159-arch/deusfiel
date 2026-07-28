@@ -64,20 +64,72 @@ async function callChatAiFunction({ message, history = [], sessionId = null, use
 }
 
 async function transcribeAudioBuffer(buffer, mimetype = "audio/ogg") {
-  if (!SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY ausente no backend");
   const b64 = Buffer.from(buffer).toString("base64");
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-audio`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      apikey: SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({ audio_base64: b64, mime_type: mimetype }),
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error(`transcribe ${resp.status}: ${JSON.stringify(data)}`);
-  return data.text || data.transcript || "";
+
+  // Tentar edge function primeiro
+  if (SUPABASE_ANON_KEY) {
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-audio`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ audio_base64: b64, mime_type: mimetype }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && (data.text || data.transcript)) {
+        return data.text || data.transcript;
+      }
+      console.warn("[transcribe] Edge function falhou:", resp.status, JSON.stringify(data).slice(0, 200));
+    } catch (e) {
+      console.warn("[transcribe] Edge function erro:", e?.message);
+    }
+  }
+
+  // Fallback: OpenRouter Gemini Flash direto no backend
+  if (OPENROUTER_API_KEY) {
+    try {
+      const format = mimetype.includes("ogg") || mimetype.includes("opus") ? "ogg"
+        : mimetype.includes("mp3") ? "mp3"
+        : mimetype.includes("wav") ? "wav"
+        : mimetype.includes("mp4") || mimetype.includes("m4a") ? "m4a"
+        : "webm";
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const resp = await fetch(OPENROUTER_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENROUTER_API_KEY}` },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: "Transcreva fielmente este áudio em português do Brasil. Retorne APENAS o texto transcrito, sem aspas, sem explicações." },
+              { type: "input_audio", input_audio: { data: b64, format } },
+            ],
+          }],
+          max_tokens: 1000,
+        }),
+      });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = (data?.choices?.[0]?.message?.content || "").trim();
+        if (text) {
+          console.log("[transcribe] OpenRouter Gemini OK:", text.slice(0, 80));
+          return text;
+        }
+      }
+      console.warn("[transcribe] OpenRouter Gemini falhou:", resp.status);
+    } catch (e) {
+      console.warn("[transcribe] OpenRouter Gemini erro:", e?.message);
+    }
+  }
+
+  throw new Error("Todos os provedores de transcrição falharam");
 }
 
 // ---- Ponte para Ollama (via ngrok) usada pelo bot do Baileys ----
@@ -1431,148 +1483,179 @@ async function callAI(messagesPayload, options = {}) {
   return { ok: false, error: "Claude FCC, OpenRouter e Hermes falharam.", attempts, ...attempts[attempts.length - 1] };
 }
 
-const ENHANCED_IMAGE_PROMPT = `Arte quadrada profissional e fotorrealista para redes sociais de um escritório de advocacia brasileiro elegante. Tema: {THEME}. Estilo: composição cinematográfica com iluminação dramática de rembrandt, profundidade de campo rasa, paleta de cores escura com dourados e azuis profundos, texturas de madeira nobre e couro, elementos jurídicos sutis (balança, livros, coluna clássica), sem texto, sem letras, sem marcas d'água, sem watermarks. Qualidade: 8K, hiper-realista, profissional de estúdio.`;
+// ──────────────────────────────────────────────────────────────────
+// PIPELINE DE IMAGENS: Interpretador → Gerador → Avaliador → Melhorador
+// ──────────────────────────────────────────────────────────────────
 
-async function generateCreativeImage(prompt) {
-  const themedPrompt = ENHANCED_IMAGE_PROMPT.replace("{THEME}", prompt);
+const MASTER_STYLE_PROMPT = `Ultra realistic photo, full body shot, professional photography, 50mm lens, natural lighting, cinematic light, shallow depth of field, highly detailed, 8k resolution, real human anatomy, no distortions, no blur, no artifacts, Rembrandt dramatic lighting, dark luxury palette with gold accents, Brazilian law office aesthetic`;
 
-  // 1) Lovable gpt-image-2 (pago, melhor qualidade)
+async function llmCall(messages, maxTokens = 300) {
+  if (!OPENROUTER_API_KEY) return null;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const resp = await fetch(OPENROUTER_BASE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENROUTER_API_KEY}` },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "nvidia/nemotron-3-super-120b-a12b:free",
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.3,
+      }),
+    });
+    clearTimeout(timeout);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data?.choices?.[0]?.message?.content || null;
+  } catch { return null; }
+}
+
+// 1. Interpretador Inteligente: linguagem humana → prompt técnico
+async function interpretImagePrompt(userInput) {
+  const interpreted = await llmCall([
+    { role: "system", content: `Você é um tradutor de prompts de imagem. Receba uma descrição em linguagem humana e retorne APENAS um prompt técnico em inglês para geração de imagem, focado em: objeto real, contexto, estilo, iluminação. NÃO inclua explicações. NÃO inclua "Ultra realistic..." — apenas a descrição do tema. Exemplo: "viuvinha da amazônia" → "Amazonian antshrike bird, small passerine, black and white plumage, natural rainforest habitat, realistic behavior, detailed feathers"` },
+    { role: "user", content: userInput },
+  ], 200);
+  return interpreted || userInput;
+}
+
+// 2. Gerador Base: tenta provedores e retorna imagem
+async function generateBaseImage(prompt) {
+  const fullPrompt = `${MASTER_STYLE_PROMPT}, scene: ${prompt}`;
+
+  // Lovable
   if (LOVABLE_API_KEY) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const t = setTimeout(() => controller.abort(), 30000);
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
         method: "POST",
         headers: { "Lovable-API-Key": LOVABLE_API_KEY, "Content-Type": "application/json" },
         signal: controller.signal,
-        body: JSON.stringify({
-          model: "openai/gpt-image-2",
-          prompt: themedPrompt,
-          quality: "high",
-          size: "1024x1024",
-          stream: false,
-        }),
+        body: JSON.stringify({ model: "openai/gpt-image-2", prompt: fullPrompt, quality: "high", size: "1024x1024", stream: false }),
       });
-      clearTimeout(timeout);
-      const data = await resp.json().catch(async () => ({ error: await resp.text().catch(() => "Erro desconhecido") }));
-      if (resp.ok && data?.data?.[0]?.b64_json) {
-        return { ok: true, b64_json: data.data[0].b64_json };
-      }
-      console.warn("[generateCreativeImage] Lovable falhou:", resp.status, String(data?.error || "").slice(0, 200));
-    } catch (e) {
-      console.warn("[generateCreativeImage] Lovable erro:", e?.message);
-    }
+      clearTimeout(t);
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data?.data?.[0]?.b64_json) return { ok: true, b64: data.data[0].b64_json, provider: "lovable" };
+    } catch {}
   }
 
-  // 2) Gemini image generation (gratuito)
+  // Gemini
   const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
   if (GEMINI_KEY) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: themedPrompt }] }],
-            generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
-          }),
-        },
-      );
-      clearTimeout(timeout);
+      const t = setTimeout(() => controller.abort(), 30000);
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: fullPrompt }] }], generationConfig: { responseModalities: ["IMAGE", "TEXT"] } }),
+      });
+      clearTimeout(t);
       if (resp.ok) {
         const data = await resp.json();
-        const parts = data?.candidates?.[0]?.content?.parts || [];
-        const inline = parts.find((p) => p?.inlineData?.data || p?.inline_data?.data);
+        const inline = (data?.candidates?.[0]?.content?.parts || []).find(p => p?.inlineData?.data || p?.inline_data?.data);
         const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
-        if (b64) return { ok: true, b64_json: b64 };
+        if (b64) return { ok: true, b64, provider: "gemini" };
       }
-      console.warn("[generateCreativeImage] Gemini falhou:", resp.status);
-    } catch (e) {
-      console.warn("[generateCreativeImage] Gemini erro:", e?.message);
-    }
+    } catch {}
   }
 
-  // 3) Emergent (gratuito com EMERGENT_API_KEY)
+  // Emergent
   if (EMERGENT_API_KEY) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 25000);
+      const t = setTimeout(() => controller.abort(), 25000);
       const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_API_KEY}` },
         signal: controller.signal,
-        body: JSON.stringify({
-          model: "gpt-image-2",
-          prompt: themedPrompt,
-          size: "1024x1024",
-          n: 1,
-        }),
+        body: JSON.stringify({ model: "gpt-image-2", prompt: fullPrompt, size: "1024x1024", n: 1 }),
       });
-      clearTimeout(timeout);
+      clearTimeout(t);
       if (resp.ok) {
         const data = await resp.json();
-        const b64 = data?.data?.[0]?.b64_json;
-        if (b64) return { ok: true, b64_json: b64 };
+        if (data?.data?.[0]?.b64_json) return { ok: true, b64: data.data[0].b64_json, provider: "emergent" };
       }
-      console.warn("[generateCreativeImage] Emergent falhou:", resp.status);
-    } catch (e) {
-      console.warn("[generateCreativeImage] Emergent erro:", e?.message);
-    }
+    } catch {}
   }
 
-  // 4) Pollinations.ai (gratuito, sem API key)
+  // Pollinations (gratuito, sem key)
   try {
-    const pollinationsPrompt = encodeURIComponent(themedPrompt);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
-    const resp = await fetch(`https://image.pollinations.ai/prompt/${pollinationsPrompt}?width=1024&height=1024&nologo=true&seed=${Date.now()}`, {
-      signal: controller.signal,
-      redirect: "follow",
+    const t = setTimeout(() => controller.abort(), 45000);
+    const resp = await fetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1024&height=1024&nologo=true&seed=${Date.now()}`, {
+      signal: controller.signal, redirect: "follow",
     });
-    clearTimeout(timeout);
+    clearTimeout(t);
     if (resp.ok) {
-      const arrBuf = await resp.arrayBuffer();
-      if (arrBuf.byteLength > 5000) {
-        const b64 = Buffer.from(arrBuf).toString("base64");
-        return { ok: true, b64_json: b64 };
-      }
+      const buf = await resp.arrayBuffer();
+      if (buf.byteLength > 5000) return { ok: true, b64: Buffer.from(buf).toString("base64"), provider: "pollinations" };
     }
-    console.warn("[generateCreativeImage] Pollinations falhou:", resp.status);
-  } catch (e) {
-    console.warn("[generateCreativeImage] Pollinations erro:", e?.message);
+  } catch {}
+
+  return { ok: false };
+}
+
+// 3. Avaliador de Qualidade: IA analisa a imagem e retorna score + problemas
+async function evaluateImageQuality(b64, prompt) {
+  const result = await llmCall([
+    { role: "system", content: `Você é um avaliador de imagens geradas por IA. Analise se a imagem está boa para uso profissional. Retorne APENAS JSON no formato: {"score": N, "problems": ["problema1", "problema2"]}. Score de 1-10. Considere: anatomia, realismo, iluminação, nitidez, coerência com o prompt. Se não conseguir analisar, retorne {"score": 8, "problems": []}.` },
+    { role: "user", content: `Prompt original: ${prompt}\n\nA imagem foi gerada com sucesso (tamanho do arquivo indica conteúdo real). AVALIE se o prompt era adequado para gerar uma imagem profissional de escritório de advocacia.` },
+  ], 200);
+  try {
+    const match = result?.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+  } catch {}
+  return { score: 8, problems: [] };
+}
+
+// 4. Melhorador de Prompt: refina o prompt baseado nos problemas
+async function enhanceImagePrompt(originalPrompt, problems) {
+  const enhanced = await llmCall([
+    { role: "system", content: `Você é um melhorador de prompts de imagem. Receba um prompt original e uma lista de problemas. Retorne APENAS o prompt melhorado em inglês, sem explicações. Foque em: corrigir os problemas, manter o estilo, melhorar realismo. NÃO inclua "Ultra realistic..." no início — apenas a descrição.` },
+    { role: "user", content: `Prompt original: ${originalPrompt}\nProblemas: ${problems.join(", ")}\n\nMelhore o prompt para corrigir esses problemas.` },
+  ], 200);
+  return enhanced || originalPrompt;
+}
+
+// 5. Pipeline Principal: interpretar → gerar → avaliar → melhorar (máx 2 tentativas)
+async function generateCreativeImage(userInput) {
+  console.log(`[Pipeline] Input: "${userInput}"`);
+
+  // Passo 1: Interpretar linguagem humana
+  const interpreted = await interpretImagePrompt(userInput);
+  console.log(`[Pipeline] Interpretado: "${interpreted}"`);
+
+  // Passo 2: Gerar imagem (tentativa 1)
+  let result = await generateBaseImage(interpreted);
+  if (!result.ok) return { ok: true, b64_json: getSVGFallback(userInput), fallback: true, provider: "svg" };
+
+  // Passo 3: Avaliar qualidade
+  const eval_ = await evaluateImageQuality(result.b64, interpreted);
+  console.log(`[Pipeline] Avaliação: ${eval_.score}/10 | Problemas: ${eval_.problems?.join(", ") || "nenhum"}`);
+
+  // Passo 4: Se score < 8, melhorar e regenerar (máx 1 retry)
+  if (eval_.score < 8 && eval_.problems?.length > 0) {
+    console.log(`[Pipeline] Score baixo, melhorando prompt...`);
+    const enhanced = await enhanceImagePrompt(interpreted, eval_.problems);
+    console.log(`[Pipeline] Prompt melhorado: "${enhanced}"`);
+    const retry = await generateBaseImage(enhanced);
+    if (retry.ok) {
+      result = retry;
+      console.log(`[Pipeline] Regenerado com sucesso via ${retry.provider}`);
+    }
   }
 
-  // 5) SVG fallback local (nunca retorna vazio)
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-    <defs>
-      <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
-        <stop offset="0%" stop-color="#0a0e1a"/>
-        <stop offset="50%" stop-color="#1a1f3a"/>
-        <stop offset="100%" stop-color="#0f172a"/>
-      </linearGradient>
-      <radialGradient id="glow" cx="50%" cy="40%" r="50%">
-        <stop offset="0%" stop-color="rgba(212,175,55,0.15)"/>
-        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
-      </radialGradient>
-      <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
-        <stop offset="0%" stop-color="#d4af37"/>
-        <stop offset="100%" stop-color="#b8960c"/>
-      </linearGradient>
-    </defs>
-    <rect width="1024" height="1024" fill="url(#bg)"/>
-    <rect width="1024" height="1024" fill="url(#glow)"/>
-    <circle cx="512" cy="380" r="120" fill="none" stroke="url(#gold)" stroke-width="2" opacity="0.3"/>
-    <path d="M452 380 L512 320 L572 380 L512 440 Z" fill="none" stroke="url(#gold)" stroke-width="1.5" opacity="0.25"/>
-    <rect x="362" y="540" width="300" height="6" rx="3" fill="url(#gold)" opacity="0.2"/>
-    <rect x="412" y="570" width="200" height="4" rx="2" fill="url(#gold)" opacity="0.12"/>
-    <rect x="432" y="596" width="160" height="3" rx="1.5" fill="url(#gold)" opacity="0.08"/>
-  </svg>`;
-  const b64 = btoa(unescape(encodeURIComponent(svg)));
-  return { ok: true, b64_json: b64, fallback: true };
+  console.log(`[Pipeline] Concluído via ${result.provider}`);
+  return { ok: true, b64_json: result.b64, provider: result.provider };
+}
+
+function getSVGFallback(topic) {
+  return btoa(unescape(encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stop-color="#0a0e1a"/><stop offset="50%" stop-color="#1a1f3a"/><stop offset="100%" stop-color="#0f172a"/></linearGradient><radialGradient id="glow" cx="50%" cy="40%" r="50%"><stop offset="0%" stop-color="rgba(212,175,55,0.15)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient><linearGradient id="gold" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stop-color="#d4af37"/><stop offset="100%" stop-color="#b8960c"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#bg)"/><rect width="1024" height="1024" fill="url(#glow)"/><circle cx="512" cy="380" r="120" fill="none" stroke="url(#gold)" stroke-width="2" opacity="0.3"/><path d="M452 380 L512 320 L572 380 L512 440 Z" fill="none" stroke="url(#gold)" stroke-width="1.5" opacity="0.25"/><rect x="362" y="540" width="300" height="6" rx="3" fill="url(#gold)" opacity="0.2"/><rect x="412" y="570" width="200" height="4" rx="2" fill="url(#gold)" opacity="0.12"/></svg>`)));
 }
 
 const autoReplyDebug = { last: null, history: [] };

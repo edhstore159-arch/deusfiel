@@ -2,6 +2,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -43,13 +44,11 @@ async function transcribeWithElevenLabs(bytes: Uint8Array, mime: string): Promis
 
   if (!resp.ok) {
     const detail = await resp.text();
-    console.error("❌ ElevenLabs STT error", { status: resp.status, detail: detail.slice(0, 300) });
     throw new Error(`ElevenLabs STT ${resp.status}: ${detail.slice(0, 200)}`);
   }
 
   const data = await resp.json();
-  const text: string = (data?.text || "").trim();
-  return text;
+  return (data?.text || "").trim();
 }
 
 async function transcribeWithLovableAI(audio_base64: string, mime: string): Promise<string> {
@@ -67,7 +66,7 @@ async function transcribeWithLovableAI(audio_base64: string, mime: string): Prom
         {
           role: "user",
           content: [
-            { type: "text", text: "Transcreva fielmente o áudio em português do Brasil. Retorne APENAS o texto transcrito." },
+            { type: "text", text: "Transcreva fielmente o áudio em português do Brasil. Retorne APENAS o texto transcrito, sem aspas, sem explicações." },
             { type: "input_audio", input_audio: { data: audio_base64, format } },
           ],
         },
@@ -79,6 +78,37 @@ async function transcribeWithLovableAI(audio_base64: string, mime: string): Prom
     throw new Error(`Lovable AI ${aiResp.status}: ${detail.slice(0, 200)}`);
   }
   const data = await aiResp.json();
+  return (data?.choices?.[0]?.message?.content || "").trim();
+}
+
+async function transcribeWithOpenRouterGemini(audio_base64: string, mime: string): Promise<string> {
+  if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY ausente");
+  const format = pickExtension(mime);
+  const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Transcreva fielmente este áudio em português do Brasil. Retorne APENAS o texto transcrito, sem aspas, sem explicações, sem formatação extra." },
+            { type: "input_audio", input_audio: { data: audio_base64, format } },
+          ],
+        },
+      ],
+      max_tokens: 1000,
+    }),
+  });
+  if (!resp.ok) {
+    const detail = await resp.text();
+    throw new Error(`OpenRouter Gemini ${resp.status}: ${detail.slice(0, 200)}`);
+  }
+  const data = await resp.json();
   return (data?.choices?.[0]?.message?.content || "").trim();
 }
 
@@ -95,6 +125,7 @@ Deno.serve(async (req) => {
       mime_type: mt,
       hasElevenLabs: !!ELEVENLABS_API_KEY,
       hasLovableAI: !!LOVABLE_API_KEY,
+      hasOpenRouter: !!OPENROUTER_API_KEY,
     });
 
     if (!audio_base64) {
@@ -108,7 +139,7 @@ Deno.serve(async (req) => {
     let provider = "";
     let lastError: string | null = null;
 
-    // Primary: ElevenLabs Scribe (reliable for short audio in PT-BR)
+    // Primary: ElevenLabs Scribe
     if (ELEVENLABS_API_KEY) {
       try {
         const bytes = base64ToBytes(audio_base64);
@@ -116,18 +147,29 @@ Deno.serve(async (req) => {
         provider = "elevenlabs";
       } catch (err) {
         lastError = String((err as Error)?.message || err);
-        console.warn("⚠️ ElevenLabs falhou, tentando fallback:", lastError);
+        console.warn("⚠️ ElevenLabs falhou:", lastError);
       }
     }
 
-    // Fallback: Lovable AI Gateway
+    // Fallback 1: Lovable AI Gateway
     if (!text && LOVABLE_API_KEY) {
       try {
         text = await transcribeWithLovableAI(audio_base64, mt);
         provider = "lovable-ai";
       } catch (err) {
         lastError = String((err as Error)?.message || err);
-        console.error("❌ Lovable AI também falhou:", lastError);
+        console.warn("⚠️ Lovable AI falhou:", lastError);
+      }
+    }
+
+    // Fallback 2: OpenRouter Gemini Flash (gratuito)
+    if (!text && OPENROUTER_API_KEY) {
+      try {
+        text = await transcribeWithOpenRouterGemini(audio_base64, mt);
+        provider = "openrouter-gemini";
+      } catch (err) {
+        lastError = String((err as Error)?.message || err);
+        console.warn("⚠️ OpenRouter Gemini falhou:", lastError);
       }
     }
 
