@@ -11,6 +11,7 @@ import Landing from "@/kenia/pages/Landing";
 import Login from "@/kenia/pages/Login";
 import AppLayout from "@/kenia/components/AppLayout";
 import ScrollToTop from "@/kenia/components/ScrollToTop";
+import AdminGuard from "@/kenia/components/AdminGuard";
 
 // Lazy: tudo o resto carrega sob demanda
 // Wrapper que recarrega a página quando o chunk hash ficou obsoleto (deploy novo)
@@ -108,8 +109,8 @@ function App() {
                 <Route path="/app" element={<Dashboard />} />
                 <Route path="/app/chat-ia" element={<ChatIA />} />
                 <Route path="/app/chat-multi-modelo" element={<ChatMultiModelo />} />
-                <Route path="/app/admin" element={<AdminCases />} />
-                <Route path="/app/admin/secretaria" element={<AdminSecretaria />} />
+                <Route path="/app/admin" element={<AdminGuard><AdminCases /></AdminGuard>} />
+                <Route path="/app/admin/secretaria" element={<AdminGuard><AdminSecretaria /></AdminGuard>} />
                 <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
                 <Route path="/app/juiz-virtual" element={<JuizVirtual />} />
                 <Route path="/app/agents" element={<Agents />} />
@@ -133,8 +134,8 @@ function App() {
                 <Route path="/app/whatsapp" element={<WhatsAppSettings />} />
                 <Route path="/app/whatsapp-logs" element={<WhatsAppLogs />} />
                 <Route path="/app/whatsapp-media" element={<WhatsAppMedia />} />
-                <Route path="/app/settings" element={<Settings />} />
-                <Route path="/app/debug" element={<DebugTool />} />
+                <Route path="/app/settings" element={<AdminGuard><Settings /></AdminGuard>} />
+                <Route path="/app/debug" element={<AdminGuard><DebugTool /></AdminGuard>} />
                 <Route path="/app/emergent-login" element={<EmergentLogin />} />
               </Route>
             </Routes>

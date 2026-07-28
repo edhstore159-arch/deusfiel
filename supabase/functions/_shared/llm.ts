@@ -228,7 +228,7 @@ export async function chatOpenRouter(opts: ChatOptions) {
     }
   }
   
-  const requested = opts.maxTokens || 700;
+  const requested = opts.maxTokens || 2000;
   // Hermes primeiro (barato, bom em PT-BR) → free models → paid backup
   const hermesModels = ["nousresearch/hermes-4-70b"];
   const freeModels = ["nvidia/nemotron-3-super-120b-a12b:free"];
@@ -505,7 +505,7 @@ async function imageLovable(opts: ImageOptions) {
       body: JSON.stringify({
         model: "openai/gpt-image-2",
         prompt: opts.prompt,
-        quality: opts.quality || "low",
+        quality: opts.quality || "high",
         size: opts.size || "1024x1024",
         stream: false,
       }),
@@ -552,7 +552,7 @@ async function imageEmergent(opts: ImageOptions) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        model: "gpt-image-2",
         prompt: opts.prompt,
         size: opts.size || "1024x1024",
         n: 1,

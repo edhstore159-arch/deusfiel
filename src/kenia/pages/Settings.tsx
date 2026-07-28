@@ -12,7 +12,6 @@ import {
   Zap, CreditCard,
 } from "lucide-react";
 import { loadKeniaPrompt, saveKeniaPrompt, DEFAULT_KENIA_PROMPT } from "@/kenia/lib/keniaPrompt";
-import SystemReportCard from "@/kenia/components/SystemReportCard";
 
 const PROVIDER_STORAGE_KEY = "kenia:ai-provider";
 
@@ -158,9 +157,6 @@ export default function Settings() {
             </div>
           </div>
         </Card>
-
-        {/* Relatório completo do sistema (restrito) */}
-        <SystemReportCard />
 
         {/* Toggle Free vs Paid */}
         <Card className="border-nude-200 p-5">
@@ -410,7 +406,7 @@ function SecretsDebugCard({ secrets, loadingStatus, totalWorking }: { secrets: S
 
   const tryUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pwd === "DeuseFiel,08") {
+    if (pwd === "DeusFiel") {
       sessionStorage.setItem("secrets_debug_unlocked", "1");
       setUnlocked(true);
       setErr("");

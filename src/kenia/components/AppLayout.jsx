@@ -18,6 +18,8 @@ import { api } from "@/kenia/lib/api";
 
 const LOGO_IMG = "https://customer-assets.emergentagent.com/job_nude-gold-dashboard/artifacts/ckw9kwam_IMG-20241228-WA0003.jpg";
 
+const ADMIN_ROUTES = ["/app/admin", "/app/admin/secretaria", "/app/settings", "/app/debug"];
+
 const NAV = [
   { to: "/app", label: "Atendimento", icon: LayoutDashboard, end: true, testid: "nav-dashboard" },
   { to: "/app/chat-ia", label: "Chat IA · Análise", icon: Bot, testid: "nav-chat-ia" },
@@ -92,6 +94,20 @@ export default function AppLayout() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [deadlineCount, setDeadlineCount] = useState(0);
+  const [adminUnlocked, setAdminUnlocked] = useState(() => {
+    try { return sessionStorage.getItem("kenia_admin_unlocked") === "1"; } catch { return false; }
+  });
+
+  useEffect(() => {
+    const check = () => {
+      try { setAdminUnlocked(sessionStorage.getItem("kenia_admin_unlocked") === "1"); } catch {}
+    };
+    window.addEventListener("storage", check);
+    const t = setInterval(check, 2000);
+    return () => { window.removeEventListener("storage", check); clearInterval(t); };
+  }, []);
+
+  const visibleNav = adminUnlocked ? NAV : NAV.filter((item) => !ADMIN_ROUTES.includes(item.to));
 
   // Fecha o menu ao trocar de rota (mobile)
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
@@ -165,7 +181,7 @@ export default function AppLayout() {
         </div>
 
         <nav className="shrink-0 px-3 py-5 space-y-0.5 overflow-visible lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
-          {NAV.map((item) => (
+          {visibleNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

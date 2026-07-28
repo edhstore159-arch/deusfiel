@@ -8,12 +8,12 @@ import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/kenia/components/ui/avatar";
 import { Separator } from "@/kenia/components/ui/separator";
-import { Progress } from "@/kenia/components/ui/progress";
-import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Flame, Tag, Calendar, AlertTriangle, ArrowLeft, GraduationCap } from "lucide-react";
+
+import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Calendar, AlertTriangle, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/kenia/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import SystemReportCard from "@/kenia/components/SystemReportCard";
+
 
 
 const URG_COLORS = {
@@ -664,33 +664,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <SystemReportCard />
-
-      {/* Training Stats Widget */}
-      {trainingStats && (trainingStats.lawyer?.total > 0 || trainingStats.judge?.total > 0) && (
-        <div className="px-8 py-3 bg-card border-b border-nude-200 flex items-center gap-6 shrink-0">
-          <div className="flex items-center gap-2">
-            <GraduationCap className="w-4 h-4 text-gold-600" />
-            <span className="text-xs font-semibold text-nude-800">Treinamento Jurídico</span>
-          </div>
-          {trainingStats.lawyer?.total > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground">Advogados:</span>
-              <Badge variant="secondary" className="text-[10px]">{Math.round((trainingStats.lawyer.passed / trainingStats.lawyer.total) * 100)}% acerto</Badge>
-              <span className="text-[10px] text-muted-foreground">({trainingStats.lawyer.total} casos)</span>
-            </div>
-          )}
-          {trainingStats.judge?.total > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground">Juízes:</span>
-              <Badge variant="secondary" className="text-[10px]">{Math.round((trainingStats.judge.passed / trainingStats.judge.total) * 100)}% acerto</Badge>
-              <span className="text-[10px] text-muted-foreground">({trainingStats.judge.total} casos)</span>
-            </div>
-          )}
-          <a href="/app/legal-training" className="text-[10px] text-gold-600 hover:text-gold-800 ml-auto">Abrir Treinamento →</a>
-        </div>
-      )}
-
 
       {/* 3-column layout */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4 p-4 overflow-hidden">
@@ -1049,83 +1022,6 @@ export default function Dashboard() {
                 <Separator />
 
                 <div className="space-y-3">
-                  {caseAnalysisForContact && (
-                    <div className="rounded-xl border border-gold-200 bg-gold-50/60 p-3 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs tracking-widest uppercase font-semibold text-gold-800 flex items-center gap-1.5">
-                          <Sparkles className="w-3 h-3" /> Análise em tempo real
-                        </div>
-                        <Badge className="bg-white text-gold-800 border border-gold-200 hover:bg-white">
-                          {caseAnalysisForContact.qualificacao === "qualificado" ? "Qualificado" : caseAnalysisForContact.qualificacao === "nao_qualificado" ? "Não qualificado" : "Precisa de info"}
-                        </Badge>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-xs text-nude-700 mb-1">
-                          <span>Acertividade do caso</span>
-                          <span className="font-semibold">{Math.round(Number(caseAnalysisForContact.acertividade) || 0)}%</span>
-                        </div>
-                        <Progress value={Math.round(Number(caseAnalysisForContact.acertividade) || 0)} className="h-2" />
-                      </div>
-                      <Field label="Área analisada" value={caseAnalysisForContact.area || "Em análise"} />
-                      {caseAnalysisForContact.resumo && (
-                        <div>
-                          <div className="text-xs text-nude-500 mb-1">Resumo da análise</div>
-                          <div className="text-xs text-nude-700 bg-white/80 border border-gold-100 rounded-md p-2">
-                            {caseAnalysisForContact.resumo}
-                          </div>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div className="bg-white/80 border border-gold-100 rounded-md p-1.5">
-                          <div className="text-nude-500">Probabilidade</div>
-                          <div className="font-semibold text-nude-800">{caseAnalysisForContact.probabilidade_exito || "—"}</div>
-                        </div>
-                        <div className="bg-white/80 border border-gold-100 rounded-md p-1.5">
-                          <div className="text-nude-500">Complexidade</div>
-                          <div className="font-semibold text-nude-800">{caseAnalysisForContact.complexidade || "—"}</div>
-                        </div>
-                        <div className="bg-white/80 border border-gold-100 rounded-md p-1.5">
-                          <div className="text-nude-500">Potencial financeiro</div>
-                          <div className="font-semibold text-nude-800">{caseAnalysisForContact.potencial_financeiro || "—"}</div>
-                        </div>
-                        <div className="bg-white/80 border border-gold-100 rounded-md p-1.5">
-                          <div className="text-nude-500">Score viabilidade</div>
-                          <div className="font-semibold text-nude-800">{Math.round(Number(caseAnalysisForContact.score_viabilidade) || 0)}/100</div>
-                        </div>
-                      </div>
-                      {caseAnalysisForContact.provas && (
-                        <div className="text-[11px] text-nude-700 bg-white/80 border border-gold-100 rounded-md p-2">
-                          <span className="font-semibold">Provas:</span>{" "}
-                          {["documentos","testemunhas","mensagens","suficientes"].map((k) => (
-                            <span key={k} className="mr-2">{k}: {caseAnalysisForContact.provas[k] ? "✓" : "—"}</span>
-                          ))}
-                        </div>
-                      )}
-                      {caseAnalysisForContact.risco_prazo && (
-                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Risco de prazo:</span> {caseAnalysisForContact.risco_prazo}</div>
-                      )}
-                      {Array.isArray(caseAnalysisForContact.pontos_favoraveis) && caseAnalysisForContact.pontos_favoraveis.length > 0 && (
-                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Pontos favoráveis:</span> {caseAnalysisForContact.pontos_favoraveis.join("; ")}</div>
-                      )}
-                      {Array.isArray(caseAnalysisForContact.pontos_atencao) && caseAnalysisForContact.pontos_atencao.length > 0 && (
-                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Pontos de atenção:</span> {caseAnalysisForContact.pontos_atencao.join("; ")}</div>
-                      )}
-                      {Array.isArray(caseAnalysisForContact.documentos_necessarios) && caseAnalysisForContact.documentos_necessarios.length > 0 && (
-                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Documentos necessários:</span> {caseAnalysisForContact.documentos_necessarios.join("; ")}</div>
-                      )}
-                      {Array.isArray(caseAnalysisForContact.informacoes_faltantes) && caseAnalysisForContact.informacoes_faltantes.length > 0 && (
-                        <div className="text-[11px] text-nude-700"><span className="font-semibold">Informações faltantes:</span> {caseAnalysisForContact.informacoes_faltantes.join("; ")}</div>
-                      )}
-                      {caseAnalysisForContact.recomendacao && (
-                        <div className="text-[11px] text-nude-700 bg-white/80 border border-gold-100 rounded-md p-2"><span className="font-semibold">Recomendação ao advogado:</span> {caseAnalysisForContact.recomendacao}</div>
-                      )}
-                      {caseAnalysisForContact.proxima_pergunta && (
-                        <div className="text-[11px] text-nude-600">
-                          <span className="font-semibold">Próxima pergunta:</span> {caseAnalysisForContact.proxima_pergunta}
-                        </div>
-                      )}
-                    </div>
-                  )}
                   {activeContact.sinestesic_style && (
                     <div>
                       <div className="text-xs text-nude-500 mb-1">Estilo do cliente (IA)</div>
@@ -1139,44 +1035,6 @@ export default function Dashboard() {
                       {activeContact.prefers_audio && (
                         <div className="text-[10px] text-nude-500 mt-1">🎙️ Prefere comunicação por áudio</div>
                       )}
-                    </div>
-                  )}
-                  {leadForContact ? (
-                    <>
-                      <Field label="Status CRM" value={stageName(leadForContact.stage)} badge="amber" />
-                      <Field label="Área do Direito" value={leadForContact.case_type || "—"} />
-                      <div>
-                        <div className="text-xs text-nude-500 mb-1">Urgência</div>
-                        <Badge className={`${URG_COLORS[leadForContact.urgency || "media"]} hover:${URG_COLORS[leadForContact.urgency || "media"]} gap-1`}>
-                          <Flame className="w-3 h-3" /> {leadForContact.urgency || "media"}
-                        </Badge>
-                      </div>
-                      <Field label="Score IA" value={`${leadForContact.score || 50}/100`} />
-                      <Field label="Origem" value={leadForContact.source || "WhatsApp"} />
-                      {leadForContact.tags?.length > 0 && (
-                        <div>
-                          <div className="text-xs text-nude-500 mb-1.5">Tags</div>
-                          <div className="flex flex-wrap gap-1">
-                            {leadForContact.tags.map((t, i) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded inline-flex items-center gap-1">
-                                <Tag className="w-2.5 h-2.5" />{t}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {leadForContact.description && (
-                        <div>
-                          <div className="text-xs text-nude-500 mb-1">Resumo IA</div>
-                          <div className="text-xs text-nude-700 bg-nude-50 border border-nude-200 rounded-md p-2">
-                            {leadForContact.description}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="text-xs text-nude-400 text-center py-4">
-                      Contato ainda sem lead qualificado.<br/>A IA irá classificar na próxima mensagem recebida.
                     </div>
                   )}
                 </div>

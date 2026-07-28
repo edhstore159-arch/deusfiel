@@ -415,7 +415,7 @@ async function callZen(messagesPayload, options = {}) {
 const FCC_BASE_URL = process.env.FCC_BASE_URL || "http://127.0.0.1:8082";
 const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "freecc";
 const FCC_MODEL = process.env.FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
-const FCC_ENABLED = process.env.FCC_ENABLED !== "false";
+const FCC_ENABLED = process.env.FCC_ENABLED !== "false" && !FCC_BASE_URL.includes("ngrok");
 const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 // ---- OpenRouter (free models cloud fallback) ----
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
@@ -1355,6 +1355,10 @@ async function callAI(messagesPayload, options = {}) {
 
   const systemPrompt = messagesPayload.find((message) => message.role === "system")?.content || OLLAMA_SYSTEM_PROMPT;
   const attempts = [];
+  const isWhatsApp = options.whatsapp;
+
+  // WhatsApp: timeout global de 25s — se Zen falhou, vai direto pro fallback local
+  const deadline = isWhatsApp ? Date.now() + 25000 : Date.now() + 120000;
 
   // 0) OpenCode Zen primeiro (gratuito)
   try {
@@ -1366,6 +1370,16 @@ async function callAI(messagesPayload, options = {}) {
   } catch (e) {
     attempts.push({ ok: false, provider: "zen", error: e?.message || String(e) });
     recordAutoReply({ step: "ai_provider_fail", provider: "zen", error: e?.message || String(e) });
+  }
+
+  // WhatsApp: se Zen falhou, vai direto pro fallback local (sem tentar FCC/OpenRouter/Hermes)
+  if (isWhatsApp) {
+    return { ok: false, error: "Zen falhou no WhatsApp, usando fallback local.", attempts };
+  }
+
+  // Desktop/web: continuar com fallback chain
+  if (Date.now() > deadline) {
+    return { ok: false, error: "Timeout global atingido.", attempts };
   }
 
   // 1) Claude FCC segundo
@@ -1388,6 +1402,10 @@ async function callAI(messagesPayload, options = {}) {
     }
   }
 
+  if (Date.now() > deadline) {
+    return { ok: false, error: "Timeout global atingido.", attempts };
+  }
+
   // 2) OpenRouter Hermes + free models (cloud 24/7)
   try {
     const orResult = await callOpenRouter(messagesPayload, options);
@@ -1400,7 +1418,7 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "openrouter", error: e?.message || String(e) });
   }
 
-  // 3) Hermes via OpenRouter como último recurso (sem depender de PC local)
+  // 3) Hermes via OpenRouter como último recurso
   try {
     const hermesReply = await callHermesCloud(messagesPayload, systemPrompt);
     return { ok: true, provider: "hermes", endpoint: "openrouter", model: "nousresearch/hermes-4-70b", reply: sanitizeOllamaReply(hermesReply, options.userText), attempts };
@@ -1420,8 +1438,8 @@ async function generateCreativeImage(prompt) {
     headers: { "Lovable-API-Key": LOVABLE_API_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "openai/gpt-image-2",
-      prompt: `Arte quadrada profissional para redes sociais de um escritório de advocacia brasileiro. Tema: ${prompt}. Visual elegante, jurídico, humano, sem texto, sem letras, sem marcas d'água.`,
-      quality: "low",
+      prompt: `Arte quadrada profissional para redes sociais de um escritório de advocacia brasileiro. Tema: ${prompt}. Visual elegante, jurídico, humano, sem texto, sem letras, sem marcas d'água. Iluminação suave e natural, composição equilibrada, profundidade de campo.`,
+      quality: "high",
       size: "1024x1024",
       stream: false,
     }),
@@ -1580,13 +1598,60 @@ async function processAutoReplyQueue() {
   }
 }
 
+function parseAppointmentBlock(text) {
+  if (!text) return null;
+  const match = text.match(/<AGENDAMENTO>([\s\S]*?)<\/AGENDAMENTO>/i);
+  if (!match) return null;
+  try {
+    const raw = match[1].trim();
+    const obj = JSON.parse(raw);
+    const required = ["client_name", "appointment_date", "appointment_time"];
+    for (const k of required) {
+      if (!obj[k]) return null;
+    }
+    return {
+      client_name: String(obj.client_name || "").trim(),
+      phone: String(obj.phone || "").trim(),
+      email: String(obj.email || "").trim(),
+      city: String(obj.city || "").trim(),
+      legal_area: String(obj.legal_area || "").trim(),
+      case_summary: String(obj.case_summary || "").trim(),
+      appointment_date: String(obj.appointment_date || "").trim(),
+      appointment_time: String(obj.appointment_time || "").trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function autoReply(jid, userText, contactName) {
   recordAutoReply({ step: "trigger", jid, userText: String(userText || "").slice(0, 200), hasOpenAI: Boolean(OPENAI_API_KEY), hasEmergent: Boolean(EMERGENT_API_KEY), hasLovable: Boolean(LOVABLE_API_KEY), botEnabled: whatsappConfig.bot_enabled, connectionState });
   if (!sock || connectionState !== "open") {
     recordAutoReply({ step: "skip_socket", jid, connectionState });
     return;
   }
-  const history = await loadPersistedAiHistory(jid);
+  // Queries DB em paralelo para reduzir latência
+  const [history] = await Promise.all([
+    loadPersistedAiHistory(jid),
+    (async () => {
+      try {
+        if (supabaseDb) {
+          const { data: evolvedRow } = await supabaseDb
+            .from("agent_prompts")
+            .select("prompt")
+            .eq("agent_type", "secretary")
+            .eq("is_active", true)
+            .order("version", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (evolvedRow?.prompt && evolvedRow.prompt.trim().length > 100 && evolvedRow.prompt.trim().length < 3000) {
+            return evolvedRow.prompt;
+          }
+        }
+      } catch {}
+      return null;
+    })(),
+  ]);
   const phoneDigits = jidToPhone(jid);
 
   // Respostas rápidas sem IA
@@ -1613,26 +1678,13 @@ async function autoReply(jid, userText, contactName) {
     ? `\nANTI-REPETIÇÃO: Não repita respostas anteriores. Responda apenas à última mensagem.`
     : "";
   let secretaryPrompt = SECRETARY_SYSTEM_PROMPT;
-  try {
-    if (supabaseDb) {
-      const { data: evolvedRow } = await supabaseDb
-        .from("agent_prompts")
-        .select("prompt")
-        .eq("agent_type", "secretary")
-        .eq("is_active", true)
-        .order("version", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (evolvedRow?.prompt && evolvedRow.prompt.trim().length > 100 && evolvedRow.prompt.trim().length < 3000) {
-        secretaryPrompt = evolvedRow.prompt;
-      }
-    }
-  } catch {}
-  // Prompt enxuto para WhatsApp — máximo 1500 chars
-  const shortPrompt = secretaryPrompt.length > 1500 ? secretaryPrompt.slice(0, 1500) + "\n\nResponda SEMPRE em português brasileiro. Seja curta e direta." : secretaryPrompt;
+  // Prompt já carregado em paralelo acima, se disponível
+  // Se não, usar o padrão
+  // Prompt enxuto para WhatsApp — máximo 2500 chars (preserva seção AGENDAMENTOS)
+  const shortPrompt = secretaryPrompt.length > 2500 ? secretaryPrompt.slice(0, 2500) + "\n\nResponda SEMPRE em português brasileiro. Seja curta e direta." : secretaryPrompt;
   const messagesPayload = [
     { role: "system", content: `${shortPrompt}\nNome do contato: ${contactName || "Cliente"}.${antiRepetitionContext}` },
-    ...history.slice(-6),
+    ...history.slice(-10),
     { role: "user", content: userText },
   ];
   recordAutoReply({ step: "ai_request", jid, providers: ["zen"], model: "deepseek-v4-flash-free" });
@@ -1646,7 +1698,33 @@ async function autoReply(jid, userText, contactName) {
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
   // Sem retry no WhatsApp — responde direto para não atrasar
-  const reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
+  let reply = cleanRepeatedText(removeTemporalLeaks(rawReply, userText));
+  // Parse e salva agendamento se o bloco <AGENDAMENTO> estiver presente
+  try {
+    const appointment = parseAppointmentBlock(rawReply);
+    if (appointment && supabaseDb) {
+      const cleanReply = reply.replace(/<AGENDAMENTO>[\s\S]*?<\/AGENDAMENTO>/gi, "").trim();
+      if (cleanReply) reply = cleanReply;
+      await supabaseDb.from("appointments").insert({
+        session_id: `whatsapp:${jid}`,
+        client_name: appointment.client_name || contactName || "Cliente WhatsApp",
+        phone: appointment.phone || phoneDigits || "",
+        email: appointment.email || "",
+        city: appointment.city || "",
+        legal_area: appointment.legal_area || "",
+        case_summary: appointment.case_summary || userText.slice(0, 500),
+        appointment_date: appointment.appointment_date,
+        appointment_time: appointment.appointment_time,
+        source: "whatsapp",
+        status: "scheduled",
+      }).then(({ error }) => {
+        if (error) console.warn("[WhatsApp] Erro ao salvar agendamento:", error.message);
+        else console.log("[WhatsApp] Agendamento salvo:", appointment.client_name, appointment.appointment_date, appointment.appointment_time);
+      });
+    }
+  } catch (e) {
+    console.warn("[WhatsApp] Erro ao parse/salvar agendamento:", e?.message);
+  }
   if (usedFallback) recordAutoReply({ step: "ai_fail_local_fallback", jid, result, reply: reply.slice(0, 200) });
   history.push({ role: "user", content: userText });
   history.push({ role: "assistant", content: reply });
