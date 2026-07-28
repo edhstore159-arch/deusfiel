@@ -88,44 +88,47 @@ async function transcribeAudioBuffer(buffer, mimetype = "audio/ogg") {
     }
   }
 
-  // Fallback: OpenRouter Gemini Flash direto no backend
-  if (OPENROUTER_API_KEY) {
+  // Fallback: Gemini direto no backend (usa GEMINI_API_KEY)
+  const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
+  if (GEMINI_KEY) {
     try {
-      const format = mimetype.includes("ogg") || mimetype.includes("opus") ? "ogg"
-        : mimetype.includes("mp3") ? "mp3"
-        : mimetype.includes("wav") ? "wav"
-        : mimetype.includes("mp4") || mimetype.includes("m4a") ? "m4a"
-        : "webm";
+      const geminiMime = mimetype.includes("ogg") || mimetype.includes("opus") ? "audio/ogg"
+        : mimetype.includes("mp3") ? "audio/mp3"
+        : mimetype.includes("wav") ? "audio/wav"
+        : mimetype.includes("mp4") || mimetype.includes("m4a") ? "audio/mp4"
+        : "audio/webm";
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
-      const resp = await fetch(OPENROUTER_BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENROUTER_API_KEY}` },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [{
-            role: "user",
-            content: [
-              { type: "text", text: "Transcreva fielmente este áudio em português do Brasil. Retorne APENAS o texto transcrito, sem aspas, sem explicações." },
-              { type: "input_audio", input_audio: { data: b64, format } },
-            ],
-          }],
-          max_tokens: 1000,
-        }),
-      });
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [
+                { text: "Transcreva fielmente este áudio em português do Brasil. Retorne APENAS o texto transcrito, sem aspas, sem explicações." },
+                { inlineData: { mimeType: geminiMime, data: b64 } },
+              ],
+            }],
+            generationConfig: { maxOutputTokens: 1000 },
+          }),
+        },
+      );
       clearTimeout(timeout);
       if (resp.ok) {
         const data = await resp.json();
-        const text = (data?.choices?.[0]?.message?.content || "").trim();
+        const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
         if (text) {
-          console.log("[transcribe] OpenRouter Gemini OK:", text.slice(0, 80));
+          console.log("[transcribe] Gemini OK:", text.slice(0, 80));
           return text;
         }
       }
-      console.warn("[transcribe] OpenRouter Gemini falhou:", resp.status);
+      console.warn("[transcribe] Gemini falhou:", resp.status);
     } catch (e) {
-      console.warn("[transcribe] OpenRouter Gemini erro:", e?.message);
+      console.warn("[transcribe] Gemini erro:", e?.message);
     }
   }
 

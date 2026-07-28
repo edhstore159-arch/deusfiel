@@ -2,7 +2,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -22,6 +22,16 @@ function pickExtension(mime: string): string {
   if (mt.includes("ogg") || mt.includes("opus")) return "ogg";
   if (mt.includes("mp4") || mt.includes("m4a") || mt.includes("aac")) return "m4a";
   return "webm";
+}
+
+function mimeToGeminiMime(mime: string): string {
+  const mt = cleanMime(mime);
+  if (mt.includes("ogg") || mt.includes("opus")) return "audio/ogg";
+  if (mt.includes("mp3") || mt.includes("mpeg")) return "audio/mp3";
+  if (mt.includes("wav")) return "audio/wav";
+  if (mt.includes("mp4")) return "audio/mp4";
+  if (mt.includes("m4a") || mt.includes("aac")) return "audio/aac";
+  return "audio/webm";
 }
 
 async function transcribeWithElevenLabs(bytes: Uint8Array, mime: string): Promise<string> {
@@ -81,35 +91,36 @@ async function transcribeWithLovableAI(audio_base64: string, mime: string): Prom
   return (data?.choices?.[0]?.message?.content || "").trim();
 }
 
-async function transcribeWithOpenRouterGemini(audio_base64: string, mime: string): Promise<string> {
-  if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY ausente");
-  const format = pickExtension(mime);
-  const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        {
+async function transcribeWithGemini(audio_base64: string, mime: string): Promise<string> {
+  if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY ausente");
+  const geminiMime = mimeToGeminiMime(mime);
+
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
           role: "user",
-          content: [
-            { type: "text", text: "Transcreva fielmente este áudio em português do Brasil. Retorne APENAS o texto transcrito, sem aspas, sem explicações, sem formatação extra." },
-            { type: "input_audio", input_audio: { data: audio_base64, format } },
+          parts: [
+            { text: "Transcreva fielmente este áudio em português do Brasil. Retorne APENAS o texto transcrito, sem aspas, sem explicações, sem formatação extra." },
+            { inlineData: { mimeType: geminiMime, data: audio_base64 } },
           ],
-        },
-      ],
-      max_tokens: 1000,
-    }),
-  });
+        }],
+        generationConfig: { maxOutputTokens: 1000 },
+      }),
+    },
+  );
+
   if (!resp.ok) {
     const detail = await resp.text();
-    throw new Error(`OpenRouter Gemini ${resp.status}: ${detail.slice(0, 200)}`);
+    throw new Error(`Gemini STT ${resp.status}: ${detail.slice(0, 200)}`);
   }
+
   const data = await resp.json();
-  return (data?.choices?.[0]?.message?.content || "").trim();
+  const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+  return text;
 }
 
 Deno.serve(async (req) => {
@@ -125,7 +136,7 @@ Deno.serve(async (req) => {
       mime_type: mt,
       hasElevenLabs: !!ELEVENLABS_API_KEY,
       hasLovableAI: !!LOVABLE_API_KEY,
-      hasOpenRouter: !!OPENROUTER_API_KEY,
+      hasGemini: !!GEMINI_API_KEY,
     });
 
     if (!audio_base64) {
@@ -162,14 +173,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fallback 2: OpenRouter Gemini Flash (gratuito)
-    if (!text && OPENROUTER_API_KEY) {
+    // Fallback 2: Gemini direto (gratuito com GEMINI_API_KEY)
+    if (!text && GEMINI_API_KEY) {
       try {
-        text = await transcribeWithOpenRouterGemini(audio_base64, mt);
-        provider = "openrouter-gemini";
+        text = await transcribeWithGemini(audio_base64, mt);
+        provider = "gemini";
       } catch (err) {
         lastError = String((err as Error)?.message || err);
-        console.warn("⚠️ OpenRouter Gemini falhou:", lastError);
+        console.warn("⚠️ Gemini falhou:", lastError);
       }
     }
 
