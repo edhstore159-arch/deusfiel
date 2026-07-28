@@ -33,25 +33,34 @@ const supabaseDb = SUPABASE_URL && SUPABASE_DB_KEY
 
 async function callChatAiFunction({ message, history = [], sessionId = null, userId = null, wantAudio = false, returnAnalysis = false }) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error("chat-ai indisponível: credenciais do backend ausentes");
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat-ai`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      apikey: SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({
-      message,
-      history,
-      session_id: sessionId,
-      user_id: userId,
-      want_audio: wantAudio,
-      return_analysis: returnAnalysis,
-    }),
-  });
-  const data = await resp.json().catch(async () => ({ error: await resp.text().catch(() => "Erro desconhecido") }));
-  if (!resp.ok) throw new Error(`chat-ai ${resp.status}: ${data?.error || JSON.stringify(data)}`);
-  return data;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat-ai`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        message,
+        history,
+        session_id: sessionId,
+        user_id: userId,
+        want_audio: wantAudio,
+        return_analysis: returnAnalysis,
+      }),
+    });
+    clearTimeout(timeout);
+    const data = await resp.json().catch(async () => ({ error: await resp.text().catch(() => "Erro desconhecido") }));
+    if (!resp.ok) throw new Error(`chat-ai ${resp.status}: ${data?.error || JSON.stringify(data)}`);
+    return data;
+  } catch (e) {
+    clearTimeout(timeout);
+    throw e;
+  }
 }
 
 async function transcribeAudioBuffer(buffer, mimetype = "audio/ogg") {
@@ -359,18 +368,22 @@ async function callZen(messagesPayload, options = {}) {
     .filter((m) => m.role !== "system")
     .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
   const attempts = [];
-  for (const model of ZEN_MODELS) {
+  // Tenta big-pickle primeiro (rápido), depois fallback
+  const fastMode = options.whatsapp;
+  const models = fastMode ? ["big-pickle"] : ["big-pickle", "deepseek-v4-flash-free"];
+  for (const model of models) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), fastMode ? 12000 : 20000);
       const patchedSystem = systemMsg
-        ? { role: "system", content: `INSTRUÇÃO CRÍTICA: Responda APENAS com a resposta final destinada ao cliente. NÃO inclua raciocínio, análise, passos de pensamento. A resposta deve parecer uma mensagem natural de WhatsApp de uma secretária jurídica.\n\n${systemMsg.content}` }
+        ? { role: "system", content: `INSTRUÇÃO CRÍTICA: Responda APENAS com a resposta final destinada ao cliente. NÃO inclua raciocínio, análise, passos de pensamento. Resposta curta (máx 3 frases). A resposta deve parecer uma mensagem natural de WhatsApp de uma secretária jurídica.\n\n${systemMsg.content}` }
         : null;
       const body = {
         model,
         messages: patchedSystem ? [patchedSystem, ...apiMessages] : apiMessages,
         temperature: 0.7,
-        max_tokens: 700,
+        max_tokens: fastMode ? 400 : 700,
+        reasoning_effort: "low",
       };
       const resp = await fetch(ZEN_BASE_URL, {
         method: "POST",
@@ -1634,7 +1647,7 @@ async function autoReply(jid, userText, contactName) {
     ? { ok: true, provider: "handoff-rule", reply: buildHandoffReply(firstNameCt) }
     : isResumeRequest(userText)
     ? { ok: true, provider: "resume-rule", reply: buildResumeReply(history, firstNameCt) }
-    : await callAI(messagesPayload, { temperature: 0.72, userText });
+    : await callAI(messagesPayload, { temperature: 0.72, userText, whatsapp: true });
   const usedFallback = !result.ok;
   let rawReply = usedFallback ? buildLocalLegalReply(jid, userText, contactName) : result.reply;
   if (!usedFallback && (isHistoryDumpReply(rawReply) || isNearDuplicateReply(rawReply, history))) {

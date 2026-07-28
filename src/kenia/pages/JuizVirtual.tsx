@@ -63,6 +63,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 const AGENTS = [
+  { id: "big-pickle", label: "OpenCode Zen", desc: "Gratuito, sem limite, prioridade máxima", provider: "zen" },
   { id: "claude-fcc", label: "Claude FCC", desc: "Gratuito, sem Emergent, prioridade", provider: "claude-fcc" },
   { id: "openai/gpt-5.5", label: "GPT-5.5", desc: "Máximo rigor técnico", provider: "openai" },
   { id: "openai/gpt-5.4", label: "GPT-5.4", desc: "Raciocínio previdenciário avançado", provider: "openai" },

@@ -88,7 +88,7 @@ export function loadChatConfig() {
   return {
     prompt: safeGet(CHAT_KEYS.prompt) || CHAT_DEFAULT_PROMPT,
     enabled: (safeGet(CHAT_KEYS.enabled) ?? "1") === "1",
-    model: safeGet(CHAT_KEYS.model) || "google/gemini-2.5-flash",
+    model: safeGet(CHAT_KEYS.model) || "big-pickle",
     history,
   };
 }
@@ -106,6 +106,6 @@ export function saveChatConfig(cfg = {}) {
 export const CHAT_DEFAULTS = {
   prompt: CHAT_DEFAULT_PROMPT,
   enabled: true,
-  model: "google/gemini-2.5-flash",
+  model: "big-pickle",
   history: [],
 };

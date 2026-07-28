@@ -1,4 +1,4 @@
-// Shared LLM helpers with fallback chain: Nemotron (NVIDIA NIM direto) → OpenRouter (Gemini Flash) → DeepSeek (OpenRouter) → Claude FCC → Lovable → Gemini → Emergent.
+// Shared LLM helpers with fallback chain: Zen (OpenCode, gratuito) → Nemotron → OpenRouter → Claude FCC → Lovable → Gemini → Emergent.
 
 type ChatMessage = { role: string; content: any };
 
@@ -25,12 +25,48 @@ const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "";
 const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
 const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
 
+// OpenCode Zen (gratuito, principal)
+const ZEN_KEY = Deno.env.get("ZEN_API_KEY") || "";
+const ZEN_BASE = "https://opencode.ai/zen/v1/chat/completions";
+const ZEN_MODELS = ["big-pickle", "deepseek-v4-flash-free", "nemotron-3-ultra-free"];
+
 // NVIDIA NIM direto
 const NVIDIA_NIM_API_KEY = Deno.env.get("NVIDIA_NIM_API_KEY") || "";
 const NVIDIA_NIM_BASE = "https://integrate.api.nvidia.com/v1";
 const NEMOTRON_MODEL = "nvidia/nemotron-3-super-120b-a12b";
 
 // ---------- chat completions ----------
+
+async function chatZen(opts: ChatOptions) {
+  if (!ZEN_KEY) return { ok: false as const, status: 0, error: "ZEN_API_KEY ausente" };
+  for (const model of ZEN_MODELS) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const resp = await fetch(ZEN_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${ZEN_KEY}` },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages: opts.messages,
+          ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
+          max_tokens: opts.maxTokens || 4096,
+          reasoning_effort: "low",
+        }),
+      });
+      clearTimeout(timeout);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const text = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+      if (!text || text.length < 5) continue;
+      return { ok: true as const, data: { choices: [{ message: { role: "assistant", content: text } }] }, provider: `zen/${model}` };
+    } catch (e) {
+      console.warn(`Zen ${model} erro:`, (e as Error)?.message);
+    }
+  }
+  return { ok: false as const, status: 502, error: "Zen: todos os modelos falharam" };
+}
 
 async function chatLovable(opts: ChatOptions) {
   if (!LOVABLE_KEY) return { ok: false as const, status: 0, error: "LOVABLE_API_KEY ausente" };
@@ -295,13 +331,24 @@ export async function chatCompletion(opts: ChatOptions) {
     if (r.ok) return r;
     console.warn("Emergent falhou, tentando fallback completo:", r.error?.slice?.(0, 200));
   }
-  // Se pediu Claude, começa por FCC
-  if (wantsClaude && FCC_BASE_URL) {
-    const r = await chatClaudeFCC(opts);
-    if (r.ok) return r;
+  // Se pediu Claude, tenta Emergent primeiro (cloud 24/7), depois FCC
+  if (wantsClaude) {
+    if (EMERGENT_KEY) {
+      const r = await chatEmergent(opts);
+      if (r.ok) return r;
+    }
+    if (FCC_BASE_URL) {
+      const r = await chatClaudeFCC(opts);
+      if (r.ok) return r;
+    }
   }
 
-  // Fallback chain: Emergent (primario) → OpenRouter (acabou credito) → FCC → Nemotron → Lovable → Gemini
+  // Fallback chain: Zen (primario, gratuito) → Emergent → OpenRouter → FCC → Nemotron → Lovable → Gemini
+  if (ZEN_KEY) {
+    const r = await chatZen(opts);
+    if (r.ok) return r;
+    console.warn("Zen falhou, tentando Emergent:", r.error?.slice?.(0, 200));
+  }
   if (EMERGENT_KEY) {
     const r = await chatEmergent(opts);
     if (r.ok) return r;
@@ -381,9 +428,13 @@ export async function chatPipeline(opts: ChatOptions): Promise<PipelineResult> {
     return { ...fallback, reviewApplied: false };
   }
 
-  // Step 1: Nemotron (free) generates — tenta direto via NIM, senão via FCC
-  console.log("[pipeline] Step 1: Gerando com Nemotron (free)...");
-  let genResult = await chatNemotronDirect(opts);
+  // Step 1: Zen (free) generates → tenta Nemotron → FCC
+  console.log("[pipeline] Step 1: Gerando com Zen (free)...");
+  let genResult = await chatZen(opts);
+  if (!genResult.ok) {
+    console.log("[pipeline] Zen falhou, tentando Nemotron NIM...");
+    genResult = await chatNemotronDirect(opts);
+  }
   if (!genResult.ok) {
     console.log("[pipeline] Nemotron NIM direto falhou, tentando via FCC...");
     genResult = await chatClaudeFCC(opts);

@@ -179,22 +179,38 @@ Deno.serve(async (req) => {
       }];
     }
 
-    // Stream response via SSE — usa pipeline Nemotron → Claude
+    // Stream response via SSE — usa pipeline Zen → Nemotron → Claude
     const stream = new ReadableStream({
       async start(controller) {
         try {
           const systemMsg = systemPrompt;
           const userMsg = finalMessages.map((m) => m.content).join("\n\n");
 
-          const pipelineResult = await chatPipeline({
-            messages: [
-              { role: "system", content: systemMsg },
-              { role: "user", content: userMsg },
-            ],
-            model: agentConfig?.model || model,
-            temperature: 0.3,
-            maxTokens: 4000,
-          });
+          // Se pediu Zen, usa chatCompletion direto (não pipeline)
+          const isZen = model === "big-pickle" || model === "zen";
+          let pipelineResult;
+          if (isZen) {
+            const { chatCompletion } = await import("../_shared/llm.ts");
+            pipelineResult = await chatCompletion({
+              messages: [
+                { role: "system", content: systemMsg },
+                { role: "user", content: userMsg },
+              ],
+              model: "big-pickle",
+              temperature: 0.3,
+              maxTokens: 4000,
+            });
+          } else {
+            pipelineResult = await chatPipeline({
+              messages: [
+                { role: "system", content: systemMsg },
+                { role: "user", content: userMsg },
+              ],
+              model: agentConfig?.model || model,
+              temperature: 0.3,
+              maxTokens: 4000,
+            });
+          }
 
           const reply = pipelineResult.ok
             ? (pipelineResult.data?.choices?.[0]?.message?.content || "Sem resposta.")
