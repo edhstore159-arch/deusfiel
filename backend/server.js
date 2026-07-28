@@ -88,7 +88,45 @@ async function transcribeAudioBuffer(buffer, mimetype = "audio/ogg") {
     }
   }
 
-  // Fallback: Gemini direto no backend (usa GEMINI_API_KEY)
+  // Fallback 1: Groq Whisper (gratuito, rápido)
+  const GROQ_KEY = process.env.GROQ_API_KEY || "";
+  if (GROQ_KEY) {
+    try {
+      const ext = mimetype.includes("ogg") || mimetype.includes("opus") ? "ogg"
+        : mimetype.includes("mp3") ? "mp3"
+        : mimetype.includes("wav") ? "wav"
+        : mimetype.includes("mp4") || mimetype.includes("m4a") ? "m4a"
+        : "webm";
+      const blob = new Blob([buffer], { type: mimetype });
+      const form = new FormData();
+      form.append("file", blob, `audio.${ext}`);
+      form.append("model", "whisper-large-v3");
+      form.append("language", "pt");
+      form.append("response_format", "json");
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const resp = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${GROQ_KEY}` },
+        signal: controller.signal,
+        body: form,
+      });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = (data?.text || "").trim();
+        if (text) {
+          console.log("[transcribe] Groq Whisper OK:", text.slice(0, 80));
+          return text;
+        }
+      }
+      console.warn("[transcribe] Groq Whisper falhou:", resp.status);
+    } catch (e) {
+      console.warn("[transcribe] Groq Whisper erro:", e?.message);
+    }
+  }
+
+  // Fallback 2: Gemini direto no backend
   const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
   if (GEMINI_KEY) {
     try {
