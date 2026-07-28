@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const fullPrompt = `Arte quadrada profissional para redes sociais de um escritório de advocacia brasileiro. Tema: ${prompt}. Visual elegante, jurídico, humano, sem texto, sem letras, sem marcas d'água.`;
+    const fullPrompt = `Arte quadrada profissional e fotorrealista para redes sociais de um escritório de advocacia brasileiro elegante. Tema: ${prompt}. Estilo: composição cinematográfica com iluminação dramática de rembrandt, profundidade de campo rasa, paleta de cores escura com dourados e azuis profundos, texturas de madeira nobre e couro, elementos jurídicos sutis (balança, livros, coluna clássica), sem texto, sem letras, sem marcas d'água. Qualidade: 8K, hiper-realista.`;
 
     const toDataUrl = (b64: string) =>
       b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;

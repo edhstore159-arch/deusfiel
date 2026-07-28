@@ -1431,23 +1431,126 @@ async function callAI(messagesPayload, options = {}) {
   return { ok: false, error: "Claude FCC, OpenRouter e Hermes falharam.", attempts, ...attempts[attempts.length - 1] };
 }
 
+const ENHANCED_IMAGE_PROMPT = `Arte quadrada profissional e fotorrealista para redes sociais de um escritório de advocacia brasileiro elegante. Tema: {THEME}. Estilo: composição cinematográfica com iluminação dramática de rembrandt, profundidade de campo rasa, paleta de cores escura com dourados e azuis profundos, texturas de madeira nobre e couro, elementos jurídicos sutis (balança, livros, coluna clássica), sem texto, sem letras, sem marcas d'água, sem watermarks. Qualidade: 8K, hiper-realista, profissional de estúdio.`;
+
 async function generateCreativeImage(prompt) {
-  if (!LOVABLE_API_KEY) return { ok: false, error: "LOVABLE_API_KEY ausente no backend do Render." };
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
-    method: "POST",
-    headers: { "Lovable-API-Key": LOVABLE_API_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "openai/gpt-image-2",
-      prompt: `Arte quadrada profissional para redes sociais de um escritório de advocacia brasileiro. Tema: ${prompt}. Visual elegante, jurídico, humano, sem texto, sem letras, sem marcas d'água. Iluminação suave e natural, composição equilibrada, profundidade de campo.`,
-      quality: "high",
-      size: "1024x1024",
-      stream: false,
-    }),
-  });
-  const data = await resp.json().catch(async () => ({ error: await resp.text().catch(() => "Erro desconhecido") }));
-  if (!resp.ok) return { ok: false, status: resp.status, error: data?.error || JSON.stringify(data) };
-  const b64 = data?.data?.[0]?.b64_json;
-  return b64 ? { ok: true, b64_json: b64 } : { ok: false, error: "Sem imagem gerada." };
+  const themedPrompt = ENHANCED_IMAGE_PROMPT.replace("{THEME}", prompt);
+
+  // 1) Lovable gpt-image-2 (pago, melhor qualidade)
+  if (LOVABLE_API_KEY) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+        method: "POST",
+        headers: { "Lovable-API-Key": LOVABLE_API_KEY, "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "openai/gpt-image-2",
+          prompt: themedPrompt,
+          quality: "high",
+          size: "1024x1024",
+          stream: false,
+        }),
+      });
+      clearTimeout(timeout);
+      const data = await resp.json().catch(async () => ({ error: await resp.text().catch(() => "Erro desconhecido") }));
+      if (resp.ok && data?.data?.[0]?.b64_json) {
+        return { ok: true, b64_json: data.data[0].b64_json };
+      }
+      console.warn("[generateCreativeImage] Lovable falhou:", resp.status, String(data?.error || "").slice(0, 200));
+    } catch (e) {
+      console.warn("[generateCreativeImage] Lovable erro:", e?.message);
+    }
+  }
+
+  // 2) Gemini image generation (gratuito)
+  const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
+  if (GEMINI_KEY) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: themedPrompt }] }],
+            generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+          }),
+        },
+      );
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const data = await resp.json();
+        const parts = data?.candidates?.[0]?.content?.parts || [];
+        const inline = parts.find((p) => p?.inlineData?.data || p?.inline_data?.data);
+        const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
+        if (b64) return { ok: true, b64_json: b64 };
+      }
+      console.warn("[generateCreativeImage] Gemini falhou:", resp.status);
+    } catch (e) {
+      console.warn("[generateCreativeImage] Gemini erro:", e?.message);
+    }
+  }
+
+  // 3) Emergent (gratuito com EMERGENT_API_KEY)
+  if (EMERGENT_API_KEY) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 25000);
+      const resp = await fetch("https://integrations.emergentagent.com/llm/images/generations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_API_KEY}` },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "gpt-image-2",
+          prompt: themedPrompt,
+          size: "1024x1024",
+          n: 1,
+        }),
+      });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const data = await resp.json();
+        const b64 = data?.data?.[0]?.b64_json;
+        if (b64) return { ok: true, b64_json: b64 };
+      }
+      console.warn("[generateCreativeImage] Emergent falhou:", resp.status);
+    } catch (e) {
+      console.warn("[generateCreativeImage] Emergent erro:", e?.message);
+    }
+  }
+
+  // 4) SVG fallback local (nunca retorna vazio)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+    <defs>
+      <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+        <stop offset="0%" stop-color="#0a0e1a"/>
+        <stop offset="50%" stop-color="#1a1f3a"/>
+        <stop offset="100%" stop-color="#0f172a"/>
+      </linearGradient>
+      <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+        <stop offset="0%" stop-color="rgba(212,175,55,0.15)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+      </radialGradient>
+      <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
+        <stop offset="0%" stop-color="#d4af37"/>
+        <stop offset="100%" stop-color="#b8960c"/>
+      </linearGradient>
+    </defs>
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+    <rect width="1024" height="1024" fill="url(#glow)"/>
+    <circle cx="512" cy="380" r="120" fill="none" stroke="url(#gold)" stroke-width="2" opacity="0.3"/>
+    <path d="M452 380 L512 320 L572 380 L512 440 Z" fill="none" stroke="url(#gold)" stroke-width="1.5" opacity="0.25"/>
+    <rect x="362" y="540" width="300" height="6" rx="3" fill="url(#gold)" opacity="0.2"/>
+    <rect x="412" y="570" width="200" height="4" rx="2" fill="url(#gold)" opacity="0.12"/>
+    <rect x="432" y="596" width="160" height="3" rx="1.5" fill="url(#gold)" opacity="0.08"/>
+  </svg>`;
+  const b64 = btoa(unescape(encodeURIComponent(svg)));
+  return { ok: true, b64_json: b64, fallback: true };
 }
 
 const autoReplyDebug = { last: null, history: [] };
