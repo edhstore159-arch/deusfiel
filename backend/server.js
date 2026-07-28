@@ -2307,6 +2307,21 @@ setInterval(() => {
   processAutoReplyQueue().catch((e) => recordAutoReply({ step: "queue_process_error", error: e?.message || String(e) }));
 }, AUTO_REPLY_RETRY_EVERY_MS);
 
+// ---- Render Keep-Alive: self-ping a cada 10min para evitar spin-down no plano gratuito ----
+const RENDER_SELF_PING_MS = 10 * 60 * 1000; // 10 minutos
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || "https://deusfielbak.onrender.com";
+setInterval(() => {
+  fetch(`${RENDER_EXTERNAL_URL}/api/health`, { method: "GET", signal: AbortSignal.timeout(10000) })
+    .then((r) => console.log("[render-keepalive] Self-ping OK:", r.status))
+    .catch((e) => console.warn("[render-keepalive] Self-ping falhou:", e?.message));
+}, RENDER_SELF_PING_MS);
+// Also ping immediately on startup to ensure the service stays warm
+setTimeout(() => {
+  fetch(`${RENDER_EXTERNAL_URL}/api/health`, { method: "GET", signal: AbortSignal.timeout(10000) })
+    .then(() => console.log("[render-keepalive] Initial ping OK"))
+    .catch(() => {});
+}, 5000);
+
 // ---- Helpers ----
 const ok = (data = {}) => ({ ok: true, ...data });
 const normalizeRecipient = (value) => {
