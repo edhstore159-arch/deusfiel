@@ -600,8 +600,6 @@ Deno.serve(async (req: Request) => {
       const issuesList = Array.isArray(caseData?.key_issues) ? caseData.key_issues.join("; ") : (caseData?.key_issues || "N/A");
 
       // 1+2. Geração e avaliação em PARALELO (reduz latência pela metade)
-      const lawList = Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A");
-      const issuesList = Array.isArray(caseData?.key_issues) ? caseData.key_issues.join("; ") : (caseData?.key_issues || "N/A");
       const lawyerPrompt = mode === "lawyer" ? LAWYER_PRODUCTION_PROMPT : JUDGE_PRODUCTION_PROMPT;
       const lawyerMessages = [
         { role: "system" as const, content: `${lawyerPrompt}\n\n${STRATEGIES_CONTEXT}` },
