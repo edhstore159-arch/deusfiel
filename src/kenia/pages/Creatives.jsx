@@ -233,9 +233,8 @@ export default function Creatives() {
     try {
       const { data } = await api.get("/creatives");
       const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : Array.isArray(data?.creatives) ? data.creatives : [];
-      // Only update if we received non-empty list; otherwise keep current items to avoid wiping cache on empty responses
+      setItems(list);
       if (list.length > 0) {
-        setItems(list);
         try { localStorage.setItem("kenia.creatives.cache", JSON.stringify(list.slice(0, 24))); } catch {}
         try { localStorage.setItem("kenia.gallery.cache", JSON.stringify(list.slice(0, 100))); } catch {}
       }

@@ -416,7 +416,7 @@ const seedCreatives = [
     network: "instagram",
     format: "post",
     caption: "Você saiu da empresa e não sabe se recebeu tudo? Separe TRCT, holerites e comprovantes. A análise correta evita prejuízo.",
-    image_b64: "",
+    image_b64: "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="400" height="400" fill="#f7f0e8"/><rect x="30" y="30" width="340" height="340" rx="16" fill="rgba(255,255,255,.6)" stroke="rgba(80,55,30,.15)"/><text x="200" y="180" text-anchor="middle" font-family="Georgia, serif" font-size="22" font-weight="700" fill="#2f261f">Direitos na rescisão</text><text x="200" y="220" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#6f5a45">Conteúdo jurídico profissional</text><path d="M120 260h160" stroke="#9b7628" stroke-width="4" stroke-linecap="round"/><text x="200" y="310" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#4c3f35">Kênia Garcia Advocacia</text></svg>'))),
   },
 ];
 
@@ -857,7 +857,8 @@ const staticGet = async (url, config = {}) => {
   }
   if (path === "/creatives") {
     return (async () => {
-      const local = read("creatives", seedCreatives);
+      const raw = read("creatives", seedCreatives);
+      const local = Array.isArray(raw) && raw.length > 0 ? raw : clone(seedCreatives);
       try {
         const { data: auth } = await supabase.auth.getUser();
         const uid = auth?.user?.id;
@@ -959,7 +960,7 @@ const staticGet = async (url, config = {}) => {
         const cloudIds = new Set(cloudItems.map((c) => c.id));
         const orphan = local.filter((l) => !cloudIds.has(l.id));
         const merged = [...cloudItems, ...orphan];
-        try { write("creatives", merged.slice(0, 100)); } catch {}
+        if (merged.length > 0) { try { write("creatives", merged.slice(0, 100)); } catch {} }
         return response(merged);
       } catch {
         return response(local);
