@@ -2,7 +2,7 @@
 CRM + Chatbot IA + Voz (Whisper STT + OpenAI TTS) + WhatsApp via Baileys (QR Code) auto-hospedado.
 Inclui também Z-API / Evolution / Meta Cloud como provedores opcionais.
 """
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response, StreamingResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response, StreamingResponse, status as http_status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -52,6 +52,26 @@ log = logging.getLogger("espirito-santo")
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+_INSUFFICIENT_KEYWORDS = [
+    "insufficient", "billing", "quota", "payment required", "402",
+    "account has run out of credit", "insufficient_quota",
+    "exceeded your current quota", "no credit", "balance",
+    "card declined", "past due", "suspended", "rate limit exceeded",
+    "429 too many requests",
+]
+
+def _raise_on_insufficient_balance(e: Exception):
+    """Verifica se o erro e por saldo insuficiente e levanta HTTP 402."""
+    msg = str(e).lower()
+    for kw in _INSUFFICIENT_KEYWORDS:
+        if kw in msg:
+            log.warning(f"Insufficient balance detected: {str(e)[:200]}")
+            raise HTTPException(
+                status_code=http_status.HTTP_402_PAYMENT_REQUIRED,
+                detail={"code": "insufficient_balance", "message": "Chave Emergent sem saldo. Adicione uma nova chave nas configurações."},
+            )
+    return  # not a balance error, let caller handle
 
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
@@ -563,6 +583,8 @@ async def get_daily_legislation_brief() -> str:
         brief = await chat.send_message(UserMessage(
             text=f"Hoje e {today_key}. Gere o brief diario de legislacao para advogados."
         ))
+    except HTTPException:
+        raise
     except Exception:
         log.exception("legislation brief gen failed")
         brief = (
@@ -635,7 +657,8 @@ async def chat_message(payload: ChatMessageIn):
             system_message=system_prompt,
         ).with_model("openai", "gpt-5.2")
         response = await chat.send_message(UserMessage(text=msg))
-    except Exception:
+    except Exception as e1:
+        _raise_on_insufficient_balance(e1)
         log.exception("AI chat error (gpt-5.2) — tentando fallback gpt-4o")
         try:
             chat = LlmChat(
@@ -643,7 +666,8 @@ async def chat_message(payload: ChatMessageIn):
                 system_message=system_prompt,
             ).with_model("openai", "gpt-4o")
             response = await chat.send_message(UserMessage(text=msg))
-        except Exception:
+        except Exception as e2:
+            _raise_on_insufficient_balance(e2)
             log.exception("AI chat fallback failed")
             response = (
                 "Desculpe, estou com dificuldade tecnica nesse exato momento. "
@@ -744,6 +768,8 @@ async def _analyze_case_session(
             system_message=sys_prompt,
         ).with_model("openai", "gpt-5.2")
         raw = await chat.send_message(UserMessage(text=f"Conversa:\n{convo}\n\nGere o JSON de analise."))
+    except HTTPException:
+        raise
     except Exception:
         log.exception("analyze llm call failed")
         return None
@@ -760,12 +786,11 @@ async def _analyze_case_session(
         return None
 
     # sanitiza
-    def _i(v, lo=0, hi=100, default=50):
-        try:
-            n = int(v)
-            return max(lo, min(hi, n))
-        except Exception:
-            return default
+    except HTTPException:
+        raise
+    except Exception:
+        log.exception("classify llm call failed")
+        pass
 
     out = {
         "area": str(data.get("area") or "Outro"),
@@ -1273,7 +1298,10 @@ async def voice_command(payload: VoiceCommandRequest, current_user=Depends(get_c
         )
         out_b64 = base64.b64encode(audio_bytes).decode("ascii")
         return {"ok": True, "transcription": user_text, "reply": reply, "audio_base64": out_b64, "audio_mime": "audio/mpeg"}
+    except HTTPException:
+        raise
     except Exception as e:
+        _raise_on_insufficient_balance(e)
         log.exception("voice command failed")
         raise HTTPException(500, f"Erro no comando de voz: {str(e)[:200]}")
 
@@ -2239,7 +2267,8 @@ async def _maybe_autorespond(
             system_message=system_prompt,
         ).with_model("openai", "gpt-4o-mini")
         reply = await chat.send_message(UserMessage(text=incoming_text))
-    except Exception:
+    except Exception as e:
+        _raise_on_insufficient_balance(e)
         log.exception("bot reply failed")
         return None
     if not reply:
@@ -3163,7 +3192,8 @@ Retorne APENAS o texto da legenda."""
             raw = images[0] if isinstance(images[0], (bytes, bytearray)) else None
             if raw:
                 image_b64 = _b64.b64encode(raw).decode()
-    except Exception:
+    except Exception as e:
+        _raise_on_insufficient_balance(e)
         log.exception("Image gen failed")
 
     cid = str(uuid.uuid4())
@@ -3321,6 +3351,8 @@ async def ai_summary(payload: SummaryRequest, current_user=Depends(get_current_u
         ).with_model("openai", "gpt-4o-mini")
         summary = await chat.send_message(UserMessage(text=f"Resuma:\n{payload.text}"))
         return {"summary": summary}
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(500, "Erro ao resumir")
 
@@ -3827,6 +3859,7 @@ async def test_text_key(current_user=Depends(get_current_user)):
         r = await chat.send_message(UserMessage(text="Teste"))
         return {"ok": True, "using_custom_key": bool(s.get("llm_text_key")), "response": (r or "")[:50]}
     except Exception as e:
+        _raise_on_insufficient_balance(e)
         return {"ok": False, "error": str(e)[:200]}
 
 @api_router.post("/settings/test-image")
@@ -3843,7 +3876,10 @@ async def test_image_key(current_user=Depends(get_current_user)):
         )
         return {"ok": bool(images), "using_custom_key": bool(s.get("llm_image_key")),
                 "model": "gpt-image-1"}
+    except HTTPException:
+        raise
     except Exception as e:
+        _raise_on_insufficient_balance(e)
         return {"ok": False, "error": str(e)[:300]}
 
 # ==================== FUSAO DE IMAGENS (Gemini Nano Banana) ====================
@@ -3895,13 +3931,20 @@ async def fuse_images(payload: FuseImagesIn, current_user=Depends(get_current_us
         try:
             text_resp, images = await chat.send_message_multimodal_response(msg)
         except Exception as primary_err:
+            _raise_on_insufficient_balance(primary_err)
             log.warning(f"gemini-2.5 falhou, tentando gemini-3.1: {primary_err}")
             chat = LlmChat(
                 api_key=EMERGENT_LLM_KEY,
                 session_id=session_id + "-retry",
                 system_message="Você é um diretor de arte que combina imagens com excelência estética.",
             ).with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
-            text_resp, images = await chat.send_message_multimodal_response(msg)
+            try:
+                text_resp, images = await chat.send_message_multimodal_response(msg)
+            except Exception as fallback_err:
+                _raise_on_insufficient_balance(fallback_err)
+                raise
+    except HTTPException:
+        raise
     except Exception as e:
         log.exception("fuse-images error")
         raise HTTPException(500, f"Erro ao gerar imagem: {str(e)[:200]}")

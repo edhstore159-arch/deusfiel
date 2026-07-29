@@ -3,6 +3,8 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { KeyPromptProvider } from "@/contexts/KeyPromptContext";
+import KeyPromptModal from "@/components/KeyPromptModal";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -28,7 +30,12 @@ function Protected({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  return children;
+  return (
+    <KeyPromptProvider>
+      {children}
+      <KeyPromptModal />
+    </KeyPromptProvider>
+  );
 }
 
 function App() {
