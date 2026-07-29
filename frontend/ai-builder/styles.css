@@ -1,0 +1,16 @@
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial; margin:0; height:100vh; }
+.layout { display:flex; height:100vh; }
+.panel { padding:12px; overflow:auto; }
+.left { width:320px; border-right:1px solid #eee; background:#fafafa; }
+.center { flex:1; padding:16px; }
+.right { width:420px; border-left:1px solid #eee; background:#fff; }
+.chat-history { height:60vh; border:1px solid #ddd; padding:8px; overflow:auto; background:#fff; }
+textarea { width:100%; height:80px; margin-top:8px; }
+.controls { display:flex; gap:8px; margin-top:8px; }
+.progress { height:160px; border:1px solid #eee; padding:8px; background:#111827; color:#fff; overflow:auto; }
+.plan { white-space:pre-wrap; background:#f7f7f7; padding:8px; border:1px solid #eee; height:220px; overflow:auto; }
+.files { max-height:160px; overflow:auto; border:1px solid #eee; padding:8px; }
+.diff { background:#0b1220; color:#e6fffa; padding:8px; height:300px; overflow:auto; }
+.actions { display:flex; gap:8px; margin-top:8px; }
+button { padding:8px 10px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer; }

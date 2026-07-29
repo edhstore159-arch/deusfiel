@@ -1,0 +1,11 @@
+{
+  "id": "1781052408379-rsd3zkc",
+  "message": "Create an AI Builder dashboard section similar to Lovable with chat, plan, diffs, and approval workflow.",
+  "model": "qwen2.5-coder:7b",
+  "result": {
+    "plan": "Ollama unavailable: Ollama error 404",
+    "patches": [],
+    "changedFiles": []
+  },
+  "createdAt": 1781052408379
+}

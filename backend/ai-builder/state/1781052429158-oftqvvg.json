@@ -1,0 +1,11 @@
+{
+  "id": "1781052429158-oftqvvg",
+  "message": "Generate a detailed implementation plan for adding AI Builder dashboard section (no file changes).",
+  "model": "qwen2.5-coder:7b",
+  "result": {
+    "plan": "Ollama unavailable: Ollama error 404",
+    "patches": [],
+    "changedFiles": []
+  },
+  "createdAt": 1781052429158
+}

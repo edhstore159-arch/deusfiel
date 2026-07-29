@@ -1,0 +1,11 @@
+{
+  "id": "1781054363163-ejrbe5g",
+  "message": "test",
+  "model": "qwen2.5-coder:7b",
+  "result": {
+    "plan": "Ollama unavailable: Ollama error 404",
+    "patches": [],
+    "changedFiles": []
+  },
+  "createdAt": 1781054363163
+}

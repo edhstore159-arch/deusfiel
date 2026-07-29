@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # MongoDB database
+  mongodb:
+    image: mongo:7.0
+    container_name: espirito-santo-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-password123}
+      MONGO_INITDB_DATABASE: ${DB_NAME:-espirito-santo}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    ports:
+      - "27017:27017"
+    networks:
+      - espirito-santo-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node.js AI Builder Microservice
+  ai-builder:
+    build:
+      context: .
+      dockerfile: backend/ai-builder/Dockerfile
+    container_name: espirito-santo-ai-builder
+    restart: unless-stopped
+    environment:
+      PORT: 4321
+      JWT_SECRET: ${JWT_SECRET:-legalflow-secret}
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://host.docker.internal:11434}
+    ports:
+      - "4321:4321"
+    networks:
+      - espirito-santo-network
+    depends_on:
+      - mongodb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4321/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: espirito-santo-backend
+    restart: unless-stopped
+    environment:
+      PORT: 8001
+      MONGO_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASSWORD:-password123}@mongodb:27017/${DB_NAME:-espirito-santo}?authSource=admin
+      DB_NAME: ${DB_NAME:-espirito-santo}
+      JWT_SECRET: ${JWT_SECRET:-legalflow-secret}
+      JWT_ALG: ${JWT_ALG:-HS256}
+      EMERGENT_LLM_KEY: ${EMERGENT_LLM_KEY:-}
+      NODE_ENV: ${NODE_ENV:-development}
+      # Add other required environment variables from your .env file
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      BAILEYS_PORT: ${BAILEYS_PORT:-8002}
+      BAILEYS_INTERNAL_TOKEN: ${BAILEYS_INTERNAL_TOKEN:-legalflow-baileys-2026}
+    ports:
+      - "8001:8001"
+    networks:
+      - espirito-santo-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ai-builder:
+        condition: service_healthy
+    volumes:
+      # Mount the backend directory for live code reloading in development
+      - ./backend:/app/backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Ollama service for local LLM inference
+  # Uncomment this section if you want Ollama to run in Docker
+  # Note: Ollama requires GPU support, which may not work in all Docker environments
+  # For better performance, run Ollama on the host machine (http://localhost:11434)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: espirito-santo-ollama
+  #   restart: unless-stopped
+  #   environment:
+  #     OLLAMA_HOST: 0.0.0.0:11434
+  #   ports:
+  #     - "11434:11434"
+  #   networks:
+  #     - espirito-santo-network
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   # GPU support (uncomment if you have NVIDIA GPU)
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  # ollama_data:
+  #   driver: local
+
+networks:
+  espirito-santo-network:
+    driver: bridge
