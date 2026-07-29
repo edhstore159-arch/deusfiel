@@ -24,8 +24,8 @@ const AREAS = [
 const TONES = ["Cordial", "Formal", "Empática", "Objetiva", "Consultiva"];
 
 const MODELS = [
-  { id: "big-pickle", label: "OpenCode Zen (Gratuito)", group: "Zen" },
-  { id: "claude-fcc", label: "Claude FCC (Gratuito)", group: "Claude" },
+  { id: "big-pickle", label: "OpenCode Zen", group: "Zen" },
+  { id: "claude-fcc", label: "Claude FCC", group: "Claude" },
   { id: "openai/gpt-5.5", label: "GPT-5.5", group: "OpenAI" },
   { id: "openai/gpt-5.4", label: "GPT-5.4", group: "OpenAI" },
   { id: "openai/gpt-5.2", label: "GPT-5.2", group: "OpenAI" },

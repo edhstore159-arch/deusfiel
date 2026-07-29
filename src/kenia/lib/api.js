@@ -880,36 +880,53 @@ const staticGet = async (url, config = {}) => {
         const tablePaths = new Set((rows || []).map((r) => r.storage_path).filter(Boolean));
         const storagePaths = new Set((files || []).filter((f) => f.name).map((f) => `${uid}/${f.name}`));
 
-        // Insere órfãos na tabela
+        // Insere órfãos em lote único e já retorna os registros inseridos
         const orphanPaths = [...storagePaths].filter((p) => !tablePaths.has(p));
-        for (const path of orphanPaths) {
-          const fileName = path.split("/").pop() || "";
-          await supabase.from("generated_images").insert({
-            user_id: uid,
-            storage_path: path,
-            prompt: fileName.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ").trim() || null,
-            kind: "creative",
-            paid: false,
-          });
+        let newRows = [];
+        if (orphanPaths.length > 0) {
+          const { data: inserted } = await supabase.from("generated_images").insert(
+            orphanPaths.map((path) => {
+              const fileName = path.split("/").pop() || "";
+              return {
+                user_id: uid,
+                storage_path: path,
+                prompt: fileName.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ").trim() || null,
+                kind: "creative",
+                paid: false,
+              };
+            })
+          ).select("id, storage_path, prompt, created_at, kind, title, network, format, caption, tone, case_type");
+          newRows = inserted || [];
         }
+        // Evita re-fetch — mescla os novos registros com os existentes
+        const allRows = newRows.length > 0 ? [...newRows, ...(rows || [])] : (rows || []);
 
-        // Recarrega rows se orfaos foram criados
-        const allRows = orphanPaths.length > 0
-          ? (await supabase
-              .from("generated_images")
-              .select("id, storage_path, prompt, created_at, kind, title, network, format, caption, tone, case_type")
-              .eq("user_id", uid)
-              .order("created_at", { ascending: false })
-              .limit(200)).data || rows || []
-          : rows || [];
-
+        // Signed URLs cacheadas no localStorage (válidas 7d, cache renovado a cada 6d)
+        const CACHE_KEY = `kenia.creatives.signed_urls_${uid}`;
         const paths = allRows.map((r) => r.storage_path).filter(Boolean);
-        const { data: signed, error: signedErr } = paths.length > 0
-          ? await supabase.storage.from("creative-assets").createSignedUrls(paths, 60 * 60 * 24 * 7)
-          : { data: [] };
-        const urlByPath = {};
-        if (!signedErr) {
-          (signed || []).forEach((s, i) => { if (s?.signedUrl) urlByPath[paths[i]] = s.signedUrl; });
+        let urlByPath = {};
+        let needRefresh = true;
+        try {
+          const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
+          if (cached.expiresAt && Date.now() < cached.expiresAt) {
+            const missing = paths.filter((p) => !cached.urls?.[p]);
+            if (missing.length === 0) {
+              urlByPath = cached.urls;
+              needRefresh = false;
+            }
+          }
+        } catch {}
+        if (needRefresh) {
+          const { data: signed, error: signedErr } = paths.length > 0
+            ? await supabase.storage.from("creative-assets").createSignedUrls(paths, 60 * 60 * 24 * 7)
+            : { data: [] };
+          urlByPath = {};
+          if (!signedErr) {
+            (signed || []).forEach((s, i) => { if (s?.signedUrl) urlByPath[paths[i]] = s.signedUrl; });
+          }
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ urls: urlByPath, expiresAt: Date.now() + 6 * 24 * 60 * 60 * 1000 }));
+          } catch {}
         }
 
         const cloudItems = allRows.map((r) => {

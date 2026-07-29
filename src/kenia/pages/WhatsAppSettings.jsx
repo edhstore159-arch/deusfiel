@@ -490,34 +490,34 @@ export default function WhatsAppSettings() {
 
   return (
     <div className="h-screen flex flex-col bg-nude-50 overflow-hidden">
-      <div className="px-6 py-4 bg-white border-b border-nude-200 flex items-center justify-between">
-        <div>
+      <div className="px-4 sm:px-6 py-4 bg-white border-b border-nude-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="min-w-0">
           <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold">Integrações</div>
-          <h1 className="font-display font-bold text-2xl">WhatsApp</h1>
+          <h1 className="font-display font-bold text-xl sm:text-2xl truncate">WhatsApp</h1>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={test} disabled={testing} data-testid="wa-test-btn">
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={test} disabled={testing} data-testid="wa-test-btn" className="flex-1 sm:flex-none text-xs sm:text-sm">
             {testing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testando...</> : "Testar conexão"}
           </Button>
-          <Button onClick={save} disabled={saving} className="bg-nude-900 hover:bg-nude-800" data-testid="wa-save-btn">
+          <Button onClick={save} disabled={saving} className="bg-nude-900 hover:bg-nude-800 flex-1 sm:flex-none text-xs sm:text-sm" data-testid="wa-save-btn">
             {saving ? "Salvando..." : "Salvar"}
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6 space-y-4">
+      <div className="flex-1 overflow-auto p-3 sm:p-6 space-y-4">
         <Card className="border-nude-200 p-5" data-testid="wa-diagnostics-panel">
-          <div className="flex items-start justify-between mb-3">
-            <div>
+          <div className="flex flex-col sm:flex-row items-start gap-3 mb-3">
+            <div className="flex-1 min-w-0">
               <h3 className="font-display font-semibold text-base flex items-center gap-2">
-                <Activity className="w-4 h-4 text-gold-600" />
+                <Activity className="w-4 h-4 text-gold-600 shrink-0" />
                 Diagnóstico — Por que não estou recebendo mensagens?
               </h3>
               <p className="text-sm text-nude-500 mt-0.5">
                 Checklist automático de tudo que precisa estar OK para o robô responder.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={runDiagnostics} disabled={loadingDiag} data-testid="wa-diag-refresh">
+            <Button variant="outline" size="sm" onClick={runDiagnostics} disabled={loadingDiag} data-testid="wa-diag-refresh" className="w-full sm:w-auto">
               {loadingDiag ? <Loader2 className="w-4 h-4 animate-spin" /> : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Re-checar</>}
             </Button>
           </div>
@@ -623,12 +623,12 @@ export default function WhatsAppSettings() {
         <Card className="border-nude-200">
           <div className="p-5">
             <Tabs value={cfg.provider} onValueChange={(v) => up("provider", v)}>
-              <TabsList className="grid grid-cols-5 w-full max-w-3xl">
-                <TabsTrigger value="zapi" data-testid="tab-zapi"><Zap className="w-3.5 h-3.5 mr-1.5" />Z-API</TabsTrigger>
-                <TabsTrigger value="baileys" data-testid="tab-baileys"><Smartphone className="w-3.5 h-3.5 mr-1.5" />Baileys</TabsTrigger>
-                <TabsTrigger value="evolution" data-testid="tab-evolution"><Server className="w-3.5 h-3.5 mr-1.5" />Evolution</TabsTrigger>
-                <TabsTrigger value="meta" data-testid="tab-meta"><Building2 className="w-3.5 h-3.5 mr-1.5" />Meta Cloud</TabsTrigger>
-                <TabsTrigger value="twilio" data-testid="tab-twilio"><Send className="w-3.5 h-3.5 mr-1.5" />Twilio</TabsTrigger>
+              <TabsList className="flex overflow-x-auto gap-1 w-full max-w-3xl pb-px">
+                <TabsTrigger value="zapi" data-testid="tab-zapi" className="whitespace-nowrap shrink-0"><Zap className="w-3.5 h-3.5 mr-1.5" />Z-API</TabsTrigger>
+                <TabsTrigger value="baileys" data-testid="tab-baileys" className="whitespace-nowrap shrink-0"><Smartphone className="w-3.5 h-3.5 mr-1.5" />Baileys</TabsTrigger>
+                <TabsTrigger value="evolution" data-testid="tab-evolution" className="whitespace-nowrap shrink-0"><Server className="w-3.5 h-3.5 mr-1.5" />Evolution</TabsTrigger>
+                <TabsTrigger value="meta" data-testid="tab-meta" className="whitespace-nowrap shrink-0"><Building2 className="w-3.5 h-3.5 mr-1.5" />Meta Cloud</TabsTrigger>
+                <TabsTrigger value="twilio" data-testid="tab-twilio" className="whitespace-nowrap shrink-0"><Send className="w-3.5 h-3.5 mr-1.5" />Twilio</TabsTrigger>
               </TabsList>
 
               <TabsContent value="zapi" className="mt-5 space-y-3">
@@ -640,7 +640,7 @@ export default function WhatsAppSettings() {
                 <div><Label>Instance Token</Label><Input value={cfg.zapi_instance_token || ""} onChange={(e) => up("zapi_instance_token", e.target.value)} data-testid="zapi-token" className="font-mono text-xs" /></div>
                 <div>
                   <Label>Client-Token (Account Security Token)</Label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Input
                       value={cfg.zapi_client_token || ""}
                       onChange={(e) => up("zapi_client_token", e.target.value)}
@@ -711,13 +711,14 @@ export default function WhatsAppSettings() {
                       as rotas <code>/api/whatsapp/baileys/status|qr|logout|reconnect</code> e aceitar
                       o parâmetro <code>?instance=&lt;nome&gt;</code> para múltiplos números.
                     </p>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Input
                         placeholder="https://meu-baileys.exemplo.com"
                         value={baileysBackend}
                         onChange={(e) => setBaileysBackend(e.target.value)}
+                        className="flex-1"
                       />
-                      <Button onClick={saveBackendUrl} variant="outline" size="sm">Salvar</Button>
+                      <Button onClick={saveBackendUrl} variant="outline" size="sm" className="w-full sm:w-auto">Salvar</Button>
                     </div>
                   </div>
 
@@ -734,14 +735,15 @@ export default function WhatsAppSettings() {
                       escaneie o QR abaixo com o WhatsApp desse aparelho.
                     </p>
 
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex flex-col sm:flex-row gap-2 mb-3">
                       <Input
                         placeholder="Nome do número (ex: secretaria2)"
                         value={newInstanceName}
                         onChange={(e) => setNewInstanceName(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && addInstance()}
+                        className="flex-1"
                       />
-                      <Button onClick={addInstance} size="sm">
+                      <Button onClick={addInstance} size="sm" className="w-full sm:w-auto">
                         <QrCode className="w-3.5 h-3.5 mr-1.5" /> Adicionar número
                       </Button>
                     </div>
@@ -798,32 +800,32 @@ export default function WhatsAppSettings() {
                 )}
 
                 <Card className="bg-nude-50 border-nude-200 p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1 min-w-0">
+                  <div className="flex flex-col sm:flex-row items-start gap-4">
+                    <div className="flex-1 min-w-0 w-full">
                       <div className="text-xs uppercase tracking-wider text-nude-500 mb-1">Status</div>
                       {baileysStatus?.connected ? (
                         <div className="flex items-center gap-2 text-gold-700 font-medium">
-                          <CheckCircle2 className="w-4 h-4" />
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
                           Conectado{centerDigits ? ` — ${centerPhone}` : ""}
                         </div>
                       ) : baileysStatus?.state === "conflicted" ? (
                         <div className="flex items-center gap-2 text-rose-700 font-medium">
-                          <AlertCircle className="w-4 h-4" />
+                          <AlertCircle className="w-4 h-4 shrink-0" />
                           Conflito de sessão
                         </div>
                       ) : baileysStatus?.state === "static" ? (
                         <div className="flex items-center gap-2 text-gold-700 font-medium">
-                          <AlertTriangle className="w-4 h-4" />
+                          <AlertTriangle className="w-4 h-4 shrink-0" />
                           Site estático ativo
                         </div>
                       ) : baileysStatus?.state === "offline" ? (
                         <div className="flex items-center gap-2 text-gold-700 font-medium">
-                          <AlertTriangle className="w-4 h-4" />
+                          <AlertTriangle className="w-4 h-4 shrink-0" />
                           Serviço externo indisponível
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-gold-700 font-medium">
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                           {baileysStatus?.state === "connecting" ? "Aguardando leitura do QR..." : "Inicializando..."}
                         </div>
                       )}
@@ -841,7 +843,7 @@ export default function WhatsAppSettings() {
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-col gap-2 shrink-0">
+                    <div className="flex flex-row sm:flex-col gap-2 shrink-0 w-full sm:w-auto">
                       <Button variant="outline" size="sm" onClick={pollBaileys} data-testid="baileys-refresh">
                         <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Atualizar
                       </Button>
@@ -1017,7 +1019,7 @@ export default function WhatsAppSettings() {
 
                 <div>
                   <Label>Webhook URL (cole no Twilio Console)</Label>
-                  <div className="flex gap-2 mt-1">
+                  <div className="flex flex-col sm:flex-row gap-2 mt-1">
                     <Input
                       readOnly
                       value={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-twilio-webhook`}
@@ -1095,13 +1097,13 @@ export default function WhatsAppSettings() {
             />
           </div>
           <div>
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1.5">
               <Label>Prompt do robô (personalidade/instruções)</Label>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs text-gold-700 hover:text-gold-800 hover:bg-gold-50"
+                className="h-7 text-xs text-gold-700 hover:text-gold-800 hover:bg-gold-50 w-full sm:w-auto"
                 data-testid="bot-reset-prompt"
                 onClick={async () => {
                   try {
@@ -1219,8 +1221,8 @@ export default function WhatsAppSettings() {
                 )}
               </div>
               <div>
-                <Label className="text-xs">ElevenLabs API Key</Label>
-                <div className="flex gap-2">
+                  <Label className="text-xs">ElevenLabs API Key</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     type="password"
                     placeholder="sk_xxxxxxxxxxxxxxxxxxxx"
@@ -1270,7 +1272,7 @@ export default function WhatsAppSettings() {
                       }
                     }}
                     data-testid="elevenlabs-validate-btn"
-                    className="h-9 whitespace-nowrap"
+                    className="h-9 whitespace-nowrap w-full sm:w-auto"
                   >
                     Validar key
                   </Button>
@@ -1512,13 +1514,13 @@ export default function WhatsAppSettings() {
 
         {!isBaileys && (
           <Card className="border-nude-200 p-5">
-            <div className="flex items-start justify-between mb-4">
-              <div>
+            <div className="flex flex-col sm:flex-row items-start gap-3 mb-4">
+              <div className="flex-1 min-w-0">
                 <h3 className="font-display font-semibold text-base mb-1">Webhooks (recebimento)</h3>
                 <p className="text-sm text-nude-500">Configure a URL correspondente no painel do provedor para receber mensagens e ativar o robô.</p>
               </div>
               {cfg.provider === "zapi" && (
-                <Button onClick={autoSetupWebhook} disabled={settingWebhook} className="bg-gold-600 hover:bg-gold-700" data-testid="wa-auto-webhook">
+                <Button onClick={autoSetupWebhook} disabled={settingWebhook} className="bg-gold-600 hover:bg-gold-700 w-full sm:w-auto" data-testid="wa-auto-webhook">
                   {settingWebhook ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Configurando...</> : <><Zap className="w-4 h-4 mr-2" />Configurar Z-API automaticamente</>}
                 </Button>
               )}
@@ -1529,10 +1531,10 @@ export default function WhatsAppSettings() {
                 { p: "evolution", label: "Evolution" },
                 { p: "meta", label: "Meta" },
               ].map((w) => (
-                <div key={w.p} className="flex items-center gap-2">
-                  <Badge variant="outline" className="w-24 justify-center">{w.label}</Badge>
-                  <code className="flex-1 text-xs bg-nude-100 px-3 py-1.5 rounded-md font-mono truncate">{`${webhookBase}/${w.p}`}</code>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyHook(w.p)}>
+                <div key={w.p} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <Badge variant="outline" className="w-full sm:w-24 justify-center shrink-0">{w.label}</Badge>
+                  <code className="flex-1 text-xs bg-nude-100 px-3 py-1.5 rounded-md font-mono break-all sm:truncate w-full sm:w-auto">{`${webhookBase}/${w.p}`}</code>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 self-end sm:self-auto" onClick={() => copyHook(w.p)}>
                     <Copy className="w-3.5 h-3.5" />
                   </Button>
                 </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/kenia/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
@@ -9,20 +10,24 @@ import { Separator } from "@/kenia/components/ui/separator";
 import { toast } from "sonner";
 import {
   Key, MessageSquare, Image, Loader2, CheckCircle2,
-  XCircle, Sparkles, Save, Info, Eye, EyeOff,
+  XCircle, Sparkles, Save, Info, Eye, EyeOff, KeyRound,
 } from "lucide-react";
 
 export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [textKey, setTextKey] = useState("");
   const [imageKey, setImageKey] = useState("");
+  const [emergentKey, setEmergentKey] = useState("");
   const [showText, setShowText] = useState(false);
   const [showImage, setShowImage] = useState(false);
+  const [showEmergent, setShowEmergent] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingEmergent, setSavingEmergent] = useState(false);
   const [testingText, setTestingText] = useState(false);
   const [testingImage, setTestingImage] = useState(false);
   const [textResult, setTextResult] = useState(null);
   const [imageResult, setImageResult] = useState(null);
+  const [emergentResult, setEmergentResult] = useState(null);
 
   useEffect(() => { load(); }, []);
 
@@ -98,6 +103,41 @@ export default function Settings() {
       toast.error("Erro no teste");
     } finally {
       setTestingImage(false);
+    }
+  };
+
+  const saveEmergentKey = async () => {
+    if (!emergentKey.trim()) { toast.error("Digite uma chave válida"); return; }
+    setSavingEmergent(true);
+    setEmergentResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("settings-test", {
+        body: { action: "save_emergent_key", key: emergentKey.trim() },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast.success("Chave Emergent salva!");
+        setEmergentKey("");
+        await load();
+      } else {
+        toast.error(data?.error || "Erro ao salvar");
+      }
+    } catch (e) {
+      toast.error("Erro: " + (e?.message || e));
+    } finally {
+      setSavingEmergent(false);
+    }
+  };
+
+  const testEmergent = async () => {
+    setEmergentResult(null);
+    try {
+      const { data } = await api.post("/settings/test-image");
+      setEmergentResult(data);
+      if (data.ok) toast.success("Geração de imagem funcionando!");
+      else toast.error("Chave não funcional");
+    } catch {
+      toast.error("Erro no teste");
     }
   };
 
@@ -225,6 +265,55 @@ export default function Settings() {
                 <>Funcionando! Modelo {imageResult.model}. {imageResult.using_custom_key ? "Chave personalizada" : "Emergent padrão"}.</>
               ) : (
                 <>Erro: {imageResult.error}</>
+              )}
+            </div>
+          )}
+        </Card>
+
+        <Card className="border-violet-200 p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <KeyRound className="w-5 h-5 text-violet-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-display font-semibold text-base">Chave Emergent (Imagens)</h3>
+              <p className="text-sm text-nude-500 mt-1">
+                Chave usada como fallback para geração de imagens no <strong>Criativos</strong>. Salva diretamente no Supabase.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Input
+                type={showEmergent ? "text" : "password"}
+                placeholder="sk-emergent-..."
+                value={emergentKey}
+                onChange={(e) => setEmergentKey(e.target.value)}
+                className="pr-10 font-mono text-xs h-10"
+              />
+              <button type="button" onClick={() => setShowEmergent(!showEmergent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-nude-400 hover:text-nude-600">
+                {showEmergent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <Button
+              size="sm"
+              onClick={saveEmergentKey}
+              disabled={savingEmergent || !emergentKey.trim()}
+              className="bg-violet-600 hover:bg-violet-700 text-white"
+            >
+              {savingEmergent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            </Button>
+            <Button variant="outline" onClick={testEmergent} disabled={savingEmergent}>
+              Testar
+            </Button>
+          </div>
+
+          {emergentResult && (
+            <div className={`mt-3 text-sm flex items-center gap-2 ${emergentResult.ok ? "text-gold-700" : "text-rose-700"}`}>
+              {emergentResult.ok ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+              {emergentResult.ok ? (
+                <>Funcionando! {emergentResult.using_custom_key ? "Chave personalizada" : "Emergent padrão"}.</>
+              ) : (
+                <>Erro: {emergentResult.error}</>
               )}
             </div>
           )}

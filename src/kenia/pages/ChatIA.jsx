@@ -975,9 +975,16 @@ export default function ChatIA() {
   };
 
   const deleteConversation = async () => {
-    try { localStorage.removeItem(storageKey); } catch {}
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("kenia:chatia"))
+        .forEach((k) => localStorage.removeItem(k));
+    } catch {}
     if (user?.id) {
       try { await supabase.from("conversations").delete().eq("user_id", user.id); } catch {}
+    }
+    if (sessionId) {
+      try { await supabase.from("conversations").delete().eq("session_id", sessionId); } catch {}
     }
     setMessages([initialChatMessages[0]]);
     setSessionId(null);
@@ -987,7 +994,7 @@ export default function ChatIA() {
     setLeadId(null);
     stopAudio();
     setConfirmDelete(false);
-    toast.success("Conversa apagada com sucesso.");
+    toast.success("Todas as conversas apagadas.");
   };
 
   const QM = analysis ? QUAL_META[analysis.qualificacao] || QUAL_META.necessita_mais_info : null;

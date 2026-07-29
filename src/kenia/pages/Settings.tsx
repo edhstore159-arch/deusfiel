@@ -165,7 +165,7 @@ export default function Settings() {
             <div className="flex-1">
               <div className="font-display font-semibold text-lg">Provider de IA — Free vs Pago</div>
               <div className="text-xs text-nude-600 mt-1">
-                Escolha entre <strong>Claude Free</strong> (Nemotron gratuito via ngrok) ou <strong>Claude Pago</strong> (Claude via Emergent). Quando no modo Pago, o Nemotron gera e o Claude revisa automaticamente.
+                Escolha entre <strong>Claude Free</strong> (Nemotron via ngrok) ou <strong>Claude Pago</strong> (Claude via Emergent). Quando no modo Pago, o Nemotron gera e o Claude revisa automaticamente.
               </div>
             </div>
           </div>
@@ -190,8 +190,7 @@ export default function Settings() {
                 <span className="text-lg font-bold text-emerald-600">N</span>
               </div>
               <div className="font-bold text-sm">Claude Free</div>
-              <div className="text-[11px] text-nude-500 text-center">Nemotron (NVIDIA)<br/>Gratuito, sem revisão</div>
-              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]">Sem custo</Badge>
+              <div className="text-[11px] text-nude-500 text-center">Nemotron (NVIDIA)<br/>Sem revisão</div>
             </button>
 
             {/* Paid */}
