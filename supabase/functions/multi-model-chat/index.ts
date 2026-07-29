@@ -71,7 +71,7 @@ async function tryZen(messages: any[], system?: string, model?: string): Promise
           "Content-Type": "application/json",
           Authorization: `Bearer ${ZEN_KEY}`,
         },
-        body: JSON.stringify({ model: candidate, messages: apiMessages, max_tokens: 4096, stream: true }),
+        body: JSON.stringify({ model: candidate, messages: apiMessages, max_tokens: 8192, stream: true }),
       });
       if (!resp.ok) {
         const text = await resp.text().catch(() => "");
@@ -162,7 +162,7 @@ async function tryOpenRouter(messages: any[], system?: string): Promise<Response
           "HTTP-Referer": "https://deusfiel.onrender.com",
           "X-Title": "Kenia Garcia Advocacia",
         },
-        body: JSON.stringify({ model: candidate, messages: apiMessages, max_tokens: 4096 }),
+        body: JSON.stringify({ model: candidate, messages: apiMessages, max_tokens: 8192 }),
       });
       if (resp.ok && resp.body) {
         console.log(`OpenRouter fallback OK com ${candidate}`);
@@ -192,7 +192,7 @@ async function tryClaudeFCC(messages: any[], system?: string): Promise<Response>
     },
     body: JSON.stringify({
       model: FCC_MODEL,
-      max_tokens: 4000,
+      max_tokens: 8192,
       stream: true,
       system: system || "",
       messages: apiMessages,
@@ -280,7 +280,7 @@ async function tryNemotronDirect(messages: any[], system?: string): Promise<Resp
     body: JSON.stringify({
       model: NEMOTRON_MODEL,
       messages: apiMessages,
-      max_tokens: 4096,
+      max_tokens: 8192,
       stream: true,
       temperature: 0.7,
     }),

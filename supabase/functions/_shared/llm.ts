@@ -28,7 +28,7 @@ const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/nvid
 // OpenCode Zen (gratuito, principal)
 const ZEN_KEY = Deno.env.get("ZEN_API_KEY") || "";
 const ZEN_BASE = "https://opencode.ai/zen/v1/chat/completions";
-const ZEN_MODELS = ["big-pickle", "deepseek-v4-flash-free", "nemotron-3-ultra-free"];
+const ZEN_MODELS = ["big-pickle", "deepseek-v4-flash-free"];
 
 // NVIDIA NIM direto
 const NVIDIA_NIM_API_KEY = Deno.env.get("NVIDIA_NIM_API_KEY") || "";
@@ -49,7 +49,7 @@ async function chatZen(opts: ChatOptions) {
         return m;
       });
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+      const timeout = setTimeout(() => controller.abort(), 30000);
       const resp = await fetch(ZEN_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${ZEN_KEY}` },
@@ -65,9 +65,15 @@ async function chatZen(opts: ChatOptions) {
       clearTimeout(timeout);
       if (!resp.ok) continue;
       const data = await resp.json();
-      const text = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
-      if (!text || text.length < 5) continue;
-      return { ok: true as const, data: { choices: [{ message: { role: "assistant", content: text } }] }, provider: `zen/${model}` };
+      const msg = data?.choices?.[0]?.message || {};
+      const text = String(msg.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+      // Reasoning models (big-pickle, deepseek) puts output in "reasoning", "reasoning_content" or "reasoning_details"
+      const reasoningRaw = String(msg.reasoning || msg.reasoning_content || "").trim();
+      const reasoningDetails = Array.isArray(msg.reasoning_details) ? msg.reasoning_details.map((d: any) => d?.text || "").join(" ") : "";
+      const reasoning = (reasoningRaw || reasoningDetails).trim();
+      if (!text && !reasoning) continue;
+      const finalText = text || reasoning.slice(0, 3000);
+      return { ok: true as const, data: { choices: [{ message: { role: "assistant", content: finalText } }] }, provider: `zen/${model}` };
     } catch (e) {
       console.warn(`Zen ${model} erro:`, (e as Error)?.message);
     }
@@ -80,7 +86,7 @@ async function chatLovable(opts: ChatOptions) {
   try {
     const { model: _, ...body } = opts;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Lovable-API-Key": LOVABLE_KEY },
@@ -128,7 +134,7 @@ export async function chatGemini(opts: ChatOptions) {
       body.generationConfig = { ...(body.generationConfig || {}), temperature: opts.temperature };
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
     const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -153,7 +159,7 @@ export async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
     const resp = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${EMERGENT_KEY}` },
@@ -180,7 +186,7 @@ export async function chatOpenRouter(opts: ChatOptions) {
   
   async function tryOpenRouter(model: string, maxTokens: number) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
     try {
       // Inject anti-CoT instruction into system message
       const patchedMessages = opts.messages.map((m) => {
@@ -264,15 +270,14 @@ async function chatClaudeFCC(opts: ChatOptions) {
       .filter((m) => m.role !== "system")
       .map((m) => ({ role: m.role === "assistant" ? "assistant" as const : "user" as const, content: String(m.content || "") }));
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
     const resp = await fetch(`${FCC_BASE_URL}/v1/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": FCC_AUTH_TOKEN,
-        "Authorization": `Bearer ${FCC_AUTH_TOKEN}`,
         "anthropic-version": "2023-06-01",
-        "ngrok-skip-browser-warning": "true",
+        ...(opts.model ? {} : { "anthropic-beta": "output-128k-2025-02-19" }),
       },
       signal: controller.signal,
       body: JSON.stringify({
@@ -299,7 +304,7 @@ async function chatNemotronDirect(opts: ChatOptions) {
   if (!NVIDIA_NIM_API_KEY) return { ok: false as const, status: 0, error: "NVIDIA_NIM_API_KEY ausente" };
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 6000);
     const resp = await fetch(`${NVIDIA_NIM_BASE}/chat/completions`, {
       method: "POST",
       headers: {
@@ -331,7 +336,32 @@ async function chatNemotronDirect(opts: ChatOptions) {
   }
 }
 
+// Hard timeout wrapper para chatCompletion
+const CHAT_TIMEOUT_MS = Number(Deno.env.get("LLM_CHAT_TIMEOUT_MS") || 120000);
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout ${ms}ms`)), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
+
 export async function chatCompletion(opts: ChatOptions) {
+  return withTimeout(chatCompletionInner(opts), CHAT_TIMEOUT_MS);
+}
+
+async function chatCompletionInner(opts: ChatOptions) {
+  // Inject Portuguese instruction into system message for ALL providers
+  const ptInstruction = "INSTRUÇÃO CRÍTICA: Responda SEMPRE em português brasileiro. NUNCA responda em inglês. NÃO inclua raciocínio, análise, passos de pensamento. Responda apenas com a resposta final.";
+  opts = {
+    ...opts,
+    messages: opts.messages.map((m) => {
+      if (m.role === "system") {
+        return { ...m, content: `${ptInstruction}\n\n${m.content}` };
+      }
+      return m;
+    }),
+  };
   const requestedModel = opts.model || "";
   const wantsGemini = requestedModel.includes("gemini");
   const wantsEmergent = requestedModel.includes("gpt") || requestedModel.includes("openai");
@@ -362,40 +392,45 @@ export async function chatCompletion(opts: ChatOptions) {
     }
   }
 
-  // OTIMIZAÇÃO: Race providers em paralelo (15s max)
-  // Tier 1: Zen (gratuito, rápido) — tenta sozinho primeiro
-  if (ZEN_KEY) {
-    const r = await chatZen(opts);
-    if (r.ok) return r;
+  // Tier 1: Race Zen + Emergent simultaneously (Zen fast for short, Emergent reliable for long)
+  const tier1: Promise<any>[] = [];
+  if (ZEN_KEY) tier1.push(chatZen(opts));
+  if (EMERGENT_KEY) tier1.push(chatEmergent(opts));
+  if (tier1.length > 0) {
+    const winner = await Promise.race(tier1);
+    if (winner.ok) {
+      tier1.forEach((p) => p.catch(() => {}));
+      return winner;
+    }
+    const results = await Promise.allSettled(tier1);
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value?.ok) return r.value;
+    }
   }
 
-  // Tier 2: Race Emergent + Nemotron NIM + OpenRouter simultaneamente
+  // Tier 2: Race Nemotron NIM + OpenRouter + Gemini
   const tier2: Promise<any>[] = [];
-  if (EMERGENT_KEY) tier2.push(chatEmergent(opts));
   if (NVIDIA_NIM_API_KEY) tier2.push(chatNemotronDirect(opts));
   if (OPENROUTER_KEY) {
-    // Só Hermes (barato, bom em PT-BR) — paga modelos lentos
     tier2.push(chatOpenRouter({ ...opts, model: "nousresearch/hermes-4-70b" }));
   }
+  if (GEMINI_KEY) tier2.push(chatGemini(opts));
   if (tier2.length > 0) {
     const winner = await Promise.race(tier2);
     if (winner.ok) {
-      // Cancela os perdedores
       tier2.forEach((p) => p.catch(() => {}));
       return winner;
     }
-    // Se race perdeu, espera todos e pega o primeiro OK
     const results = await Promise.allSettled(tier2);
     for (const r of results) {
       if (r.status === "fulfilled" && r.value?.ok) return r.value;
     }
   }
 
-  // Tier 3: Race FCC + Lovable + Gemini (mais lentos)
+  // Tier 3: Race FCC + Lovable (slowest)
   const tier3: Promise<any>[] = [];
   if (FCC_BASE_URL) tier3.push(chatClaudeFCC(opts));
   if (LOVABLE_KEY) tier3.push(chatLovable(opts));
-  if (GEMINI_KEY) tier3.push(chatGemini(opts));
   if (tier3.length > 0) {
     const results = await Promise.allSettled(tier3);
     for (const r of results) {

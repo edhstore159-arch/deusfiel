@@ -389,11 +389,11 @@ export default function ChatMultiModelo() {
                 className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 whitespace-pre-wrap text-sm ${
-                    m.role === "user"
-                      ? "bg-gold-600 text-white rounded-br-sm"
-                      : "bg-white border border-nude-200 text-nude-900 rounded-bl-sm"
-                  }`}
+                   className={`max-w-[85%] rounded-2xl px-4 py-2.5 whitespace-pre-wrap break-words text-sm ${
+                     m.role === "user"
+                       ? "bg-gold-600 text-white rounded-br-sm"
+                       : "bg-white border border-nude-200 text-nude-900 rounded-bl-sm"
+                   }`}
                 >
                   {m.content}
                   {m.streaming && <span className="inline-block w-2 h-4 ml-1 bg-current animate-pulse" />}

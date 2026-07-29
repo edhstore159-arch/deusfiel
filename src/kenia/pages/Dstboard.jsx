@@ -1314,7 +1314,7 @@ function ChecklistDetail({ process, toggleCheck, expandedCats, toggleCategory, m
             </Button>
           </div>
         </div>
-        <div className="px-4 py-3 text-sm text-nude-800 whitespace-pre-wrap leading-relaxed min-h-[80px] max-h-[520px] overflow-y-auto">
+        <div className="px-4 py-3 text-sm text-nude-800 whitespace-pre-wrap break-words leading-relaxed min-h-[80px] max-h-[520px] overflow-y-auto">
           {judgeText
             ? judgeText
             : judgeLoading

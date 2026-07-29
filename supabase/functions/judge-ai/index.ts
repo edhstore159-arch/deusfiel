@@ -3,6 +3,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { getEvolvedPrompt } from "../_shared/prompts.ts";
 import { chatPipeline, chatCompletion } from "../_shared/llm.ts";
 
+// Wrapper: always specify model to force Emergent routing
+function aiChat(opts: Parameters<typeof chatCompletion>[0]) {
+  return chatCompletion({ ...opts, model: opts.model || "gpt-4o-mini" });
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -276,41 +281,59 @@ Deno.serve(async (req) => {
     const systemMsg = systemPrompt;
     const userMsg = finalMessages.map((m) => m.content).join("\n\n");
 
+    // Hard timeout global de 25s para o judge-ai inteiro
+    const JUDGE_TIMEOUT_MS = 25000;
+    const judgeDeadline = Date.now() + JUDGE_TIMEOUT_MS;
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
           let pipelineResult;
 
           if (isZen) {
-            // Etapa 1: Identificar temas jurídicos
-            const themesResult = await chatCompletion({
-              messages: [
-                { role: "system", content: `${systemMsg}\n\nIMPORTANTE: NÃO redija a decisão ainda. Apenas liste os institutos jurídicos envolvidos no caso abaixo (máximo 20 institutos).` },
-                { role: "user", content: userMsg },
-              ],
-              model: "big-pickle",
-              temperature: 0.1,
-              maxTokens: 1000,
-            });
+            // Etapa 1: Identificar temas jurídicos (timeout reduzido)
+            const themesRemaining = judgeDeadline - Date.now();
+            if (themesRemaining < 5000) {
+              // Sem tempo para 2 etapas, pula direto para análise completa
+              pipelineResult = await chatCompletion({
+                messages: [
+                  { role: "system", content: systemMsg },
+                  { role: "user", content: userMsg },
+                ],
+                model: "big-pickle",
+                temperature: 0.3,
+                maxTokens: 8192,
+              });
+            } else {
+              const themesResult = await chatCompletion({
+                messages: [
+                  { role: "system", content: `${systemMsg}\n\nIMPORTANTE: NÃO redija a decisão ainda. Apenas liste os institutos jurídicos envolvidos no caso abaixo (máximo 20 institutos).` },
+                  { role: "user", content: userMsg },
+                ],
+                model: "big-pickle",
+                temperature: 0.1,
+                maxTokens: 2000,
+              });
 
-            const themes = themesResult.ok
-              ? (themesResult.data?.choices?.[0]?.message?.content || "")
-              : "";
+              const themes = themesResult.ok
+                ? (themesResult.data?.choices?.[0]?.message?.content || "")
+                : "";
 
-            // Etapa 2: Análise completa com temas identificados
-            const fullPrompt = themes
-              ? `${systemMsg}\n\nTEMAS JURÍDICOS IDENTIFICADOS NA ETAPA ANTERIOR:\n${themes}\n\nAgora proceda com a análise COMPLETA do caso, seguindo TODAS as etapas do fluxo (pesquisa de legislação, jurisprudência real, separação fatos/direito, fundamentação, checklist e dispositivo). Use SOMENTE artigos que existem de fato na legislação vigente.`
-              : systemMsg;
+              // Etapa 2: Análise completa com temas identificados
+              const fullPrompt = themes
+                ? `${systemMsg}\n\nTEMAS JURÍDICOS IDENTIFICADOS NA ETAPA ANTERIOR:\n${themes}\n\nAgora proceda com a análise COMPLETA do caso, seguindo TODAS as etapas do fluxo (pesquisa de legislação, jurisprudência real, separação fatos/direito, fundamentação, checklist e dispositivo). Use SOMENTE artigos que existem de fato na legislação vigente.`
+                : systemMsg;
 
-            pipelineResult = await chatCompletion({
-              messages: [
-                { role: "system", content: fullPrompt },
-                { role: "user", content: userMsg },
-              ],
-              model: "big-pickle",
-              temperature: 0.3,
-              maxTokens: 4000,
-            });
+              pipelineResult = await chatCompletion({
+                messages: [
+                  { role: "system", content: fullPrompt },
+                  { role: "user", content: userMsg },
+                ],
+                model: "big-pickle",
+                temperature: 0.3,
+                maxTokens: 8192,
+              });
+            }
           } else {
             pipelineResult = await chatPipeline({
               messages: [
@@ -319,7 +342,7 @@ Deno.serve(async (req) => {
               ],
               model: agentConfig?.model || model,
               temperature: 0.3,
-              maxTokens: 4000,
+              maxTokens: 8192,
             });
           }
 

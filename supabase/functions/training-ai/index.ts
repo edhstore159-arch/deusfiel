@@ -1,6 +1,11 @@
 import { chatCompletion, chatEmergent, chatGemini, EMERGENT_KEY } from "../_shared/llm.ts";
 import { saveEvolvedPrompt, getEvolvedPrompt } from "../_shared/prompts.ts";
 
+// Wrapper: always specify model to force Emergent routing (Zen unreliable for long prompts)
+function aiChat(opts: Parameters<typeof chatCompletion>[0]) {
+  return chatCompletion({ ...opts, model: opts.model || "gpt-4o-mini" });
+}
+
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -532,6 +537,7 @@ Deno.serve(async (req: Request) => {
     let systemPrompt = "";
     let userContent = "";
     let lawyerFeedback = "";
+    let _evalResult: any = null;
 
     if (action === "generate_case") {
       systemPrompt = GENERATE_CASE_PROMPT;
@@ -554,7 +560,7 @@ Deno.serve(async (req: Request) => {
       let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 3000 });
       if (!lawyerResult.ok) {
         console.log("[training-ai] Gemini falhou para generate_lawyer_response, usando fallback...");
-        lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1200 });
+        lawyerResult = await aiChat({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1200 });
       }
 
       let response = lawyerResult.ok
@@ -572,7 +578,7 @@ Deno.serve(async (req: Request) => {
           temperature: 0.3, maxTokens: 2000,
         });
         if (!reviewResult.ok) {
-          reviewResult = await chatCompletion({
+          reviewResult = await aiChat({
             messages: [
               { role: "system", content: LEGAL_REVIEW_PROMPT },
               { role: "user", content: `Texto para revisão:\n\n${response}` },
@@ -607,7 +613,7 @@ Deno.serve(async (req: Request) => {
       ];
 
       // Gera resposta do advogado em paralelo com a avaliação
-      const lawyerPromise = chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1000 });
+      const lawyerPromise = aiChat({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1000 });
       const evalSystemPrompt = EVALUATE_PROMPT;
       const evalUserContent = `Avalie RIGOROSAMENTE a resposta do profissional no modo ${modeLabel}.
 
@@ -621,12 +627,13 @@ ${userResponse}
 
 INSTRUÇÕES DE AVALIAÇÃO:
 - Score deve ser RIGOROSO: respostas genéricas sem artigos específicos devem receber abaixo de 50`;
-      const evalPromise = chatCompletion({
+      const evalPromise = aiChat({
         messages: [{ role: "system", content: evalSystemPrompt }, { role: "user", content: evalUserContent }],
         temperature: 0.3, maxTokens: 1500,
       });
 
       const [lawyerResult, evalResult] = await Promise.allSettled([lawyerPromise, evalPromise]);
+      _evalResult = evalResult;
 
       lawyerFeedback = "Análise não disponível.";
       if (lawyerResult.status === "fulfilled" && lawyerResult.value.ok) {
@@ -756,7 +763,7 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
       }
 
       // 1. Gerar resposta do profissional
-      const simResult = await chatCompletion({
+      const simResult = await aiChat({
         messages: [
           { role: "system", content: systemInstruction },
           { role: "user", content: userInstruction },
@@ -785,7 +792,7 @@ Produza uma ANÁLISE JUDICIAL COMPLETA. Avalie se um advogado bem orientado acer
       const evalCriteria = mode === "secretary"
         ? "escuta ativa, personalização (nome do cliente), demonstração de valor, tratamento de objeções, urgência ética, fechamento com agendamento, tom acolhedor, persuasão, estratégias de captação."
         : "fundamentação legal (artigos citados), argumentação lógica, conclusão clara, empatia, personalização (nome do cliente), persuasão, tratamento de objeções, convite para agendamento.";
-      let evalResult = await chatCompletion({
+      let evalResult = await aiChat({
         messages: [
           { role: "system", content: `Você é um avaliador de atendimento jurídico. Avalie a resposta da ${evalRole} e retorne APENAS JSON válido:
 {"score": 0-100, "feedback": "feedback com 2-3 frases", "strengths": ["ponto forte 1", "ponto forte 2"], "weaknesses": ["ponto fraco 1", "ponto fraco 2"]}
@@ -815,7 +822,7 @@ Critérios: ${evalCriteria}` },
       // 3. Se score < 80, gerar prompt melhorado automaticamente
       let improvedPrompt: string | null = null;
       if (evaluation.score < 80) {
-        const improveResult = await chatCompletion({
+        const improveResult = await aiChat({
           messages: [
             { role: "system", content: `Melhore o prompt de um ${mode === "lawyer" ? "ADVOGADO" : "JUIZ"} para WhatsApp. O prompt atual gerou uma resposta com score ${evaluation.score}/100.
 
@@ -889,7 +896,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
           const areaLabel = sc.area.charAt(0).toUpperCase() + sc.area.slice(1);
           const roleLabel = mode === "secretary" ? "secretária jurídica" : "advogado especialista";
 
-          const simResult = await chatCompletion({
+          const simResult = await aiChat({
             messages: [
               { role: "system", content: `${systemPromptBase}\n\n${STRATEGIES_CONTEXT}\n\nÁREA: ${areaLabel}\nESTRATÉGIA FOCAL: ${sc.strategy}` },
               { role: "user", content: `CLIENTE: ${clientName}\nÁREA: ${areaLabel}\nMENSAGEM: "${sc.client_message}"\n\nResponda como ${roleLabel}, aplicando TODAS as estratégias de captação e conversão. Use o nome do cliente, seja empático e termine com convite para agendamento. Máximo 500 palavras.` },
@@ -955,7 +962,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
         // OTIMIZAÇÃO: Gerar TODOS os casos em paralelo, depois TODAS as respostas, depois TODAS as avaliações
         // Reduz de 3×N sequencial para 3 batches paralelos
         const casePromises = areas.map((iterArea) =>
-          chatCompletion({
+          aiChat({
             messages: [
               { role: "system", content: GENERATE_CASE_PROMPT },
               { role: "user", content: `Gere um caso simulado para treinamento de ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"} na área de ${iterArea.charAt(0).toUpperCase() + iterArea.slice(1)} com dificuldade Médio. Use nomes fictícios. Caso realista.` },
@@ -977,7 +984,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
 
         // Gerar TODAS as respostas em paralelo
         const responsePromises = validCases.map(({ area: iterArea, caseData: cd }) =>
-          chatCompletion({
+          aiChat({
             messages: [
               { role: "system", content: currentPrompt + "\n\n" + STRATEGIES_CONTEXT },
               { role: "user", content: `Caso: ${cd.title}\n\n${cd.description}\n\nPergunta: ${cd.question || ""}\n\nResponda como ${mode === "lawyer" ? "advogado" : "juiz"}, aplicando estratégias de atendimento ao cliente.` },
@@ -997,7 +1004,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
 
         // Avaliar TODAS as respostas em paralelo
         const evalPromises = validResponses.map(({ area: iterArea, caseData: cd, response: resp }) =>
-          chatCompletion({
+          aiChat({
             messages: [
               { role: "system", content: EVALUATE_PROMPT },
               { role: "user", content: `Avalie RIGOROSAMENTE a resposta do profissional no modo ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"}.\n\nCASO:\n${JSON.stringify(cd, null, 2)}\n\nLEIS APLICÁVEIS: ${Array.isArray(cd?.applicable_laws) ? cd.applicable_laws.join(", ") : (cd?.applicable_laws || "N/A")}\nQUESTÕES JURÍDICAS: ${Array.isArray(cd?.key_issues) ? cd.key_issues.join("; ") : (cd?.key_issues || "N/A")}\n\nRESPOSTA DO PROFISSIONAL:\n${resp}\n\nScore RIGOROSO.` },
@@ -1057,7 +1064,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
         }
 
         // 7. Melhorar prompt
-        const improveResult = await chatCompletion({
+        const improveResult = await aiChat({
           messages: [
             { role: "system", content: `Melhore o prompt do ${mode === "lawyer" ? "advogado" : "juiz"} para treinamento jurídico. JSON: {"improved_prompt": "...", "changes": []}` },
             { role: "user", content: `PROMPT ATUAL:\n${currentPrompt}\n\nWEAKNESSES:\n${allWeaknesses.slice(0, 5).join("\n")}\n\nSTRENGTHS:\n${allStrengths.slice(0, 3).join("\n")}\n\nScore atual: ${avgScore}/100. Meta: +${targetImprovement}%. Melhore o prompt para o profissional responder melhor em treinos.` },
@@ -1114,7 +1121,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
         );
       }
 
-      const stratResult = await chatCompletion({
+      const stratResult = await aiChat({
         messages: [
           { role: "system", content: SECRETARY_STRATEGY_PROMPT },
           { role: "user", content: `Gere um cenário realista de atendimento para a estratégia: "${strategy.name}" — ${strategy.desc}.\n\nO cenário deve simular um cliente real de escritório de advocacia brasileiro. Inclua contexto emocional, urgência, objeções prováveis e detalhes que tornem o treinamento desafiador. Use nomes fictícios brasileiros.` },
@@ -1158,7 +1165,7 @@ Responda APENAS com o prompt melhorado, sem explicações extras.` },
         );
       }
 
-      const evalResult = await chatCompletion({
+      const evalResult = await aiChat({
         messages: [
           { role: "system", content: SECRETARY_EVALUATE_PROMPT },
           { role: "user", content: `CENÁRIO DE TREINAMENTO:\n${scenario}\n\nESTRATÉGIA: ${strategyId}\n\nRESPOSTA DA SECRETÁRIA:\n${userResponse}\n\nPROMPT ATUAL DA SECRETÁRIA:\n${(currentPrompt || "").slice(0, 1500)}\n\nAvalie a resposta considerando todas as estratégias de atendimento ao cliente. Score 0-100.` },
@@ -1234,7 +1241,7 @@ REGRAS OBRIGATÓRIAS:
         : `PROMPT ATUAL DO ${mode === "lawyer" ? "ADVOGADO" : "JUIZ"}:\n${currentPrompt.slice(0, 3000)}\n\nRESUMO DA AVALIAÇÃO:\n${evaluationSummary.slice(0, 1500)}\n\nPONTOS FRACOS:\n${weaknesses.map((w, i) => `${i + 1}. ${w}`).join("\n") || "Nenhum identificado"}\n\nDICAS:\n${tips.map((t, i) => `${i + 1}. ${t}`).join("\n") || "Nenhuma identificada"}\n\nMELHORE o prompt do profissional para que ele responda melhor nos próximos treinos. O prompt deve ser completo e autocontido.`;
 
       // Retry: até 2 tentativas para improve_prompt
-      let improveResult = await chatCompletion({
+      let improveResult = await aiChat({
         messages: [
           { role: "system", content: improveSystemPrompt },
           { role: "user", content: userMessage },
@@ -1244,7 +1251,7 @@ REGRAS OBRIGATÓRIAS:
 
       if (!improveResult.ok) {
         console.warn(`[training-ai] improve_prompt tentativa 1 falhou: ${improveResult.error}, tentando retry...`);
-        improveResult = await chatCompletion({
+        improveResult = await aiChat({
           messages: [
             { role: "system", content: improveSystemPrompt },
             { role: "user", content: userMessage },
@@ -1308,7 +1315,7 @@ REGRAS OBRIGATÓRIAS:
 
       // Gerar TODOS os cenários em paralelo
       const scenPromises = stratSlice.map((strategy) =>
-        chatCompletion({
+        aiChat({
           messages: [
             { role: "system", content: SECRETARY_STRATEGY_PROMPT },
             { role: "user", content: `Gere um cenário para a estratégia: "${strategy.name}" — ${strategy.desc}. Use nomes fictícios brasileiros. Cenário realista.` },
@@ -1331,7 +1338,7 @@ REGRAS OBRIGATÓRIAS:
 
       // Gerar TODAS as respostas em paralelo
       const respPromises = validScenarios.map(({ strategy, scenarioText }) =>
-        chatCompletion({
+        aiChat({
           messages: [
             { role: "system", content: currentPrompt },
             { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica da Dra. Kênia Garcia, aplicando estratégias de atendimento.` },
@@ -1351,7 +1358,7 @@ REGRAS OBRIGATÓRIAS:
 
       // Avaliar TODAS as respostas em paralelo
       const evalPromises = validResponses.map(({ strategy, scenarioText, response }) =>
-        chatCompletion({
+        aiChat({
           messages: [
             { role: "system", content: SECRETARY_EVALUATE_PROMPT },
             { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nESTRATÉGIA: ${strategy.name}\n\nRESPOSTA DA SECRETÁRIA:\n${response}\n\nAvalie. Score 0-100.` },
@@ -1389,7 +1396,7 @@ REGRAS OBRIGATÓRIAS:
 
       let improvedPrompt: string | null = null;
       if (allWeaknesses.length > 0) {
-        const improveResult = await chatCompletion({
+        const improveResult = await aiChat({
           messages: [
             { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
             { role: "user", content: `PROMPT ATUAL:\n${currentPrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${[...new Set(allWeaknesses)].slice(0, 8).join("\n")}\n\nSTRENGTHS:\n${[...new Set(allStrengths)].slice(0, 5).join("\n")}\n\nScore médio: ${avgScore}/100. Melhore o prompt.` },
@@ -1449,7 +1456,7 @@ REGRAS OBRIGATÓRIAS:
         // OTIMIZAÇÃO: Gerar TODOS os cenários em paralelo
         const stratSlice = SECRETARY_STRATEGIES.slice(0, 5);
         const scenPromises = stratSlice.map((strategy) =>
-          chatCompletion({
+          aiChat({
             messages: [
               { role: "system", content: SECRETARY_STRATEGY_PROMPT },
               { role: "user", content: `Cenário para: "${strategy.name}" — ${strategy.desc}. Només fictícios.` },
@@ -1470,7 +1477,7 @@ REGRAS OBRIGATÓRIAS:
 
         // Gerar TODAS as respostas em paralelo
         const respPromises = validScenarios.map(({ strategy, scenarioText }) =>
-          chatCompletion({
+          aiChat({
             messages: [
               { role: "system", content: activePrompt },
               { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nResponda como secretária jurídica.` },
@@ -1490,7 +1497,7 @@ REGRAS OBRIGATÓRIAS:
 
         // Avaliar TODAS as respostas em paralelo
         const evalPromises = validResponses.map(({ strategy, scenarioText, response }) =>
-          chatCompletion({
+          aiChat({
             messages: [
               { role: "system", content: SECRETARY_EVALUATE_PROMPT },
               { role: "user", content: `CENÁRIO:\n${scenarioText}\n\nRESPOSTA:\n${response}\n\nAvalie. Score 0-100.` },
@@ -1540,7 +1547,7 @@ REGRAS OBRIGATÓRIAS:
         if (reachedTarget || iter >= maxIterations) break;
 
         // Melhorar prompt
-        const improveResult = await chatCompletion({
+        const improveResult = await aiChat({
           messages: [
             { role: "system", content: SECRETARY_IMPROVE_PROMPT_PROMPT },
             { role: "user", content: `PROMPT ATUAL:\n${activePrompt.slice(0, 2500)}\n\nWEAKNESSES:\n${allWeaknesses.slice(0, 5).join("\n")}\n\nSTRENGTHS:\n${allStrengths.slice(0, 3).join("\n")}\n\nScore: ${avgScore}/100. Meta: +${targetImprovement}%. Melhore o prompt.` },
@@ -1605,7 +1612,7 @@ Seja breve e direta.`;
         { role: "user", content: clientMessage },
       ];
 
-      const aiResult = await chatCompletion({
+      const aiResult = await aiChat({
         messages,
         temperature: 0.5,
         maxTokens: 1500,
@@ -1637,38 +1644,58 @@ Seja breve e direta.`;
 
     console.log("[training-ai] Calling AI, action:", action);
 
-    let aiResult = await chatCompletion({
-      messages,
-      temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
-      maxTokens: action === "generate_case" ? 2000 : 4000,
-      preferFastProvider: true,
-    });
+    let aiResult;
+    let rawText = "";
+    let parsed: any = null;
 
-    if (!aiResult.ok) {
-      console.warn("[training-ai] chatCompletion gpt-4o-mini failed, tentando sem modelo específico:", aiResult.error);
-      aiResult = await chatCompletion({
+    // Para evaluate: os 2 LLM calls já foram feitos em paralelo acima
+    if (action === "evaluate") {
+      const evalOk = _evalResult && _evalResult.status === "fulfilled" && _evalResult.value?.ok;
+      if (evalOk) {
+        rawText = _evalResult.value.data?.choices?.[0]?.message?.content || "";
+        aiResult = _evalResult.value;
+      } else {
+        console.error("[training-ai] Evaluate LLM failed:", _evalResult?.status);
+        return new Response(
+          JSON.stringify({ error: "Nenhum provider de IA disponível para avaliação", details: "Tente novamente" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    } else {
+      aiResult = await aiChat({
         messages,
-        temperature: action === "evaluate" ? 0.3 : action === "evaluate_and_correct" ? 0.5 : 0.8,
+        temperature: action === "evaluate_and_correct" ? 0.5 : 0.8,
         maxTokens: action === "generate_case" ? 2000 : 4000,
+        preferFastProvider: true,
       });
+
+      if (!aiResult.ok) {
+        console.warn("[training-ai] chatCompletion failed, tentando sem modelo específico:", aiResult.error);
+        aiResult = await aiChat({
+          messages,
+          temperature: action === "evaluate_and_correct" ? 0.5 : 0.8,
+          maxTokens: action === "generate_case" ? 2000 : 4000,
+        });
+      }
+
+      if (!aiResult.ok) {
+        console.error("[training-ai] AI failed:", aiResult.status, aiResult.error);
+        return new Response(
+          JSON.stringify({ error: "Nenhum provider de IA disponível", details: String(aiResult.error || "").slice(0, 200) }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      rawText = aiResult.data?.choices?.[0]?.message?.content || "";
     }
 
-    if (!aiResult.ok) {
-      console.error("[training-ai] AI failed:", aiResult.status, aiResult.error);
-      return new Response(
-        JSON.stringify({ error: "Nenhum provider de IA disponível", details: String(aiResult.error || "").slice(0, 200) }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
+    console.log("[training-ai] Got response, length:", rawText.length, "provider:", aiResult?.provider);
 
-    const rawText = aiResult.data?.choices?.[0]?.message?.content || "";
-    console.log("[training-ai] Got response, length:", rawText.length, "provider:", aiResult.provider);
-
-    let parsed = parseJsonResponse(rawText);
+    parsed = parseJsonResponse(rawText);
 
     if (!parsed && rawText.length > 100) {
       console.warn("[training-ai] Primeira tentativa de parse falhou, tentando com provider diferente...");
-      const retryResult = await chatCompletion({
+      const retryResult = await aiChat({
         messages: [...messages, { role: "user", content: "IMPORTANTE: Responda APENAS em JSON válido, sem texto adicional." }],
         temperature: 0.2,
         maxTokens: 4000,

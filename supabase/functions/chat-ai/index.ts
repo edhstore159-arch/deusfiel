@@ -1122,34 +1122,6 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
     const history: Array<{ role: string; content: string }> = compactHistory(Array.isArray(body.history) ? body.history : []);
-    // Tenta usar prompt evoluído do treinamento; senão, usa body.prompt; senão, usa o padrão hardcoded
-    let extraPrompt: string = DEFAULT_PROMPT;
-    try {
-      const evolved = await getEvolvedPrompt("secretary");
-      if (evolved && evolved.trim().length > 100) {
-        extraPrompt = evolved;
-        console.log("[chat-ai] Usando prompt evoluído do treinamento (agent_type=secretary)");
-      } else if (body.prompt && String(body.prompt).trim().length > 100) {
-        extraPrompt = String(body.prompt).trim();
-        console.log("[chat-ai] Usando prompt do body (fallback)");
-      }
-    } catch (e) {
-      console.warn("[chat-ai] Falha ao buscar prompt evoluído, usando padrão:", e);
-      if (body.prompt && String(body.prompt).trim().length > 100) {
-        extraPrompt = String(body.prompt).trim();
-        console.log("[chat-ai] Usando prompt do body (fallback após erro DB)");
-      }
-    }
-
-    // Buscar também prompt evoluído do advogado para enriquecer conhecimento jurídico
-    try {
-      const lawyerEvolved = await getEvolvedPrompt("lawyer", "*");
-      if (lawyerEvolved && lawyerEvolved.trim().length > 100) {
-        extraPrompt += `\n\n# CONHECIMENTO JURÍDICO AVANÇADO (Treinamento de Advogado)\n${lawyerEvolved.slice(0, 2000)}`;
-        console.log("[chat-ai] Prompt evoluído do advogado incorporado ao conhecimento jurídico");
-      }
-    } catch { /* optional */ }
-
     const sessionId: string | null = body.session_id ? String(body.session_id) : null;
     const userId: string | null = body.user_id ? String(body.user_id) : null;
 
@@ -1190,6 +1162,160 @@ Deno.serve(async (req) => {
       new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now),
       10,
     );
+
+    // ===== FAST-PATH: shortcuts ANTES de qualquer query DB ou LLM =====
+    const normalizedFast = userMessage.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const wordCount = userMessage.trim().split(/\s+/).length;
+
+    // Saudações (resposta instantânea, sem LLM)
+    const isGreeting = wordCount <= 4 && /\b(oi|ol[áa]|bom\s+dia|boa\s+tarde|boa\s+noite|hey|hello|hi|eai|eai\?|salve|fala|opa|bom dia|boa tarde|boa noite|bom dia\!|boa tarde\!|boa noite\!)\b/i.test(normalizedFast);
+    if (isGreeting) {
+      const now2 = new Date();
+      const h = parseInt(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now2), 10);
+      const saludo = h >= 5 && h < 12 ? "Bom dia" : h >= 12 && h < 18 ? "Boa tarde" : "Boa noite";
+      return new Response(
+        JSON.stringify({ response: `${saludo}! Sou a secretária da Dra. Kênia Garcia. Como posso ajudar?`, analysis: { acertividade: 90, qualificacao: "saudacao" }, appointment: null, audio_base64: null, handoff: false, session_id: null, speaker: "Assistente virtual" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const askDateFast = /(que dia (e|eh|é) (hoje|hj))|(qual( e| eh| é)? a data)|(data de hoje)|(dia de hoje)|(que dia da semana)|(estamos em que dia)|(\bhoje e\b)|(hj e )|(qdia)/.test(normalizedFast);
+    const askTimeFast = /(que hora)|(qhora)|(ke hora)|(hora agora)|(horario agora)|(me diz a hora)|(que horas sao)/.test(normalizedFast);
+    if (askDateFast || askTimeFast) {
+      let quick = "";
+      if (askDateFast && askTimeFast) quick = `Hoje é ${weekdaySp}, ${dateOnlySp}, e agora são ${fmtTime}.`;
+      else if (askDateFast) quick = `Hoje é ${weekdaySp}, ${dateOnlySp}.`;
+      else quick = `Agora são ${fmtTime}.`;
+      return new Response(
+        JSON.stringify({ response: quick, analysis: { acertividade: 100, qualificacao: "informacao_direta" }, appointment: null, audio_base64: null, handoff: false, session_id: null, speaker: "Assistente virtual" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (userAskedTemporalInfo(userMessage)) {
+      return new Response(
+        JSON.stringify({ response: `Hoje é ${fmtDate}, e agora são ${fmtTime}.`, analysis: { acertividade: 100, qualificacao: "informacao_direta" }, appointment: null, audio_base64: null, handoff: false, session_id: null, speaker: "Assistente virtual" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (isThanksMessage(userMessage)) {
+      return new Response(
+        JSON.stringify({ response: buildThanksReply(history), analysis: { acertividade: 100, qualificacao: "agradecimento" }, appointment: null, audio_base64: null, handoff: false, session_id: null, speaker: "Assistente virtual" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (isHandoffRequest(userMessage)) {
+      return new Response(
+        JSON.stringify({ response: buildHandoffReply(), analysis: { acertividade: 100, qualificacao: "handoff" }, appointment: null, audio_base64: null, handoff: true, session_id: null, speaker: "Assistente virtual" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    if (isResumeRequest(userMessage)) {
+      return new Response(
+        JSON.stringify({ response: buildResumeReply(history), analysis: { acertividade: 85, qualificacao: "retomada" }, appointment: null, audio_base64: null, handoff: false, session_id: null, speaker: "Assistente virtual" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const skipOfficeFast = /\b(agendar|marcar|consulta|consultar|reuni[aã]o|hor[aá]rio|hor[aá]rios|atendimento)\b/i.test(userMessage) ||
+      /\b(\d{1,2}[:h]\d{0,2}|\d{1,2}\s*horas?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/i.test(userMessage) ||
+      /\b(meu\s+nome|telefone|email|e-mail|whats|cidade|estado|@)\b/i.test(userMessage);
+    if (!skipOfficeFast && userAskedOfficeInfo(userMessage)) {
+      return new Response(
+        JSON.stringify({ response: buildOfficeInfoReply(), analysis: { acertividade: 90, qualificacao: "info_escritorio" }, appointment: null, audio_base64: null, handoff: false, session_id: null, speaker: "Assistente virtual" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    // ===== FIM FAST-PATH =====
+
+    // ===== DB QUERIES EM PARALELO =====
+    let extraPrompt: string = DEFAULT_PROMPT;
+    let agentConfig: any = null;
+    let availabilityDays: { weekday: string; iso: string; br: string; hours: string[] }[] = [];
+
+    const sbAgent = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const startISO = now.toISOString().slice(0, 10);
+    const endDate = new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10);
+
+    const detectAreaAndAgent = async (): Promise<void> => {
+      const areaKeywords: Record<string, string[]> = {
+        penal: ["crime", "criminal", "penal", "roubo", "furto", "estupro", "homicídio", "mandado", "prisão", "delegacia", "inquérito", "CPP", "CP", "criminal"],
+        civel: ["contrato", "cível", "civil", "dano moral", "dano material", "indenização", "responsabilidade civil", "propriedade", "usufruto", "CC", "CPC"],
+        trabalhista: ["trabalho", "trabalhista", "CLT", "emprego", "demissão", "horas extras", "fgts", "rescisão", "patrão", "empregador", "chefe"],
+        familia: ["divórcio", "guarda", "pensão alimentícia", "filhos", "casamento", "união estável", "família", "herança", "inventário", "alimentos"],
+        previdenciario: ["INSS", "aposentadoria", "previdenciário", "benefício", "BPC", "LOAS", "tempo de contribuição", "auxílio", "doença", "incapacidade"],
+        tributario: ["imposto", "tributo", "ICMS", "ISS", "IR", "IPTU", "multa tributária", "execução fiscal", "CTN", "fiscal"],
+        administrativo: ["servidor público", "licitação", "improbidade", "administrativo", "concurso", "estabilidade", "processo disciplinar", "Lei 8.112"],
+        constitucional: ["constitucional", "CF", "direito fundamental", "ADI", "ADC", "ADPF", "habeas corpus", "mandado de segurança", "STF"],
+        consumidor: ["consumidor", "CDC", "compra", "produto defeituoso", "cláusula abusiva", "reclamação", "loja", "garantia"],
+        ambiental: ["ambiental", "licenciamento", "APP", "passivo ambiental", "poluição", "ICMBio", "Lei 6.938"],
+        eleitoral: ["eleitoral", "candidato", "propaganda eleitoral", "Ficha Limpa", "TSE", "urna", "voto"],
+        internacional: ["internacional", "tratado", "extradição", "cooperação", "embaixada", "passaporte"],
+        sucessões: ["sucessão", "inventário", "testamento", "herdeiro", "partilha", "doação", "legado"],
+      };
+      const normalizedMsg = userMessage.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      let detectedArea = "";
+      for (const [area, keywords] of Object.entries(areaKeywords)) {
+        if (keywords.some(kw => normalizedMsg.includes(kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) {
+          detectedArea = area;
+          break;
+        }
+      }
+      if (detectedArea) {
+        try {
+          const { data: agent } = await sbAgent.from("ai_agents").select("*").ilike("area", detectedArea).eq("active", true).limit(1).single();
+          if (agent) { agentConfig = agent; console.log(`[chat-ai] Agente detectado: ${agent.name} (área: ${detectedArea})`); }
+        } catch (e) { console.warn("[chat-ai] Falha ao buscar agente:", e); }
+      }
+    };
+
+    const fetchPrompts = async (): Promise<void> => {
+      try {
+        const [evolved, lawyerEvolved] = await Promise.all([
+          getEvolvedPrompt("secretary").catch(() => null),
+          getEvolvedPrompt("lawyer", "*").catch(() => null),
+        ]);
+        if (evolved && evolved.trim().length > 100) {
+          extraPrompt = evolved;
+          console.log("[chat-ai] Usando prompt evoluído do treinamento (secretary)");
+        } else if (body.prompt && String(body.prompt).trim().length > 100) {
+          extraPrompt = String(body.prompt).trim();
+        }
+        if (lawyerEvolved && lawyerEvolved.trim().length > 100) {
+          extraPrompt += `\n\n# CONHECIMENTO JURÍDICO AVANÇADO (Treinamento de Advogado)\n${lawyerEvolved.slice(0, 2000)}`;
+        }
+      } catch (e) { console.warn("[chat-ai] Falha ao buscar prompts:", e); }
+    };
+
+    const fetchAvailability = async (): Promise<void> => {
+      try {
+        const { data: booked } = await sbAgent.from("appointments").select("appointment_date, appointment_time").gte("appointment_date", startISO).lte("appointment_date", endDate);
+        const taken = new Set((booked || []).map((b: any) => `${b.appointment_date} ${String(b.appointment_time).slice(0, 5)}`));
+        const WORK_HOURS = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00"];
+        const WEEKDAY_NAMES = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+        const days: string[] = [];
+        for (let i = 0; i < 14 && days.length < 7; i++) {
+          const d = new Date(now.getTime() + i * 86400000);
+          const dow = d.getDay();
+          if (dow === 0 || dow === 6) continue;
+          const iso = d.toISOString().slice(0, 10);
+          const [yy, mm, dd] = iso.split("-");
+          const br = `${dd}/${mm}/${yy}`;
+          const free = WORK_HOURS.filter((h) => !taken.has(`${iso} ${h}`));
+          if (i === 0) {
+            const curH = parseInt(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now), 10);
+            const futureFree = free.filter((h) => parseInt(h.slice(0, 2), 10) > curH);
+            if (futureFree.length === 0) continue;
+            days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${futureFree.join(", ")}`);
+            availabilityDays.push({ weekday: WEEKDAY_NAMES[dow], iso, br, hours: futureFree });
+          } else if (free.length > 0) {
+            days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${free.join(", ")}`);
+            availabilityDays.push({ weekday: WEEKDAY_NAMES[dow], iso, br, hours: free });
+          }
+        }
+      } catch (err) { console.error("Falha ao consultar agenda:", err); }
+    };
+
+    await Promise.all([fetchPrompts(), detectAreaAndAgent(), fetchAvailability()]);
+    // ===== FIM DB QUERIES PARALELAS =====
+
     const saudacao =
       hourSp >= 5 && hourSp < 12 ? "Bom dia" : hourSp >= 12 && hourSp < 18 ? "Boa tarde" : "Boa noite";
 
@@ -1197,54 +1323,6 @@ Deno.serve(async (req) => {
     const antiRepetitionContext = assistantReplies.length
       ? `\n\nANTI-REPETIÇÃO OPERACIONAL INTERNA:\n- Use o histórico apenas para saber o que já foi dito.\n- Não copie, liste ou recite respostas anteriores.\n- Responda somente à última mensagem do cliente, avançando a conversa.`
       : "";
-
-    // Detectar área jurídica e buscar agente correspondente
-    let detectedArea = "";
-    let agentConfig: any = null;
-    const areaKeywords: Record<string, string[]> = {
-      penal: ["crime", "criminal", "penal", "roubo", "furto", "estupro", "homicídio", "mandado", "prisão", "delegacia", "inquérito", "CPP", "CP", "criminal"],
-      civel: ["contrato", "cível", "civil", "dano moral", "dano material", "indenização", "responsabilidade civil", "propriedade", "usufruto", "CC", "CPC"],
-      trabalhista: ["trabalho", "trabalhista", "CLT", "emprego", "demissão", "horas extras", "fgts", "rescisão", "patrão", "empregador", "chefe"],
-      familia: ["divórcio", "guarda", "pensão alimentícia", "filhos", "casamento", "união estável", "família", "herança", "inventário", "alimentos"],
-      previdenciario: ["INSS", "aposentadoria", "previdenciário", "benefício", "BPC", "LOAS", "tempo de contribuição", "auxílio", "doença", "incapacidade"],
-      tributario: ["imposto", "tributo", "ICMS", "ISS", "IR", "IPTU", "multa tributária", "execução fiscal", "CTN", "fiscal"],
-      administrativo: ["servidor público", "licitação", "improbidade", "administrativo", "concurso", "estabilidade", "processo disciplinar", "Lei 8.112"],
-      constitucional: ["constitucional", "CF", "direito fundamental", "ADI", "ADC", "ADPF", "habeas corpus", "mandado de segurança", "STF"],
-      consumidor: ["consumidor", "CDC", "compra", "produto defeituoso", "cláusula abusiva", "reclamação", "loja", "garantia"],
-      ambiental: ["ambiental", "licenciamento", "APP", "passivo ambiental", "poluição", "ICMBio", "Lei 6.938"],
-      eleitoral: ["eleitoral", "candidato", "propaganda eleitoral", "Ficha Limpa", "TSE", "urna", "voto"],
-      internacional: ["internacional", "tratado", "extradição", "cooperação", "embaixada", "passaporte"],
-      sucessões: ["sucessão", "inventário", "testamento", "herdeiro", "partilha", "doação", "legado"],
-    };
-
-    const normalizedMsg = userMessage.toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-    for (const [area, keywords] of Object.entries(areaKeywords)) {
-      if (keywords.some(kw => normalizedMsg.includes(kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) {
-        detectedArea = area;
-        break;
-      }
-    }
-
-    if (detectedArea) {
-      try {
-        const sbAgent = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-        const { data: agent } = await sbAgent
-          .from("ai_agents")
-          .select("*")
-          .ilike("area", detectedArea)
-          .eq("active", true)
-          .limit(1)
-          .single();
-        if (agent) {
-          agentConfig = agent;
-          console.log(`[chat-ai] Agente detectado: ${agent.name} (área: ${detectedArea})`);
-        }
-      } catch (e) {
-        console.warn("[chat-ai] Falha ao buscar agente:", e);
-      }
-    }
 
     const systemContent = `${extraPrompt}
 
@@ -1303,47 +1381,10 @@ REGRAS OBRIGATÓRIAS PARA PERGUNTAS JURÍDICAS:
    - Penal: inquérito policial, representação criminal, audiência de custódia, medidas cautelares, defesa técnica
    - Consumidor: CDC, inversão do ônus da prova, vício/conhecimento do produto, direito de arrependimento, cláusula abusiva` : ""}`;
 
-    // === Agenda real da Dra. Kênia (slots disponíveis a partir do dashboard) ===
-    let availabilityBlock = "";
-    let availabilityDays: { weekday: string; iso: string; br: string; hours: string[] }[] = [];
-    try {
-      const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-      const startISO = now.toISOString().slice(0, 10);
-      const endDate = new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10);
-      const { data: booked } = await sb
-        .from("appointments")
-        .select("appointment_date, appointment_time")
-        .gte("appointment_date", startISO)
-        .lte("appointment_date", endDate);
-      const taken = new Set((booked || []).map((b: any) => `${b.appointment_date} ${String(b.appointment_time).slice(0, 5)}`));
-      const WORK_HOURS = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00"];
-      const WEEKDAY_NAMES = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
-      const days: string[] = [];
-      for (let i = 0; i < 14 && days.length < 7; i++) {
-        const d = new Date(now.getTime() + i * 86400000);
-        const dow = d.getDay();
-        if (dow === 0 || dow === 6) continue;
-        const iso = d.toISOString().slice(0, 10);
-        const [yy, mm, dd] = iso.split("-");
-        const br = `${dd}/${mm}/${yy}`;
-        const free = WORK_HOURS.filter((h) => !taken.has(`${iso} ${h}`));
-        if (i === 0) {
-          const curH = parseInt(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now), 10);
-          const futureFree = free.filter((h) => parseInt(h.slice(0, 2), 10) > curH);
-          if (futureFree.length === 0) continue;
-          days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${futureFree.join(", ")}`);
-          availabilityDays.push({ weekday: WEEKDAY_NAMES[dow], iso, br, hours: futureFree });
-        } else if (free.length > 0) {
-          days.push(`- ${WEEKDAY_NAMES[dow]} ${iso}: ${free.join(", ")}`);
-          availabilityDays.push({ weekday: WEEKDAY_NAMES[dow], iso, br, hours: free });
-        }
-      }
-      availabilityBlock = days.length
-        ? `\n\nAGENDA REAL DA DRA. KÊNIA (consultada agora no dashboard de agendamentos — use APENAS estes horários ao oferecer/confirmar consultas; nunca invente outros):\n${days.join("\n")}\n- Horário de atendimento: seg–sex, 09:00–11:00 e 14:00–17:00 (consultas de 1h).\n- Se o cliente pedir um horário fora desta lista, diga que está ocupado e ofereça as opções acima.`
-        : "\n\nAGENDA REAL DA DRA. KÊNIA: nenhum horário livre nos próximos 14 dias úteis — peça ao cliente para aguardar contato.";
-    } catch (err) {
-      console.error("Falha ao consultar agenda:", err);
-    }
+    // === Agenda já carregada em paralelo acima ===
+    const availabilityBlock = availabilityDays.length
+      ? `\n\nAGENDA REAL DA DRA. KÊNIA (consultada agora no dashboard de agendamentos — use APENAS estes horários ao oferecer/confirmar consultas; nunca invente outros):\n${availabilityDays.map((d) => `- ${d.weekday} ${d.iso}: ${d.hours.join(", ")}`).join("\n")}\n- Horário de atendimento: seg–sex, 09:00–11:00 e 14:00–17:00 (consultas de 1h).\n- Se o cliente pedir um horário fora desta lista, diga que está ocupado e ofereça as opções acima.`
+      : "\n\nAGENDA REAL DA DRA. KÊNIA: nenhum horário livre nos próximos 14 dias úteis — peça ao cliente para aguardar contato.";
 
     function buildSlotsReply(): string {
       if (!availabilityDays.length) {
@@ -1354,7 +1395,7 @@ REGRAS OBRIGATÓRIAS PARA PERGUNTAS JURÍDICAS:
     }
 
 
-    // Atalho determinístico para perguntas de data/hora
+    // Atalho determinístico para perguntas de data/hora (já coberto pelo fast-path, mantido como fallback)
     const normalizedUser = String(userMessage || "")
       .toLowerCase()
       .normalize("NFD")
