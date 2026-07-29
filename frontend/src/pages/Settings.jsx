@@ -115,7 +115,7 @@ export default function Settings() {
             <div className="text-sm text-nude-700">
               <div className="font-medium mb-1">Sobre as chaves</div>
               <div className="text-xs">
-                Por padrão, usamos a <strong>Emergent Universal Key</strong> que já vem configurada e funciona para chat (GPT-4o-mini) e imagens (gpt-image-1). Se você tiver uma chave OpenAI própria, pode substituir aqui para usar créditos próprios.
+                A <strong>Emergent Key</strong> é usada para chat (GPT/Gemini/IA). Para <strong>gerar imagens</strong>, use uma chave OpenAI própria (sk-...) ou deixe em branco para usar a chave do sistema.
               </div>
             </div>
           </div>

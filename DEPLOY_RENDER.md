@@ -1,52 +1,77 @@
-# 🚀 Manual de Deploy — Render.com
+# 🚀 Manual de Deploy — Render.com + Supabase
 
-Guia completo, passo-a-passo, para colocar **Kênia Garcia Advocacia** em produção no [Render.com](https://render.com).
+Sistema **Espírito Santo AI** para **Kênia Garcia Advocacia**.
 
-> **Tempo estimado**: 30-45 minutos (primeira vez).  
-> **Custo**: ~US$ 14-21/mês (Starter Web Service x2 + DB free 90 dias OU Render-managed Mongo via Atlas).
+> **Já deployed**: Supabase + Render (`kenia-whatsapp-backend` + `jatai-app`).  
+> **Custo atual**: ~$7/mês (Starter) + Supabase Free.
 
 ---
 
-## 📋 Arquitetura em produção
+## 📋 Arquitetura
 
-| Componente | Tipo Render | Plano sugerido |
+| Componente | Onde | Plano | Status |
+|---|---|---|---|
+| **WhatsApp Baileys** (`backend/server.js`) | Render Web Service | **Starter** ⚠️ | ✅ Live |
+| **Frontend React** (`frontend/`) | Render Static Site | Grátis | ✅ Live |
+| **Supabase Edge Functions** (chat-ai, twilio, etc) | Supabase | Free | ✅ Live |
+| **WhatsApp Twilio** (supabase/functions) | Supabase Edge | Free | ✅ Live |
+| **FastAPI Backend** (`backend/server.py`) | Local (PC) | — | Só quando PC ligado |
+
+---
+
+## ⚠️ CRÍTICO: WhatsApp não pode ficar no Free
+
+O plano **Free** do Render **dorme após 15 min de inatividade** → o WebSocket do WhatsApp cai → **WhatsApp desconecta**.
+
+**Solução**: O serviço `kenia-whatsapp-backend` precisa estar no plano **Starter** ($7/mês).
+
+Para verificar/alterar:
+1. Acesse [dashboard.render.com](https://dashboard.render.com/)
+2. Clique em `kenia-whatsapp-backend` → **Settings** → **Plan** → mude para **Starter**
+3. O serviço **nunca mais dorme** → WhatsApp fica 24/7
+
+> 💡 Starter = 512 MB RAM, CPU compartilhado, sem sleep. Perfeito para Baileys.
+
+---
+
+## ✅ Já deployado (não precisa refazer)
+
+### Render (via `render.yaml`)
+| Serviço | URL | O que faz |
 |---|---|---|
-| **Backend FastAPI** (`/app/backend`) | Web Service | Starter ($7/mês, 512 MB RAM, **disco persistente +$1/GB**) |
-| **Sidecar Baileys** (`/app/baileys-service`) | Web Service | Starter ($7/mês, **disco persistente OBRIGATÓRIO** para `auth_info/`) |
-| **Frontend React** (`/app/frontend`) | Static Site | **Grátis** |
-| **MongoDB** | externo | **MongoDB Atlas Free** (M0, 512 MB) — vide passo 1 |
+| `jatai-app` | Static Site | Frontend React |
+| `kenia-whatsapp-backend` | Node.js Web Service | Baileys WhatsApp + APIs |
+
+### Supabase
+| Projeto | URL |
+|---|---|
+| Dashboard | https://supabase.com/dashboard/project/uzzbgjwpfxokagrvmdoa |
+| API | https://uzzbgjwpfxokagrvmdoa.supabase.co |
+
+#### Edge Functions já deployadas
+- `chat-ai` — atendimento com IA
+- `training-ai` — treinamento jurídico
+- `document-builder` — gerador de documentos (usa Zen)
+- `whatsapp-twilio-webhook` — WhatsApp via Twilio
+- `transcribe-audio` — transcrição de áudio
+- `generate-image`, `fuse-images` — geração de imagens
+- `legal-brief` — brief legislativo diário
+- `judge-ai`, `multi-model-chat`, `setup-agents`, `seed-secretaria`
 
 ---
 
-## 1️⃣ Preparar o MongoDB (Atlas Free)
+## 🆕 Se quiser criar os serviços do zero
 
-1. Vá em [cloud.mongodb.com](https://cloud.mongodb.com/) → criar conta gratuita
-2. **Build a Database** → **M0 Free** → escolha região **São Paulo (sa-east-1)** ou a mais próxima
-3. Cluster criado → **Database Access** → **Add New Database User**:
-   - Username: `kenia-prod`
-   - Password: gere uma forte (anote!)
-   - Privilégios: `Read and write to any database`
-4. **Network Access** → **Add IP Address** → **Allow access from anywhere** (`0.0.0.0/0`) — necessário porque Render usa IPs dinâmicos.
-5. Volte ao Cluster → **Connect** → **Drivers** → copie a connection string:
-   ```
-   mongodb+srv://kenia-prod:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
-   ```
-   ⚠️ Troque `<password>` pelo password que você criou.
+Apague os serviços existentes no Render e use Blueprint:
 
----
+1. Vá em [dashboard.render.com](https://dashboard.render.com/) → **New +** → **Blueprint**
+2. Conecte o GitHub → escolha `deusfiel`
+3. O `render.yaml` configura automaticamente:
+   - `jatai-app` (static site) — **grátis**
+   - `kenia-whatsapp-backend` (Node + Baileys) — **Starter obrigatório**
+4. Confirme e clique em **Deploy Blueprint**
 
-## 2️⃣ Preparar o repositório Git
-
-No painel do Emergent, clique em **"Save to GitHub"** (botão no chat de input) → conecte sua conta GitHub → criar repositório (ex: `kenia-garcia-advocacia`).
-
----
-
-## 3️⃣ Deploy do Backend (FastAPI)
-
-### 3.1. Criar Web Service no Render
-1. Em [dashboard.render.com](https://dashboard.render.com/) → **New +** → **Web Service**
-2. Conecte seu GitHub → escolha o repositório `kenia-garcia-advocacia`
-3. Configure:
+> A baileys-service standalone está comentada no render.yaml — opcional se for deployar o FastAPI backend também.
 
 | Campo | Valor |
 |---|---|

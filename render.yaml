@@ -28,7 +28,7 @@ services:
   - type: web
     name: kenia-whatsapp-backend
     runtime: node
-    plan: free
+    plan: starter
     renderSubdomainPolicy: enabled
     rootDir: backend
     buildCommand: npm install
@@ -84,3 +84,27 @@ services:
         value: sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8
       - key: EMERGENT_API_KEY
         sync: false
+
+  # baileys-service standalone (opcional — sidecar para o FastAPI backend)
+  # Só ative se também for fazer deploy do FastAPI backend (server.py) no Render.
+  # Caso contrário, o kenia-whatsapp-backend (acima) já cobre WhatsApp 24/7.
+  #
+  # - type: web
+  #   name: baileys-sidecar
+  #   runtime: node
+  #   plan: starter
+  #   rootDir: baileys-service
+  #   buildCommand: npm install
+  #   startCommand: npm start
+  #   healthCheckPath: /health
+  #   disk:
+  #     name: baileys-sidecar-auth
+  #     mountPath: /opt/render/project/src/baileys-service/auth_info
+  #     sizeGB: 1
+  #   envVars:
+  #     - key: NODE_VERSION
+  #       value: "20"
+  #     - key: BAILEYS_INTERNAL_TOKEN
+  #       value: legalflow-baileys-2026
+  #     - key: BACKEND_WEBHOOK
+  #       value: https://SEU-FASTAPI.onrender.com/api/whatsapp/webhook/baileys

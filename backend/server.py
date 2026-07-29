@@ -3150,7 +3150,7 @@ async def generate_creative(payload: CreativeGenerate, current_user=Depends(get_
     # get per-user settings for custom keys
     settings = await db.app_settings.find_one({"owner_id": current_user["id"]}, {"_id": 0}) or {}
     text_key = settings.get("llm_text_key") or EMERGENT_LLM_KEY
-    image_key = settings.get("llm_image_key") or EMERGENT_LLM_KEY
+    image_key = settings.get("llm_image_key") or os.environ.get("OPENAI_API_KEY") or ""
 
     caption_prompt = f"""Crie uma legenda envolvente para um post de {payload.network} de um escritório de advocacia.
 Título: {payload.title}
@@ -3178,6 +3178,11 @@ Retorne APENAS o texto da legenda."""
         f"Square 1:1, high-quality, tasteful. Typography elegant, no people faces."
     )
     image_b64 = None
+    if not image_key:
+        raise HTTPException(
+            status_code=http_status.HTTP_402_PAYMENT_REQUIRED,
+            detail={"code": "insufficient_balance", "message": "Nenhuma chave de imagem configurada. Adicione uma chave OpenAI para gerar imagens."},
+        )
     try:
         from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
         img_gen = OpenAIImageGeneration(api_key=image_key)
@@ -3865,7 +3870,7 @@ async def test_text_key(current_user=Depends(get_current_user)):
 @api_router.post("/settings/test-image")
 async def test_image_key(current_user=Depends(get_current_user)):
     s = await db.app_settings.find_one({"owner_id": current_user["id"]}, {"_id": 0}) or {}
-    key = s.get("llm_image_key") or EMERGENT_LLM_KEY
+    key = s.get("llm_image_key") or os.environ.get("OPENAI_API_KEY") or ""
     try:
         from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
         img_gen = OpenAIImageGeneration(api_key=key)
