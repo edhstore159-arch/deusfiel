@@ -1,0 +1,86 @@
+services:
+  - type: web
+    name: jatai-app
+    runtime: static
+    autoDeploy: true
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        value: https://uzzbgjwpfxokagrvmdoa.supabase.co
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6emJnandwZnhva2FncnZtZG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDk2NzgsImV4cCI6MjA5OTgyNTY3OH0.4lX8OydcmKTx_U2A0MvMCs1-ZBKpQUcKFjSFsNfBttc
+      - key: VITE_SUPABASE_PROJECT_ID
+        value: uzzbgjwpfxokagrvmdoa
+      - key: VITE_BACKEND_URL
+        value: https://minimal-arch-muse-384-bak.onrender.com
+      - key: VITE_FCC_URL
+        value: https://unabashed-vertical-crispness.ngrok-free.dev
+  - type: web
+    name: kenia-whatsapp-backend
+    runtime: node
+    plan: free
+    renderSubdomainPolicy: enabled
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: baileys-auth
+      mountPath: /opt/render/project/src/backend/auth
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: AUTH_DIR
+        value: /opt/render/project/src/backend/auth
+      - key: SUPABASE_URL
+        value: https://uzzbgjwpfxokagrvmdoa.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6emJnandwZnhva2FncnZtZG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDk2NzgsImV4cCI6MjA5OTgyNTY3OH0.4lX8OydcmKTx_U2A0MvMCs1-ZBKpQUcKFjSFsNfBttc
+      - key: OLLAMA_URL
+        value: https://unabashed-vertical-crispness.ngrok-free.dev
+      - key: OLLAMA_MODEL
+        value: qwen2.5:3b-instruct
+      - key: AI_REQUEST_TIMEOUT_MS
+        value: "90000"
+      - key: OLLAMA_GENERATE_TIMEOUT_MS
+        value: "90000"
+      - key: OLLAMA_PROBE_TIMEOUT_MS
+        value: "30000"
+      - key: OLLAMA_REQUEST_RETRIES
+        value: "0"
+      - key: QR_TIMEOUT_MS
+        value: "900000"
+      - key: QR_RENEW_AFTER_MS
+        value: "240000"
+      - key: CONNECT_TIMEOUT_MS
+        value: "120000"
+      - key: KEEP_ALIVE_INTERVAL_MS
+        value: "15000"
+      - key: RECONNECT_MAX_DELAY_MS
+        value: "300000"
+      - key: FCC_BASE_URL
+        value: https://unabashed-vertical-crispness.ngrok-free.dev
+      - key: FCC_AUTH_TOKEN
+        value: freecc
+      - key: FCC_MODEL
+        value: claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+      - key: NVIDIA_NIM_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: ZEN_API_KEY
+        value: sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8
+      - key: EMERGENT_API_KEY
+        sync: false

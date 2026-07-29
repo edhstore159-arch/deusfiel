@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: kenia-whatsapp-backend
+    runtime: node
+    plan: free
+    renderSubdomainPolicy: enabled
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: baileys-auth
+      mountPath: /opt/render/project/src/backend/auth
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: AUTH_DIR
+        value: /opt/render/project/src/backend/auth
+      - key: SUPABASE_URL
+        value: https://wfycqufqdheluvzhgvfw.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmeWNxdWZxZGhlbHV2emhndmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MDEwMjEsImV4cCI6MjA5MjQ3NzAyMX0.tt__n-MunXAz5FJiQiWEKF9XE6NHfd7XHyNwVMG4IV4
+      - key: OLLAMA_URL
+        value: https://unabashed-vertical-crispness.ngrok-free.dev
+      - key: OLLAMA_MODEL
+        value: qwen2.5:3b-instruct
+      - key: AI_REQUEST_TIMEOUT_MS
+        value: "90000"
+      - key: OLLAMA_GENERATE_TIMEOUT_MS
+        value: "90000"
+      - key: OLLAMA_PROBE_TIMEOUT_MS
+        value: "30000"
+      - key: OLLAMA_REQUEST_RETRIES
+        value: "0"
+      - key: QR_TIMEOUT_MS
+        value: "900000"
+      - key: QR_RENEW_AFTER_MS
+        value: "240000"
+      - key: CONNECT_TIMEOUT_MS
+        value: "120000"
+      - key: KEEP_ALIVE_INTERVAL_MS
+        value: "15000"
+      - key: RECONNECT_MAX_DELAY_MS
+        value: "300000"
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

@@ -1,0 +1,23 @@
+{
+  "name": "kenia-whatsapp-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "build": "node -e \"console.log('Backend Express não precisa de build; pronto para iniciar.')\"",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@supabase/supabase-js": "^2.108.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc13",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  }
+}
