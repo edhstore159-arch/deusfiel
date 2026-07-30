@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
 
       if (reference_image_base64) {
         imageUrls.push(toDataUrl(reference_image_base64));
-        promptParts.push("Use a primeira imagem enviada como referência visual principal (mantenha tema, cores e elementos).");
+        promptParts.push("Use a primeira imagem enviada como referência visual principal. Preserve o rosto e a identidade da pessoa fotografada, recriando-a em um novo cenário profissional de escritório de advocacia (iluminação de estúdio, fundo de escritório elegante).");
       }
       if (logo_base64) {
         imageUrls.push(toDataUrl(logo_base64));
