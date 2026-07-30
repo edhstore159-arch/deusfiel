@@ -382,7 +382,7 @@ let reconnectingSince = null;
 let lastOpenAt = null;
 let lastDisconnectCode = null;
 let manualLogoutRequested = false;
-let whatsappConfig = { provider: "baileys", bot_enabled: true };
+let whatsappConfig = { provider: "baileys", bot_enabled: true, bot_voice_mode: "text_and_audio", bot_voice: "nova", voice_provider: "openai" };
 let qrEnsurePromise = null;
 let lastQrEnsureAt = 0;
 

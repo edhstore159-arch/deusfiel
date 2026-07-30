@@ -245,7 +245,7 @@ const defaultWhatsAppConfig = {
   twilio_from_number: "",
   bot_enabled: true,
   bot_prompt: DEFAULT_PROMPT,
-  bot_voice_mode: "text_only",
+  bot_voice_mode: "text_and_audio",
   bot_voice: "nova",
   voice_provider: "openai",
   elevenlabs_api_key: "",
