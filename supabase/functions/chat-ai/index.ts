@@ -1275,8 +1275,9 @@ Deno.serve(async (req) => {
         if (evolved && evolved.trim().length > 100) {
           extraPrompt = evolved;
           console.log("[chat-ai] Usando prompt evoluído do treinamento (secretary)");
-        } else if (body.prompt && String(body.prompt).trim().length > 100) {
-          extraPrompt = String(body.prompt).trim();
+        } else {
+          extraPrompt = SECRETARIA_JURIDICA_PROMPT;
+          console.log("[chat-ai] Usando prompt padrão completo (SECRETARIA_JURIDICA_PROMPT)");
         }
         if (lawyerEvolved && lawyerEvolved.trim().length > 100) {
           extraPrompt += `\n\n# CONHECIMENTO JURÍDICO AVANÇADO (Treinamento de Advogado)\n${lawyerEvolved.slice(0, 2000)}`;

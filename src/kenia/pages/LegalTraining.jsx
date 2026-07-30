@@ -327,6 +327,11 @@ function LegalTraining() {
   const [simRunning, setSimRunning] = useState(false);
   const [simProgress, setSimProgress] = useState({ current: 0, total: 0, strategy: "" });
   const [simResults, setSimResults] = useState(null);
+  const [judgeReports, setJudgeReports] = useState([]);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [waMobileTab, setWaMobileTab] = useState("contatos");
 
   const SEC_STRATEGIES = [
     { id: "abordagem_inicial", name: "Abordagem Inicial", desc: "Primeira impressão e quebra de gelo", color: "#22c55e" },
@@ -359,6 +364,40 @@ function LegalTraining() {
   const [waSending, setWaSending] = useState(false);
   const [waRefreshing, setWaRefreshing] = useState(false);
   const waRefreshInterval = useRef(null);
+
+  const loadJudgeReports = useCallback(async () => {
+    if (!HAS_BACKEND) return;
+    setLoadingReports(true);
+    try {
+      const res = await fetch(`${API}/judge-reports`);
+      if (res.ok) {
+        const data = await res.json();
+        setJudgeReports(Array.isArray(data) ? data : []);
+      }
+    } catch { /* ignore */ }
+    setLoadingReports(false);
+  }, []);
+
+  const generateJudgeReportFor = useCallback(async (jid, clientName) => {
+    if (!HAS_BACKEND) return;
+    setGeneratingReport(true);
+    try {
+      const res = await fetch(`${API}/judge-reports/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jid, client_name: clientName }),
+      });
+      if (res.ok) {
+        const report = await res.json();
+        setSelectedReport(report);
+        await loadJudgeReports();
+        toast.success("Relatório do juiz gerado!");
+      } else {
+        toast.error("Erro ao gerar relatório");
+      }
+    } catch { toast.error("Erro de conexão"); }
+    setGeneratingReport(false);
+  }, [loadJudgeReports]);
 
   const loadWaConversations = useCallback(async () => {
     setWaLoading(true);
@@ -436,7 +475,8 @@ function LegalTraining() {
 
   useEffect(() => {
     if (activeSection === "conversas") loadWaConversations();
-  }, [activeSection, loadWaConversations]);
+    if (activeSection === "relatorios") loadJudgeReports();
+  }, [activeSection, loadWaConversations, loadJudgeReports]);
 
   useEffect(() => {
     waMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1318,6 +1358,7 @@ function LegalTraining() {
           <TabsList>
             <TabsTrigger value="treinamento"><GraduationCap className="w-3 h-3 mr-1" /> Treinamento</TabsTrigger>
             <TabsTrigger value="conversas"><Phone className="w-3 h-3 mr-1" /> Conversas WhatsApp</TabsTrigger>
+            <TabsTrigger value="relatorios"><Scale className="w-3 h-3 mr-1" /> Relatórios do Juiz</TabsTrigger>
           </TabsList>
           {activeSection === "treinamento" && currentSession && (
             <Button size="sm" variant="outline" onClick={resetSession}>
@@ -1362,7 +1403,7 @@ function LegalTraining() {
         <Card className="flex flex-col flex-1 min-w-0 shrink-0">
           <div className="px-4 py-3 border-b flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-gold-600" />
-            <span className="text-sm font-bold">
+            <span className="text-xs font-bold">
               {showConfig ? "Configurar Treino" : "Análise de Argumentação"}
             </span>
           </div>
@@ -1370,7 +1411,7 @@ function LegalTraining() {
             {showConfig ? (
               <div className="space-y-5">
                 <div>
-                  <label className="text-sm font-semibold text-foreground mb-3 block">Modo de Treinamento</label>
+                            <label className="text-xs font-semibold text-foreground mb-2 block">Modo de Treinamento</label>
                   <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => setMode("lawyer")}
@@ -1381,8 +1422,8 @@ function LegalTraining() {
                       }`}
                     >
                       <Scale className="w-5 h-5 mb-2" />
-                      <div className="text-sm font-bold">Advogado</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">Argumente a favor</div>
+                      <div className="text-xs font-bold">Advogado</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">Argumente a favor</div>
                     </button>
                     <button
                       onClick={() => setMode("judge")}
@@ -1393,8 +1434,8 @@ function LegalTraining() {
                       }`}
                     >
                       <Star className="w-5 h-5 mb-2" />
-                      <div className="text-sm font-bold">Juiz</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">Analise e julgue</div>
+                      <div className="text-xs font-bold">Juiz</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">Analise e julgue</div>
                     </button>
                     <button
                       onClick={() => { setMode("secretary"); setSecStrategy(null); setSecScenario(null); setSecEval(null); setSecImprovedPrompt(null); }}
@@ -1405,21 +1446,21 @@ function LegalTraining() {
                       }`}
                     >
                       <Phone className="w-5 h-5 mb-2" />
-                      <div className="text-sm font-bold">Secretaria</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">Treino com estratégias</div>
+                      <div className="text-xs font-bold">Secretaria</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">Treino com estratégias</div>
                     </button>
                   </div>
                 </div>
 
                 {mode === "secretary" && (<>
                   <div>
-                    <label className="text-sm font-semibold text-foreground mb-3 block">Estratégia de Treinamento</label>
+                    <label className="text-xs font-semibold text-foreground mb-2 block">Estratégia de Treinamento</label>
                     <div className="space-y-2 max-h-[40vh] overflow-auto pr-1">
                       {SEC_STRATEGIES.map((s) => (
                         <button
                           key={s.id}
                           onClick={() => { setSecStrategy(s); setSecScenario(null); setSecEval(null); setSecImprovedPrompt(null); }}
-                          className={`w-full text-left px-4 py-3 rounded-xl text-sm flex items-center gap-3 transition-all ${
+                          className={`w-full text-left px-3 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all ${
                             secStrategy?.id === s.id
                               ? "bg-purple-100 text-purple-800 font-semibold border-2 border-purple-300 shadow-sm"
                               : "hover:bg-muted border-2 border-transparent hover:border-border"
@@ -1428,7 +1469,7 @@ function LegalTraining() {
                           <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                           <div className="min-w-0 flex-1">
                             <div className="font-semibold">{s.name}</div>
-                            <div className="text-xs text-muted-foreground truncate">{s.desc}</div>
+                            <div className="text-[11px] text-muted-foreground truncate">{s.desc}</div>
                           </div>
                         </button>
                       ))}
@@ -1472,7 +1513,7 @@ function LegalTraining() {
                           }
                         }}
                         disabled={secLoading}
-                        className="w-full mt-3 h-11 text-sm font-semibold"
+                        className="w-full mt-2 h-10 text-xs font-semibold"
                       >
                         {secLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Target className="w-4 h-4 mr-2" />}
                         Gerar Cenário
@@ -1484,7 +1525,7 @@ function LegalTraining() {
                   <div className="mt-4 p-3 rounded-xl border-2 border-dashed border-purple-200 bg-purple-50/50">
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="w-4 h-4 text-purple-600" />
-                      <span className="text-sm font-bold text-purple-800">Simulador Completo</span>
+                      <span className="text-xs font-bold text-purple-800">Simulador Completo</span>
                     </div>
                     <p className="text-[10px] text-purple-600 mb-3">
                       Testa todas as 18 estratégias automaticamente, gera relatório por estratégia e melhora o prompt.
@@ -1492,7 +1533,7 @@ function LegalTraining() {
                     <Button
                       onClick={runSimulator}
                       disabled={simRunning}
-                      className="w-full h-10 text-sm font-semibold bg-purple-600 hover:bg-purple-700"
+                      className="w-full h-9 text-xs font-semibold bg-purple-600 hover:bg-purple-700"
                     >
                       {simRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
                       {simRunning ? `${simProgress.current}/${simProgress.total} — ${simProgress.strategy}` : "Rodar Simulador (18 estratégias)"}
@@ -1544,13 +1585,13 @@ function LegalTraining() {
 
                 {mode !== "secretary" && <>
                   <div>
-                    <label className="text-sm font-semibold text-foreground mb-3 block">Área do Direito</label>
+                    <label className="text-xs font-semibold text-foreground mb-2 block">Área do Direito</label>
                     <div className="grid grid-cols-2 gap-2">
                       {LEGAL_AREAS.map((a) => (
                         <button
                           key={a.value}
                           onClick={() => { setArea(a.value); setSelectedCaseId(null); }}
-                          className={`px-3 py-2.5 rounded-xl text-sm text-left transition-all ${
+                          className={`px-2.5 py-2 rounded-xl text-xs text-left transition-all ${
                             area === a.value
                               ? "bg-gold-100 text-gold-700 font-semibold border-2 border-gold-300"
                               : "text-muted-foreground hover:bg-muted border-2 border-transparent hover:border-border"
@@ -1563,13 +1604,13 @@ function LegalTraining() {
                   </div>
 
                 <div>
-                  <label className="text-sm font-semibold text-foreground mb-3 block">Dificuldade</label>
+                  <label className="text-xs font-semibold text-foreground mb-2 block">Dificuldade</label>
                   <div className="flex gap-3">
                     {DIFFICULTY_LEVELS.map((d) => (
                       <button
                         key={d.value}
                         onClick={() => { setDifficulty(d.value); setSelectedCaseId(null); }}
-                        className={`flex-1 px-3 py-3 rounded-xl text-sm text-center transition-all ${
+                        className={`flex-1 px-2.5 py-2 rounded-xl text-xs text-center transition-all ${
                           difficulty === d.value
                             ? "bg-gold-100 text-gold-700 font-semibold border-2 border-gold-300"
                             : "text-muted-foreground hover:bg-muted border-2 border-transparent hover:border-border"
@@ -1583,7 +1624,7 @@ function LegalTraining() {
                 </div>
 
                 <div className="p-3 rounded-xl bg-muted/50 border-2 border-border">
-                  <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
                     <input
                       type="checkbox"
                       checked={useRealCase}
@@ -1606,7 +1647,7 @@ function LegalTraining() {
                         <select
                           value={selectedCaseId || ""}
                           onChange={(e) => setSelectedCaseId(e.target.value || null)}
-                          className="w-full text-sm p-2.5 rounded-lg border-2 bg-background border-border"
+                          className="w-full text-xs p-2 rounded-lg border-2 bg-background border-border"
                         >
                           <option value="">Selecione um caso...</option>
                           {filteredCases.map((c) => (
@@ -1625,7 +1666,7 @@ function LegalTraining() {
                 </div>
                 </>}
 
-                <Button onClick={startTraining} disabled={sending || (useRealCase && !selectedCaseId) || (mode === "secretary" && !secStrategy)} className="w-full h-12 text-sm font-bold mt-2">
+                <Button onClick={startTraining} disabled={sending || (useRealCase && !selectedCaseId) || (mode === "secretary" && !secStrategy)} className="w-full h-10 text-xs font-bold mt-2">
                   {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Target className="w-4 h-4 mr-2" />}
                   {mode === "secretary" ? "Iniciar Treino Secretaria" : useRealCase && selectedCaseId ? "Carregar Caso Real" : "Gerar Caso para Treino"}
                 </Button>
@@ -1665,13 +1706,13 @@ function LegalTraining() {
 
                 {sessions.length > 0 && (
                   <div>
-                    <label className="text-sm font-semibold text-foreground mb-3 block">Histórico Recente</label>
+                    <label className="text-xs font-semibold text-foreground mb-2 block">Histórico Recente</label>
                     <div className="space-y-2">
                       {sessions.slice(0, 5).map((s) => (
                         <button
                           key={s.id}
                           onClick={() => { setCurrentSession(s); setShowConfig(false); setCorrectedData(null); setImprovementData(null); }}
-                          className="w-full text-left px-3 py-2.5 rounded-xl text-sm hover:bg-muted flex items-center gap-3 transition-all border-2 border-transparent hover:border-border"
+                          className="w-full text-left px-2.5 py-2 rounded-xl text-xs hover:bg-muted flex items-center gap-2 transition-all border-2 border-transparent hover:border-border"
                         >
                           <span className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
                             style={{ backgroundColor: s.score >= 80 ? "#dcfce7" : s.score >= 60 ? "#fef9c3" : "#fee2e2" }}>
@@ -1698,7 +1739,7 @@ function LegalTraining() {
                       <span className="text-xs font-semibold text-purple-800">{currentSession.case_data.strategy.name}</span>
                     </div>
                   )}
-                  <div className="text-sm font-semibold mb-1">{currentSession.case_data?.title}</div>
+                  <div className="text-xs font-semibold mb-1">{currentSession.case_data?.title}</div>
                   <div className="text-xs text-muted-foreground leading-relaxed">
                     {currentSession.case_data?.description?.slice(0, 500)}
                     {currentSession.case_data?.description?.length > 500 && "..."}
@@ -1763,7 +1804,7 @@ function LegalTraining() {
                     <div className="flex items-center gap-4 mb-3">
                       <ScoreGauge score={currentSession.score} label="Acertabilidade" />
                       <div className="flex-1">
-                        <div className="text-sm font-semibold text-gold-800">Avaliação</div>
+                        <div className="text-xs font-semibold text-gold-800">Avaliação</div>
                         <div className="text-[10px] text-muted-foreground">
                           {currentSession.score >= 80 ? "Excelente!" : currentSession.score >= 60 ? "Bom trabalho" : "Precisa melhorar"}
                         </div>
@@ -2131,7 +2172,7 @@ function LegalTraining() {
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <div className="text-center py-12">
                   <GraduationCap className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm font-medium">Configure e inicie um treino.</p>
+                  <p className="text-xs font-medium">Configure e inicie um treino.</p>
                 </div>
               </div>
             )}
@@ -2142,7 +2183,7 @@ function LegalTraining() {
         <Card className="flex flex-col flex-1 min-w-0">
           <div className="px-4 py-3 border-b flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-gold-600" />
-            <span className="text-sm font-bold">
+            <span className="text-xs font-bold">
               {currentSession
                 ? currentSession.mode === "lawyer"
                   ? "Sua Argumentação"
@@ -2152,7 +2193,7 @@ function LegalTraining() {
                 : "Chat de Treino"}
             </span>
             {currentSession?.score != null && (
-              <Badge variant="secondary" className="ml-auto text-sm px-3 py-1">
+              <Badge variant="secondary" className="ml-auto text-xs px-2 py-0.5">
                 {currentSession.score}/100
               </Badge>
             )}
@@ -2162,8 +2203,8 @@ function LegalTraining() {
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <div className="text-center py-12">
                   <GraduationCap className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                  <p className="text-lg font-medium mb-1">Configure e inicie um treino</p>
-                  <p className="text-sm text-muted-foreground">Escolha o modo à esquerda e clique em Gerar</p>
+                  <p className="text-sm font-medium mb-1">Configure e inicie um treino</p>
+                  <p className="text-xs text-muted-foreground">Escolha o modo à esquerda e clique em Gerar</p>
                 </div>
               </div>
             ) : (
@@ -2179,13 +2220,13 @@ function LegalTraining() {
                             <Scale className="w-4 h-4 text-blue-600" />
                             <span className="text-xs font-semibold text-blue-800">ARGUMENTAÇÃO DO ADVOGADO (Referência)</span>
                           </div>
-                          <div className="whitespace-pre-wrap break-words text-sm leading-relaxed text-blue-900">
+                          <div className="whitespace-pre-wrap break-words text-xs leading-relaxed text-blue-900">
                             {m.content.replace("📋 **ARGUMENTAÇÃO DO ADVOGADO (Referência):**\n\n", "")}
                           </div>
                         </div>
                       ) : isScenario ? (
                         <div className="w-full p-5 rounded-xl border border-purple-200 bg-purple-50/80 text-left">
-                          <div className="whitespace-pre-wrap break-words text-sm leading-relaxed text-purple-900">
+                          <div className="whitespace-pre-wrap break-words text-xs leading-relaxed text-purple-900">
                             {m.content}
                           </div>
                         </div>
@@ -2193,7 +2234,7 @@ function LegalTraining() {
                         <div className={`max-w-[80%] rounded-xl px-5 py-3 ${
                           m.role === "user" ? "bg-gold-100 text-gold-900" : "bg-muted text-foreground"
                         }`}>
-                          <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{m.content}</div>
+                          <div className="whitespace-pre-wrap break-words text-xs leading-relaxed">{m.content}</div>
                         </div>
                       )}
                     </div>
@@ -2202,21 +2243,21 @@ function LegalTraining() {
                 {sending && (
                   <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/50">
                     <Loader2 className="w-5 h-5 animate-spin text-gold-600" />
-                    <span className="text-sm font-medium">{currentSession.mode === "lawyer" ? "Analisando argumentação..." : currentSession.mode === "secretary" ? "Simulando atendimento..." : "Avaliando sentença..."}</span>
+                    <span className="text-xs font-medium">{currentSession.mode === "lawyer" ? "Analisando argumentação..." : currentSession.mode === "secretary" ? "Simulando atendimento..." : "Avaliando sentença..."}</span>
                   </div>
                 )}
                 {correcting && (
                   <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <Sparkles className="w-5 h-5 text-blue-500" />
-                    <span className="text-sm font-medium">Corrigindo resposta automaticamente...</span>
+                    <span className="text-xs font-medium">Corrigindo resposta automaticamente...</span>
                   </div>
                 )}
                 {improving && (
                   <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <Lightbulb className="w-5 h-5 text-yellow-500" />
-                    <span className="text-sm font-medium">Gerando sugestões de melhoria...</span>
+                    <span className="text-xs font-medium">Gerando sugestões de melhoria...</span>
                   </div>
                 )}
                 <div ref={chatEndRef} />
@@ -2239,9 +2280,9 @@ function LegalTraining() {
                         : "Escreva sua sentença/decisão..."
                 }
                 disabled={sending || !currentSession}
-                className="flex-1 h-11 text-sm"
+                className="flex-1 h-10 text-xs"
               />
-              <Button size="default" onClick={sendResponse} disabled={sending || !input.trim() || !currentSession} className="h-11 px-5">
+              <Button size="default" onClick={sendResponse} disabled={sending || !input.trim() || !currentSession} className="h-10 px-4">
                 <Send className="w-4 h-4" />
               </Button>
             </div>
@@ -2645,8 +2686,8 @@ function LegalTraining() {
       </div>
       </TabsContent>
 
-      <TabsContent value="conversas" className="flex-1 min-h-0 mt-2">
-        <div className="h-full flex gap-3 overflow-hidden">
+      <TabsContent value="conversas" className="flex-1 min-h-0 mt-2 flex flex-col">
+        <div className="h-full max-lg:hidden flex gap-3 overflow-hidden">
           {/* Col 1: Conversations list */}
           <div className="w-[220px] shrink-0 flex flex-col border border-border rounded-xl bg-card overflow-hidden">
             <div className="p-2.5 border-b border-border">
@@ -2718,6 +2759,30 @@ function LegalTraining() {
                       </button>
                     </div>
                   </div>
+                  {/* Strategy flow timeline */}
+                  {waMessages.length > 2 && (() => {
+                    const uniqueStrats = [...new Set(waMessages.map(m => m.strategy_name || detectStrategy(m.content, m.direction)))];
+                    if (uniqueStrats.length <= 1) return null;
+                    return (
+                      <div className="px-1 py-2">
+                        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                          {uniqueStrats.map((s, si) => {
+                            const info = WA_STRATEGIES.find(st => st.name === s);
+                            return (
+                              <div key={s} className="flex items-center gap-0 shrink-0">
+                                {si > 0 && <ChevronDown className="w-3 h-3 -rotate-90 text-muted-foreground shrink-0" />}
+                                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-bold whitespace-nowrap"
+                                  style={{ backgroundColor: (info?.color || "#64748b") + "20", color: info?.color || "#64748b", border: `1px solid ${(info?.color || "#64748b")}40` }}>
+                                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: info?.color || "#64748b" }} />
+                                  {info?.label || s}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div className="flex-1 overflow-y-auto p-3 space-y-2">
                     {waMessages.length === 0 && (
                       <div className="text-center text-xs text-muted-foreground py-8">
@@ -2730,13 +2795,18 @@ function LegalTraining() {
                       const isOut = msg.direction === "outgoing";
                       const stratName = msg.strategy_name || detectStrategy(msg.content, msg.direction);
                       const stratInfo = WA_STRATEGIES.find(s => s.name === stratName);
+                      const isLatest = idx === waMessages.length - 1;
+                      const prevStratName = idx > 0 ? (waMessages[idx - 1].strategy_name || detectStrategy(waMessages[idx - 1].content, waMessages[idx - 1].direction)) : null;
+                      const stratChanged = prevStratName && prevStratName !== stratName;
                       return (
                         <div key={msg.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm ${isOut ? "bg-green-500 text-white" : "bg-white border border-gray-200"}`}>
+                          <div className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm ${isOut ? "bg-green-500 text-white" : "bg-white border border-gray-200"} ${stratChanged && !isOut ? "ring-2 ring-offset-1" : ""}`}
+                            style={stratChanged && !isOut ? { ringColor: stratInfo?.color || "#64748b" } : {}}>
                             <p className={`text-xs leading-relaxed whitespace-pre-wrap ${isOut ? "text-white" : "text-gray-800"}`}>{msg.content}</p>
                             <div className="mt-0.5 flex items-center justify-end gap-1 flex-wrap">
                               {stratInfo && (
-                                <span className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[7px] font-bold" style={{ backgroundColor: stratInfo.color + "30", color: isOut ? "#fff" : stratInfo.color, border: `1px solid ${stratInfo.color}40` }}>
+                                <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[7px] font-bold ${isLatest ? "animate-pulse" : ""}`}
+                                  style={{ backgroundColor: stratInfo.color + "30", color: isOut ? "#fff" : stratInfo.color, border: `1px solid ${stratInfo.color}40` }}>
                                   <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: stratInfo.color }} />
                                   {stratInfo.label}
                                 </span>
@@ -2890,6 +2960,309 @@ function LegalTraining() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Mobile: Conversas */}
+        <div className="flex-1 min-h-0 lg:hidden flex flex-col">
+          <Tabs value={waMobileTab} onValueChange={setWaMobileTab} className="h-full flex flex-col">
+            <TabsList className="shrink-0">
+              <TabsTrigger value="contatos"><Phone className="w-3 h-3 mr-1" /> Contatos</TabsTrigger>
+              <TabsTrigger value="mensagens" disabled={!waSelectedId}><MessageSquare className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
+            </TabsList>
+            <TabsContent value="contatos" className="flex-1 min-h-0 mt-2">
+              <div className="h-full overflow-y-auto">
+                {waLoading ? (
+                  <div className="p-3 text-xs text-muted-foreground text-center flex items-center justify-center gap-2">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Carregando...
+                  </div>
+                ) : waConversations.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground">Nenhuma conversa</div>
+                ) : (
+                  <div className="space-y-1">
+                    {waConversations.map((conv) => (
+                      <button
+                        key={conv.id}
+                        onClick={() => { loadWaMessages(conv.id); setWaSelectedMsgIdx(null); setWaCorrection(""); setWaMobileTab("mensagens"); }}
+                        className={`w-full text-left p-3 border-b border-border transition-colors hover:bg-accent ${waSelectedId === conv.id ? "bg-accent" : ""}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold truncate">{conv.member_name || formatWaPhone(conv.phone)}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">{conv.phone}</p>
+                          </div>
+                          <span className="inline-block h-3 w-3 rounded-full shrink-0 ml-2 animate-pulse" style={{ backgroundColor: getWaStrategyColor(conv.current_strategy) }} />
+                        </div>
+                        <div className="mt-1.5">
+                          <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: getWaStrategyColor(conv.current_strategy) + "22", color: getWaStrategyColor(conv.current_strategy) }}>
+                            {getWaStrategyLabel(conv.current_strategy)}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="mensagens" className="flex-1 min-h-0 mt-2">
+              <div className="h-full flex flex-col">
+                {waSelectedId ? (() => {
+                  const selectedConv = waConversations.find((c) => c.id === waSelectedId);
+                  return (
+                    <>
+                      <div className="p-2.5 border-b border-border flex items-center justify-between shrink-0 bg-card">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <button onClick={() => { const el = document.querySelector('[data-value="contatos"]'); if (el) el.click(); }} className="p-1 -ml-1 rounded hover:bg-muted">
+                            <ChevronDown className="w-4 h-4 rotate-90 text-muted-foreground" />
+                          </button>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold truncate">{selectedConv?.member_name || formatWaPhone(selectedConv?.phone || "")}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{selectedConv?.phone}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-green-600 font-medium flex items-center gap-1">
+                            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" /> Ativo
+                          </span>
+                          <button onClick={() => loadWaMessages(waSelectedId, true)} className="p-1 rounded hover:bg-muted">
+                            <RefreshCw className="w-3 h-3 text-muted-foreground" />
+                          </button>
+                        </div>
+                      </div>
+                      <ScrollArea className="flex-1 p-3">
+                        <div className="space-y-3">
+                          {waMessages.length === 0 && (
+                            <div className="text-center text-xs text-muted-foreground py-8">
+                              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                              <p>Nenhuma mensagem ainda</p>
+                            </div>
+                          )}
+                          {waMessages.map((msg, idx) => {
+                            const isOut = msg.direction === "outgoing";
+                            const stratName = msg.strategy_name || detectStrategy(msg.content, msg.direction);
+                            const stratInfo = WA_STRATEGIES.find(s => s.name === stratName);
+                            const isLatest = idx === waMessages.length - 1;
+                            return (
+                              <div key={msg.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-[85%] rounded-xl px-3 py-2 shadow-sm ${isOut ? "bg-green-500 text-white" : "bg-white border border-gray-200"}`}>
+                                  <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isOut ? "text-white" : "text-gray-800"}`}>{msg.content}</p>
+                                  <div className="mt-1 flex items-center justify-end gap-1.5 flex-wrap">
+                                    {stratInfo && (
+                                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold ${isLatest ? "animate-pulse" : ""}`}
+                                        style={{ backgroundColor: stratInfo.color + "25", color: isOut ? "#fff" : stratInfo.color, border: `1px solid ${stratInfo.color}50` }}>
+                                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: stratInfo.color }} />
+                                        {stratInfo.label}
+                                      </span>
+                                    )}
+                                    <span className={`text-[10px] ${isOut ? "text-green-100" : "text-gray-400"}`}>{formatWaTime(msg.created_at)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div ref={waMessagesEndRef} />
+                        </div>
+                      </ScrollArea>
+                      <div className="p-2.5 border-t border-border bg-muted/30 shrink-0">
+                        <div className="flex gap-2">
+                          <Input value={waInput} onChange={(e) => setWaInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendWaMessage(waInput); } }}
+                            placeholder="Resposta para o cliente..." disabled={waSending} className="flex-1 text-sm" />
+                          <Button size="sm" onClick={() => sendWaMessage(waInput)} disabled={waSending || !waInput.trim()} className="bg-green-600 hover:bg-green-700 text-white">
+                            {waSending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })() : (
+                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <div className="text-3xl mb-3">💬</div>
+                      <p className="text-sm font-semibold">Selecione um contato</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="relatorios" className="flex-1 min-h-0 mt-2">
+        <div className="h-full flex gap-3 overflow-hidden">
+          <div className="w-[320px] shrink-0 flex flex-col border border-border rounded-xl bg-card overflow-hidden">
+            <div className="p-3 border-b border-border flex items-center justify-between">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Relatórios do Juiz ({judgeReports.length})
+              </h2>
+              <Button size="sm" variant="ghost" onClick={loadJudgeReports} disabled={loadingReports}>
+                <RefreshCw className={`w-3 h-3 ${loadingReports ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+            <ScrollArea className="flex-1">
+              {loadingReports ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : judgeReports.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  <Scale className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  Nenhum relatório gerado ainda.
+                  <p className="text-xs mt-2">Os relatórios são gerados automaticamente ao final de cada conversa no WhatsApp.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {judgeReports.map((report) => (
+                    <button
+                      key={report.jid}
+                      onClick={() => setSelectedReport(report)}
+                      className={`w-full text-left px-3 py-2.5 hover:bg-accent/50 transition-colors ${
+                        selectedReport?.jid === report.jid ? "bg-accent" : ""
+                      }`}
+                    >
+                      <div className="text-xs font-medium truncate">{report.titulo || "Sem título"}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 truncate">{report.client_name}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{report.area_juridica}</span>
+                        {report.probabilidade && (
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                            report.probabilidade.toLowerCase().includes("alta") ? "bg-green-100 text-green-700" :
+                            report.probabilidade.toLowerCase().includes("média") ? "bg-yellow-100 text-yellow-700" :
+                            "bg-red-100 text-red-700"
+                          }`}>
+                            {report.probabilidade}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[9px] text-muted-foreground mt-1">
+                        {new Date(report.created_at).toLocaleString("pt-BR")}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          <div className="flex-1 flex flex-col border border-border rounded-xl bg-card overflow-hidden">
+            {selectedReport ? (
+              <>
+                <div className="p-3 border-b border-border flex items-center justify-between shrink-0">
+                  <div>
+                    <h2 className="text-sm font-semibold">{selectedReport.titulo}</h2>
+                    <p className="text-[10px] text-muted-foreground">
+                      {selectedReport.client_name} · {selectedReport.area_juridica} ·{" "}
+                      {new Date(selectedReport.data_analise).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" onClick={() => window.print()}>
+                      <Printer className="w-3 h-3 mr-1" /> Imprimir
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => generateJudgeReportFor(selectedReport.jid, selectedReport.client_name)} disabled={generatingReport}>
+                      <RefreshCw className={`w-3 h-3 mr-1 ${generatingReport ? "animate-spin" : ""}`} /> Regenerar
+                    </Button>
+                  </div>
+                </div>
+                <ScrollArea className="flex-1 p-4">
+                  <div className="max-w-3xl mx-auto space-y-6">
+                    {/* Relatório */}
+                    <div>
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Relatório</h3>
+                      <div className="text-sm leading-relaxed whitespace-pre-wrap">{selectedReport.relatorio}</div>
+                    </div>
+
+                    {/* Fundamentação */}
+                    {selectedReport.fundamentacao && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fundamentação Legal</h3>
+                        <div className="text-sm leading-relaxed whitespace-pre-wrap">{selectedReport.fundamentacao}</div>
+                      </div>
+                    )}
+
+                    {/* Dispositivo */}
+                    {selectedReport.dispositivo && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Dispositivo</h3>
+                        <div className="text-sm leading-relaxed whitespace-pre-wrap">{selectedReport.dispositivo}</div>
+                      </div>
+                    )}
+
+                    {/* Pontos Fortes */}
+                    {selectedReport.pontos_fortes?.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Pontos Fortes</h3>
+                        <ul className="space-y-1">
+                          {selectedReport.pontos_fortes.map((p, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
+                              <span>{p}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Pontos Fracos */}
+                    {selectedReport.pontos_fracos?.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Pontos Fracos / Riscos</h3>
+                        <ul className="space-y-1">
+                          {selectedReport.pontos_fracos.map((p, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm">
+                              <span className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0 flex items-center justify-center text-[10px] font-bold">!</span>
+                              <span>{p}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Probabilidade */}
+                    {selectedReport.probabilidade && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Probabilidade de Êxito</h3>
+                        <div className={`text-sm font-semibold px-3 py-1.5 rounded-lg inline-block ${
+                          selectedReport.probabilidade.toLowerCase().includes("alta") ? "bg-green-100 text-green-700" :
+                          selectedReport.probabilidade.toLowerCase().includes("média") ? "bg-yellow-100 text-yellow-700" :
+                          "bg-red-100 text-red-700"
+                        }`}>
+                          {selectedReport.probabilidade}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recomendação */}
+                    {selectedReport.recomendacao && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Recomendação</h3>
+                        <div className="text-sm leading-relaxed whitespace-pre-wrap">{selectedReport.recomendacao}</div>
+                      </div>
+                    )}
+
+                    {/* Conversa Completa */}
+                    {selectedReport.full_conversation && (
+                      <details className="border border-border rounded-lg">
+                        <summary className="px-3 py-2 text-xs font-semibold text-muted-foreground cursor-pointer hover:bg-accent/50">
+                          Conversa Completa
+                        </summary>
+                        <div className="p-3 text-xs leading-relaxed whitespace-pre-wrap font-mono border-t border-border max-h-96 overflow-y-auto">
+                          {selectedReport.full_conversation}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                </ScrollArea>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <Scale className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm text-muted-foreground">Selecione um relatório para visualizar</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </TabsContent>
