@@ -1400,12 +1400,17 @@ function LegalTraining() {
         {/* Desktop layout */}
         <div className="flex-1 min-h-0 hidden lg:flex gap-3 w-full">
         {/* Left: Config or History */}
-        <Card className="flex flex-col flex-1 min-w-0 shrink-0">
+        <Card className="flex flex-col flex-[3] min-w-0 shrink-0">
           <div className="px-4 py-3 border-b flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-gold-600" />
             <span className="text-xs font-bold">
               {showConfig ? "Configurar Treino" : "Análise de Argumentação"}
             </span>
+            {!showConfig && currentSession && (
+              <Button size="sm" variant="outline" onClick={() => { const w = window.open("","_blank"); const title = currentSession?.case_data?.title || "Análise"; const modeLabel = currentSession.mode === "lawyer" ? "Advogado" : currentSession.mode === "secretary" ? "Secretaria" : "Juiz"; const score = currentSession.score != null ? `Score: ${currentSession.score}/100` : ""; const evalText = currentSession.evaluation?.criteria?.map((c) => `${c.name}: ${c.score}/${c.max}`).join("\n") || ""; const weaknesses = currentSession.evaluation?.weaknesses?.join("\n") || ""; const strengths = currentSession.evaluation?.strengths?.join("\n") || ""; const corrected = correctedData?.corrected_response || ""; w.document.write(`<html><head><title>${title}</title><style>body{font-family:serif;max-width:700px;margin:40px auto;padding:20px;line-height:1.8;color:#333}h1{font-size:18px;border-bottom:2px solid #1e40af;padding-bottom:8px}h2{font-size:14px;color:#1e40af;margin-top:20px}.meta{font-size:12px;color:#666;margin-bottom:20px}pre{white-space:pre-wrap;font-size:12px;background:#f5f5f5;padding:10px;border-radius:4px}.score{font-size:24px;font-weight:bold;color:#166534}.tag{display:inline-block;background:#e0e7ff;padding:2px 8px;border-radius:4px;font-size:11px}</style></head><body><h1>${title}</h1><div class="meta">Modo: ${modeLabel} | ${score}</div>${corrected ? `<h2>Resposta Corrigida</h2><pre>${corrected.replace(/</g,"&lt;")}</pre>` : ""}${evalText ? `<h2>Avaliação</h2><pre>${evalText}</pre>` : ""}${strengths ? `<h2>Pontos Fortes</h2><pre>${strengths}</pre>` : ""}${weaknesses ? `<h2>Melhorar</h2><pre>${weaknesses}</pre>` : ""}<hr><p style="font-size:11px;color:#666;margin-top:20px;font-style:italic">Gerado por DeusFiel - Dra. Kênia Garcia</p></body></html>`); w.document.close(); setTimeout(() => w.print(), 400); }} className="ml-auto h-7 text-[10px]">
+                <Printer className="w-3 h-3 mr-1" /> Imprimir Análise
+              </Button>
+            )}
           </div>
           <ScrollArea className="flex-1 p-4">
             {showConfig ? (
@@ -2120,7 +2125,7 @@ function LegalTraining() {
                         )}
                         <pre className="text-[10px] bg-amber-100 rounded p-2 whitespace-pre-wrap max-h-[20vh] overflow-auto border border-amber-200">{improvePromptData.improved_prompt}</pre>
                         <div className="mt-2 flex gap-2">
-                          <Button size="sm" onClick={() => { setCurrentPrompt(improvePromptData.improved_prompt); toast.success("Prompt aplicado!"); setShowImprovePrompt(false); }} className="flex-1 text-[10px] h-7 bg-amber-600 hover:bg-amber-700">
+                          <Button size="sm" onClick={() => { setCurrentPrompt(improvePromptData.improved_prompt); saveEvolvedLegalPrompt(mode, improvePromptData.improved_prompt); toast.success("Prompt aplicado e salvo!"); setShowImprovePrompt(false); }} className="flex-1 text-[10px] h-7 bg-amber-600 hover:bg-amber-700">
                             <CheckCircle2 className="w-3 h-3 mr-1" /> Aplicar Prompt
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => setShowImprovePrompt(false)} className="text-[10px] h-7">
@@ -2180,7 +2185,7 @@ function LegalTraining() {
         </Card>
 
         {/* Right: Chat */}
-        <Card className="flex flex-col flex-1 min-w-0">
+        <Card className="flex flex-col flex-[2] min-w-0">
           <div className="px-4 py-3 border-b flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-gold-600" />
             <span className="text-xs font-bold">
