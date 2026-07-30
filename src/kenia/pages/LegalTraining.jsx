@@ -1398,9 +1398,9 @@ function LegalTraining() {
       </div>
 
         {/* Desktop layout */}
-        <div className="flex-1 min-h-0 hidden lg:flex gap-3 w-full">
+        <div className="flex-1 min-h-0 hidden lg:grid lg:grid-cols-5 gap-3 w-full">
         {/* Left: Config or History */}
-        <Card className="flex flex-col flex-[3] min-w-0 shrink-0">
+        <Card className="flex flex-col col-span-3 min-w-0 shrink-0">
           <div className="px-4 py-3 border-b flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-gold-600" />
             <span className="text-xs font-bold">
@@ -2185,7 +2185,7 @@ function LegalTraining() {
         </Card>
 
         {/* Right: Chat */}
-        <Card className="flex flex-col flex-[2] min-w-0">
+        <Card className="flex flex-col col-span-2 min-w-0">
           <div className="px-4 py-3 border-b flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-gold-600" />
             <span className="text-xs font-bold">
