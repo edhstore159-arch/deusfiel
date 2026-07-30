@@ -555,6 +555,10 @@ function LegalTraining() {
     if (direction === "outgoing") {
       if (/posso ajud|vamos analis|vou verificar|orient[aá]/.test(t)) return "demonstracao_valor";
       if (/entre em contato|whatsapp|n[uú]mero|lig[eé]/.test(t)) return "captura_whatsapp";
+      if (/agendar|marcar|consulta|hor[aá]rio|semana|ter[cç]a|quarta|quinta|sexta/.test(t)) return "fechamento";
+      if (/entendo|imagino|compreendo|sinto muito|deve estar|sei como/.test(t)) return "escuta_ativa";
+      if (/prazo|urgente|correr|perder|prescri[cç][aã]o|decad[eê]ncia|janela/.test(t)) return "urgencia_etica";
+      if (/obrigado|obrigada|dispon[ií]vel|ajudou|qualquer d[uú]vida/.test(t)) return "gatilhos_psicologicos";
     }
     return "abordagem_inicial";
   }
@@ -1473,7 +1477,7 @@ function LegalTraining() {
   const filteredCases = realCases.filter((c) => c.area === area && c.difficulty === difficulty);
 
   return (
-    <div className="p-4 h-[calc(100dvh-4rem)] flex flex-col gap-4">
+    <div className="p-2 sm:p-3 lg:p-4 h-[calc(100dvh-4rem)] flex flex-col gap-2 sm:gap-3 lg:gap-4">
       <Tabs value={activeSection} onValueChange={setActiveSection} className="h-full flex flex-col">
         <div className="flex items-center justify-between shrink-0">
           <TabsList>
@@ -2925,23 +2929,23 @@ function LegalTraining() {
                       const prevStratName = idx > 0 ? (waMessages[idx - 1].strategy_name || detectStrategy(waMessages[idx - 1].content, waMessages[idx - 1].direction)) : null;
                       const stratChanged = prevStratName && prevStratName !== stratName;
                       return (
-                        <div key={msg.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm ${isOut ? "bg-green-500 text-white" : "bg-white border border-gray-200"} ${stratChanged && !isOut ? "ring-2 ring-offset-1" : ""}`}
-                            style={stratChanged && !isOut ? { ringColor: stratInfo?.color || "#64748b" } : {}}>
-                            <p className={`text-xs leading-relaxed whitespace-pre-wrap ${isOut ? "text-white" : "text-gray-800"}`}>{msg.content}</p>
-                            <div className="mt-0.5 flex items-center justify-end gap-1 flex-wrap">
-                              {stratInfo && (
-                                <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[7px] font-bold ${isLatest ? "animate-pulse" : ""}`}
-                                  style={{ backgroundColor: stratInfo.color + "30", color: isOut ? "#fff" : stratInfo.color, border: `1px solid ${stratInfo.color}40` }}>
-                                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: stratInfo.color }} />
-                                  {stratInfo.label}
-                                </span>
-                              )}
-                              <span className={`text-[9px] ${isOut ? "text-green-100" : "text-gray-400"}`}>{formatWaTime(msg.created_at)}</span>
-                              {isOut && <span className="text-[9px] text-green-100">✓</span>}
+                          <div key={msg.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm ${isOut ? "text-white" : "bg-white border border-gray-200"} ${stratChanged && !isOut ? "ring-2 ring-offset-1" : ""}`}
+                              style={{ backgroundColor: isOut ? (stratInfo?.color || "#22c55e") : "", ...(stratChanged && !isOut ? { ringColor: stratInfo?.color || "#64748b" } : {}) }}>
+                              <p className="text-xs leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                              <div className="mt-0.5 flex items-center justify-end gap-1 flex-wrap">
+                                {stratInfo && (
+                                  <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[7px] font-bold ${isLatest ? "animate-pulse" : ""}`}
+                                    style={{ backgroundColor: stratInfo.color + "30", color: isOut ? "#fff" : stratInfo.color, border: `1px solid ${stratInfo.color}40` }}>
+                                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: stratInfo.color }} />
+                                    {stratInfo.label}
+                                  </span>
+                                )}
+                                <span className={`text-[9px] ${isOut ? "text-white/70" : "text-gray-400"}`}>{formatWaTime(msg.created_at)}</span>
+                                {isOut && <span className="text-[9px] text-white/70">✓✓</span>}
+                              </div>
                             </div>
                           </div>
-                        </div>
                       );
                     })}
                     <div ref={waMessagesEndRef} />
@@ -3170,8 +3174,9 @@ function LegalTraining() {
                             const isLatest = idx === waMessages.length - 1;
                             return (
                               <div key={msg.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-                                <div className={`max-w-[85%] rounded-xl px-3 py-2 shadow-sm ${isOut ? "bg-green-500 text-white" : "bg-white border border-gray-200"}`}>
-                                  <p className={`text-sm leading-relaxed whitespace-pre-wrap ${isOut ? "text-white" : "text-gray-800"}`}>{msg.content}</p>
+                                <div className={`max-w-[85%] rounded-xl px-3 py-2 shadow-sm ${isOut ? "text-white" : "bg-white border border-gray-200"}`}
+                                  style={isOut ? { backgroundColor: stratInfo?.color || "#22c55e" } : {}}>
+                                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                                   <div className="mt-1 flex items-center justify-end gap-1.5 flex-wrap">
                                     {stratInfo && (
                                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold ${isLatest ? "animate-pulse" : ""}`}
@@ -3180,7 +3185,7 @@ function LegalTraining() {
                                         {stratInfo.label}
                                       </span>
                                     )}
-                                    <span className={`text-[10px] ${isOut ? "text-green-100" : "text-gray-400"}`}>{formatWaTime(msg.created_at)}</span>
+                                    <span className={`text-[10px] ${isOut ? "text-white/70" : "text-gray-400"}`}>{formatWaTime(msg.created_at)}</span>
                                   </div>
                                 </div>
                               </div>
