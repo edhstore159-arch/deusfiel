@@ -287,6 +287,7 @@ function LegalTraining() {
   const [useRealCase, setUseRealCase] = useState(false);
 
   const [correcting, setCorrecting] = useState(false);
+  const [autoResponding, setAutoResponding] = useState(false);
   const [correctedData, setCorrectedData] = useState(null);
   const [showComparison, setShowComparison] = useState(false);
 
@@ -668,6 +669,22 @@ function LegalTraining() {
         saveSessionToDb(session);
         toast.success(`Cenário de treinamento gerado: ${secStrategy.name}`);
         setSending(false);
+        try {
+          const { data: secResp } = await supabase.functions.invoke("training-ai", {
+            body: {
+              action: "simulate_whatsapp",
+              mode: "secretary",
+              area: "secretaria",
+              client_message: data.strategy.scenario || secStrategy.name,
+              client_name: "Aluno",
+            },
+          });
+          if (secResp?.professional_response) {
+            await autoRespond(session, secResp.professional_response);
+          }
+        } catch (e) {
+          console.error("[autoRespond-secretary] error:", e);
+        }
         return;
       }
 
@@ -701,6 +718,16 @@ function LegalTraining() {
           saveSessionToDb(session);
           toast.success(`Caso real carregado: ${selected.real_reference || selected.title}`);
           setSending(false);
+          try {
+            const { data: refResp } = await supabase.functions.invoke("training-ai", {
+              body: { action: "generate_lawyer_response", mode, area: selected.area, case_data: session.case_data },
+            });
+            if (refResp?.response) {
+              await autoRespond(session, refResp.response);
+            }
+          } catch (e) {
+            console.error("[autoRespond-real] error:", e);
+          }
           return;
         }
       }
@@ -745,6 +772,14 @@ function LegalTraining() {
       setShowConfig(false);
       saveSessionToDb(session);
       toast.success("Caso gerado! Inicie o treinamento.");
+
+      // Auto-responder com a argumentação de referência
+      const refMsg = session.messages.find(m => m.content?.startsWith("📋 **ARGUMENTAÇÃO DO ADVOGADO"));
+      if (refMsg) {
+        const autoContent = refMsg.content.replace("📋 **ARGUMENTAÇÃO DO ADVOGADO (Referência):**\n\n", "");
+        setSending(false);
+        await autoRespond(session, autoContent);
+      }
 
       // --- PIPELINE AUTOMÁTICO (em background, não bloqueia o usuário) ---
       // Roda auto_train_loop + simulação em paralelo enquanto o usuário já pode interagir
@@ -935,6 +970,92 @@ function LegalTraining() {
       }));
     } finally {
       setSending(false);
+    }
+  };
+
+  const autoRespond = async (session, responseContent) => {
+    if (!session || !responseContent || autoResponding) return;
+    setAutoResponding(true);
+    setCorrectedData(null);
+    setImprovementData(null);
+
+    const updatedSession = {
+      ...session,
+      messages: [...session.messages, { role: "user", content: responseContent }],
+    };
+    setCurrentSession(updatedSession);
+
+    try {
+      if (session.mode === "secretary") {
+        const { data, error } = await supabase.functions.invoke("training-ai", {
+          body: {
+            action: "secretary_evaluate",
+            scenario: session.case_data?.description || "",
+            user_response: responseContent,
+            strategy_id: secStrategy?.id || "",
+            current_prompt: currentPrompt || "",
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        const finalSession = {
+          ...updatedSession,
+          messages: [...updatedSession.messages, { role: "assistant", content: data.feedback }],
+          score: data.score,
+          evaluation: {
+            score: data.score,
+            feedback: data.feedback,
+            strengths: data.strengths || [],
+            weaknesses: data.weaknesses || [],
+            tips: data.tips || [],
+          },
+        };
+        setCurrentSession(finalSession);
+        setSecEval(data);
+        setSessions((prev) => [finalSession, ...prev].slice(0, 50));
+        saveSessionToDb(finalSession);
+        toast.success(`Auto-avaliação: ${data.score}/100`);
+      } else {
+        const { data, error } = await supabase.functions.invoke("training-ai", {
+          body: {
+            action: "evaluate",
+            mode: session.mode,
+            area: session.area || area,
+            case_data: session.case_data,
+            user_response: responseContent,
+            history: session.messages.slice(-10),
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        const finalSession = {
+          ...updatedSession,
+          messages: [...updatedSession.messages, { role: "assistant", content: data.feedback }],
+          score: data.score,
+          evaluation: data.evaluation,
+          lawyer_feedback: data.lawyer_feedback,
+        };
+        setCurrentSession(finalSession);
+
+        const newStats = { ...stats };
+        newStats[session.mode].total++;
+        if (data.score >= 60) newStats[session.mode].passed++;
+        setStats(newStats);
+
+        setSessions((prev) => [finalSession, ...prev].slice(0, 50));
+        saveSessionToDb(finalSession);
+        toast.success(`Auto-avaliação: ${data.score}/100`);
+      }
+    } catch (e) {
+      toast.error("Erro na auto-avaliação: " + (e?.message || e));
+      setCurrentSession((prev) => ({
+        ...prev,
+        messages: [...(prev?.messages || []), { role: "assistant", content: "Erro na auto-avaliação: " + (e?.message || e) }],
+      }));
+    } finally {
+      setAutoResponding(false);
     }
   };
 
