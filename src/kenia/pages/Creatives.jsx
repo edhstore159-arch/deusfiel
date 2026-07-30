@@ -138,10 +138,12 @@ export default function Creatives() {
     provider: "emergent",
   });
 
+  const [creativeMode, setCreativeMode] = useState("legal");
   const [promptText, setPromptText] = useState("");
   const [promptPlatform, setPromptPlatform] = useState("instagram");
   const [promptFormat, setPromptFormat] = useState("post");
   const [promptCaseType, setPromptCaseType] = useState("Geral");
+  const [freePrompt, setFreePrompt] = useState("");
 
   const handlePromptGenerate = async () => {
     if (!promptText.trim()) {
@@ -172,6 +174,40 @@ export default function Creatives() {
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Erro ao gerar");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleFreeGenerate = async () => {
+    if (!freePrompt.trim()) {
+      toast.error("Descreva o que você quer criar");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const { data } = await api.post("/creatives/generate", {
+        title: freePrompt.trim().slice(0, 120),
+        network: promptPlatform,
+        format: promptFormat,
+        topic: freePrompt.trim(),
+        tone: "profissional",
+        case_type: "Geral",
+        caption: "",
+        subtitle: "",
+        provider: form.provider,
+        reference_image_base64: refImage || null,
+        logo_base64: logoImage || null,
+      });
+      if (data?.image_b64) {
+        toast.success("Imagem gerada!");
+      } else {
+        toast.error(`Imagem não gerada${data?.error ? `: ${String(data.error).slice(0, 120)}` : ""}`);
+      }
+      setPreview(data);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erro ao gerar imagem");
     } finally {
       setGenerating(false);
     }
@@ -636,8 +672,129 @@ export default function Creatives() {
             </div>
           </div>
 
-          {/* Chat-style prompt input */}
-          <div className="bg-nude-50 border border-nude-200 rounded-lg p-4">
+          {/* Mode tabs */}
+          <div className="flex gap-0.5 mb-4 bg-nude-100 rounded-lg p-0.5 w-fit">
+            <button
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${creativeMode === "legal" ? "bg-white text-nude-900 shadow-sm" : "text-nude-500 hover:text-nude-800"}`}
+              onClick={() => setCreativeMode("legal")}
+            >
+              ⚖️ Jurídico
+            </button>
+            <button
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${creativeMode === "free" ? "bg-white text-nude-900 shadow-sm" : "text-nude-500 hover:text-nude-800"}`}
+              onClick={() => setCreativeMode("free")}
+            >
+              🎨 Criação Livre
+            </button>
+          </div>
+
+          {creativeMode === "free" ? (
+            <div className="bg-gradient-to-br from-fuchsia-50 to-amber-50 border border-fuchsia-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-fuchsia-500 to-amber-500 flex items-center justify-center">
+                  <Sparkles className="w-3.5 h-3.5 text-white" />
+                </div>
+                <span className="text-xs font-medium text-nude-600">Modo Livre — Qualquer tema</span>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  {refImage ? (
+                    <div className="relative inline-block">
+                      <img src={refImage} alt="referência" className="h-24 w-24 object-cover rounded-md border border-nude-200" />
+                      <button
+                        type="button"
+                        onClick={() => setRefImage(null)}
+                        className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 shadow"
+                        aria-label="Remover imagem"
+                      >
+                        <XIcon className="w-3 h-3" />
+                      </button>
+                      <div className="text-[10px] text-nude-500 mt-1">Imagem de referência</div>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 h-20 border-2 border-dashed border-fuchsia-300 rounded-md cursor-pointer hover:bg-fuchsia-100 text-sm text-fuchsia-600 transition-colors">
+                      <Upload className="w-4 h-4" />
+                      <span className="text-xs">Imagem de referência (opcional)</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
+                    </label>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Textarea
+                    rows={3}
+                    placeholder="Descreva qualquer imagem que você quer criar. Ex: Um gato astronauta flutuando no espaço com a Terra ao fundo, estilo cyberpunk."
+                    className="flex-1 border-fuchsia-200 focus:border-fuchsia-500 focus:ring-fuchsia-500/20 resize-none text-sm"
+                    value={freePrompt}
+                    onChange={e => setFreePrompt(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleFreeGenerate();
+                      }
+                    }}
+                    data-testid="free-prompt-input"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={promptPlatform} onValueChange={setPromptPlatform}>
+                    <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PLATFORMS.map(p => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={promptFormat} onValueChange={setPromptFormat}>
+                    <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="post">Post</SelectItem>
+                      <SelectItem value="story">Story</SelectItem>
+                      <SelectItem value="carousel">Carrossel</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={form.provider} onValueChange={v => setForm({ ...form, provider: v })}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Automático</SelectItem>
+                      <SelectItem value="pollinations">Gratuito</SelectItem>
+                      <SelectItem value="emergent">Alta qualidade</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {logoImage ? (
+                    <div className="relative">
+                      <img src={logoImage} alt="logo" className="h-8 w-8 object-contain rounded border border-nude-200 bg-white p-0.5" />
+                      <button
+                        type="button"
+                        onClick={clearLogo}
+                        className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5 shadow"
+                        aria-label="Remover logo"
+                      >
+                        <XIcon className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-1 h-8 px-2 border border-dashed border-fuchsia-300 rounded cursor-pointer hover:bg-fuchsia-100 text-[11px] text-fuchsia-500">
+                      <Upload className="w-3 h-3" /> Logo
+                      <input type="file" accept="image/*" className="hidden" onChange={onPickLogo} />
+                    </label>
+                  )}
+                  <Button
+                    size="sm"
+                    className="h-8 bg-gradient-to-r from-fuchsia-600 to-amber-600 hover:from-fuchsia-700 hover:to-amber-700"
+                    onClick={handleFreeGenerate}
+                    disabled={generating || !freePrompt.trim()}
+                    data-testid="free-prompt-generate"
+                  >
+                    {generating ? (
+                      <span className="animate-pulse-soft">Gerando...</span>
+                    ) : (
+                      <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Gerar</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Chat-style prompt input — legal mode */
+            <div className="bg-nude-50 border border-nude-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-full bg-nude-900 flex items-center justify-center">
                 <Sparkles className="w-3.5 h-3.5 text-white" />
@@ -768,6 +925,7 @@ export default function Creatives() {
               </div>
             </div>
           </div>
+          )}
         </Card>
 
         {igAccount && (
