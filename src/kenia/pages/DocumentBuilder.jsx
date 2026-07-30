@@ -8,7 +8,7 @@ import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/tabs";
 import {
   Send, Loader2, FileText, Eye, FileCode, Download,
-  MessageSquare, FolderTree, ExternalLink, Trash2, Scale, Copy
+  MessageSquare, FolderTree, ExternalLink, Trash2, Scale, Copy, CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -330,7 +330,7 @@ export default function DocumentBuilder() {
             docType={docType}
             setDocType={setDocType}
           />
-          <DocumentPanel documents={documents} activeDocument={activeDocument} setActiveDocument={setActiveDocument} deleteFile={deleteFile} />
+          <DocumentPanel documents={documents} setDocuments={setDocuments} activeDocument={activeDocument} setActiveDocument={setActiveDocument} deleteFile={deleteFile} />
           <PreviewPanel html={previewHtml} onOpen={openInNewTab} />
         </div>
 
@@ -356,7 +356,7 @@ export default function DocumentBuilder() {
               />
             </TabsContent>
             <TabsContent value="editor" className="flex-1 min-h-0 mt-2">
-              <DocumentPanel documents={documents} activeDocument={activeDocument} setActiveDocument={setActiveDocument} deleteFile={deleteFile} fullHeight />
+              <DocumentPanel documents={documents} setDocuments={setDocuments} activeDocument={activeDocument} setActiveDocument={setActiveDocument} deleteFile={deleteFile} fullHeight />
             </TabsContent>
             <TabsContent value="preview" className="flex-1 min-h-0 mt-2">
               <PreviewPanel html={previewHtml} onOpen={openInNewTab} fullHeight />
@@ -422,9 +422,28 @@ function ChatPanel({ messages, input, setInput, sending, send, handleKeyDown, ch
   );
 }
 
-function DocumentPanel({ documents, activeDocument, setActiveDocument, deleteFile, fullHeight }) {
+function DocumentPanel({ documents, setDocuments, activeDocument, setActiveDocument, deleteFile, fullHeight }) {
   const docList = Object.keys(documents);
   const content = documents[activeDocument] || "";
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState("");
+
+  const startEditing = () => {
+    setEditText(content);
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setEditText("");
+  };
+
+  const saveEditing = () => {
+    if (!activeDocument) return;
+    setDocuments((prev) => ({ ...prev, [activeDocument]: editText }));
+    setEditing(false);
+    toast.success("Documento salvo!");
+  };
 
   return (
     <Card className={`flex flex-col ${fullHeight ? "h-full" : ""}`}>
@@ -432,6 +451,11 @@ function DocumentPanel({ documents, activeDocument, setActiveDocument, deleteFil
         <FolderTree className="w-4 h-4 text-gold-600" />
         <span className="text-xs font-medium">Arquivos do Documento</span>
         <Badge variant="secondary" className="ml-auto text-[10px]">{docList.length}</Badge>
+        {docList.length > 0 && !editing && (
+          <Button size="sm" variant="outline" onClick={startEditing} className="h-6 text-[10px] px-2">
+            Editar
+          </Button>
+        )}
       </div>
       {docList.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
@@ -447,7 +471,7 @@ function DocumentPanel({ documents, activeDocument, setActiveDocument, deleteFil
             {docList.map((path) => (
               <button
                 key={path}
-                onClick={() => setActiveDocument(path)}
+                onClick={() => { setActiveDocument(path); setEditing(false); }}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] whitespace-nowrap transition-colors ${
                   activeDocument === path
                     ? "bg-gold-100 text-gold-700 font-medium"
@@ -466,9 +490,27 @@ function DocumentPanel({ documents, activeDocument, setActiveDocument, deleteFil
             ))}
           </div>
           <div className="flex-1 min-h-0 overflow-auto">
-            <pre className="p-3 text-[11px] leading-relaxed font-mono text-foreground whitespace-pre-wrap break-words">
-              {content}
-            </pre>
+            {editing ? (
+              <div className="h-full flex flex-col">
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className="flex-1 p-3 text-[11px] leading-relaxed font-mono resize-none border-0 outline-none focus:ring-0"
+                />
+                <div className="flex gap-2 p-2 border-t shrink-0">
+                  <Button size="sm" onClick={saveEditing} className="h-7 text-[10px]">
+                    <CheckCircle2 className="w-3 h-3 mr-1" /> Salvar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={cancelEditing} className="h-7 text-[10px]">
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <pre className="p-3 text-[11px] leading-relaxed font-mono text-foreground whitespace-pre-wrap break-words">
+                {content}
+              </pre>
+            )}
           </div>
         </div>
       )}
