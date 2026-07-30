@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { prompt, reference_image_base64, logo_base64 } = body || {};
+    const { prompt, reference_image_base64, logo_base64, provider } = body || {};
     if (!prompt || typeof prompt !== "string") {
       return new Response(JSON.stringify({ error: "Prompt obrigatório" }), {
         status: 400,
@@ -54,15 +54,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Text-to-image: try Lovable Gateway gpt-image-2, fallback to Emergent, then Pollinations (free).
-    const img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "high" });
-    if (!img.ok) {
-      // Pollinations.ai (gratuito, sem API key)
+    async function tryPollinations(p: string) {
       try {
-        const pollinationsPrompt = encodeURIComponent(fullPrompt);
+        const pollPrompt = encodeURIComponent(p);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 45000);
-        const pollResp = await fetch(`https://image.pollinations.ai/prompt/${pollinationsPrompt}?width=1024&height=1024&nologo=true&seed=${Date.now()}`, {
+        const pollResp = await fetch(`https://image.pollinations.ai/prompt/${pollPrompt}?width=1024&height=1024&nologo=true&seed=${Date.now()}`, {
           signal: controller.signal,
           redirect: "follow",
         });
@@ -71,13 +68,30 @@ Deno.serve(async (req) => {
           const arrBuf = await pollResp.arrayBuffer();
           if (arrBuf.byteLength > 5000) {
             const b64 = btoa(String.fromCharCode(...new Uint8Array(arrBuf)));
-            return new Response(JSON.stringify({ b64_json: b64, image_data_url: `data:image/png;base64,${b64}`, provider: "pollinations" }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+            return b64;
           }
         }
-      } catch (pollErr) {
-        console.warn("[generate-cover-image] Pollinations erro:", pollErr);
+      } catch {}
+      return null;
+    }
+
+    let img: { ok: boolean; b64?: string; provider?: string; error?: string } = { ok: false };
+    if (provider === "pollinations") {
+      const b64 = await tryPollinations(fullPrompt);
+      if (b64) {
+        return new Response(JSON.stringify({ b64_json: b64, image_data_url: `data:image/png;base64,${b64}`, provider: "pollinations" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "high" });
+    }
+    if (!img.ok) {
+      const b64 = await tryPollinations(fullPrompt);
+      if (b64) {
+        return new Response(JSON.stringify({ b64_json: b64, image_data_url: `data:image/png;base64,${b64}`, provider: "pollinations" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
       // Local SVG fallback so the client never sees a 502 / blank screen.
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#g)"/><circle cx="512" cy="420" r="160" fill="rgba(255,255,255,0.08)"/><rect x="312" y="640" width="400" height="14" rx="7" fill="rgba(255,255,255,0.35)"/><rect x="372" y="680" width="280" height="10" rx="5" fill="rgba(255,255,255,0.22)"/></svg>`;

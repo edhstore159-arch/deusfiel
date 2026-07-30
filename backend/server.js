@@ -1899,8 +1899,24 @@ async function interpretImagePrompt(userInput) {
 }
 
 // 2. Gerador Base: tenta provedores e retorna imagem
-async function generateBaseImage(prompt) {
+async function generateBaseImage(prompt, preferredProvider) {
   const fullPrompt = `${MASTER_STYLE_PROMPT}, scene: ${prompt}`;
+
+  if (preferredProvider === "pollinations") {
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 45000);
+      const resp = await fetch(`https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1024&height=1024&nologo=true&seed=${Date.now()}`, {
+        signal: controller.signal, redirect: "follow",
+      });
+      clearTimeout(t);
+      if (resp.ok) {
+        const buf = await resp.arrayBuffer();
+        if (buf.byteLength > 5000) return { ok: true, b64: Buffer.from(buf).toString("base64"), provider: "pollinations" };
+      }
+    } catch {}
+    return { ok: false };
+  }
 
   // Lovable
   if (LOVABLE_API_KEY) {
@@ -2000,7 +2016,7 @@ async function enhanceImagePrompt(originalPrompt, problems) {
 }
 
 // 5. Pipeline Principal: interpretar → gerar → avaliar → melhorar (máx 2 tentativas)
-async function generateCreativeImage(userInput) {
+async function generateCreativeImage(userInput, preferredProvider) {
   console.log(`[Pipeline] Input: "${userInput}"`);
 
   // Passo 1: Interpretar linguagem humana
@@ -2008,7 +2024,7 @@ async function generateCreativeImage(userInput) {
   console.log(`[Pipeline] Interpretado: "${interpreted}"`);
 
   // Passo 2: Gerar imagem (tentativa 1)
-  let result = await generateBaseImage(interpreted);
+  let result = await generateBaseImage(interpreted, preferredProvider);
   if (!result.ok) return { ok: true, b64_json: getSVGFallback(userInput), fallback: true, provider: "svg" };
 
   // Passo 3: Avaliar qualidade
@@ -3267,7 +3283,8 @@ app.get("/api/creatives", (_req, res) => {
 
 app.post("/api/creatives/generate", async (req, res) => {
   const topic = req.body?.topic || req.body?.title || req.body?.prompt || "post jurídico";
-  const result = await generateCreativeImage(topic).catch((e) => ({ ok: false, error: e?.message || String(e) }));
+  const provider = req.body?.provider || "";
+  const result = await generateCreativeImage(topic, provider).catch((e) => ({ ok: false, error: e?.message || String(e) }));
   const item = {
     id: `creative-${Date.now()}`,
     title: req.body?.title || topic,
