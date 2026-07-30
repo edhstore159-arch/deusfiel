@@ -46,7 +46,10 @@ export default function FloatingVoiceOrb() {
   const recognitionRef = useRef(null);
   const supported =
     typeof window !== "undefined" &&
-    (window.SpeechRecognition || window.webkitSpeechRecognition);
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const chromeBlocked = typeof window !== "undefined" && !supported &&
+    !!window.webkitSpeechRecognition && location.protocol !== "https:" &&
+    location.hostname !== "localhost" && location.hostname !== "127.0.0.1";
 
   const alwaysOnRef = useRef(false);
   const awakeUntilRef = useRef(0);
@@ -268,7 +271,14 @@ export default function FloatingVoiceOrb() {
 
   const toggleAlwaysOn = () => {
     unlockSpeech();
-    if (!supported) { toast.error("Reconhecimento de voz não suportado."); return; }
+    if (!supported) {
+      if (chromeBlocked) {
+        toast.error("Reconhecimento de voz bloqueado pelo Chrome fora de HTTPS. Use a versão segura (https://) do site.");
+      } else {
+        toast.error("Reconhecimento de voz não suportado neste navegador.");
+      }
+      return;
+    }
     const rec = recognitionRef.current; if (!rec) return;
     if (alwaysOnRef.current) {
       shouldRestartRef.current = false;
@@ -316,22 +326,44 @@ export default function FloatingVoiceOrb() {
   const loadVoices = () => {
     try {
       const list = window.speechSynthesis?.getVoices?.() || [];
-      if (list.length) voicesRef.current = list;
-    } catch {}
+      if (list.length) { voicesRef.current = list; return true; }
+      return false;
+    } catch { return false; }
   };
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
+    // Chrome carrega vozes de forma assíncrona e pode não disparar onvoiceschanged.
+    // Tentamos polling + onvoiceschanged para máxima compatibilidade.
+    if (!loadVoices()) {
+      const id = setInterval(() => { if (loadVoices()) clearInterval(id); }, 200);
+      window.speechSynthesis.onvoiceschanged = () => { loadVoices(); clearInterval(id); };
+    } else {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
     return () => { try { window.speechSynthesis.onvoiceschanged = null; } catch {} };
   }, []);
 
   // Deve ser chamado DE DENTRO de um gesto do usuário (click/touch).
   // Em iOS/Android o speechSynthesis fica bloqueado até esse "unlock".
+  // Chrome recente também bloqueia; usamos AudioContext como fallback mais confiável.
   const unlockSpeech = () => {
     if (speechUnlockedRef.current) return;
     try {
+      // AudioContext unlock (funciona no Chrome mobile/desktop)
+      try {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (Ctor) {
+          const ctx = new Ctor();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          gain.gain.value = 0.001;
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(0);
+          osc.stop(0.05);
+        }
+      } catch {}
       const synth = window.speechSynthesis;
       if (!synth) return;
       const warm = new SpeechSynthesisUtterance(" ");
@@ -1130,7 +1162,11 @@ Depois daquele dia, Chapeuzinho aprendeu a não se desviar do caminho e a ter cu
   const toggleListen = () => {
     unlockSpeech();
     if (!supported) {
-      toast.error("Reconhecimento de voz não suportado neste navegador.");
+      if (chromeBlocked) {
+        toast.error("Reconhecimento de voz bloqueado pelo Chrome fora de HTTPS. Use a versão segura (https://) do site.");
+      } else {
+        toast.error("Reconhecimento de voz não suportado neste navegador.");
+      }
       return;
     }
     const rec = recognitionRef.current;
