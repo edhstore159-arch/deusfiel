@@ -140,6 +140,36 @@ function loadImage(src) {
   });
 }
 
+// Valida que a imagem gerada realmente carrega e não está vazia/em branco,
+// antes de exibir/salvar. Evita salvar resultado quebrado como sucesso.
+async function isImageUsable(src) {
+  try {
+    const img = await loadImage(src);
+    if (!img.width || !img.height) return false;
+    const c = document.createElement("canvas");
+    c.width = 32;
+    c.height = 32;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0, 32, 32);
+    const { data } = ctx.getImageData(0, 0, 32, 32);
+    let sum = 0;
+    let sumSq = 0;
+    let n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const lum = data[i] + data[i + 1] + data[i + 2];
+      sum += lum;
+      sumSq += lum * lum;
+      n += 1;
+    }
+    const mean = sum / n;
+    const variance = sumSq / n - mean * mean;
+    return variance > 2;
+  } catch (e) {
+    console.warn("isImageUsable: imagem não carregou:", e);
+    return false;
+  }
+}
+
 function canvasToBlob(canvas, type = "image/png", quality = 0.92) {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
@@ -678,8 +708,16 @@ export default function ImageFusion() {
         },
         { timeout: 180000 }
       );
-      if (data.ok && data.image) {
-        await finishWithImage(data.image, swapKeepFaceMode ? "Criativo trocado para a Imagem 2 mantendo o rosto da Imagem 1! Salvando..." : (sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : (personReplaceMode ? "Pessoa substituída mantendo o criativo original! Salvando..." : (detailTransferMode ? "Detalhes aplicados mantendo o criativo original! Salvando..." : "Imagem gerada! Salvando e criando variações..."))))));
+      const serverImage = data.ok && data.image ? data.image : null;
+      if (serverImage && await isImageUsable(serverImage)) {
+        await finishWithImage(serverImage, swapKeepFaceMode ? "Criativo trocado para a Imagem 2 mantendo o rosto da Imagem 1! Salvando..." : (sceneCloneMode ? "Cena + look clonados! Salvando..." : (templateMode ? "Modelo clonado! Salvando..." : (singleMode ? "Imagem editada! Salvando..." : (personReplaceMode ? "Pessoa substituída mantendo o criativo original! Salvando..." : (detailTransferMode ? "Detalhes aplicados mantendo o criativo original! Salvando..." : "Imagem gerada! Salvando e criando variações..."))))));
+      } else if (serverImage) {
+        if (canUseFusionFallback) {
+          const fallback = await buildClientFusionFallback(img1, img2);
+          await finishWithImage(fallback, "A imagem retornada estava vazia ou em branco; fusão local criada e salva.");
+        } else {
+          toast.error("A imagem retornada estava vazia ou em branco. Tente novamente ou reformule o pedido.");
+        }
       } else if (canUseFusionFallback) {
         const fallback = await buildClientFusionFallback(img1, img2);
         await finishWithImage(fallback, "A IA externa falhou, mas a fusão foi criada e salva localmente.");
