@@ -95,9 +95,9 @@ Deno.serve(async (req) => {
       }
       // Local SVG fallback so the client never sees a 502 / blank screen.
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#4338ca"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#g)"/><circle cx="512" cy="420" r="160" fill="rgba(255,255,255,0.08)"/><rect x="312" y="640" width="400" height="14" rx="7" fill="rgba(255,255,255,0.35)"/><rect x="372" y="680" width="280" height="10" rx="5" fill="rgba(255,255,255,0.22)"/></svg>`;
-      const b64 = btoa(unescape(encodeURIComponent(svg)));
+      const svgB64 = btoa(unescape(encodeURIComponent(svg)));
       return new Response(JSON.stringify({
-        image_data_url: `data:image/svg+xml;base64,${b64}`,
+        image_data_url: `data:image/svg+xml;base64,${svgB64}`,
         provider: "local-fallback",
         warning: img.error,
       }), {
