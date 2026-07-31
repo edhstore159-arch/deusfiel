@@ -243,43 +243,58 @@ async function callLovableGateway(opts: NanoBananaOptions): Promise<{ url: strin
   }
 }
 
-// Direct Google Generative Language API (Gemini) — uses GEMINI_API_KEY.
+// Direct Google Generative Language API (Gemini / Nano Banana) — uses GEMINI_API_KEY.
+// Tenta o modelo legado (gemini-2.5-flash-image) e, se indisponível, os modelos
+// novos do Nano Banana. Quando a chave está sem cota no plano grátis (HTTP 429),
+// retorna uma mensagem acionável em vez de falhar silenciosamente na cadeia.
 async function callGeminiDirect(opts: NanoBananaOptions): Promise<{ url: string | null; error?: string }> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return { url: null, error: "GEMINI_API_KEY ausente" };
-  const model = "gemini-2.5-flash-image";
-  const parts: any[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
-  for (let i = 0; i < (opts.imageUrls || []).length; i += 1) {
-    const u = opts.imageUrls?.[i] || "";
-    parts.push({ text: referenceLabel(opts.mode, i) });
-    const m = String(u).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-    if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
-  }
-  try {
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts }],
-          generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
-        }),
-      },
-    );
-    if (!resp.ok) {
-      return { url: null, error: `Gemini direto ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
+  const isQuotaError = (value: string) => /quota|resource_exhausted|rate[_\s-]?limit|exceeded your current quota/i.test(value);
+  const quotaMessage = (detail: string) =>
+    `Gemini (Nano Banana): a chave GEMINI_API_KEY está sem cota (HTTP 429). Para voltar a gerar imagens imediatamente, ative o pay-as-you-go/billing da chave em https://aistudio.google.com (projeto de onde a chave foi criada); no plano grátis basta aguardar o reset diário. Detalhe: ${detail}`;
+  // Ordem: legado Nano Banana → Nano Banana 2 Lite → previews. Todas usam a
+  // mesma chave; a lista só protege contra depreciação de modelos.
+  const models = ["gemini-2.5-flash-image", "gemini-3.1-flash-image", "gemini-3.1-flash-image-preview"];
+  let lastError = "";
+  for (const model of models) {
+    const parts: any[] = [{ text: withFacePreservation(opts.prompt, opts.mode) }];
+    for (let i = 0; i < (opts.imageUrls || []).length; i += 1) {
+      const u = opts.imageUrls?.[i] || "";
+      parts.push({ text: referenceLabel(opts.mode, i) });
+      const m = String(u).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (m) parts.push({ inlineData: { mimeType: m[1], data: m[2] } });
     }
-    const data = await resp.json();
-    const out = data?.candidates?.[0]?.content?.parts || [];
-    const inline = out.find((p: any) => p?.inlineData?.data || p?.inline_data?.data);
-    const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
-    const mime = inline?.inlineData?.mimeType || inline?.inline_data?.mime_type || "image/png";
-    if (!b64) return { url: null, error: "Gemini direto não retornou imagem" };
-    return { url: `data:${mime};base64,${b64}` };
-  } catch (e) {
-    return { url: null, error: `Gemini direto erro: ${(e as Error)?.message || e}` };
+    try {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts }],
+            generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+          }),
+        },
+      );
+      const text = await resp.text();
+      if (!resp.ok) {
+        if (isQuotaError(text)) return { url: null, error: quotaMessage(text.slice(0, 220)) };
+        lastError = `Gemini[${model}] ${resp.status}: ${text.slice(0, 200)}`;
+        continue;
+      }
+      const data = JSON.parse(text);
+      const out = data?.candidates?.[0]?.content?.parts || [];
+      const inline = out.find((p: any) => p?.inlineData?.data || p?.inline_data?.data);
+      const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
+      const mime = inline?.inlineData?.mimeType || inline?.inline_data?.mime_type || "image/png";
+      if (b64) return { url: `data:${mime};base64,${b64}` };
+      lastError = `Gemini[${model}] não retornou imagem`;
+    } catch (e) {
+      lastError = `Gemini[${model}] erro: ${(e as Error)?.message || e}`;
+    }
   }
+  return { url: null, error: lastError || "Gemini falhou" };
 }
 
 function parseDataUrl(value: string): { mime: string; base64: string; ext: string } | null {
@@ -721,14 +736,13 @@ export async function generateWithNanoBanana(
   }
 
   // ===== Modos com imagens de referência (edição/fusão/template/clone).
-  // Gemini direto é o único provider de edição com chave operacional (Emergent
-  // está fora do ar/404 e Lovable/OpenAI sem chave configurada), então vem
-  // primeiro. Emergent só é tentado antes se o caller pedir explicitamente.
-  const emergentFirst = Boolean(Deno.env.get("EMERGENT_API_KEY") && pref === "emergent");
+  // Emergent é o provider do Nano Banana com cota operacional (a chave
+  // GEMINI_API_KEY direta está em 429 no plano grátis), então vem primeiro.
+  // Gemini direto e os demais continuam na cadeia como fallback.
+  const emergentFirst = Boolean(Deno.env.get("EMERGENT_API_KEY"));
   const chain: Array<{ label: string; provider: string; run: () => Promise<{ url: string | null; error?: string }> }> = [];
   if (emergentFirst) chain.push({ label: "Emergent", provider: "emergent", run: () => callEmergent(opts) });
-  if (Deno.env.get("GEMINI_API_KEY")) chain.push({ label: "Gemini", provider: "gemini", run: () => callGeminiDirect(opts) });
-  if (Deno.env.get("EMERGENT_API_KEY") && !emergentFirst) chain.push({ label: "Emergent", provider: "emergent", run: () => callEmergent(opts) });
+  if (Deno.env.get("GEMINI_API_KEY") && !emergentFirst) chain.push({ label: "Gemini", provider: "gemini", run: () => callGeminiDirect(opts) });
   if (Deno.env.get("LOVABLE_API_KEY")) chain.push({ label: "Lovable", provider: "lovable", run: () => callLovableGateway(opts) });
   if (Deno.env.get("OPENAI_API_KEY")) chain.push({ label: "OpenAI", provider: "openai", run: () => callOpenAIImages(opts) });
 

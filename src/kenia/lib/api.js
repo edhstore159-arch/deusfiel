@@ -1185,6 +1185,7 @@ const staticPost = (url, body = {}) => {
       let genError = null;
       try {
         const { data, error } = await supabase.functions.invoke("generate-cover-image", {
+          timeout: 120000,
           body: {
             prompt: topic,
             title: body.title || "",

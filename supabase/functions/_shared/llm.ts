@@ -718,24 +718,39 @@ async function imageLovable(opts: ImageOptions) {
 
 async function imageGemini(opts: ImageOptions) {
   if (!GEMINI_KEY) return { ok: false as const, error: "GEMINI_API_KEY ausente" };
-  const model = "gemini-2.5-flash-image";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+  const models = ["gemini-2.5-flash-image", "gemini-3.1-flash-image", "gemini-3.1-flash-image-preview"];
   const safePrompt = opts.prompt;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: safePrompt }] }],
-      generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
-    }),
-  });
-  if (!resp.ok) return { ok: false as const, error: `Gemini ${resp.status}: ${(await resp.text()).slice(0, 200)}` };
-  const data = await resp.json();
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  const inline = parts.find((p: any) => p?.inlineData?.data || p?.inline_data?.data);
-  const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
-  if (!b64) return { ok: false as const, error: "Gemini direto não retornou imagem" };
-  return { ok: true as const, b64, provider: "gemini" };
+  let lastError = "";
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: safePrompt }] }],
+          generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
+        }),
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        if (/quota|resource_exhausted|exceeded your current quota/i.test(text)) {
+          return { ok: false as const, error: `Gemini (Nano Banana): chave GEMINI_API_KEY sem cota (HTTP 429). Ative pay-as-you-go em https://aistudio.google.com ou aguarde o reset diário. Detalhe: ${text.slice(0, 200)}` };
+        }
+        lastError = `Gemini[${model}] ${resp.status}: ${text.slice(0, 200)}`;
+        continue;
+      }
+      const data = await resp.json();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const inline = parts.find((p: any) => p?.inlineData?.data || p?.inline_data?.data);
+      const b64 = inline?.inlineData?.data || inline?.inline_data?.data;
+      if (b64) return { ok: true as const, b64, provider: "gemini" };
+      lastError = `Gemini[${model}] não retornou imagem`;
+    } catch (error) {
+      lastError = `Gemini[${model}] ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+  return { ok: false as const, error: lastError || "Gemini direto não retornou imagem" };
 }
 
 async function imageEmergent(opts: ImageOptions) {

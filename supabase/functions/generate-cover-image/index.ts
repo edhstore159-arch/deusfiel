@@ -58,8 +58,8 @@ Deno.serve(async (req) => {
       try {
         const pollPrompt = encodeURIComponent(p);
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 45000);
-        const pollResp = await fetch(`https://image.pollinations.ai/prompt/${pollPrompt}?width=1024&height=1024&nologo=true&seed=${Date.now()}`, {
+        const timeout = setTimeout(() => controller.abort(), 110000);
+        const pollResp = await fetch(`https://image.pollinations.ai/prompt/${pollPrompt}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 2147483647)}`, {
           signal: controller.signal,
           redirect: "follow",
         });
