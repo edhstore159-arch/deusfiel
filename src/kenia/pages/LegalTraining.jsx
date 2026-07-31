@@ -583,12 +583,12 @@ function LegalTraining() {
               strategy_name: m.strategy || detectStrategy(m.text || m.content || "", m.from_me ? "outgoing" : "incoming"),
               created_at: m.created_at || new Date().toISOString(),
             }));
-            if (!silent) setWaMessages(mapped);
-          } else {
-            if (!silent) setWaMessages([]);
+            setWaMessages(mapped);
+          } else if (!silent) {
+            setWaMessages([]);
           }
         })
-        .catch(() => setWaMessages([]));
+        .catch(() => { if (!silent) setWaMessages([]); });
     }
   }
 

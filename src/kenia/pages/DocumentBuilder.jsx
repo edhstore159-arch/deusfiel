@@ -1,4 +1,9 @@
 import { useState, useRef, useEffect, useCallback, Component } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
+import TextAlign from "@tiptap/extension-text-align";
+import Placeholder from "@tiptap/extension-placeholder";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
@@ -8,7 +13,9 @@ import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/tabs";
 import {
   Send, Loader2, FileText, Eye, FileCode, Download,
-  MessageSquare, FolderTree, ExternalLink, Trash2, Scale, Copy, CheckCircle2
+  MessageSquare, FolderTree, ExternalLink, Trash2, Scale, Copy, CheckCircle2,
+  Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Heading1, Heading2,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify, Undo, Redo, Pilcrow
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -422,28 +429,89 @@ function ChatPanel({ messages, input, setInput, sending, send, handleKeyDown, ch
   );
 }
 
+function RichTextToolbar({ editor }) {
+  if (!editor) return null;
+  const btn = (active, onClick, icon, title) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`p-1.5 rounded hover:bg-nude-200 transition-colors ${active ? "bg-nude-200 text-nude-900" : "text-nude-500"}`}
+    >
+      {icon}
+    </button>
+  );
+  const btnGroup = (children) => <div className="flex items-center gap-0.5 px-1 border-r border-nude-200 last:border-r-0">{children}</div>;
+  return (
+    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b bg-white flex-wrap shrink-0 sticky top-0 z-10">
+      {btnGroup([
+        btn(editor.isActive("bold"), () => editor.chain().focus().toggleBold().run(), <Bold className="w-3.5 h-3.5" />, "Negrito"),
+        btn(editor.isActive("italic"), () => editor.chain().focus().toggleItalic().run(), <Italic className="w-3.5 h-3.5" />, "Itálico"),
+        btn(editor.isActive("underline"), () => editor.chain().focus().toggleUnderline().run(), <UnderlineIcon className="w-3.5 h-3.5" />, "Sublinhado"),
+      ])}
+      {btnGroup([
+        btn(editor.isActive("heading", { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run(), <Heading1 className="w-3.5 h-3.5" />, "Título 1"),
+        btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), <Heading2 className="w-3.5 h-3.5" />, "Título 2"),
+        btn(editor.isActive("paragraph"), () => editor.chain().focus().setParagraph().run(), <Pilcrow className="w-3.5 h-3.5" />, "Parágrafo"),
+      ])}
+      {btnGroup([
+        btn(editor.isActive("bulletList"), () => editor.chain().focus().toggleBulletList().run(), <List className="w-3.5 h-3.5" />, "Lista"),
+        btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), <ListOrdered className="w-3.5 h-3.5" />, "Lista numerada"),
+      ])}
+      {btnGroup([
+        btn(editor.isActive({ textAlign: "left" }), () => editor.chain().focus().setTextAlign("left").run(), <AlignLeft className="w-3.5 h-3.5" />, "Alinhar à esquerda"),
+        btn(editor.isActive({ textAlign: "center" }), () => editor.chain().focus().setTextAlign("center").run(), <AlignCenter className="w-3.5 h-3.5" />, "Centralizar"),
+        btn(editor.isActive({ textAlign: "right" }), () => editor.chain().focus().setTextAlign("right").run(), <AlignRight className="w-3.5 h-3.5" />, "Alinhar à direita"),
+        btn(editor.isActive({ textAlign: "justify" }), () => editor.chain().focus().setTextAlign("justify").run(), <AlignJustify className="w-3.5 h-3.5" />, "Justificar"),
+      ])}
+      {btnGroup([
+        btn(false, () => editor.chain().focus().undo().run(), <Undo className="w-3.5 h-3.5" />, "Desfazer"),
+        btn(false, () => editor.chain().focus().redo().run(), <Redo className="w-3.5 h-3.5" />, "Refazer"),
+      ])}
+    </div>
+  );
+}
+
 function DocumentPanel({ documents, setDocuments, activeDocument, setActiveDocument, deleteFile, fullHeight }) {
   const docList = Object.keys(documents);
   const content = documents[activeDocument] || "";
-  const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState("");
+  const isHtml = activeDocument?.endsWith(".html");
 
-  const startEditing = () => {
-    setEditText(content);
-    setEditing(true);
-  };
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      Placeholder.configure({ placeholder: "Comece a digitar ou cole o conteúdo aqui..." }),
+    ],
+    content: "",
+    editorProps: {
+      attributes: {
+        class: "prose prose-sm max-w-none focus:outline-none min-h-full px-4 py-3 text-sm leading-relaxed",
+      },
+    },
+    onUpdate: ({ editor: ed }) => {
+      if (!activeDocument) return;
+      const html = ed.getHTML();
+      setDocuments((prev) => ({ ...prev, [activeDocument]: html }));
+    },
+  });
 
-  const cancelEditing = () => {
-    setEditing(false);
-    setEditText("");
-  };
+  useEffect(() => {
+    if (!editor || !content) return;
+    const currentHtml = editor.getHTML();
+    const normalizedContent = content.trim();
+    const normalizedCurrent = currentHtml.trim();
+    if (normalizedContent !== normalizedCurrent && normalizedContent !== "") {
+      editor.commands.setContent(normalizedContent);
+    }
+  }, [activeDocument]);
 
-  const saveEditing = () => {
-    if (!activeDocument) return;
-    setDocuments((prev) => ({ ...prev, [activeDocument]: editText }));
-    setEditing(false);
-    toast.success("Documento salvo!");
-  };
+  useEffect(() => {
+    if (!editor) return;
+    const isEditable = isHtml;
+    editor.setEditable(isEditable);
+  }, [isHtml, editor]);
 
   return (
     <Card className={`flex flex-col ${fullHeight ? "h-full" : ""}`}>
@@ -451,11 +519,6 @@ function DocumentPanel({ documents, setDocuments, activeDocument, setActiveDocum
         <FolderTree className="w-4 h-4 text-gold-600" />
         <span className="text-xs font-medium">Arquivos do Documento</span>
         <Badge variant="secondary" className="ml-auto text-[10px]">{docList.length}</Badge>
-        {docList.length > 0 && !editing && (
-          <Button size="sm" variant="outline" onClick={startEditing} className="h-6 text-[10px] px-2">
-            Editar
-          </Button>
-        )}
       </div>
       {docList.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
@@ -471,7 +534,7 @@ function DocumentPanel({ documents, setDocuments, activeDocument, setActiveDocum
             {docList.map((path) => (
               <button
                 key={path}
-                onClick={() => { setActiveDocument(path); setEditing(false); }}
+                onClick={() => setActiveDocument(path)}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] whitespace-nowrap transition-colors ${
                   activeDocument === path
                     ? "bg-gold-100 text-gold-700 font-medium"
@@ -489,29 +552,18 @@ function DocumentPanel({ documents, setDocuments, activeDocument, setActiveDocum
               </button>
             ))}
           </div>
-          <div className="flex-1 min-h-0 overflow-auto">
-            {editing ? (
-              <div className="h-full flex flex-col">
-                <textarea
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  className="flex-1 p-3 text-[11px] leading-relaxed font-mono resize-none border-0 outline-none focus:ring-0"
-                />
-                <div className="flex gap-2 p-2 border-t shrink-0">
-                  <Button size="sm" onClick={saveEditing} className="h-7 text-[10px]">
-                    <CheckCircle2 className="w-3 h-3 mr-1" /> Salvar
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={cancelEditing} className="h-7 text-[10px]">
-                    Cancelar
-                  </Button>
-                </div>
+          {isHtml ? (
+            <>
+              <RichTextToolbar editor={editor} />
+              <div className="flex-1 min-h-0 overflow-auto bg-white">
+                <EditorContent editor={editor} className="h-full" />
               </div>
-            ) : (
-              <pre className="p-3 text-[11px] leading-relaxed font-mono text-foreground whitespace-pre-wrap break-words">
-                {content}
-              </pre>
-            )}
-          </div>
+            </>
+          ) : (
+            <pre className="flex-1 min-h-0 overflow-auto p-3 text-[11px] leading-relaxed font-mono text-foreground whitespace-pre-wrap break-words">
+              {content}
+            </pre>
+          )}
         </div>
       )}
     </Card>
