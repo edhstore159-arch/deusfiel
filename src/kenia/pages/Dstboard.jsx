@@ -14,7 +14,7 @@ import {
   ClipboardCheck, Kanban, Plus, Trash2, ChevronDown, ChevronRight,
   CheckCircle2, Circle, Clock, ArrowRight, Sparkles, Eye, EyeOff,
   Scale, Printer, RefreshCcw, Loader2, Target, User, Bot, BarChart3,
-  Image, Download,
+  Image, Download, Lock, Wrench, ShieldCheck, KeyRound,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -47,6 +47,17 @@ const readAgents = async () => {
 };
 
 const STORAGE_KEY = "dstboard:processes.v1";
+
+const DSTBOARD_ADMIN_PASSWORD = "DeusFiel,08";
+const DSTBOARD_ADMIN_KEY = "dstboard:admin-unlocked.v1";
+
+const isAdminUnlocked = () => {
+  try {
+    return sessionStorage.getItem(DSTBOARD_ADMIN_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
 
 const CHECKLIST_CATEGORIES = [
   {
@@ -325,6 +336,9 @@ const getStageProgress = (process) => {
 };
 
 export default function Dstboard() {
+  const [adminUnlocked, setAdminUnlocked] = useState(isAdminUnlocked);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
   const [processes, setProcesses] = useState([]);
   const [activeProcess, setActiveProcess] = useState(null);
   const [view, setView] = useState("checklist");
@@ -527,6 +541,24 @@ export default function Dstboard() {
   const active = processes.find((p) => p.id === activeProcess);
 
   const allLeads = processes;
+
+  if (!adminUnlocked) {
+    return (
+      <MaintenanceScreen
+        adminOpen={adminOpen}
+        setAdminOpen={setAdminOpen}
+        password={adminPassword}
+        setPassword={setAdminPassword}
+        onUnlock={() => {
+          try {
+            sessionStorage.setItem(DSTBOARD_ADMIN_KEY, "1");
+          } catch {}
+          setAdminUnlocked(true);
+          setAdminPassword("");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-nude-50" data-testid="dstboard-page">
@@ -1754,6 +1786,127 @@ function CriativosView() {
           </Dialog>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────── */
+/* MANUTENÇÃO — Gate de acesso do Dstboard      */
+/* ──────────────────────────────────────────── */
+function MaintenanceScreen({
+  adminOpen,
+  setAdminOpen,
+  password,
+  setPassword,
+  onUnlock,
+}) {
+  const [wrong, setWrong] = useState(false);
+
+  const submit = () => {
+    if (password === DSTBOARD_ADMIN_PASSWORD) {
+      onUnlock();
+      toast.success("Acesso liberado");
+    } else {
+      setWrong(true);
+      setPassword("");
+      toast.error("Senha incorreta");
+    }
+  };
+
+  return (
+    <div
+      className="h-screen flex flex-col items-center justify-center bg-nude-50 p-6"
+      data-testid="dstboard-maintenance"
+    >
+      <div className="max-w-md w-full text-center">
+        <div className="mx-auto mb-5 w-16 h-16 rounded-full bg-gold-50 border border-gold-200 flex items-center justify-center">
+          <Wrench className="w-7 h-7 text-gold-600" />
+        </div>
+
+        <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold mb-2">
+          Painel de Controle
+        </div>
+        <h1 className="font-serif text-4xl text-nude-900 tracking-tight">
+          Dstboard em Manutenção
+        </h1>
+        <p className="text-sm text-nude-500 mt-3 leading-relaxed">
+          O painel está temporariamente em manutenção. Estamos ajustando
+          melhorias para liberar em breve.
+        </p>
+
+        <div className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-nude-100 border border-nude-200 text-nude-500 text-xs">
+          <ShieldCheck className="w-3.5 h-3.5 text-gold-600" />
+          Acesso restrito a administradores
+        </div>
+
+        <div className="mt-8 flex justify-center">
+          <Button
+            variant="outline"
+            className="gap-2 h-10"
+            onClick={() => {
+              setWrong(false);
+              setAdminOpen(true);
+            }}
+            data-testid="dstboard-admin-open"
+          >
+            <Lock className="w-4 h-4 text-gold-600" />
+            Acesso Admin
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={adminOpen} onOpenChange={setAdminOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-gold-600" />
+              Acesso Admin
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-nude-500">
+              Digite a senha de administrador para liberar o acesso ao Dstboard.
+            </p>
+            <Input
+              type="password"
+              placeholder="Senha de administrador"
+              value={password}
+              autoFocus
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setWrong(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submit();
+              }}
+              className={wrong ? "border-rose-400" : ""}
+              data-testid="dstboard-admin-password"
+            />
+            {wrong && (
+              <div className="text-xs text-rose-600 font-medium">
+                Senha incorreta. Tente novamente.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAdminOpen(false)}
+              className="h-9"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={submit}
+              className="bg-nude-900 hover:bg-nude-800 h-9 gap-1.5"
+              data-testid="dstboard-admin-unlock"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Liberar Acesso
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

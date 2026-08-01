@@ -60,7 +60,7 @@ const SECTIONS = [
     stack: "Supabase Secrets + Dashboard Local",
     items: [
       "ZEN_API_KEY — sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8",
-      "EMERGENT_API_KEY — sk-emergent-e69E465EfCaEa16C2A",
+      "EMERGENT_API_KEY — sk-emergent-b8cEdA5822d14C0638",
       "Claude FCC — localhost:8082 (auto-start no boot)",
     ],
   },
