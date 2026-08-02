@@ -84,7 +84,12 @@ Deno.serve(async (req) => {
         });
       }
     } else {
-      img = await generateImage({ prompt: fullPrompt, size: "1024x1024", quality: "high" });
+      img = await generateImage({
+        prompt: fullPrompt,
+        size: "1024x1024",
+        quality: "high",
+        preferProvider: provider === "emergent" ? "emergent" : undefined,
+      });
     }
     if (!img.ok) {
       const b64 = await tryPollinations(fullPrompt);

@@ -3178,35 +3178,74 @@ Retorne APENAS o texto da legenda."""
         f"Square 1:1, high-quality, tasteful. Typography elegant, no people faces."
     )
     image_b64 = None
-    if not image_key:
+    image_model = None
+    if not EMERGENT_LLM_KEY and not image_key:
         raise HTTPException(
             status_code=http_status.HTTP_402_PAYMENT_REQUIRED,
-            detail={"code": "insufficient_balance", "message": "Nenhuma chave de imagem configurada. Adicione uma chave OpenAI para gerar imagens."},
+            detail={"code": "insufficient_balance", "message": "Nenhuma chave de imagem configurada. Adicione uma chave Emergent (Nano Banana) ou OpenAI nas configurações."},
         )
-    try:
-        from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
-        img_gen = OpenAIImageGeneration(api_key=image_key)
-        images = await img_gen.generate_images(
-            prompt=image_prompt,
-            model="gpt-image-1",
-            number_of_images=1,
+
+    # 1) Gemini Nano Banana via Emergent (gerador preferencial)
+    if EMERGENT_LLM_KEY:
+        image_prompt_msg = UserMessage(text=image_prompt)
+        try:
+            image_chat = LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id=session_id + "-gemini-img",
+                system_message="You are a professional graphic designer for Brazilian law firms.",
+            ).with_model("gemini", "gemini-2.5-flash-image-preview").with_params(modalities=["image", "text"])
+            _text_resp, gemini_images = await image_chat.send_message_multimodal_response(image_prompt_msg)
+            if gemini_images and gemini_images[0].get("data"):
+                image_b64 = gemini_images[0]["data"]
+                image_model = "gemini-2.5-flash-image-preview"
+        except Exception as primary_err:
+            _raise_on_insufficient_balance(primary_err)
+            log.warning(f"gemini-2.5 falhou, tentando gemini-3.1: {primary_err}")
+            try:
+                image_chat = LlmChat(
+                    api_key=EMERGENT_LLM_KEY,
+                    session_id=session_id + "-gemini-img-retry",
+                    system_message="You are a professional graphic designer for Brazilian law firms.",
+                ).with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
+                _text_resp, gemini_images = await image_chat.send_message_multimodal_response(image_prompt_msg)
+                if gemini_images and gemini_images[0].get("data"):
+                    image_b64 = gemini_images[0]["data"]
+                    image_model = "gemini-3.1-flash-image-preview"
+            except Exception as fallback_err:
+                _raise_on_insufficient_balance(fallback_err)
+                log.warning(f"Gemini image gen via Emergent failed: {fallback_err}")
+
+    # 2) Fallback OpenAI (gpt-image-1) com chave do usuario ou OPENAI_API_KEY
+    if not image_b64 and image_key:
+        try:
+            from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
+            img_gen = OpenAIImageGeneration(api_key=image_key)
+            images = await img_gen.generate_images(
+                prompt=image_prompt,
+                model="gpt-image-1",
+                number_of_images=1,
+            )
+            if images:
+                raw = images[0] if isinstance(images[0], (bytes, bytearray)) else None
+                if raw:
+                    image_b64 = base64.b64encode(raw).decode()
+                    image_model = "gpt-image-1"
+        except Exception as e:
+            _raise_on_insufficient_balance(e)
+            log.warning(f"OpenAI image gen failed: {e}")
+
+    if not image_b64:
+        raise HTTPException(
+            status_code=http_status.HTTP_402_PAYMENT_REQUIRED,
+            detail={"code": "insufficient_balance", "message": "Nenhuma imagem gerada. Verifique a chave Emergent (Nano Banana) ou adicione uma chave OpenAI nas configurações."},
         )
-        if images:
-            # images[0] is bytes
-            import base64 as _b64
-            raw = images[0] if isinstance(images[0], (bytes, bytearray)) else None
-            if raw:
-                image_b64 = _b64.b64encode(raw).decode()
-    except Exception as e:
-        _raise_on_insufficient_balance(e)
-        log.exception("Image gen failed")
 
     cid = str(uuid.uuid4())
     doc = {
         "id": cid, "owner_id": current_user["id"],
         "title": payload.title, "network": payload.network, "format": payload.format,
         "topic": payload.topic, "tone": payload.tone, "case_type": payload.case_type,
-        "caption": caption, "image_b64": image_b64,
+        "caption": caption, "image_b64": image_b64, "image_model": image_model,
         "status": "rascunho", "created_at": now_iso(),
     }
     await db.creatives.insert_one(doc)
@@ -3871,21 +3910,45 @@ async def test_text_key(current_user=Depends(get_current_user)):
 async def test_image_key(current_user=Depends(get_current_user)):
     s = await db.app_settings.find_one({"owner_id": current_user["id"]}, {"_id": 0}) or {}
     key = s.get("llm_image_key") or os.environ.get("OPENAI_API_KEY") or ""
-    try:
-        from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
-        img_gen = OpenAIImageGeneration(api_key=key)
-        images = await img_gen.generate_images(
-            prompt="simple blue circle on white background, minimal, test image",
-            model="gpt-image-1",
-            number_of_images=1,
-        )
-        return {"ok": bool(images), "using_custom_key": bool(s.get("llm_image_key")),
-                "model": "gpt-image-1"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        _raise_on_insufficient_balance(e)
-        return {"ok": False, "error": str(e)[:300]}
+
+    # 1) Gemini Nano Banana via Emergent (gerador preferencial)
+    if EMERGENT_LLM_KEY:
+        try:
+            test_chat = LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id=f"test-img-{uuid.uuid4()}",
+                system_message="You are a helpful assistant.",
+            ).with_model("gemini", "gemini-2.5-flash-image-preview").with_params(modalities=["image", "text"])
+            _t, gemini_images = await test_chat.send_message_multimodal_response(
+                UserMessage(text="simple blue circle on white background, minimal, test image")
+            )
+            if gemini_images:
+                return {"ok": True, "using_custom_key": bool(s.get("llm_image_key")),
+                        "model": "gemini-2.5-flash-image-preview (Nano Banana via Emergent)"}
+        except HTTPException:
+            raise
+        except Exception as e:
+            _raise_on_insufficient_balance(e)
+            log.warning(f"test-image Gemini failed: {e}")
+    # 2) Fallback OpenAI
+    if key:
+        try:
+            from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
+            img_gen = OpenAIImageGeneration(api_key=key)
+            images = await img_gen.generate_images(
+                prompt="simple blue circle on white background, minimal, test image",
+                model="gpt-image-1",
+                number_of_images=1,
+            )
+            if images:
+                return {"ok": True, "using_custom_key": bool(s.get("llm_image_key")),
+                        "model": "gpt-image-1"}
+        except HTTPException:
+            raise
+        except Exception as e:
+            _raise_on_insufficient_balance(e)
+            log.warning(f"test-image OpenAI failed: {e}")
+    return {"ok": False, "error": "Nenhuma chave de imagem configurada ou todas falharam. Adicione uma OpenAI key ou verifique a Emergent."}
 
 # ==================== FUSAO DE IMAGENS (Gemini Nano Banana) ====================
 

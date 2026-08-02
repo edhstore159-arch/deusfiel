@@ -9,7 +9,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { Textarea } from "@/kenia/components/ui/textarea";
 import { Label } from "@/kenia/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/kenia/components/ui/dialog";
-import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, CalendarClock, Pencil, ArrowLeft, RotateCcw, Archive, Box } from "lucide-react";
+import { Sparkles, Instagram, Facebook, Linkedin, Trash2, Download, Copy, Wand2, Upload, CalendarClock, Pencil, ArrowLeft, RotateCcw, Archive, Box, ListChecks, Check } from "lucide-react";
 import Immersive3DViewer from "@/kenia/components/Immersive3DViewer";
 import { toast } from "sonner";
 
@@ -40,6 +40,8 @@ export default function CreativesGallery() {
   const [showTrash, setShowTrash] = useState(false);
   const [trash, setTrash] = useState([]);
   const [viewer3D, setViewer3D] = useState(null); // { image_b64, title }
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
 
   const TRASH_KEY = "creatives-trash-v1";
   const loadTrash = () => {
@@ -261,6 +263,46 @@ export default function CreativesGallery() {
     }
   };
 
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => (prev.size === items.length ? new Set() : new Set(items.map((i) => i.id).filter(Boolean))));
+  };
+
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelected(new Set());
+  };
+
+  const removeSelected = async () => {
+    const ids = [...selected];
+    if (!ids.length) return;
+    if (!confirm(`Excluir ${ids.length} imagem(ns)? Elas serão enviadas para a lixeira.`)) return;
+    let ok = 0;
+    for (const id of ids) {
+      const item = items.find((i) => i.id === id);
+      if (!item) continue;
+      try {
+        const { image_b64, signed_url, ...meta } = item;
+        const snapshot = { ...meta, deleted_at: new Date().toISOString() };
+        saveTrash([snapshot, ...trash.filter((t) => t.id !== id)]);
+        try { await api.delete(`/creatives/${id}`); } catch {}
+        try { await supabase.from("generated_images").delete().eq("id", id); } catch {}
+        ok++;
+      } catch {}
+    }
+    setItems((prev) => prev.filter((it) => !selected.has(it.id)));
+    exitSelection();
+    toast.success(`${ok} imagem(ns) excluída(s)`, { description: "Enviadas para a lixeira." });
+  };
+
   const restore = async (item) => {
     try {
       const { data: authData } = await supabase.auth.getUser();
@@ -426,6 +468,15 @@ export default function CreativesGallery() {
           <Button
             variant="outline"
             size="sm"
+            className={`border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50 ${selectionMode ? "ring-2 ring-indigo-400" : ""}`}
+            onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+          >
+            <ListChecks className="w-4 h-4 mr-2" />
+            {selectionMode ? "Cancelar seleção" : "Selecionar"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             className={`border-gold-300 bg-white text-nude-900 hover:bg-gold-50 ${showTrash ? "ring-2 ring-gold-400" : ""}`}
             onClick={() => setShowTrash((v) => !v)}
           >
@@ -507,9 +558,32 @@ export default function CreativesGallery() {
             </Button>
           </Card>
         ) : (
+          <>
+            {selectionMode && items.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 sticky top-0 z-20">
+                <div className="text-sm font-semibold text-indigo-900 mr-2">{selected.size} selecionada(s)</div>
+                <Button size="sm" variant="outline" className="border-indigo-200 text-indigo-700" onClick={toggleSelectAll}>
+                  <Check className="w-3 h-3 mr-1" />
+                  {selected.size === items.length ? "Desmarcar todas" : "Selecionar todas"}
+                </Button>
+                <div className="flex-1" />
+                <Button size="sm" variant="outline" className="border-nude-300 text-nude-700" onClick={exitSelection}>
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-rose-600 hover:bg-rose-700 text-white"
+                  disabled={selected.size === 0}
+                  onClick={removeSelected}
+                >
+                  <Trash2 className="w-3 h-3 mr-1" /> Excluir ({selected.size})
+                </Button>
+              </div>
+            )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {items.map((item, idx) => (
-              <Card key={item.id || `creative-${idx}`} className="overflow-hidden border-nude-200 hover:shadow-md transition-shadow">
+              <Card key={item.id || `creative-${idx}`} className={`overflow-hidden border-nude-200 hover:shadow-md transition-shadow ${selectionMode ? "cursor-pointer" : ""} ${selected.has(item.id) ? "ring-2 ring-indigo-500 border-indigo-400" : ""}`}
+                onClick={selectionMode ? () => toggleSelect(item.id) : undefined}>
 
                 <div className="aspect-square bg-nude-100 relative overflow-hidden">
                   {hasImage(item) ? (
@@ -519,11 +593,24 @@ export default function CreativesGallery() {
                       <Sparkles className="w-8 h-8" />
                     </div>
                   )}
+                  {selectionMode && (
+                    <div className={`absolute top-2 right-2 w-6 h-6 rounded-full grid place-items-center border-2 transition-colors ${selected.has(item.id) ? "bg-indigo-600 border-indigo-600 text-white" : "bg-white/90 border-nude-400 text-transparent"}`}>
+                      <Check className="w-4 h-4" />
+                    </div>
+                  )}
                   <Badge className="absolute top-2 left-2 bg-white/90 text-nude-900 hover:bg-white/90 gap-1 backdrop-blur">
                     <NetIcon network={item.network} className="w-3 h-3" />
                     {item.network}
                   </Badge>
                 </div>
+                {selectionMode ? (
+                  <div className="p-3">
+                    <div className="font-medium text-sm line-clamp-1">{item.title}</div>
+                    <div className={`text-xs font-medium mt-1 ${selected.has(item.id) ? "text-indigo-700" : "text-nude-400"}`}>
+                      {selected.has(item.id) ? "Selecionada" : "Clique para selecionar"}
+                    </div>
+                  </div>
+                ) : (
                 <div className="p-3">
                   <div className="font-medium text-sm line-clamp-1">{item.title}</div>
                   <div className="text-xs text-nude-500 line-clamp-3 mt-1.5 whitespace-pre-wrap min-h-[3rem]">{item.caption}</div>
@@ -559,9 +646,11 @@ export default function CreativesGallery() {
                     </Button>
                   </div>
                 </div>
+                )}
               </Card>
             ))}
           </div>
+          </>
         )}
       </div>
 
