@@ -136,7 +136,7 @@ export default function JuizVirtual() {
   const [model, setModel] = useState<string>(() => {
     const stored = localStorage.getItem("juiz_model") || "";
     const valid = AGENTS.some((a) => a.id === stored);
-    return valid ? stored : "openai/gpt-5.5";
+    return valid ? stored : "claude-fcc";
   });
   const [area, setArea] = useState<string>(() => {
     const stored = localStorage.getItem("juiz_area") || "";
@@ -309,7 +309,7 @@ export default function JuizVirtual() {
             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${configOpen ? "rotate-180" : ""}`} />
             <span className="text-muted-foreground">Configuração</span>
             <Badge variant="secondary" className="text-[10px] font-normal gap-1">
-              {selectedAgent?.label || "GPT-5.5"}
+              {selectedAgent?.label || "Claude FCC"}
               <span className="text-muted-foreground">·</span>
               {selectedArea?.label || "Geral"}
             </Badge>
