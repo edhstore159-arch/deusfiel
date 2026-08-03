@@ -9,8 +9,15 @@ import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
 import { Send, Loader2, Bot, Trash2, Server, Sparkles, Brain, Zap } from "lucide-react";
 
-// Modelos oferecidos: Nemotron (NVIDIA, gratuito), Claude FCC, Emergent, Ollama local, OpenCode Zen.
+// Modelos oferecidos: Groq (gratuito, primário), Nemotron (NVIDIA, gratuito), Claude FCC, Emergent, Ollama local, OpenCode Zen.
 const MODELS = [
+  {
+    id: "groq",
+    label: "GRQ",
+    provider: "groq",
+    icon: Brain,
+    color: "from-orange-500 to-red-500",
+  },
   {
     id: "nemotron",
     label: "NEM",

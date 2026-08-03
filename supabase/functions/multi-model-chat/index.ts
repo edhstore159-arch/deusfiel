@@ -1,5 +1,5 @@
-// Multi-model chat: Claude FCC (primario) → OpenCode Zen → OpenRouter (fallback) → Emergent (ultimo recurso, opcional).
-// Fallback automatico: quando FCC/Zen falhar, usa OpenRouter. Emergent só quando habilitado no painel.
+// Multi-model chat: Claude FCC (primario) → Groq (gratuito) → OpenCode Zen → OpenRouter (fallback) → Emergent (ultimo recurso, opcional).
+// Fallback automatico: quando FCC/Groq/Zen falhar, usa OpenRouter. Emergent só quando habilitado no painel.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -26,6 +26,11 @@ const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/open
 const NVIDIA_NIM_API_KEY = Deno.env.get("NVIDIA_NIM_API_KEY") || "";
 const NVIDIA_NIM_BASE = "https://integrate.api.nvidia.com/v1";
 const NEMOTRON_MODEL = "nvidia/nemotron-3-super-120b-a12b";
+
+// Groq API (gratuito, rápido) — segundo do chat
+const GROQ_BASE = "https://api.groq.com/openai/v1";
+const GROQ_KEY = Deno.env.get("GROQ_API_KEY") || "";
+const GROQ_MODEL = Deno.env.get("GROQ_MODEL") || "groq/compound";
 
 // Maps frontend model IDs to Emergent candidate model names (tries each in order)
 const MODEL_CANDIDATES: Record<string, string[]> = {
@@ -299,6 +304,42 @@ async function tryNemotronDirect(messages: any[], system?: string): Promise<Resp
   });
 }
 
+// Groq API direto — streaming nativo (OpenAI SSE), sem ngrok
+async function tryGroq(messages: any[], system?: string): Promise<Response | null> {
+  if (!GROQ_KEY) return null;
+  const apiMessages = [
+    ...(system ? [{ role: "system", content: String(system) }] : []),
+    ...messages.map((m: any) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: String(m.content || ""),
+    })),
+  ];
+  const resp = await fetch(`${GROQ_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${GROQ_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: apiMessages,
+      max_tokens: 8192,
+      stream: true,
+      temperature: 0.7,
+    }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    console.warn(`Groq ${resp.status}: ${text.slice(0, 200)}`);
+    return null;
+  }
+  // Groq usa formato OpenAI SSE — streaming direto
+  return new Response(resp.body, {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -320,6 +361,27 @@ Deno.serve(async (req) => {
         console.warn("Zen falhou, tentando Emergent...");
       } catch (e) {
         console.warn("Zen erro:", (e as Error)?.message);
+      }
+    }
+
+    // Rota dedicada: Groq (gratuito, rápido)
+    if (model === "groq") {
+      console.log("Rota direta: Groq");
+      try {
+        const groqResp = await tryGroq(messages, system);
+        if (groqResp) return groqResp;
+        const sseErr = `data: ${JSON.stringify({ error: "Groq indisponível (GROQ_API_KEY ausente ou erro do provedor)." })}\n\ndata: [DONE]\n\n`;
+        return new Response(sseErr, {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      } catch (e) {
+        const msg = String((e as Error)?.message || e);
+        const sseErr = `data: ${JSON.stringify({ error: `Groq falhou: ${msg}` })}\n\ndata: [DONE]\n\n`;
+        return new Response(sseErr, {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
       }
     }
 
@@ -350,12 +412,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Rota dedicada: Claude FCC via ngrok (não precisa de Emergent)
+    // Rota dedicada: Claude FCC via ngrok (fallback Groq)
     if (model === "claude-fcc") {
-      console.log("Rota direta: Claude FCC via ngrok");
+      console.log("Rota direta: Claude FCC via ngrok (fallback Groq)");
       try {
         const claudeResp = await tryClaudeFCC(messages, system);
         if (claudeResp.ok) return claudeResp;
+        console.warn("Claude FCC falhou, tentando Groq...");
+        const groqResp = await tryGroq(messages, system);
+        if (groqResp) return groqResp;
         // Encapsula erro do FCC num envelope SSE pro cliente mostrar
         const errBody = await claudeResp.text().catch(() => "");
         const sseErr = `data: ${JSON.stringify({ error: `Claude FCC ${claudeResp.status}: ${errBody.slice(0, 200)}` })}\n\ndata: [DONE]\n\n`;
@@ -390,13 +455,22 @@ Deno.serve(async (req) => {
     let lastError = "";
     let lastStatus = 0;
 
-    // 1) Claude FCC — primeiro recurso (primário)
+    // 0) Claude FCC — primário
     try {
       const claudeResp = await tryClaudeFCC(messages, system);
       if (claudeResp.ok) return claudeResp;
-      console.warn("Claude FCC falhou, tentando Zen/OpenRouter...");
+      console.warn("Claude FCC falhou, tentando Groq...");
     } catch (e) {
       console.warn("Claude FCC erro:", (e as Error)?.message);
+    }
+
+    // 1) Groq — segundo (gratuito, rápido)
+    try {
+      const groqResp = await tryGroq(messages, system);
+      if (groqResp) return groqResp;
+      console.warn("Groq falhou, tentando Zen/OpenRouter...");
+    } catch (e) {
+      console.warn("Groq erro:", (e as Error)?.message);
     }
 
     // 2) OpenCode Zen — fallback gratuito
@@ -443,8 +517,8 @@ Deno.serve(async (req) => {
     }
 
     // Todos falharam
-    let msg = lastError || "Claude FCC, Zen, OpenRouter e Emergent falharam.";
-    if (!useEmergent) msg = "Claude FCC, Zen e OpenRouter falharam. Habilitar Emergent no painel não mudaria este resultado.";
+    let msg = lastError || "Groq, Claude FCC, Zen, OpenRouter e Emergent falharam.";
+    if (!useEmergent) msg = "Groq, Claude FCC, Zen e OpenRouter falharam. Habilitar Emergent no painel não mudaria este resultado.";
     if (lastStatus === 401 || lastStatus === 402) msg = "Credito Emergent esgotado e fallbacks indisponiveis.";
     if (lastStatus === 429) msg = "Limite de requisicoes excedido em todos os provedores.";
     return new Response(JSON.stringify({ error: msg }), {
