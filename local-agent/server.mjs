@@ -14,7 +14,7 @@ const HOST = "127.0.0.1";
 
 // Apenas estes comandos são permitidos. Edite à vontade.
 const ALLOWED = {
-  "ngrok-restart": "pkill ngrok; sleep 1; ngrok http 11434 > /tmp/ngrok.log 2>&1 &",
+  "ngrok-restart": "pkill ngrok; sleep 1; ngrok http 11111 > /tmp/ngrok.log 2>&1 &",
 };
 
 // Liste aqui as origens do seu app Lovable que podem chamar o agente.

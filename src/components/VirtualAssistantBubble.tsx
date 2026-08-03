@@ -4,13 +4,15 @@ import avatar from "@/assets/virtual-assistant.png";
 
 const LOCAL_AGENT_URL = "http://localhost:7777/run";
 const COMMAND_NAME = "ngrok-restart";
-const FALLBACK_CMD = "pkill ngrok\nngrok http 11434";
+const FALLBACK_CMD = "pkill ngrok\nngrok http 11111";
 
 /**
  * Bolinha flutuante da atendente virtual.
  *
  * Ao clicar, chama o agente local (local-agent/server.mjs em http://localhost:7777)
- * para executar `pkill ngrok; ngrok http 11434` na máquina do usuário.
+ * para executar `pkill ngrok; ngrok http 11111` na máquina do usuário.
+ * A porta 11111 é o proxy combinado (FCC 8082 + Ollama 11434) — nunca mude para
+ * 11434 direto, senão o túnel expõe só o Ollama e o FCC da nuvem quebra.
  * Se o agente não estiver rodando, copia os comandos para a área de transferência.
  */
 export const VirtualAssistantBubble = () => {
