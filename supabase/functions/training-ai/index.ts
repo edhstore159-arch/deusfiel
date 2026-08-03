@@ -1,4 +1,4 @@
-import { chatCompletion, chatEmergent, chatGemini, EMERGENT_KEY } from "../_shared/llm.ts";
+import { chatCompletion } from "../_shared/llm.ts";
 import { saveEvolvedPrompt, getEvolvedPrompt } from "../_shared/prompts.ts";
 
 // Wrapper: always specify model to force Emergent routing (Zen unreliable for long prompts)

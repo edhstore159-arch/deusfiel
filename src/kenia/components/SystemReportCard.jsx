@@ -5,8 +5,17 @@ import { FileText, ChevronDown, ChevronUp, Settings, Zap } from "lucide-react";
 
 const AI_PROVIDERS = [
   {
+    id: "fcc",
+    name: "Claude FCC (Principal)",
+    icon: "💻",
+    description: "Claude FCC via OpenCode nemotron-3-ultra-free - provedor principal 24/7 via nuvem",
+    color: "#f59e0b",
+    models: ["Nemotron 3 Ultra (Free)", "Gemini 2.5 Flash", "OpenCode"],
+    status: "ativo",
+  },
+  {
     id: "zen",
-    name: "OpenCode Zen (Principal)",
+    name: "OpenCode Zen (Fallback)",
     icon: "⚡",
     description: "OpenCode Zen - Modelos otimizados (big-pickle, Claude, GPT, Gemini)",
     color: "#00d9ff",
@@ -14,44 +23,37 @@ const AI_PROVIDERS = [
     status: "ativo",
   },
   {
-    id: "emergent",
-    name: "Emergent (Fallback)",
-    icon: "🔑",
-    description: "Multi-modelo: GPT, Claude, Gemini via API Emergent",
-    color: "#10b981",
-    models: ["GPT-5.5", "GPT-5 Mini", "Claude Sonnet 4", "Gemini 2.5 Pro", "Gemini 2.5 Flash"],
-    status: "configurado",
-  },
-  {
     id: "openrouter",
     name: "OpenRouter (Fallback)",
     icon: "🌐",
-    description: "Quando Emergent acabar credito, usa OpenRouter automaticamente",
+    description: "Fallback automatico quando FCC/Zen falharem",
     color: "#6366f1",
     models: ["Hermes 4 70B", "Nemotron (Free)", "Gemma 4 26B (Free)"],
     status: "configurado",
   },
   {
-    id: "fcc",
-    name: "Claude FCC (Local)",
-    icon: "💻",
-    description: "Servidor local - funciona quando PC estiver ligado",
-    color: "#f59e0b",
-    models: ["Claude Sonnet 4", "Nemotron 120B"],
-    status: "rodando",
+    id: "emergent",
+    name: "Emergent (Ultimo Recurso)",
+    icon: "🔑",
+    description: "Multi-modelo: GPT, Claude, Gemini via API Emergent - so quando habilitado no painel",
+    color: "#10b981",
+    models: ["GPT-5.5", "GPT-5 Mini", "Claude Sonnet 4", "Gemini 2.5 Pro", "Gemini 2.5 Flash"],
+    status: "opcional",
   },
 ];
 
-const FALLBACK_ORDER = ["OpenCode Zen (Principal)", "Emergent (Fallback)", "OpenRouter (Fallback)", "Claude FCC (Local)"];
+const FALLBACK_ORDER = ["Claude FCC (Principal)", "OpenCode Zen (Fallback)", "OpenRouter (Fallback)", "Emergent (Ultimo Recurso)"];
+
+const EMERGENT_STORAGE_KEY = "kenia:use_emergent";
 
 const SECTIONS = [
   {
     title: "Secretaria Virtual (WhatsApp)",
-    stack: "OpenCode Zen (big-pickle) + Supabase Edge Functions",
+    stack: "Claude FCC (nemotron-3-ultra-free) + Supabase Edge Functions",
     items: [
       "Recepcao 24/7 de mensagens no WhatsApp.",
       "Persona fixa: Kenia Garcia — nunca revela ser IA.",
-      "Fallback automatico: Zen → Emergent → OpenRouter → FCC.",
+      "Fallback automatico: FCC → Zen → OpenRouter → Emergent (opcional).",
       "Roteamento por modelo: big-pickle, GPT, Claude, Gemini.",
     ],
   },
@@ -59,9 +61,9 @@ const SECTIONS = [
     title: "Chaves Configuradas",
     stack: "Supabase Secrets + Dashboard Local",
     items: [
-      "ZEN_API_KEY — sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8",
-      "EMERGENT_API_KEY — sk-emergent-b8cEdA5822d14C0638",
-      "Claude FCC — localhost:8082 (auto-start no boot)",
+      "ZEN_API_KEY — configurada",
+      "Claude FCC — via ngrok/proxy combinado (FCC + Ollama)",
+      "EMERGENT_API_KEY — opcional, so ativado no painel abaixo",
     ],
   },
 ];
@@ -69,6 +71,15 @@ const SECTIONS = [
 export default function SystemReportCard() {
   const [open, setOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("report");
+  const [useEmergent, setUseEmergent] = useState(
+    () => localStorage.getItem(EMERGENT_STORAGE_KEY) === "true"
+  );
+
+  const toggleEmergent = () => {
+    const next = !useEmergent;
+    setUseEmergent(next);
+    localStorage.setItem(EMERGENT_STORAGE_KEY, String(next));
+  };
 
   return (
     <Card className="mx-4 mt-4 p-4 border-nude-200">
@@ -122,7 +133,27 @@ export default function SystemReportCard() {
                 </span>
               ))}
             </div>
-            <p className="text-[11px] text-nude-500 mt-2">OpenCode Zen e o provedor principal (big-pickle, gratuito). Se falhar, muda para Emergent → OpenRouter → Claude FCC local.</p>
+            <p className="text-[11px] text-nude-500 mt-2">Claude FCC e o provedor principal (nemotron-3-ultra-free). Se falhar, muda para Zen → OpenRouter. Emergent e o ultimo recurso, so quando habilitado abaixo.</p>
+          </div>
+
+          <div className="border border-nude-200 rounded-md p-3 bg-nude-50/40">
+            <div className="font-semibold text-sm text-nude-900 mb-1 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-gold-600" /> Emergent (Ultimo Recurso)
+            </div>
+            <p className="text-[11px] text-nude-500 mb-2">Ative apenas se quiser usar a API Emergent como ultimo recurso apos FCC/Zen/OpenRouter falharem. Desligado por padrao.</p>
+            <button
+              type="button"
+              onClick={toggleEmergent}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${useEmergent ? "bg-emerald-500" : "bg-nude-300"}`}
+              aria-pressed={useEmergent}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${useEmergent ? "translate-x-[18px]" : "translate-x-0.5"}`}
+              />
+            </button>
+            <span className="ml-2 text-xs font-medium text-nude-800">
+              {useEmergent ? "Emergent habilitado" : "Emergent desabilitado"}
+            </span>
           </div>
 
           <div className="grid md:grid-cols-2 gap-2">

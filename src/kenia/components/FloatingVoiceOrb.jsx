@@ -715,6 +715,7 @@ export default function FloatingVoiceOrb() {
           fast_mode: !creativeVoiceRequest,
           creative_mode: creativeVoiceRequest,
           user_id: authUserId,
+          use_emergent: localStorage.getItem("kenia:use_emergent") === "true",
         },
       });
       if (error) throw error;

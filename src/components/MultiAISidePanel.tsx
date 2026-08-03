@@ -106,7 +106,7 @@ const FCC_URL = (
   import.meta.env.VITE_FCC_URL || "https://unabashed-vertical-crispness.ngrok-free.dev"
 ).replace(/\/$/, "");
 const FCC_AUTH_TOKEN = import.meta.env.VITE_FCC_AUTH_TOKEN || "freecc";
-const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
 
 const callClaudeFCC = async (msg: string, history: { role: string; content: string }[]): Promise<string> => {
   const systemPrompt = "Voce e um assistente juridico inteligente. Responda de forma clara, objetiva e profissional em portugues do Brasil.";

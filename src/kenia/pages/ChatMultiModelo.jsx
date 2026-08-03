@@ -150,7 +150,12 @@ export default function ChatMultiModelo() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ model: selected.id, system, messages: allMessages }),
+      body: JSON.stringify({
+        model: selected.id,
+        system,
+        messages: allMessages,
+        use_emergent: localStorage.getItem("kenia:use_emergent") === "true",
+      }),
       signal: abortRef.current?.signal,
     });
     if (!res.ok || !res.body) {

@@ -1,5 +1,5 @@
-// Multi-model chat: Emergent API (primario) → OpenRouter (fallback) → Claude FCC (ultimo recurso).
-// Fallback automatico: quando Emergent acabar credito, usa OpenRouter.
+// Multi-model chat: Claude FCC (primario) → OpenCode Zen → OpenRouter (fallback) → Emergent (ultimo recurso, opcional).
+// Fallback automatico: quando FCC/Zen falhar, usa OpenRouter. Emergent só quando habilitado no painel.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -20,7 +20,7 @@ const OPENROUTER_FALLBACK_MODELS = [
 
 const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev";
 const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
 
 // NVIDIA NIM API direto (sem ngrok)
 const NVIDIA_NIM_API_KEY = Deno.env.get("NVIDIA_NIM_API_KEY") || "";
@@ -302,7 +302,9 @@ async function tryNemotronDirect(messages: any[], system?: string): Promise<Resp
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { messages, model, system } = await req.json();
+    const reqBody = await req.json().catch(() => ({}));
+    const { messages, model, system } = reqBody;
+    const useEmergent = reqBody.use_emergent === true || Deno.env.get("EMERGENT_ENABLED") === "true";
     if (!Array.isArray(messages) || !messages.length) {
       return new Response(JSON.stringify({ error: "messages obrigatório" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -373,7 +375,7 @@ Deno.serve(async (req) => {
 
     const emergentKey = Deno.env.get("EMERGENT_API_KEY") || Deno.env.get("EMERGENT_LLM_KEY") || "";
 
-    const candidates = emergentKey
+    const candidates = emergentKey && useEmergent
       ? (MODEL_CANDIDATES[model] || [...(model ? [model] : []), ...FALLBACK_CANDIDATES])
       : [];
 
@@ -388,14 +390,35 @@ Deno.serve(async (req) => {
     let lastError = "";
     let lastStatus = 0;
 
-    // 0) OpenCode Zen — primeiro recurso (gratuito)
+    // 1) Claude FCC — primeiro recurso (primário)
+    try {
+      const claudeResp = await tryClaudeFCC(messages, system);
+      if (claudeResp.ok) return claudeResp;
+      console.warn("Claude FCC falhou, tentando Zen/OpenRouter...");
+    } catch (e) {
+      console.warn("Claude FCC erro:", (e as Error)?.message);
+    }
+
+    // 2) OpenCode Zen — fallback gratuito
     const zenResp = await tryZen(messages, system, model);
     if (zenResp) {
       return zenResp;
     }
-    console.warn("Zen indisponível, tentando Emergent...");
+    console.warn("Zen indisponível, tentando OpenRouter...");
 
-    // 1) Emergent — tenta todos os candidatos
+    // 3) OpenRouter — fallback automatico
+    if (OPENROUTER_KEY) {
+      const orResp = await tryOpenRouter(messages, system);
+      if (orResp && orResp.ok && orResp.body) {
+        return new Response(orResp.body, {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+        });
+      }
+      console.warn("OpenRouter falhou, tentando Emergent...");
+    }
+
+    // 4) Emergent — ultimo recurso, SOMENTE se habilitado no painel
     for (const candidate of candidates) {
       const upstream = await tryEmergent(emergentKey, candidate, payload);
 
@@ -419,26 +442,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2) OpenRouter — fallback automatico quando Emergent acabar
-    if (OPENROUTER_KEY) {
-      const orResp = await tryOpenRouter(messages, system);
-      if (orResp && orResp.ok && orResp.body) {
-        return new Response(orResp.body, {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
-        });
-      }
-      console.warn("OpenRouter falhou, tentando Claude FCC...");
-    }
-
-    // 3) Claude FCC — ultimo recurso
-    try {
-      const claudeResp = await tryClaudeFCC(messages, system);
-      if (claudeResp.ok) return claudeResp;
-    } catch {}
-
     // Todos falharam
-    let msg = lastError || "Emergent, OpenRouter e Claude FCC falharam.";
+    let msg = lastError || "Claude FCC, Zen, OpenRouter e Emergent falharam.";
+    if (!useEmergent) msg = "Claude FCC, Zen e OpenRouter falharam. Habilitar Emergent no painel não mudaria este resultado.";
     if (lastStatus === 401 || lastStatus === 402) msg = "Credito Emergent esgotado e fallbacks indisponiveis.";
     if (lastStatus === 429) msg = "Limite de requisicoes excedido em todos os provedores.";
     return new Response(JSON.stringify({ error: msg }), {

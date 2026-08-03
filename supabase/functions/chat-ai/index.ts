@@ -715,7 +715,7 @@ async function callOpenRouterClaude(messages: Array<{ role: string; content: str
 async function callClaudeFCC(messages: Array<{ role: string; content: string }>): Promise<string> {
   const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "";
   const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-  const FCC_MODEL = Deno.env.get("FCC_MODEL") || "openrouter/anthropic/claude-opus-5-20250620";
+  const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
   if (!FCC_BASE_URL) throw new Error("FCC_BASE_URL não configurado");
   const systemMsg = messages.find((m) => m.role === "system")?.content || SECRETARIA_JURIDICA_PROMPT;
   const apiMessages = messages
@@ -755,7 +755,7 @@ async function callClaudeFCC(messages: Array<{ role: string; content: string }>)
   }
 }
 
-async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string, agentModel?: string): Promise<string> {
+async function callAssistantLLM(messages: Array<{ role: string; content: string }>, fmtDate: string, fmtTime: string, agentModel?: string, allowEmergent?: boolean): Promise<string> {
   // Se o agente tem modelo específico, SEMPRE usar chatCompletion com esse modelo
   if (agentModel) {
     try {
@@ -764,6 +764,7 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
         messages,
         temperature: 0.3,
         maxTokens: 2000,
+        allowEmergent,
       });
       const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
         .replace(/<think>[\s\S]*?<\/think>/giu, "")
@@ -775,12 +776,21 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
     }
   }
 
+  // 1) Claude FCC — primeiro recurso (primário)
+  try {
+    const fccReply = await callClaudeFCC(messages);
+    if (fccReply) return fccReply;
+  } catch (err) {
+    console.warn("Claude FCC indisponível:", err);
+  }
+
   // Fallback: tentar os melhores modelos disponíveis
   try {
     const response = await chatCompletion({
       model: "anthropic/claude-haiku-4-5",
       messages,
       temperature: 0.3,
+      allowEmergent,
     });
     const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
       .replace(/<think>[\s\S]*?<\/think>/giu, "")
@@ -795,6 +805,7 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
       model: "google/gemini-3-flash-preview",
       messages,
       temperature: 0.3,
+      allowEmergent,
     });
     const reply = String(response.ok ? response.data?.choices?.[0]?.message?.content || "" : "")
       .replace(/<think>[\s\S]*?<\/think>/giu, "")
@@ -1120,6 +1131,7 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
+    const allowEmergent = body.use_emergent === true;
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
     const history: Array<{ role: string; content: string }> = compactHistory(Array.isArray(body.history) ? body.history : []);
     const sessionId: string | null = body.session_id ? String(body.session_id) : null;
@@ -1502,7 +1514,7 @@ NUNCA responda com informações genéricas ou de outros países. Sempre use a l
           ? buildHandoffReply()
         : isResumeRequest(userMessage)
           ? buildResumeReply(history)
-        : await callAssistantLLM(messages, fmtDate, fmtTime, agentConfig?.model);
+        : await callAssistantLLM(messages, fmtDate, fmtTime, agentConfig?.model, allowEmergent);
     } catch (err) {
       console.error("Erro ao chamar Ollama qwen2.5:3b-instruct:", err);
       rawReply = buildNonRepeatingFallback(userMessage, fmtDate, fmtTime);
@@ -1517,7 +1529,7 @@ NUNCA responda com informações genéricas ou de outros países. Sempre use a l
           ...history.map((m) => ({ role: m.role, content: String(m.content || "") })),
           { role: "user", content: userMessage },
         ];
-        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime, agentConfig?.model);
+        const retryReply = await callAssistantLLM(retryMessages, fmtDate, fmtTime, agentConfig?.model, allowEmergent);
         if (retryReply && !isHistoryDumpReply(retryReply) && !isNearDuplicateReply(retryReply, history)) {
           rawReply = retryReply;
         } else {
@@ -1554,6 +1566,7 @@ NUNCA responda com informações genéricas ou de outros países. Sempre use a l
           { role: "user", content: `Conversa:\n${convoText}\n\nGere o JSON de análise.` },
         ],
         response_format: { type: "json_object" },
+        allowEmergent,
       });
       if (aResp.ok) {
         const parsed = JSON.parse(aResp.data?.choices?.[0]?.message?.content || "{}");

@@ -182,6 +182,7 @@ export default function SecretaryTasks() {
           history: chatMessages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
           session_id: "secretary-tasks-chat",
           prompt: currentPrompt || undefined,
+          use_emergent: localStorage.getItem("kenia:use_emergent") === "true",
         },
       });
       if (error) throw error;

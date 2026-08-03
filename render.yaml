@@ -75,7 +75,7 @@ services:
       - key: FCC_AUTH_TOKEN
         value: freecc
       - key: FCC_MODEL
-        value: claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+        value: claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free
       - key: NVIDIA_NIM_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
@@ -84,6 +84,8 @@ services:
         value: sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8
       - key: EMERGENT_API_KEY
         sync: false
+      - key: EMERGENT_ENABLED
+        value: "false"
 
   # baileys-service standalone (opcional — sidecar para o FastAPI backend)
   # Só ative se também for fazer deploy do FastAPI backend (server.py) no Render.

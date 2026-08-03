@@ -30,6 +30,7 @@ import { Textarea } from "@/kenia/components/ui/textarea";
 import { Card } from "@/kenia/components/ui/card";
 import { Badge } from "@/kenia/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/tabs";
+import AutoImprovePanel from "@/kenia/components/AutoImprovePanel";
 import { toast } from "sonner";
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/judge-ai`;
@@ -395,6 +396,8 @@ export default function JuizVirtual() {
           </div>
         </div>
       </div>
+
+      <AutoImprovePanel area={area} />
 
       {/* Chat area */}
       <Card

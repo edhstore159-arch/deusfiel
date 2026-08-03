@@ -27,7 +27,7 @@ fi
 echo "🔗 Verificando Proxy..."
 if ! curl -s http://127.0.0.1:11111/api/tags > /dev/null 2>&1; then
   echo "   Iniciando Proxy..."
-  node /tmp/proxy-fcc-ollama.mjs > /tmp/proxy.log 2>&1 &
+  node "$(dirname "$0")/local-agent/proxy-fcc-ollama.mjs" > /tmp/proxy.log 2>&1 &
   sleep 2
 else
   echo "   Proxy já rodando"
@@ -52,8 +52,8 @@ grep "url=https" /tmp/ngrok-proxy.log | head -1 | sed 's/.*url=/   /'
 echo ""
 echo "🧪 Testar:"
 echo "   curl -s http://127.0.0.1:11111/api/tags"
-echo "   curl -s http://127.0.0.1:11111/v1/messages -H 'x-api-key: freecc' -H 'Authorization: Bearer freecc' -H 'anthropic-version: 2023-06-01' -H 'Content-Type: application/json' -d '{\"model\":\"claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b\",\"max_tokens\":100,\"system\":\"Voce e a secretaria da Dra. Kenia Garcia.\",\"messages\":[{\"role\":\"user\",\"content\":\"Ola\"}]}'"
+echo "   curl -s http://127.0.0.1:11111/v1/messages -H 'x-api-key: freecc' -H 'Authorization: Bearer freecc' -H 'anthropic-version: 2023-06-01' -H 'Content-Type: application/json' -d '{\"model\":\"claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free\",\"max_tokens\":100,\"system\":\"Voce e a secretaria da Dra. Kenia Garcia.\",\"messages\":[{\"role\":\"user\",\"content\":\"Ola\"}]}'"
 echo ""
 echo "🛑 Para parar:"
-echo "   pkill -f 'node /tmp/proxy-fcc-ollama.mjs'"
+echo "   pkill -f 'proxy-fcc-ollama.mjs'"
 echo "   pkill -f 'ngrok http 11111'"

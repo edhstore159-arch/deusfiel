@@ -1091,6 +1091,7 @@ const staticPost = (url, body = {}) => {
             user_id: body.user_id || null,
             want_audio: body.want_audio !== undefined ? body.want_audio : false,
             prompt: currentPrompt || undefined,
+            use_emergent: localStorage.getItem("kenia:use_emergent") === "true",
           },
         });
         if (!error && data?.response) {
