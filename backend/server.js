@@ -1786,32 +1786,10 @@ async function callAI(messagesPayload, options = {}) {
   const attempts = [];
   const isWhatsApp = options.whatsapp;
 
-  // WhatsApp: timeout global de 25s — se Zen falhou, vai direto pro fallback local
+  // WhatsApp: timeout global de 25s — se FCC falhou, vai direto pro fallback local
   const deadline = isWhatsApp ? Date.now() + 25000 : Date.now() + 120000;
 
-  // 0) OpenCode Zen primeiro (gratuito)
-  try {
-    const zenResult = await callZen(messagesPayload, options);
-    if (zenResult.ok) {
-      zenResult.attempts?.forEach((a) => attempts.push(a));
-      return zenResult;
-    }
-  } catch (e) {
-    attempts.push({ ok: false, provider: "zen", error: e?.message || String(e) });
-    recordAutoReply({ step: "ai_provider_fail", provider: "zen", error: e?.message || String(e) });
-  }
-
-  // WhatsApp: se Zen falhou, vai direto pro fallback local (sem tentar FCC/OpenRouter/Hermes)
-  if (isWhatsApp) {
-    return { ok: false, error: "Zen falhou no WhatsApp, usando fallback local.", attempts };
-  }
-
-  // Desktop/web: continuar com fallback chain
-  if (Date.now() > deadline) {
-    return { ok: false, error: "Timeout global atingido.", attempts };
-  }
-
-  // 1) Claude FCC segundo
+  // 0) Claude FCC primeiro
   if (FCC_ENABLED) {
     try {
       const reply = await callClaudeFCC(messagesPayload, systemPrompt);
@@ -1829,6 +1807,28 @@ async function callAI(messagesPayload, options = {}) {
       attempts.push(failed);
       recordAutoReply({ step: "ai_provider_fail", provider: "claude-fcc", error: failed.error });
     }
+  }
+
+  // WhatsApp: se FCC falhou, vai direto pro fallback local
+  if (isWhatsApp) {
+    return { ok: false, error: "FCC falhou no WhatsApp, usando fallback local.", attempts };
+  }
+
+  // Desktop/web: continuar com fallback chain
+  if (Date.now() > deadline) {
+    return { ok: false, error: "Timeout global atingido.", attempts };
+  }
+
+  // 1) OpenCode Zen segundo (gratuito)
+  try {
+    const zenResult = await callZen(messagesPayload, options);
+    if (zenResult.ok) {
+      zenResult.attempts?.forEach((a) => attempts.push(a));
+      return zenResult;
+    }
+  } catch (e) {
+    attempts.push({ ok: false, provider: "zen", error: e?.message || String(e) });
+    recordAutoReply({ step: "ai_provider_fail", provider: "zen", error: e?.message || String(e) });
   }
 
   if (Date.now() > deadline) {

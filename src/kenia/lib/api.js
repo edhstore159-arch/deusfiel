@@ -8,7 +8,7 @@ const readBackendOverride = () => {
 const readBaileysInstance = () => {
   try { return (localStorage.getItem("kenia:baileys-instance") || "").trim(); } catch { return ""; }
 };
-const DEFAULT_BACKEND = "https://minimal-arch-muse-384-bak.onrender.com";
+const DEFAULT_BACKEND = "https://deusfielbak.onrender.com";
 const BACKEND_URL = (readBackendOverride() || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND).replace(/\/$/, "");
 export { BACKEND_URL };
 export const HAS_BACKEND = Boolean(BACKEND_URL);

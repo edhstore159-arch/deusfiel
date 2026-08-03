@@ -22,7 +22,7 @@ services:
       - key: VITE_SUPABASE_PROJECT_ID
         value: uzzbgjwpfxokagrvmdoa
       - key: VITE_BACKEND_URL
-        value: https://minimal-arch-muse-384-bak.onrender.com
+        value: https://deusfielbak.onrender.com
       - key: VITE_FCC_URL
         value: https://unabashed-vertical-crispness.ngrok-free.dev
   - type: web

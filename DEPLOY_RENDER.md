@@ -60,6 +60,25 @@ Para verificar/alterar:
 
 ---
 
+## 🤖 Cadeia de provedores de IA (FCC primário)
+
+**Ordem em todas as cadeias** (backend `server.js`, `_shared/llm.ts`, `multi-model-chat`, `chat-ai`, `judge-ai`):
+
+1. **Claude FCC** (`claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free`) — primário, via ngrok/proxy combinado `:11111` (FCC 8082 + Ollama 11434)
+2. **OpenCode Zen** (`big-pickle`, gratuito) — fallback
+3. **Ollama** local (via ngrok) — fallback desktop
+4. **Lovable / Gemini / OpenRouter** — fallbacks cloud 24/7
+5. **Emergent** (`EMERGENT_API_KEY`) — **último recurso**, SÓ quando habilitado
+
+**Emergent é opcional e desligado por padrão**. O gate é controlado por:
+- Toggle no dashboard (`SystemReportCard`) → salvo em `localStorage` (`kenia:use_emergent`)
+- Env `EMERGENT_ENABLED=true` no Render/Supabase (render.yaml já usa `"false"`)
+- `body.use_emergent: true` nas chamadas às Edge Functions
+
+**Atenção ao ngrok**: o túnel `unabashed-vertical-crispness.ngrok-free.dev` deve apontar para **`:11111`** (proxy combinado). Se apontar para `11434` (só Ollama), o Claude FCC quebra. O `start.sh` e o LaunchAgent `com.ngrok.http11434.plist` usam `ngrok http 11111`.
+
+
+
 ## 🆕 Se quiser criar os serviços do zero
 
 Apague os serviços existentes no Render e use Blueprint:
