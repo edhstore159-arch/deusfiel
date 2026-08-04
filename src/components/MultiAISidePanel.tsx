@@ -71,7 +71,7 @@ const callGroqFree = async (msg: string, history: { role: string; content: strin
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_GROQ_API_KEY}` },
       body: JSON.stringify({ model: "llama-3.1-8b-instant", messages, max_tokens: 500, temperature: 0.4 }),
     });
     if (!res.ok) throw new Error(`Groq HTTP ${res.status}`);

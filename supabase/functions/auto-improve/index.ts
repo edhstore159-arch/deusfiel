@@ -117,6 +117,54 @@ async function generateSentence(system: string, user: string): Promise<string> {
   return cc.ok ? (cc.data?.choices?.[0]?.message?.content || "") : "";
 }
 
+// Groq JSON mode (rápido e estrito): ideal para as etapas que exigem JSON válido.
+const GROQ_BASE = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+
+async function groqJsonComplete(
+  system: string,
+  user: string,
+  maxTokens = 4000,
+  timeoutMs = 45000,
+): Promise<string> {
+  const key = Deno.env.get("GROQ_API_KEY") || "";
+  if (!key) return "";
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const resp = await fetch(GROQ_BASE, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      signal: ac.signal,
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!resp.ok) {
+      await resp?.text().catch(() => {});
+      console.warn(`[auto-improve] Groq falhou: ${resp.status}`);
+      return "";
+    }
+    const data = await resp.json();
+    return String(data?.choices?.[0]?.message?.content || "").trim();
+  } catch (e) {
+    console.warn("[auto-improve] Groq erro:", (e as Error)?.message);
+    return "";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // LLM genérico: Zen (nuvem) → chatCompletion (Gemini/Emergent, nuvem). Funciona com o PC desligado.
 async function llmComplete(system: string, user: string, maxTokens = 4000): Promise<string> {
   const r = await llmCompleteDetailed(system, user, maxTokens);
@@ -171,22 +219,33 @@ async function llmJson(
   timeoutMs = 65000,
 ): Promise<{ parsed: Record<string, unknown> | null; text: string; attempts: Array<Record<string, unknown>> }> {
   const firstStart = Date.now();
+  const attempts: Array<Record<string, unknown>> = [];
+
+  // 1) Groq JSON mode: estrito e rápido (~10-20s). Garante JSON válido.
+  const groqStart = Date.now();
+  const groqText = await groqJsonComplete(system, user, Math.max(maxTokens, 2500), 45000);
+  attempts.push({ provider: "groq", ms: Date.now() - groqStart, len: groqText.length, model: GROQ_MODEL });
+  const groqParsed = parseJsonResponse(groqText);
+  if (groqParsed) return { parsed: groqParsed, text: groqText, attempts };
+
+  // 2) Cadeia existente: Zen (nuvem) → chatCompletion (nuvem)
   const first = await llmCompleteDetailed(system, user, maxTokens, timeoutMs);
+  attempts.push(...first.attempts);
   let parsed = parseJsonResponse(first.text);
-  if (parsed) return { parsed, text: first.text, attempts: first.attempts };
-  if (!first.text) return { parsed: null, text: "", attempts: first.attempts };
-  if (Date.now() - firstStart >= 70000) {
-    return { parsed: null, text: first.text, attempts: first.attempts };
-  }
+  if (parsed) return { parsed, text: first.text, attempts };
+  if (!first.text) return { parsed: null, text: "", attempts };
+
+  // 3) Coerção estrita SEMPRE (sem trava de 70s): pede para converter o texto em JSON.
   console.warn("[auto-improve] Resposta não-JSON, tentando conversão estrita...");
   const coerced = await llmCompleteDetailed(
-    `IMPORTANTE: Sua resposta será interpretada por máquina. Converta EXCLUSIVAMENTE o texto abaixo em UM objeto JSON válido EXATAMENTE neste formato:\n${schemaDef}\nNão inclua nenhum texto, marcação ou comentário antes ou depois do JSON. Responda apenas com o objeto JSON.\n\nTEXTO A CONVERTER:\n${first.text.slice(0, 8000)}`,
-    "Converta para JSON.",
+    `IMPORTANTE: Sua resposta será interpretada por máquina. Produza UM ÚNICO objeto JSON válido, EXATAMENTE neste formato:\n${schemaDef}\nSua resposta inteira DEVE ser o objeto JSON, sem nenhum outro caractere antes de { ou depois de }. Sem markdown, sem comentários, sem explicações. Se precisar, USE APENAS os dados presentes no texto.\n\nTEXTO A CONVERTER:\n${first.text.slice(0, 8000)}`,
+    "Responda SOMENTE com o objeto JSON.",
     maxTokens,
     timeoutMs,
   );
+  attempts.push(...coerced.attempts);
   const parsed2 = parseJsonResponse(coerced.text);
-  return { parsed: parsed2, text: coerced.text || first.text, attempts: [...first.attempts, ...coerced.attempts] };
+  return { parsed: parsed2, text: coerced.text || first.text, attempts };
 }
 
 function parseJsonResponse(raw: string): Record<string, unknown> | null {

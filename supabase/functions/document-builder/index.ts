@@ -1,5 +1,5 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { chatPipeline } from "../_shared/llm.ts";
+import { chatCompletion } from "../_shared/llm.ts";
 
 const SYSTEM_PROMPT = `Você é um construtor de documentos jurídicos profissional brasileiro. Sua função é criar, editar e aprimorar documentos jurídicos completos e tecnicamente corretos.
 
@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
 
     console.log("[document-builder] Chamando IA para:", message.slice(0, 80));
 
-    const aiResult = await chatPipeline({
+    const aiResult = await chatCompletion({
       messages,
       temperature: 0.4,
       maxTokens: 4000,
