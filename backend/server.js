@@ -511,8 +511,8 @@ async function callZen(messagesPayload, options = {}) {
 // ---- Claude via FCC Proxy (Free Claude Code) ----
 const FCC_BASE_URL = process.env.FCC_BASE_URL || "http://127.0.0.1:8082";
 const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "freecc";
-const FCC_MODEL = process.env.FCC_MODEL || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
-const FCC_ENABLED = process.env.FCC_ENABLED !== "false" && Boolean(FCC_BASE_URL);
+const FCC_MODEL = process.env.FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+const FCC_ENABLED = process.env.FCC_ENABLED !== "false" && !FCC_BASE_URL.includes("ngrok");
 const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 // ---- OpenRouter (free models cloud fallback) ----
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
@@ -1786,10 +1786,32 @@ async function callAI(messagesPayload, options = {}) {
   const attempts = [];
   const isWhatsApp = options.whatsapp;
 
-  // WhatsApp: timeout global de 25s — se FCC falhou, vai direto pro fallback local
+  // WhatsApp: timeout global de 25s — se Zen falhou, vai direto pro fallback local
   const deadline = isWhatsApp ? Date.now() + 25000 : Date.now() + 120000;
 
-  // 0) Claude FCC primeiro
+  // 0) OpenCode Zen primeiro (gratuito)
+  try {
+    const zenResult = await callZen(messagesPayload, options);
+    if (zenResult.ok) {
+      zenResult.attempts?.forEach((a) => attempts.push(a));
+      return zenResult;
+    }
+  } catch (e) {
+    attempts.push({ ok: false, provider: "zen", error: e?.message || String(e) });
+    recordAutoReply({ step: "ai_provider_fail", provider: "zen", error: e?.message || String(e) });
+  }
+
+  // WhatsApp: se Zen falhou, vai direto pro fallback local (sem tentar FCC/OpenRouter/Hermes)
+  if (isWhatsApp) {
+    return { ok: false, error: "Zen falhou no WhatsApp, usando fallback local.", attempts };
+  }
+
+  // Desktop/web: continuar com fallback chain
+  if (Date.now() > deadline) {
+    return { ok: false, error: "Timeout global atingido.", attempts };
+  }
+
+  // 1) Claude FCC segundo
   if (FCC_ENABLED) {
     try {
       const reply = await callClaudeFCC(messagesPayload, systemPrompt);
@@ -1807,28 +1829,6 @@ async function callAI(messagesPayload, options = {}) {
       attempts.push(failed);
       recordAutoReply({ step: "ai_provider_fail", provider: "claude-fcc", error: failed.error });
     }
-  }
-
-  // WhatsApp: se FCC falhou, vai direto pro fallback local
-  if (isWhatsApp) {
-    return { ok: false, error: "FCC falhou no WhatsApp, usando fallback local.", attempts };
-  }
-
-  // Desktop/web: continuar com fallback chain
-  if (Date.now() > deadline) {
-    return { ok: false, error: "Timeout global atingido.", attempts };
-  }
-
-  // 1) OpenCode Zen segundo (gratuito)
-  try {
-    const zenResult = await callZen(messagesPayload, options);
-    if (zenResult.ok) {
-      zenResult.attempts?.forEach((a) => attempts.push(a));
-      return zenResult;
-    }
-  } catch (e) {
-    attempts.push({ ok: false, provider: "zen", error: e?.message || String(e) });
-    recordAutoReply({ step: "ai_provider_fail", provider: "zen", error: e?.message || String(e) });
   }
 
   if (Date.now() > deadline) {

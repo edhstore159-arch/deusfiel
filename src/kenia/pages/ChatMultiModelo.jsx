@@ -9,15 +9,8 @@ import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
 import { Send, Loader2, Bot, Trash2, Server, Sparkles, Brain, Zap } from "lucide-react";
 
-// Modelos oferecidos: Groq (gratuito, primário), Nemotron (NVIDIA, gratuito), Claude FCC, Emergent, Ollama local, OpenCode Zen.
+// Modelos oferecidos: Nemotron (NVIDIA, gratuito), Claude FCC, Emergent, Ollama local, OpenCode Zen.
 const MODELS = [
-  {
-    id: "groq",
-    label: "GRQ",
-    provider: "groq",
-    icon: Brain,
-    color: "from-orange-500 to-red-500",
-  },
   {
     id: "nemotron",
     label: "NEM",
@@ -157,12 +150,7 @@ export default function ChatMultiModelo() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({
-        model: selected.id,
-        system,
-        messages: allMessages,
-        use_emergent: localStorage.getItem("kenia:use_emergent") === "true",
-      }),
+      body: JSON.stringify({ model: selected.id, system, messages: allMessages }),
       signal: abortRef.current?.signal,
     });
     if (!res.ok || !res.body) {

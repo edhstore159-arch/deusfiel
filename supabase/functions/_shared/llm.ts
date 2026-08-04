@@ -1,4 +1,4 @@
-// Shared LLM helpers with fallback chain: Claude FCC (local, primário) → Ollama → Lovable → Google Gemini (direct) → Emergent (último recurso, opcional).
+// Shared LLM helpers with fallback chain: Ollama (when configured) → Lovable → Google Gemini (direct) → Emergent.
 
 type ChatMessage = { role: string; content: any };
 
@@ -11,7 +11,6 @@ export interface ChatOptions {
   maxTokens?: number;
   preferFastProvider?: boolean;
   preferProvider?: "auto" | "emergent" | "lovable" | "gemini" | "ollama";
-  allowEmergent?: boolean;
 }
 
 export interface ImageOptions {
@@ -27,18 +26,6 @@ const EMERGENT_KEY = Deno.env.get("EMERGENT_API_KEY");
 const OLLAMA_URL = Deno.env.get("OLLAMA_URL")?.trim().replace(/\/+$/, "").replace(/\/api\/(generate|chat|tags)$/, "");
 const OLLAMA_MODEL = Deno.env.get("OLLAMA_MODEL") || "qwen3:8b";
 const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
-
-const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL")?.trim().replace(/\/+$/, "") || "";
-const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
-
-// Emergent é último recurso e SÓ é usado quando habilitado (painel) ou via EMERGENT_ENABLED,
-// exceto quando o caller força explicitamente preferProvider === "emergent".
-function isEmergentAllowed(opts: ChatOptions): boolean {
-  if (opts.allowEmergent === true) return true;
-  if (opts.preferProvider === "emergent") return true;
-  return Deno.env.get("EMERGENT_ENABLED") === "true";
-}
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = 20000) {
   const controller = new AbortController();
@@ -523,7 +510,6 @@ async function chatGemini(opts: ChatOptions) {
 
 async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
-  if (!isEmergentAllowed(opts)) return { ok: false as const, status: 0, error: "Emergent desabilitado no painel" };
   let lastError = "";
   let lastStatus = 0;
   for (const model of emergentCandidates(opts.model)) try {
@@ -646,46 +632,6 @@ async function chatOllama(opts: ChatOptions) {
   }
 }
 
-async function chatClaudeFCC(opts: ChatOptions) {
-  if (!FCC_BASE_URL) return { ok: false as const, status: 0, error: "FCC_BASE_URL ausente" };
-  const systemMessages: string[] = [];
-  const apiMessages = opts.messages
-    .filter((m) => m.role !== "system")
-    .map((m) => ({
-      role: m.role === "assistant" ? "assistant" : "user",
-      content: messageToText(m.content),
-    }));
-  for (const m of opts.messages) if (m.role === "system") systemMessages.push(messageToText(m.content));
-  try {
-    const resp = await fetchWithTimeout(`${FCC_BASE_URL}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": FCC_AUTH_TOKEN,
-        "Authorization": `Bearer ${FCC_AUTH_TOKEN}`,
-        "anthropic-version": "2023-06-01",
-        "ngrok-skip-browser-warning": "true",
-      },
-      body: JSON.stringify({
-        model: FCC_MODEL,
-        max_tokens: opts.maxTokens || 2000,
-        stream: false,
-        system: systemMessages.join("\n\n"),
-        messages: apiMessages,
-        ...(typeof opts.temperature === "number" ? { temperature: opts.temperature } : {}),
-      }),
-    }, opts.timeoutMs || 25000);
-    if (!resp.ok) return { ok: false as const, status: resp.status, error: await resp.text() };
-    const data = await resp.json();
-    const textBlock = (data?.content || []).find((b: any) => b.type === "text");
-    const content = String(textBlock?.text || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
-    if (!content) return { ok: false as const, status: 0, error: "FCC retornou resposta vazia" };
-    return { ok: true as const, provider: "fcc", model: FCC_MODEL, data: { choices: [{ message: { role: "assistant", content } }] } };
-  } catch (error) {
-    return { ok: false as const, status: 0, error: String(error instanceof Error ? error.message : error) };
-  }
-}
-
 export async function chatCompletion(opts: ChatOptions) {
   // Permite forçar um provider específico (ex.: "emergent" para análise de casos).
   if (opts.preferProvider && opts.preferProvider !== "auto") {
@@ -707,11 +653,6 @@ export async function chatCompletion(opts: ChatOptions) {
   }
   // Para voz/atendimento ao vivo, prioriza provedores cloud rápidos antes do Ollama local/ngrok.
   if (opts.preferFastProvider) {
-    if (FCC_BASE_URL) {
-      const r = await chatClaudeFCC(opts);
-      if (r.ok) return r;
-      console.warn("⚠️ Claude FCC rápido falhou, tentando Lovable/Gemini:", r.status, r.error?.slice?.(0, 200));
-    }
     if (LOVABLE_KEY) {
       const r = await chatLovable(opts);
       if (r.ok) return r;
@@ -731,12 +672,7 @@ export async function chatCompletion(opts: ChatOptions) {
     if (r3.ok) return r3;
     return { ok: false as const, status: r3.status || 502, error: r3.error || "Nenhum provider rápido disponível", provider: "none" };
   }
-  // Order: Claude FCC (primário) → Ollama → Lovable → Gemini (direct) → Emergent (último recurso, opcional)
-  if (FCC_BASE_URL) {
-    const r = await chatClaudeFCC(opts);
-    if (r.ok) return r;
-    console.warn("⚠️ Claude FCC falhou, tentando Ollama/Lovable/Gemini:", r.status, r.error?.slice?.(0, 200));
-  }
+  // Order: Ollama → Lovable → Gemini (direct) → Emergent
   if (OLLAMA_URL) {
     const r = await chatOllama(opts);
     if (r.ok) return r;
@@ -752,12 +688,9 @@ export async function chatCompletion(opts: ChatOptions) {
     if (r.ok) return r;
     console.warn("⚠️ Gemini direto falhou, tentando Emergent:", r.status, r.error?.slice?.(0, 200));
   }
-  if (isEmergentAllowed(opts)) {
-    const r3 = await chatEmergent(opts);
-    if (r3.ok) return r3;
-    return { ok: false as const, status: r3.status || 502, error: r3.error || "Nenhum provider disponível", provider: "none" };
-  }
-  return { ok: false as const, status: 502, error: "Nenhum provider disponível", provider: "none" };
+  const r3 = await chatEmergent(opts);
+  if (r3.ok) return r3;
+  return { ok: false as const, status: r3.status || 502, error: r3.error || "Nenhum provider disponível", provider: "none" };
 }
 
 // ---------- text-to-image ----------
