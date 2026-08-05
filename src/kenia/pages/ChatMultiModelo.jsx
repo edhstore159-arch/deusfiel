@@ -20,10 +20,10 @@ const MODELS = [
   },
   {
     id: "claude-fcc",
-    label: "GROQ",
+    label: "CLF",
     provider: "claude-fcc",
-    icon: Zap,
-    color: "from-green-500 to-emerald-600",
+    icon: Bot,
+    color: "from-yellow-500 to-orange-600",
   },
   {
     id: "google/gemini-2.5-pro",
