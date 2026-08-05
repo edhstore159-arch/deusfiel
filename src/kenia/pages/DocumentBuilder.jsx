@@ -15,7 +15,7 @@ import {
   Send, Loader2, FileText, Eye, FileCode, Download,
   MessageSquare, FolderTree, ExternalLink, Trash2, Scale, Copy, CheckCircle2,
   Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Heading1, Heading2,
-  AlignLeft, AlignCenter, AlignRight, AlignJustify, Undo, Redo, Pilcrow
+  AlignLeft, AlignCenter, AlignRight, AlignJustify, Undo, Redo, Pilcrow, FileType
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +49,50 @@ function loadState() {
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
     return {};
   }
+}
+
+function htmlToDocx(html) {
+  // Convert HTML to a simple docx-compatible format (HTML wrapped for Word)
+  const cleaned = html
+    .replace(/<!DOCTYPE[^>]*>/i, "")
+    .replace(/<\/?html[^>]*>/gi, "")
+    .replace(/<\/?head[^>]*>/gi, "")
+    .replace(/<meta[^>]*>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, (match) => match) // keep styles
+    .replace(/<body[^>]*>/gi, "")
+    .replace(/<\/body>/gi, "");
+  
+  // Wrap in Word-compatible HTML
+  return `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!--[if gte mso 9]>
+<xml>
+  <w:WordDocument>
+    <w:View>Print</w:View>
+    <w:Zoom>100</w:Zoom>
+    <w:DoNotOptimizeForBrowser/>
+  </w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+  body { font-family: 'Times New Roman', Times, serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.8; color: #1a1a1a; font-size: 14px; }
+  h1, h2, h3 { font-family: 'Times New Roman', Times, serif; text-align: center; margin-bottom: 1em; }
+  h1 { font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+  p { text-indent: 2em; margin-bottom: 0.8em; text-align: justify; }
+  .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 1em; margin-bottom: 2em; }
+  .signature { margin-top: 3em; text-align: center; }
+  .signature-line { border-top: 1px solid #333; width: 300px; margin: 2em auto 0.5em; }
+  @page { margin: 2.5cm; }
+</style>
+</head>
+<body>
+${cleaned}
+</body>
+</html
+`;
 }
 
 function buildDocumentPreviewHtml(documents) {
@@ -232,15 +276,33 @@ export default function DocumentBuilder() {
   const downloadDocument = useCallback(() => {
     if (docList.length === 0) { toast.error("Nenhum documento para baixar."); return; }
     try {
-      const content = docList.map((path) => `=== ${path} ===\n${documents[path]}`).join("\n\n");
-      const blob = new Blob([content], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "documento-juridico.txt";
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Download iniciado");
+      // Encontra o arquivo HTML principal
+      const htmlFile = docList.find(f => f.endsWith(".html")) || docList[0];
+      const html = documents[htmlFile];
+      
+      if (htmlFile.endsWith(".html") && html) {
+        // Exportar como .doc (Word pode abrir)
+        const docxContent = htmlToDocx(html);
+        const blob = new Blob([docxContent], { type: "application/msword" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = htmlFile.replace(".html", ".doc");
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Download .doc iniciado (abre no Word)");
+      } else {
+        // Fallback: texto puro
+        const content = docList.map((path) => `=== ${path} ===\n${documents[path]}`).join("\n\n");
+        const blob = new Blob([content], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "documento-juridico.txt";
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Download .txt iniciado");
+      }
     } catch (e) {
       toast.error("Erro ao baixar: " + (e?.message || e));
     }
@@ -315,7 +377,18 @@ export default function DocumentBuilder() {
                   <ExternalLink className="w-3 h-3 mr-1" /> Imprimir
                 </Button>
                 <Button size="sm" variant="outline" onClick={downloadDocument}>
-                  <Download className="w-3 h-3 mr-1" /> Download
+                  <Download className="w-3 h-3 mr-1" /> Word (.doc)
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => {
+                  if (docList.length === 0) return;
+                  const htmlFile = docList.find(f => f.endsWith(".html")) || docList[0];
+                  const html = documents[htmlFile];
+                  if (html) {
+                    const txt = html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+                    navigator.clipboard.writeText(txt).then(() => toast.success("Texto copiado para Word"));
+                  }
+                }}>
+                  <FileType className="w-3 h-3 mr-1" /> Copiar Texto
                 </Button>
               </>
             )}
