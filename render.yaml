@@ -29,12 +29,12 @@ services:
         value: ""
   - type: web
     name: kenia-whatsapp-backend
-    runtime: node
+    runtime: python
     plan: starter
     renderSubdomainPolicy: enabled
     rootDir: backend
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     autoDeploy: true
     disk:
@@ -77,7 +77,7 @@ services:
       - key: FCC_AUTH_TOKEN
         value: freecc
       - key: FCC_MODEL
-        value: claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free
+        value: claude-3-5-sonnet-20241022
       - key: NVIDIA_NIM_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
