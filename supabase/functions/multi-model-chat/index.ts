@@ -20,7 +20,7 @@ const OPENROUTER_FALLBACK_MODELS = [
 
 const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev";
 const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-5-sonnet-20241022";
 
 // NVIDIA NIM API direto (sem ngrok)
 const NVIDIA_NIM_API_KEY = Deno.env.get("NVIDIA_NIM_API_KEY") || "";
@@ -30,15 +30,13 @@ const NEMOTRON_MODEL = "nvidia/nemotron-3-super-120b-a12b";
 // Maps frontend model IDs to Emergent candidate model names (tries each in order)
 const MODEL_CANDIDATES: Record<string, string[]> = {
   "big-pickle": ["big-pickle", "deepseek-v4-flash-free", "nemotron-3-ultra-free"],
-  "openai/gpt-5.5": ["gpt-5.5", "gpt-5.4", "gpt-4o-mini"],
-  "openai/gpt-5-mini": ["gpt-5-mini", "gpt-5-nano", "gpt-4o-mini"],
-  "google/gemini-2.5-pro": ["gemini/gemini-2.5-pro", "gemini-3.1-pro-preview", "gpt-4o-mini"],
-  "google/gemini-2.5-flash": ["gemini/gemini-2.5-flash", "gemini/gemini-3.5-flash", "gpt-4o-mini"],
+  "openai/gpt-5.5": ["gpt-5.5", "gpt-5.4", "gpt-4o", "gpt-4o-mini"],
+  "openai/gpt-5-mini": ["gpt-5-mini", "gpt-5-nano", "gpt-4o-mini", "gpt-4o"],
+  "google/gemini-2.5-pro": ["gemini-2.5-pro", "gemini-2.5-flash", "gpt-4o-mini"],
+  "google/gemini-2.5-flash": ["gemini-2.5-flash", "gemini-2.5-pro", "gpt-4o-mini"],
   "anthropic/claude-sonnet-4-20250514": [
-    "claude-sonnet-4-20250514",
-    "claude-sonnet-4-5-20250929",
-    "claude-sonnet-4-6",
-    "claude-haiku-4-5",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
     "gpt-4o-mini",
   ],
 };
@@ -309,7 +307,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Rota dedicada: OpenCode Zen (big-pickle, gratuito)
+    // Rota dedicada: OpenCode Zen (big-pickle, gratuito) - APENAS para modelo "zen"/"big-pickle"
     if (model === "big-pickle" || model === "zen") {
       console.log("Rota direta: OpenCode Zen");
       try {
@@ -350,27 +348,41 @@ Deno.serve(async (req) => {
 
     // Rota dedicada: Claude FCC via ngrok (não precisa de Emergent)
     if (model === "claude-fcc") {
-      console.log("Rota direta: Claude FCC via ngrok");
-      try {
-        const claudeResp = await tryClaudeFCC(messages, system);
-        if (claudeResp.ok) return claudeResp;
-        // Encapsula erro do FCC num envelope SSE pro cliente mostrar
-        const errBody = await claudeResp.text().catch(() => "");
-        const sseErr = `data: ${JSON.stringify({ error: `Claude FCC ${claudeResp.status}: ${errBody.slice(0, 200)}` })}\n\ndata: [DONE]\n\n`;
-        return new Response(sseErr, {
-          status: claudeResp.status === 200 ? 500 : claudeResp.status,
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-        });
-      } catch (e) {
-        const msg = String((e as Error)?.message || e);
-        const sseErr = `data: ${JSON.stringify({ error: `Claude FCC falhou: ${msg}` })}\n\ndata: [DONE]\n\n`;
-        return new Response(sseErr, {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-        });
+      // ngrok serve Nemotron, não Groq. Pula direto para Emergent/Zen
+      console.log("GROQ: ngrok serve Nemotron, usando Emergent/Zen como primário");
+      const emergentKey = Deno.env.get("EMERGENT_API_KEY") || Deno.env.get("EMERGENT_LLM_KEY") || "";
+      if (emergentKey) {
+        const payload = {
+          stream: true,
+          messages: [
+            ...(system ? [{ role: "system", content: String(system) }] : []),
+            ...messages.map((m: any) => ({ role: m.role, content: String(m.content ?? "") })),
+          ],
+        };
+        // Tenta gpt-4o-mini via Emergent (mais estável)
+        for (const candidate of ["gpt-4o-mini", "gpt-4o"]) {
+          const upstream = await tryEmergent(emergentKey, candidate, payload);
+          if (upstream.ok && upstream.body) {
+            console.log(`[multi-model-chat] GROQ → Emergent OK com ${candidate}`);
+            return new Response(upstream.body, {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+            });
+          }
+        }
       }
+      // Fallback: Zen (big-pickle gratuito)
+      const zenResp = await tryZen(messages, system, "big-pickle");
+      if (zenResp) return zenResp;
+
+      const sseErr = `data: ${JSON.stringify({ error: "GROQ: Emergent e Zen indisponíveis" })}\n\ndata: [DONE]\n\n`;
+      return new Response(sseErr, {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
     }
 
+    // Demais modelos (gpt, gemini, claude-sonnet) → Emergent PRIMEIRO com candidatos específicos
     const emergentKey = Deno.env.get("EMERGENT_API_KEY") || Deno.env.get("EMERGENT_LLM_KEY") || "";
 
     const candidates = emergentKey
@@ -388,41 +400,39 @@ Deno.serve(async (req) => {
     let lastError = "";
     let lastStatus = 0;
 
-    // 0) OpenCode Zen — primeiro recurso (gratuito)
-    const zenResp = await tryZen(messages, system, model);
-    if (zenResp) {
-      return zenResp;
-    }
-    console.warn("Zen indisponível, tentando Emergent...");
+    // 1) Emergent — PRIMEIRO para modelos gateway (gpt, gemini, claude-sonnet)
+    if (candidates.length > 0) {
+      console.log(`[multi-model-chat] Tentando Emergent para ${model} com candidatos:`, candidates);
+      for (const candidate of candidates) {
+        const upstream = await tryEmergent(emergentKey, candidate, payload);
 
-    // 1) Emergent — tenta todos os candidatos
-    for (const candidate of candidates) {
-      const upstream = await tryEmergent(emergentKey, candidate, payload);
-
-      if (!upstream.ok || !upstream.body) {
-        const text = await upstream.text().catch(() => "");
-        lastStatus = upstream.status;
-        lastError = text || `HTTP ${upstream.status}`;
-        if (upstream.status === 400 || upstream.status === 404) {
-          console.warn(`Emergent rejeitou modelo ${candidate}, tentando proximo...`);
-          continue;
+        if (!upstream.ok || !upstream.body) {
+          const text = await upstream.text().catch(() => "");
+          lastStatus = upstream.status;
+          lastError = text || `HTTP ${upstream.status}`;
+          if (upstream.status === 400 || upstream.status === 404) {
+            console.warn(`Emergent rejeitou modelo ${candidate}, tentando próximo...`);
+            continue;
+          }
+          // 401/402/429 = chave invalida ou credito esgotado → cai para OpenRouter
+          console.warn(`Emergent falhou (${upstream.status}), tentando OpenRouter...`);
+          break;
         }
-        // 401/402/429 = chave invalida ou credito esgotado → cai para OpenRouter
-        console.warn(`Emergent falhou (${upstream.status}), tentando OpenRouter...`);
-        break;
-      }
 
-      // Success
-      return new Response(upstream.body, {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
-      });
+        // Success
+        console.log(`[multi-model-chat] Emergent OK com ${candidate}`);
+        return new Response(upstream.body, {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
+        });
+      }
     }
 
     // 2) OpenRouter — fallback automatico quando Emergent acabar
     if (OPENROUTER_KEY) {
       const orResp = await tryOpenRouter(messages, system);
       if (orResp && orResp.ok && orResp.body) {
+        console.log("[multi-model-chat] OpenRouter fallback OK");
         return new Response(orResp.body, {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
