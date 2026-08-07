@@ -51,13 +51,7 @@ const STORAGE_KEY = "dstboard:processes.v1";
 const DSTBOARD_ADMIN_PASSWORD = "DeusFiel,08";
 const DSTBOARD_ADMIN_KEY = "dstboard:admin-unlocked.v1";
 
-const isAdminUnlocked = () => {
-  try {
-    return sessionStorage.getItem(DSTBOARD_ADMIN_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
+const isAdminUnlocked = () => true;
 
 const CHECKLIST_CATEGORIES = [
   {
@@ -336,9 +330,6 @@ const getStageProgress = (process) => {
 };
 
 export default function Dstboard() {
-  const [adminUnlocked, setAdminUnlocked] = useState(isAdminUnlocked);
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
   const [processes, setProcesses] = useState([]);
   const [activeProcess, setActiveProcess] = useState(null);
   const [view, setView] = useState("checklist");
@@ -541,24 +532,6 @@ export default function Dstboard() {
   const active = processes.find((p) => p.id === activeProcess);
 
   const allLeads = processes;
-
-  if (!adminUnlocked) {
-    return (
-      <MaintenanceScreen
-        adminOpen={adminOpen}
-        setAdminOpen={setAdminOpen}
-        password={adminPassword}
-        setPassword={setAdminPassword}
-        onUnlock={() => {
-          try {
-            sessionStorage.setItem(DSTBOARD_ADMIN_KEY, "1");
-          } catch {}
-          setAdminUnlocked(true);
-          setAdminPassword("");
-        }}
-      />
-    );
-  }
 
   return (
     <div className="h-screen flex flex-col bg-nude-50" data-testid="dstboard-page">

@@ -300,7 +300,7 @@ Você é um professor de direito brasileiro criando um CASO SIMULADO REALISTA pa
 Retorne apenas o texto do enunciado do caso (entre 300 e 800 palavras), pronto para um juiz julgar. Não adicione nada além do caso.`;
 
 const GENERATE_SENTENCE_SYSTEM = (prompt: string) =>
-  `${prompt}\n\nIMPORTANTE: Elabore a sentença completa do caso abaixo em português brasileiro, seguindo obrigatoriamente todas as seções do fluxo (I-Relatório, II-Fundamentação, III-Provas, IV-Questões Jurídicas, V-Fundamentação Constitucional, VI-Direito Internacional, VII-Inteligência Artificial e VIII-Dispositivo). Decida todos os pedidos. Não invente artigos, leis, súmulas ou precedentes.`;
+  `${prompt}\n\nIMPORTANTE: Elabore a sentença completa do caso abaixo em português brasileiro, seguindo obrigatoriamente as seções do fluxo (I-Relatório, II-Fundamentação, III-Análise das Provas, IV-Enfrentamento das Questões Jurídicas, V-Fundamentação Constitucional, VI-Direito Internacional apenas se houver elemento de internacionalidade, VII-Inteligência Artificial apenas se fizer parte do caso, VIII-Dispositivo). Decida todos os pedidos. Não invente artigos, leis, súmulas ou precedentes.`;
 
 const ANALYSIS_PROMPT = `IMPORTANTE: Responda APENAS em PORTUGUÊS DO BRASIL. NUNCA use inglês. NÃO inclua raciocínio interno.
 
@@ -319,7 +319,7 @@ RETORNE APENAS JSON válido:
 
 CRITÉRIOS DE ANÁLISE:
 - ALUCINAÇÃO (severidade crítica): artigos/leis/súmulas/precedentes INVENTADOS ou com número/teor errado.
-- ESTRUTURA: a sentença contém I-Relatório, II-Fundamentação, III-Provas, IV-Questões Jurídicas, V-Fundamentação Constitucional, VI-Direito Internacional, VII-Inteligência Artificial e VIII-Dispositivo?
+- ESTRUTURA: a sentença contém I-Relatório, II-Fundamentação, III-Análise das Provas, IV-Enfrentamento das Questões Jurídicas, V-Fundamentação Constitucional, VI-Direito Internacional (apenas se houver elemento de internacionalidade) e VIII-Dispositivo? O tópico VII-Inteligência Artificial deve estar presente apenas se fizer parte do caso, caso contrário sua omissão não é erro.
 - DISPOSITIVO: todos os pedidos foram julgados (procedência/improcedência)? Tutela de urgência, honorários, custas, juros, correção monetária e determinações?
 - LÓGICA: contradições internas, erros de raciocínio, conclusões sem fundamento.
 - ÔNUS DA PROVA: distribuído corretamente quando houve incerteza probatória.

@@ -3,28 +3,23 @@ import { chatCompletion } from "../_shared/llm.ts";
 
 const SYSTEM_PROMPT = `Você é um construtor de documentos jurídicos profissional brasileiro. Sua função é criar, editar e aprimorar documentos jurídicos completos e tecnicamente corretos.
 
-REGRAS:
+REGRAS OBRIGATÓRIAS:
 - Sempre use linguagem formal jurídica brasileira
 - Nunca invente artigos de lei — use apenas os que tiver certeza absoluta
-- Formatamento: use HTML semântico para petições, contratos e pareceres
-- Quando solicitado, retorne o documento em formato HTML pronto para impressão
-- Inclua cabeçalho, ementas, fundamentação e dispositivos quando aplicável
-- Para petições: enderece ao juízo correto, inclua dados das partes, fatos, fundamentação e pedidos
-- Para contratos: inclua cláusulas completas com obrigações, penalidades, foro e assinaturas
-- Para pareceres: inclua análise técnica, fundamentação legal e conclusão
+- SEMPRE retorne JSON válido com a estrutura abaixo
+- Para petições/contratos/pareceres: gere HTML semântico completo (com <!DOCTYPE html>, <html>, <head>, <body>)
+- Inclua cabeçalho, endereçamento, fatos, fundamentação, pedidos, dispositivo e assinaturas
 
-FORMATO DE RESPOSTA:
-- Responda SEMPRE em JSON com esta estrutura:
+FORMATO DE RESPOSTA OBRIGATÓRIO (SEMPRE JSON):
 {
   "response": "Explicação do que foi feito e orientações",
   "files": {
-    "nome-do-arquivo.html": "<!DOCTYPE html>...conteúdo HTML completo...",
+    "peticao-inicial.html": "<!DOCTYPE html>...HTML COMPLETO...",
     "documento.txt": "versão em texto puro se necessário"
   }
 }
 
-Se não houver arquivos para gerar, retorne files como objeto vazio.
-Se o usuário apenas perguntar algo, responda normalmente em "response" com files vazio.`;
+NÃO retorne markdown, NÃO retorne texto solto. SEMPRE JSON válido.`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -56,7 +51,7 @@ Deno.serve(async (req: Request) => {
 
     const messages = [
       { role: "system", content: systemMsg },
-      ...history.slice(-15).map((m) => ({ role: m.role, content: m.content })),
+      ...history.slice(-15).map((m) => ({ role: m.content })),
       { role: "user", content: message },
     ];
 
@@ -64,8 +59,9 @@ Deno.serve(async (req: Request) => {
 
     const aiResult = await chatCompletion({
       messages,
-      temperature: 0.4,
-      maxTokens: 4000,
+      temperature: 0.3,
+      maxTokens: 8000,
+      response_format: { type: "json_object" },
     });
 
     if (!aiResult.ok) {
@@ -79,7 +75,7 @@ Deno.serve(async (req: Request) => {
     const rawText = aiResult.data?.choices?.[0]?.message?.content || "";
     console.log("[document-builder] Resposta IA, tamanho:", rawText.length, "provider:", aiResult.provider);
 
-    let response = rawText;
+    let response = "Documento gerado.";
     let files: Record<string, string> = {};
 
     function tryParseJson(text: string): { response: string; files: Record<string, string> } | null {
@@ -87,7 +83,7 @@ Deno.serve(async (req: Request) => {
         const parsed = JSON.parse(text);
         if (parsed && typeof parsed === "object") {
           return {
-            response: String(parsed.response || text),
+            response: String(parsed.response || "Documento gerado."),
             files: (parsed.files && typeof parsed.files === "object") ? parsed.files : {},
           };
         }
@@ -95,21 +91,9 @@ Deno.serve(async (req: Request) => {
       return null;
     }
 
-    // Extract HTML from markdown code blocks
-    function extractHtml(text: string): string | null {
-      const htmlMatch = text.match(/```html\s*([\s\S]*?)```/i);
-      if (htmlMatch) return htmlMatch[1].trim();
-      // Check if it's raw HTML
-      if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-        return text.replace(/```/g, "").trim();
-      }
-      return null;
-    }
-
-    // Try parsing the raw text directly as JSON
     let parsed = tryParseJson(rawText);
 
-    // If raw text is not valid JSON, try extracting JSON from markdown or text
+    // Se não parseou, tenta extrair JSON de dentro de markdown ou texto
     if (!parsed) {
       const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/) || rawText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -117,7 +101,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // If still no luck, the AI may have returned JSON-as-string (double-encoded)
     if (!parsed && rawText.includes('\\"')) {
       try {
         const unescaped = rawText.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
@@ -130,18 +113,41 @@ Deno.serve(async (req: Request) => {
       files = parsed.files;
     }
 
-    // If no files found but we have HTML in the response, extract it
+    // Garantir que SEMPRE haja HTML para petições
     if (Object.keys(files).length === 0) {
-      const htmlContent = extractHtml(rawText);
-      if (htmlContent) {
+      // Tenta extrair HTML do texto
+      const htmlMatch = rawText.match(/```html\s*([\s\S]*?)```/i);
+      if (htmlMatch) {
         const docName = documentType.toLowerCase().replace(/\s+/g, "-") + ".html";
-        files[docName] = htmlContent;
-        response = rawText.replace(/```html\s*([\s\S]*?)```/i, "").replace(/```/g, "").trim() || response;
+        files[docName] = htmlMatch[1].trim();
+      } else if (rawText.includes("<!DOCTYPE") || rawText.includes("<html")) {
+        const docName = documentType.toLowerCase().replace(/\s+/g, "-") + ".html";
+        files[docName] = rawText.replace(/```/g, "").trim();
+      } else {
+        // Fallback: cria HTML básico a partir do texto
+        const docName = documentType.toLowerCase().replace(/\s+/g, "-") + ".html";
+        const txt = rawText.replace(/</g, "<").replace(/>/g, ">");
+        files[docName] = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { font-family: 'Times New Roman', Times, serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.8; color: #1a1a1a; font-size: 14px; }
+  h1, h2, h3 { font-family: 'Times New Roman', Times, serif; text-align: center; margin-bottom: 1em; }
+  h1 { font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+  p { text-indent: 2em; margin-bottom: 0.8em; text-align: justify; }
+  .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 1em; margin-bottom: 2em; }
+  .signature { margin-top: 3em; text-align: center; }
+  .signature-line { border-top: 1px solid #333; width: 300px; margin: 2em auto 0.5em; }
+</style>
+</head>
+<body>
+<pre style="white-space: pre-wrap; font-family: inherit; text-indent: 0;">${txt}</pre>
+</body>
+</html>`;
+        files["documento.txt"] = rawText;
       }
-    }
-
-    if (Object.keys(files).length === 0 && !parsed) {
-      console.log("[document-builder] Resposta não é JSON, usando como texto plano");
     }
 
     return new Response(

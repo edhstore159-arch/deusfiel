@@ -43,6 +43,11 @@ JWT_ALG = "HS256"
 JWT_EXP_HOURS = 24 * 7
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
+# FCC (Free Claude Connector) - GRATUITO, tentar primeiro
+FCC_BASE_URL = os.environ.get('FCC_BASE_URL', '').rstrip('/')
+FCC_AUTH_TOKEN = os.environ.get('FCC_AUTH_TOKEN', 'freecc')
+FCC_MODEL = os.environ.get('FCC_MODEL', 'claude-3-5-sonnet-20241022')
+
 app = FastAPI(title="Espírito Santo AI")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
@@ -72,6 +77,60 @@ def _raise_on_insufficient_balance(e: Exception):
                 detail={"code": "insufficient_balance", "message": "Chave Emergent sem saldo. Adicione uma nova chave nas configurações."},
             )
     return  # not a balance error, let caller handle
+
+# ==================== FCC (Free) + Emergent (Paid) Fallback ====================
+
+async def call_fcc_then_emergent(system_prompt: str, user_message: str, session_id: str, max_tokens: int = 2000, temperature: float = 0.3) -> Optional[str]:
+    """
+    Tenta FCC (gratuito) primeiro, se falhar cai para Emergent (pago).
+    Retorna o texto da resposta ou None se ambos falharem.
+    """
+    # 1) Tentar FCC (gratuito) se configurado
+    if FCC_BASE_URL:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"{FCC_BASE_URL}/v1/messages",
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-api-key": FCC_AUTH_TOKEN,
+                        "Authorization": f"Bearer {FCC_AUTH_TOKEN}",
+                        "anthropic-version": "2023-06-01",
+                    },
+                    json={
+                        "model": FCC_MODEL,
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                        "system": system_prompt,
+                        "messages": [{"role": "user", "content": user_message}],
+                    },
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text_block = next((b for b in data.get("content", []) if b.get("type") == "text"), None)
+                    if text_block and text_block.get("text"):
+                        reply = text_block["text"].replace("<think>", "").replace("</think>", "").strip()
+                        if reply:
+                            log.info(f"[FCC] Sucesso ({FCC_MODEL})")
+                            return reply
+                log.warning(f"[FCC] Falhou ({resp.status_code}): {resp.text[:200]}")
+        except Exception as e:
+            log.warning(f"[FCC] Exceção: {e}")
+
+    # 2) Fallback Emergent (pago)
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message=system_prompt,
+        ).with_model("openai", "gpt-4o")
+        reply = await chat.send_message(UserMessage(text=user_message))
+        if reply:
+            log.info("[Emergent] Fallback sucesso (gpt-4o)")
+            return reply
+    except Exception as e:
+        log.exception("[Emergent] Fallback falhou")
+    return None
 
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
@@ -1289,7 +1348,7 @@ async def voice_command(payload: VoiceCommandRequest, current_user=Depends(get_c
             api_key=EMERGENT_LLM_KEY,
             session_id=f"voice-{current_user['id']}-{uuid.uuid4().hex[:6]}",
             system_message=LEGAL_SYSTEM_PROMPT,
-        ).with_model("openai", "gpt-4o-mini")
+        ).with_model("openai", "gpt-4o")
         reply = await chat.send_message(UserMessage(text=user_text))
         tts = OpenAITextToSpeech(api_key=EMERGENT_LLM_KEY)
         audio_bytes = await tts.generate_speech(
@@ -1724,7 +1783,7 @@ async def _maybe_create_appointment_from_message(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"schedule-{contact['id']}-{uuid.uuid4().hex[:6]}",
             system_message=sys_prompt,
-        ).with_model("openai", "gpt-4o-mini")
+        ).with_model("openai", "gpt-4o")
         raw = await chat.send_message(UserMessage(
             text=f"Conversa:\n{hist}\n\nO cliente confirmou algum horario? Retorne apenas o JSON."
         ))
@@ -2261,17 +2320,9 @@ async def _maybe_autorespond(
     )
     system_prompt = critical_top + base_prompt + style_hint + name_hint + kb_hint + agenda_block + history_block
     session = f"wa-bot-{contact['id']}"
-    try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY, session_id=session,
-            system_message=system_prompt,
-        ).with_model("openai", "gpt-4o-mini")
-        reply = await chat.send_message(UserMessage(text=incoming_text))
-    except Exception as e:
-        _raise_on_insufficient_balance(e)
-        log.exception("bot reply failed")
-        return None
+    reply = await call_fcc_then_emergent(system_prompt, incoming_text, session)
     if not reply:
+        log.error("FCC e Emergent falharam")
         return None
 
     # Tenta extrair nome se o cliente acabou de se apresentar
@@ -2695,7 +2746,7 @@ async def _classify_and_create_lead(owner_id: str, contact: Dict[str, Any], text
             api_key=EMERGENT_LLM_KEY,
             session_id=f"classify-{contact['id']}",
             system_message="Você é um classificador sênior de leads jurídicos. Responda SEMPRE em JSON válido, sem markdown.",
-        ).with_model("openai", "gpt-4o-mini")
+        ).with_model("openai", "gpt-4o")
         raw = await chat.send_message(UserMessage(text=classify_prompt))
         raw = (raw or "").strip()
         if raw.startswith("```"):
@@ -2947,7 +2998,7 @@ async def baileys_webhook(request: Request):
                 api_key=EMERGENT_LLM_KEY,
                 session_id=f"vision-{uuid.uuid4().hex[:8]}",
                 system_message=vision_sys,
-            ).with_model("openai", "gpt-4o-mini")
+            ).with_model("openai", "gpt-4o")
             img_part = _IC(image_base64=image_b64)
             caption_note = f"\nCaption do cliente: {image_caption}" if image_caption else ""
             raw_json = await vchat.send_message(_UM(
@@ -3166,7 +3217,7 @@ Retorne APENAS o texto da legenda."""
         text_chat = LlmChat(
             api_key=text_key, session_id=session_id + "-text",
             system_message="Você é especialista em copywriting jurídico para redes sociais.",
-        ).with_model("openai", "gpt-4o-mini")
+        ).with_model("openai", "gpt-4o")
         caption = await text_chat.send_message(UserMessage(text=caption_prompt))
     except Exception:
         log.exception("Caption gen failed")
@@ -3392,7 +3443,7 @@ async def ai_summary(payload: SummaryRequest, current_user=Depends(get_current_u
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()),
             system_message=system,
-        ).with_model("openai", "gpt-4o-mini")
+        ).with_model("openai", "gpt-4o")
         summary = await chat.send_message(UserMessage(text=f"Resuma:\n{payload.text}"))
         return {"summary": summary}
     except HTTPException:
@@ -3899,7 +3950,7 @@ async def test_text_key(current_user=Depends(get_current_user)):
         chat = LlmChat(
             api_key=key, session_id=f"test-{uuid.uuid4()}",
             system_message="Responda apenas 'OK' em uma palavra.",
-        ).with_model("openai", "gpt-4o-mini")
+        ).with_model("openai", "gpt-4o")
         r = await chat.send_message(UserMessage(text="Teste"))
         return {"ok": True, "using_custom_key": bool(s.get("llm_text_key")), "response": (r or "")[:50]}
     except Exception as e:

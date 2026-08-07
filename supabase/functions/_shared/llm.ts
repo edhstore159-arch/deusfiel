@@ -521,7 +521,7 @@ async function chatGemini(opts: ChatOptions) {
   }
 }
 
-async function chatEmergent(opts: ChatOptions) {
+export async function chatEmergent(opts: ChatOptions) {
   if (!EMERGENT_KEY) return { ok: false as const, status: 0, error: "EMERGENT_API_KEY ausente" };
   if (!isEmergentAllowed(opts)) return { ok: false as const, status: 0, error: "Emergent desabilitado no painel" };
   let lastError = "";
