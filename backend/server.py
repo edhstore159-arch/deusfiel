@@ -2272,6 +2272,15 @@ async def _maybe_autorespond(
         "3. Se você já ofereceu horário e o cliente ainda não confirmou, diga: 'te enviei duas opções ali em cima — qual prefere?'\n"
         "4. A cada turno avance UM passo. Se ficou 2 turnos na mesma fase, PULE pra frente: ofereça horário."
     )
+    # REGRA RÍGIDA PARA EVITAR LOOP DE FOLLOW_UP
+    if have_essentials or turns_done >= 3:
+        tracker_lines.append(
+            "\n🚨🚨🚨 REGRA RÍGIDA — PROIBIDO RESPONDER 'PERFEITO, JÁ REGISTREI' 🚨🚨🚨\n"
+            "O tracker indica: OFEREÇA 2 HORÁRIOS CONCRETOS AGORA.\n"
+            "Sua resposta OBRIGATORIAMENTE deve conter 2 horários (ex: 'Pode ser amanhã às 10h ou às 15h, qual prefere?').\n"
+            "Se você responder 'Perfeito, já registrei...' ou similar, ESTÁ ERRADO — o sistema vai forçar re-geração.\n"
+            "NÃO repita fechamento. NÃO diga que advogado vai analisar. OFEREÇA HORÁRIOS."
+        )
     tracker_block = "\n\n" + "\n".join(tracker_lines)
 
     # bot_prompt: se vazio, "keep", ou muito curto (<50 chars) usa o KENIA_DEFAULT_PROMPT
@@ -2324,6 +2333,27 @@ async def _maybe_autorespond(
     if not reply:
         log.error("FCC e Emergent falharam")
         return None
+
+    # ===== ANTI-LOOP: detecta resposta idêntica/semelhante às últimas 3 do bot =====
+    try:
+        last_bot_msgs = await db.whatsapp_messages.find(
+            {"contact_id": contact["id"], "from_me": True},
+            {"_id": 0, "text": 1}
+        ).sort("created_at", -1).limit(3).to_list(3)
+        last_bot_texts = [(m.get("text") or "").strip().lower() for m in last_bot_msgs]
+        reply_norm = (reply or "").strip().lower()
+        # Se resposta nova for muito parecida com qualquer uma das últimas 3, FORÇA re-gerar
+        for old in last_bot_texts:
+            if old and reply_norm and _similarity(reply_norm, old) > 0.75:
+                log.warning(f"[ANTI-LOOP] Resposta repetida detectada, forçando regeneração. similarity={_similarity(reply_norm, old):.2f}")
+                # Tenta uma vez com prompt corretivo
+                corrected_prompt = system_prompt + "\n\n⚠️ CORREÇÃO OBRIGATÓRIA: sua resposta anterior repetiu o que você já disse. Gere uma resposta NOVA, curta, que AVANCE a conversa. Não repita 'perfeito', 'já registrei', 'vou analisar'. Ofereça horário ou faça pergunta nova."
+                reply = await call_fcc_then_emergent(corrected_prompt, incoming_text, session + "-retry")
+                if not reply:
+                    reply = "Desculpe, pode repetir? Quero te ajudar direito."
+                break
+    except Exception as e:
+        log.warning(f"[ANTI-LOOP] erro: {e}")
 
     # Tenta extrair nome se o cliente acabou de se apresentar
     # (ex.: "sou Carlos", "meu nome e Maria", "aqui e Joao")
