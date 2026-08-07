@@ -73,7 +73,7 @@ services:
       - key: RECONNECT_MAX_DELAY_MS
         value: "300000"
       - key: FCC_BASE_URL
-        value: https://fcc-server.onrender.com
+        value: https://unabashed-vertical-crispness.ngrok-free.dev
       - key: FCC_AUTH_TOKEN
         value: freecc
       - key: FCC_MODEL
