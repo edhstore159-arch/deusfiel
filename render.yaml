@@ -73,7 +73,7 @@ services:
       - key: RECONNECT_MAX_DELAY_MS
         value: "300000"
       - key: FCC_BASE_URL
-        value: https://unabashed-vertical-crispness.ngrok-free.dev
+        value: https://fcc-server.onrender.com
       - key: FCC_AUTH_TOKEN
         value: freecc
       - key: FCC_MODEL
@@ -89,6 +89,20 @@ services:
         sync: false
       - key: EMERGENT_ENABLED
         value: "true"
+
+  - type: web
+    name: fcc-server
+    runtime: python
+    plan: starter
+    buildCommand: pip install free-claude-code
+    startCommand: fcc-server
+    envVars:
+      - key: PORT
+        value: "8082"
+      - key: FCC_AUTH_TOKEN
+        value: freecc
+      - key: FCC_MODEL
+        value: claude-3-5-sonnet-20241022
 
   # baileys-service standalone (opcional — sidecar para o FastAPI backend)
   # Só ative se também for fazer deploy do FastAPI backend (server.py) no Render.
