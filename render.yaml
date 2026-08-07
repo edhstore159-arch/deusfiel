@@ -82,8 +82,6 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
-      - key: ZEN_API_KEY
-        value: sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8
       - key: EMERGENT_API_KEY
         value: sk-emergent-b8cEdA5822d14C0638
         sync: false
