@@ -102,26 +102,25 @@ services:
       - key: FCC_MODEL
         value: claude-3-5-sonnet-20241022
 
-  # baileys-service standalone (opcional — sidecar para o FastAPI backend)
-  # Só ative se também for fazer deploy do FastAPI backend (server.py) no Render.
-  # Caso contrário, o kenia-whatsapp-backend (acima) já cobre WhatsApp 24/7.
-  #
-  # - type: web
-  #   name: baileys-sidecar
-  #   runtime: node
-  #   plan: starter
-  #   rootDir: baileys-service
-  #   buildCommand: npm install
-  #   startCommand: npm start
-  #   healthCheckPath: /health
-  #   disk:
-  #     name: baileys-sidecar-auth
-  #     mountPath: /opt/render/project/src/baileys-service/auth_info
-  #     sizeGB: 1
-  #   envVars:
-  #     - key: NODE_VERSION
-  #       value: "20"
-  #     - key: BAILEYS_INTERNAL_TOKEN
-  #       value: legalflow-baileys-2026
-  #     - key: BACKEND_WEBHOOK
-  #       value: https://SEU-FASTAPI.onrender.com/api/whatsapp/webhook/baileys
+  # baileys-service standalone (sidecar para o FastAPI backend) - 24/7 no Render
+  - type: web
+    name: baileys-sidecar
+    runtime: node
+    plan: starter
+    rootDir: baileys-service
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    disk:
+      name: baileys-sidecar-auth
+      mountPath: /opt/render/project/src/baileys-service/auth_info
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: BAILEYS_INTERNAL_TOKEN
+        value: legalflow-baileys-2026
+      - key: BACKEND_WEBHOOK
+        value: https://deusfielbak.onrender.com/api/whatsapp/webhook/baileys
+
+  # fcc-server (Claude 3.5 Sonnet grátis)
