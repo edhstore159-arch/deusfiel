@@ -1610,6 +1610,16 @@ async def whatsapp_send_direct(payload: WhatsAppSendDirect, current_user=Depends
     return {"ok": True, "delivered": delivered, "provider_result": provider_result,
             "contact_id": contact["id"], "message_id": msg_id}
 
+@api_router.delete("/whatsapp/messages/{message_id}")
+async def whatsapp_delete_message(message_id: str, current_user=Depends(get_current_user)):
+    """Exclui uma mensagem do WhatsApp pelo id."""
+    result = await db.whatsapp_messages.delete_one(
+        {"id": message_id, "owner_id": current_user["id"]}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Mensagem não encontrada")
+    return {"ok": True}
+
 # ==================== WEBHOOK (mensagens recebidas) ====================
 
 async def _resolve_owner_for_provider(provider_name: str, instance_id: Optional[str] = None) -> Optional[str]:

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Flame, Tag, Calendar, AlertTriangle } from "lucide-react";
+import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Flame, Tag, Calendar, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const URG_COLORS = {
@@ -168,6 +168,18 @@ export default function Dashboard() {
     toast.success("Resposta copiada para o WhatsApp");
   };
 
+  const deleteMessage = async (msgId) => {
+    if (!msgId) return;
+    try {
+      await api.delete(`/whatsapp/messages/${msgId}`);
+      setMessages((prev) => prev.filter((m) => m.id !== msgId));
+      toast.success("Mensagem excluída");
+      loadContacts();
+    } catch {
+      toast.error("Erro ao excluir mensagem");
+    }
+  };
+
   const filtered = contacts.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.phone.includes(search)
@@ -268,8 +280,18 @@ export default function Dashboard() {
                 <div className="space-y-3">
                   {messages.map((m) => (
                     <div key={m.id} className={`flex ${m.from_me ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[70%] px-3.5 py-2 ${m.from_me ? "bubble-out" : "bubble-in"}`}>
-                        <div className="text-sm">{m.text}</div>
+                      <div className={`group flex items-end gap-1 ${m.from_me ? "flex-row" : "flex-row-reverse"}`}>
+                        <button
+                          onClick={() => deleteMessage(m.id)}
+                          title="Excluir mensagem"
+                          data-testid={`delete-message-${m.id}`}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-nude-400 hover:text-rose-600"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <div className={`max-w-[70%] px-3.5 py-2 ${m.from_me ? "bubble-out" : "bubble-in"}`}>
+                          <div className="text-sm">{m.text}</div>
+                        </div>
                       </div>
                     </div>
                   ))}
