@@ -512,7 +512,7 @@ async function callZen(messagesPayload, options = {}) {
 const FCC_BASE_URL = process.env.FCC_BASE_URL || "http://127.0.0.1:8082";
 const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "freecc";
 const FCC_MODEL = process.env.FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
-const FCC_ENABLED = process.env.FCC_ENABLED !== "false" && !FCC_BASE_URL.includes("ngrok");
+const FCC_ENABLED = process.env.FCC_ENABLED !== "false";
 const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 // ---- OpenRouter (free models cloud fallback) ----
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
@@ -1618,6 +1618,17 @@ function removeTemporalLeaks(reply, userText) {
     .trim();
 }
 
+function stripEnglishPreamble(reply) {
+  const text = String(reply || "").trim();
+  if (!/^Okay|^Let me|^First|^As an|^So,?|^The user|^I need|^I should|^Hmm|^Right|^Well,?( now)?/i.test(text)) return text;
+  const cut = text.indexOf("Okay, the user");
+  const anchor = cut >= 0 ? cut : text.search(/(?:Okay|First|Let me|I need)[^.!?]{0,400}[.!?]/);
+  if (anchor < 0) return text;
+  let rest = text.slice(anchor).replace(/^(Okay|Let me|First|As an|The user|I need|I should|So,?|Hmm|Right|Well)[^.]*?\.\s*/i, "").trim();
+  // fallback: se sobrou coisa sem graça, devolve original
+  return rest.length >= 6 ? rest : text;
+}
+
 async function callClaudeFCC(messages, systemPrompt) {
   if (!FCC_ENABLED) throw new Error("FCC desativado");
   const controller = new AbortController();
@@ -1639,7 +1650,7 @@ async function callClaudeFCC(messages, systemPrompt) {
         model: FCC_MODEL,
         max_tokens: 500,
         stream: false,
-        system: systemPrompt,
+        system: "INSTRUÇÃO CRÍTICA: Responda APENAS em português do Brasil, como uma secretária jurídica atendendo pelo WhatsApp. NÃO inclua raciocínio, passos de pensamento, Okay, Let me, First, The user, According ou qualquer texto interno. Apenas a resposta curta final." + systemPrompt,
         messages: apiMessages,
       }),
     });
@@ -1648,8 +1659,9 @@ async function callClaudeFCC(messages, systemPrompt) {
     const data = JSON.parse(raw || "{}");
     const textBlock = (data?.content || []).find((b) => b.type === "text");
     const reply = String(textBlock?.text || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
-    if (!reply) throw new Error("FCC retornou resposta vazia");
-    return reply;
+    let finalReply = stripEnglishPreamble(reply);
+    if (!finalReply) throw new Error("FCC retornou resposta vazia");
+    return finalReply;
   } finally {
     clearTimeout(timeout);
   }
@@ -1786,8 +1798,9 @@ async function callAI(messagesPayload, options = {}) {
   const attempts = [];
   const isWhatsApp = options.whatsapp;
 
-  // WhatsApp: timeout global de 25s — se Zen falhou, vai direto pro fallback local
-  const deadline = isWhatsApp ? Date.now() + 25000 : Date.now() + 120000;
+  // WhatsApp: deadline generoso para permitir Zen -> FCC -> OpenRouter -> Hermes
+  // (Zen costuma responder rápido; em caso de falha lenta, o FCC local responde em ~2-5s)
+  const deadline = isWhatsApp ? Date.now() + 40000 : Date.now() + 120000;
 
   // 0) OpenCode Zen primeiro (gratuito)
   try {
@@ -1801,10 +1814,8 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "zen", error: e?.message || String(e) });
   }
 
-  // WhatsApp: se Zen falhou, vai direto pro fallback local (sem tentar FCC/OpenRouter/Hermes)
-  if (isWhatsApp) {
-    return { ok: false, error: "Zen falhou no WhatsApp, usando fallback local.", attempts };
-  }
+    // WhatsApp agora também cai na cadeia de fallback (FCC/OpenRouter/Hermes)
+    // caso o Zen falhe, ao invés de ficar só no fallback local.
 
   // Desktop/web: continuar com fallback chain
   if (Date.now() > deadline) {
@@ -3273,6 +3284,23 @@ app.get("/api/whatsapp/messages/:id", (req, res) => {
     if (jidToPhone(jid).endsWith(digits.slice(-8))) return res.json(list);
   }
   res.json([]);
+});
+
+app.delete("/api/whatsapp/messages/:id", (req, res) => {
+  const raw = req.params.id;
+  for (const [jid, list] of messagesStore.entries()) {
+    const idx = list.findIndex((m) => m?.id === raw);
+    if (idx === -1) continue;
+    const [removed] = list.splice(idx, 1);
+    if (list.length > 0) {
+      const last = list[list.length - 1];
+      upsertContact(jid, { last_message: last.text, last_message_at: last.created_at });
+    } else if (removed && contactsStore.get(jid)?.last_message === removed.text) {
+      upsertContact(jid, { last_message: "", last_message_at: "" });
+    }
+    return res.json(ok({ removed: true, message_id: raw }));
+  }
+  res.status(404).json({ ok: false, error: "Mensagem não encontrada" });
 });
 
 const creativesStore = [];
