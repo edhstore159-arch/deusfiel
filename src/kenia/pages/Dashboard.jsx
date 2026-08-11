@@ -9,7 +9,7 @@ import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/kenia/components/ui/avatar";
 import { Separator } from "@/kenia/components/ui/separator";
 
-import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Calendar, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Search, Send, Phone, MoreVertical, Bot, Sparkles, Paperclip, Mail, MessageSquare, FileText, Calendar, AlertTriangle, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/kenia/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -638,6 +638,30 @@ export default function Dashboard() {
     toast.success("Resposta copiada para o WhatsApp");
   };
 
+  const deleteMessage = async (msgId) => {
+    if (!msgId || !activeContact) return;
+    try {
+      await api.delete(`/whatsapp/messages/${msgId}`).catch(() => {});
+      try {
+        const userId = await getAuthenticatedUserId();
+        if (userId) {
+          await supabase
+            .from("whatsapp_messages")
+            .delete()
+            .eq("user_id", userId)
+            .eq("contact_id", String(activeContact.id))
+            .eq("provider_message_id", String(msgId));
+        }
+      } catch {}
+      const next = dedupeMessages(messages.filter((m) => m.id !== msgId));
+      persistCachedMessages(activeContact.id, next);
+      setMessages(next);
+      toast.success("Mensagem excluída");
+    } catch {
+      toast.error("Erro ao excluir mensagem");
+    }
+  };
+
   const filtered = contacts.filter(c =>
     (c.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
     (c.phone ?? "").includes(search)
@@ -767,21 +791,31 @@ export default function Dashboard() {
                     const isImage = url && /\.(png|jpe?g|webp|gif|heic)(\?|$)/i.test(url);
                     return (
                       <div key={m.id} className={`flex ${m.from_me ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[70%] px-3.5 py-2 ${m.from_me ? "bubble-out" : "bubble-in"}`}>
-                          <div className="text-sm whitespace-pre-wrap break-words">{m.text}</div>
-                          {url && (
-                            <div className="mt-2">
-                              {isImage ? (
-                                <a href={url} target="_blank" rel="noreferrer">
-                                  <img src={url} alt="anexo" className="max-h-52 rounded-md border border-nude-200" />
-                                </a>
-                              ) : (
-                                <a href={url} target="_blank" rel="noreferrer" className="text-xs font-medium text-gold-700 underline">
-                                  Abrir arquivo
-                                </a>
-                              )}
-                            </div>
-                          )}
+                        <div className={`group flex items-end gap-1 ${m.from_me ? "flex-row" : "flex-row-reverse"}`}>
+                          <button
+                            onClick={() => deleteMessage(m.id)}
+                            title="Excluir mensagem"
+                            data-testid={`delete-message-${m.id}`}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-nude-400 hover:text-rose-600"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <div className={`max-w-[70%] px-3.5 py-2 ${m.from_me ? "bubble-out" : "bubble-in"}`}>
+                            <div className="text-sm whitespace-pre-wrap break-words">{m.text}</div>
+                            {url && (
+                              <div className="mt-2">
+                                {isImage ? (
+                                  <a href={url} target="_blank" rel="noreferrer">
+                                    <img src={url} alt="anexo" className="max-h-52 rounded-md border border-nude-200" />
+                                  </a>
+                                ) : (
+                                  <a href={url} target="_blank" rel="noreferrer" className="text-xs font-medium text-gold-700 underline">
+                                    Abrir arquivo
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
