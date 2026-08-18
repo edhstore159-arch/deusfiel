@@ -12,7 +12,7 @@ import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/tabs";
 import {
-  Send, Loader2, FileText, Eye, FileCode, Download,
+  Send, Loader2, FileText, FileCode, Download,
   MessageSquare, FolderTree, ExternalLink, Trash2, Scale, Copy, CheckCircle2,
   Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Heading1, Heading2,
   AlignLeft, AlignCenter, AlignRight, AlignJustify, Undo, Redo, Pilcrow, FileType
@@ -398,7 +398,7 @@ export default function DocumentBuilder() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 hidden lg:grid lg:grid-cols-[1fr_1.2fr_1fr] gap-3">
+        <div className="flex-1 min-h-0 hidden lg:grid lg:grid-cols-[1fr_1.2fr] gap-3">
           <ChatPanel
             messages={messages}
             input={input}
@@ -411,7 +411,6 @@ export default function DocumentBuilder() {
             setDocType={setDocType}
           />
           <DocumentPanel documents={documents} setDocuments={setDocuments} activeDocument={activeDocument} setActiveDocument={setActiveDocument} deleteFile={deleteFile} />
-          <PreviewPanel html={previewHtml} onOpen={openInNewTab} />
         </div>
 
         <div className="flex-1 min-h-0 lg:hidden">
@@ -419,7 +418,6 @@ export default function DocumentBuilder() {
             <TabsList className="shrink-0">
               <TabsTrigger value="chat"><MessageSquare className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
               <TabsTrigger value="editor"><FileCode className="w-3 h-3 mr-1" /> Documento</TabsTrigger>
-              <TabsTrigger value="preview"><Eye className="w-3 h-3 mr-1" /> Visualizar</TabsTrigger>
             </TabsList>
             <TabsContent value="chat" className="flex-1 min-h-0 mt-2">
               <ChatPanel
@@ -437,9 +435,6 @@ export default function DocumentBuilder() {
             </TabsContent>
             <TabsContent value="editor" className="flex-1 min-h-0 mt-2">
               <DocumentPanel documents={documents} setDocuments={setDocuments} activeDocument={activeDocument} setActiveDocument={setActiveDocument} deleteFile={deleteFile} fullHeight />
-            </TabsContent>
-            <TabsContent value="preview" className="flex-1 min-h-0 mt-2">
-              <PreviewPanel html={previewHtml} onOpen={openInNewTab} fullHeight />
             </TabsContent>
           </Tabs>
         </div>
@@ -628,8 +623,18 @@ function DocumentPanel({ documents, setDocuments, activeDocument, setActiveDocum
           {isHtml ? (
             <>
               <RichTextToolbar editor={editor} />
-              <div className="flex-1 min-h-0 overflow-auto bg-white">
-                <EditorContent editor={editor} className="h-full" />
+              <div className="flex-1 min-h-0 grid grid-rows-[1fr_1fr] divide-y divide-nude-100">
+                <div className="min-h-0 overflow-auto bg-white">
+                  <EditorContent editor={editor} className="h-full" />
+                </div>
+                <div className="min-h-0 bg-white">
+                  <iframe
+                    srcDoc={content}
+                    className="w-full h-full border-0"
+                    sandbox="allow-scripts allow-same-origin"
+                    title="Pré-visualização embutida"
+                  />
+                </div>
               </div>
             </>
           ) : (
@@ -639,50 +644,6 @@ function DocumentPanel({ documents, setDocuments, activeDocument, setActiveDocum
           )}
         </div>
       )}
-    </Card>
-  );
-}
-
-function PreviewPanel({ html, onOpen, fullHeight }) {
-  const frameRef = useRef(null);
-
-  useEffect(() => {
-    if (frameRef.current && html) {
-      try {
-        frameRef.current.srcdoc = html;
-      } catch {}
-    }
-  }, [html]);
-
-  return (
-    <Card className={`flex flex-col ${fullHeight ? "h-full" : ""}`}>
-      <div className="px-3 py-2 border-b flex items-center gap-2">
-        <Eye className="w-4 h-4 text-gold-600" />
-        <span className="text-xs font-medium">Visualizar</span>
-        {html && (
-          <Button size="sm" variant="ghost" className="ml-auto h-6 px-2" onClick={onOpen}>
-            <ExternalLink className="w-3 h-3" />
-          </Button>
-        )}
-      </div>
-      <div className="flex-1 min-h-0 bg-white">
-        {html ? (
-          <iframe
-            ref={frameRef}
-            srcDoc={html}
-            className="w-full h-full border-0"
-            sandbox="allow-scripts allow-same-origin"
-            title="Preview do Documento"
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-            <div className="text-center">
-              <Eye className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p>O documento aparecerá aqui.</p>
-            </div>
-          </div>
-        )}
-      </div>
     </Card>
   );
 }
