@@ -41,7 +41,7 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ.get('JWT_SECRET', 'legalflow-secret')
 JWT_ALG = "HS256"
 JWT_EXP_HOURS = 24 * 7
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY') or os.environ.get('EMERGENT_API_KEY') or ''
 
 # FCC (Free Claude Connector) - GRATUITO, tentar primeiro
 FCC_BASE_URL = os.environ.get('FCC_BASE_URL', '').rstrip('/')
@@ -3068,8 +3068,11 @@ async def baileys_webhook(request: Request):
             if "mp4" in ml or "m4a" in ml: ext = "m4a"
             elif "mpeg" in ml or "mp3" in ml: ext = "mp3"
             elif "wav" in ml: ext = "wav"
-            elif "webm" in ml: ext = "webm"
             else:
+                # ogg/opus (padrão do WhatsApp) é salvo como .webm: a lib
+                # emergentintegrations valida a extensão e só aceita
+                # mp3/mp4/mpeg/mpga/m4a/wav/webm — o conteúdo ogg é detectado
+                # pelo Whisper no request.
                 ext = "webm"
             bio = io.BytesIO(raw)
             bio.name = f"voice.{ext}"
