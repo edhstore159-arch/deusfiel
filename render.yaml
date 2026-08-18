@@ -22,7 +22,7 @@ services:
       - key: VITE_SUPABASE_PROJECT_ID
         value: uzzbgjwpfxokagrvmdoa
       - key: VITE_BACKEND_URL
-        value: https://deusfielbak.onrender.com
+        value: https://kenia-whatsapp-backend.onrender.com
       - key: VITE_FCC_URL
         value: https://unabashed-vertical-crispness.ngrok-free.dev
       - key: VITE_GROQ_API_KEY
@@ -124,6 +124,6 @@ services:
       - key: BAILEYS_INTERNAL_TOKEN
         value: legalflow-baileys-2026
       - key: BACKEND_WEBHOOK
-        value: https://deusfielbak.onrender.com/api/whatsapp/webhook/baileys
+        value: https://kenia-whatsapp-backend.onrender.com/api/whatsapp/webhook/baileys
 
   # fcc-server (Claude 3.5 Sonnet grátis)
