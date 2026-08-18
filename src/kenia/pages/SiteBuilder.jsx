@@ -42,6 +42,7 @@ REGRAS OBRIGATÓRIAS:
 - Todo site DEVE ter personalização visual: CSS completo (cores harmoniosas, tipografia agradável, layout moderno e responsivo, espaçamentos, bordas arredondadas, efeitos de hover).
 - Para aplicativos, use app.js com funções que interagem com a página.
 - Textos sempre em português do Brasil.
+- Use SEMPRE imagens reais com URL completa (ex.: https://picsum.photos/800/600 ou https://images.unsplash.com/...). NUNCA use caminhos relativos para imagens.
 - Nunca responda com texto corrido descrevendo o site: SEMPRE entregue o código completo em blocos.
 - Explicação: no máximo 1 linha curta antes dos blocos.`;
 
@@ -256,6 +257,21 @@ function loadState() {
   }
 }
 
+const IMG_FALLBACK_SCRIPT = `<script>
+(function(){
+  var ph='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="#e2e8f0"/><text x="50%" y="50%" fill="#94a3b8" font-family="sans-serif" font-size="26" text-anchor="middle">Imagem</text></svg>');
+  document.addEventListener('error',function(e){var t=e.target;if(t&&t.tagName==='IMG'&&t.src&&!t.src.startsWith('data:')){t.src=ph;}},true);
+  window.addEventListener('load',function(){document.querySelectorAll('img').forEach(function(i){if(i.complete&&i.naturalWidth===0&&(!i.src||!i.src.startsWith('data:'))){try{i.src=ph;}catch(_){}};});});
+})();<\/script>`;
+
+const injectImgFallback = (html) => {
+  if (!html) return html;
+  if (/<head[\s>]/i.test(html)) {
+    return html.replace(/<head([^>]*)>/i, '<head$1>\n' + IMG_FALLBACK_SCRIPT);
+  }
+  return IMG_FALLBACK_SCRIPT + "\n" + html;
+};
+
 function buildPreviewHtml(files) {
   try {
     const html = files["index.html"] || "";
@@ -265,7 +281,7 @@ function buildPreviewHtml(files) {
     if (!html && !css && !js) return "";
 
     // Se já tem HTML completo com tudo inline, retorna direto
-    if (html && html.includes("<!DOCTYPE") && !css && !js && /<style/i.test(html)) return html;
+    if (html && html.includes("<!DOCTYPE") && !css && !js && /<style/i.test(html)) return injectImgFallback(html);
 
     // Sempre monta um HTML completo e auto-contido
     const hasHead = /<head[\s>]/i.test(html);
@@ -327,7 +343,7 @@ ${js ? `<script>\n${js}\n</script>` : ""}
       }
     }
 
-    return fullHtml;
+    return injectImgFallback(fullHtml);
   } catch {
     return "";
   }
@@ -812,22 +828,22 @@ export default function SiteBuilder() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-wrap bg-card border rounded-lg px-3 py-2">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2 shrink-0 bg-card border rounded-lg px-3 py-2 overflow-x-auto">
+          <div className="flex items-center gap-1 shrink-0">
             <span className="text-xs font-medium text-muted-foreground">Clonar:</span>
             <Input
               value={cloneUrl}
               onChange={(e) => setCloneUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") cloneSite(); }}
               placeholder="https://site-para-clonar.com"
-              className="h-7 w-52 text-xs"
+              className="h-8 w-36 sm:w-52 text-xs"
             />
-            <Button size="sm" variant="outline" className="h-7" onClick={cloneSite} disabled={cloning}>
+            <Button size="sm" variant="outline" className="h-8" onClick={cloneSite} disabled={cloning}>
               {cloning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />} Clonar
             </Button>
           </div>
-          <span className="text-muted-foreground">|</span>
-          <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-muted-foreground shrink-0">|</span>
+          <div className="flex items-center gap-1 shrink-0">
             <span className="text-xs font-medium text-muted-foreground">Gerador:</span>
             {PROVIDERS.map((p) => (
               <Button
@@ -836,15 +852,15 @@ export default function SiteBuilder() {
                 variant={provider === p.id ? "default" : "outline"}
                 onClick={() => setProvider(p.id)}
                 title={p.desc}
-                className="h-7"
+                className="h-8"
               >
                 <span className="w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: p.color }} />
                 {p.label}
               </Button>
             ))}
           </div>
-          <span className="text-muted-foreground">|</span>
-          <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-muted-foreground shrink-0">|</span>
+          <div className="flex items-center gap-1 shrink-0">
             <span className="text-xs font-medium text-muted-foreground">Tema:</span>
             {THEMES.map((t) => (
               <Button
@@ -852,13 +868,13 @@ export default function SiteBuilder() {
                 size="sm"
                 variant={theme === t.id ? "default" : "outline"}
                 onClick={() => applyTheme(t.id)}
-                className="h-7"
+                className="h-8"
               >
                 {t.label}
               </Button>
             ))}
           </div>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex gap-2 shrink-0">
             {fileList.length > 0 && (
               <Button size="sm" variant="outline" onClick={improveDesign} disabled={sending}>
                 <Sparkles className="w-3 h-3 mr-1" /> Melhorar Design
@@ -917,7 +933,7 @@ export default function SiteBuilder() {
             {showCode && fileList.length > 0 ? (
               <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} />
             ) : (
-              <PreviewPanel html={previewHtml} onOpen={openInNewTab} onFrameRef={(r) => { frameRef.current = r; }} />
+              <PreviewPanel html={previewHtml} onOpen={openInNewTab} onFrameRef={(r) => { frameRef.current = r; }} editMode={editMode} />
             )}
           </div>
         </div>
@@ -936,7 +952,7 @@ export default function SiteBuilder() {
               <ChatPanel messages={messages} input={input} setInput={setInput} sending={sending} send={send} handleKeyDown={handleKeyDown} chatEndRef={chatEndRef} fullHeight />
             </TabsContent>
             <TabsContent value="preview" className="flex-1 min-h-0 mt-2">
-              <PreviewPanel html={previewHtml} onOpen={openInNewTab} onFrameRef={(r) => { frameRef.current = r; }} fullHeight />
+              <PreviewPanel html={previewHtml} onOpen={openInNewTab} onFrameRef={(r) => { frameRef.current = r; }} fullHeight editMode={editMode} />
             </TabsContent>
             <TabsContent value="tools" className="flex-1 min-h-0 mt-2">
               <EditToolsPanel
@@ -1173,11 +1189,16 @@ function EditToolsPanel({ selected, editText, setEditText, edited, undoCount, on
   );
 }
 
-function PreviewPanel({ html, onOpen, onFrameRef, fullHeight }) {
+function PreviewPanel({ html, onOpen, onFrameRef, fullHeight, editMode }) {
   const frameRef = useRef(null);
   const wrapRef = useRef(null);
   const [dims, setDims] = useState(null);
-  const [fit, setFit] = useState(true);
+  const [zoomMode, setZoomMode] = useState("fit");
+  const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    if (editMode) { setZoomMode("full"); setZoom(1); }
+  }, [editMode]);
 
   useEffect(() => {
     if (frameRef.current && html) {
@@ -1203,7 +1224,7 @@ function PreviewPanel({ html, onOpen, onFrameRef, fullHeight }) {
   };
 
   const wrapW = wrapRef.current?.clientWidth || 0;
-  const scale = fit && dims && wrapW > 0 ? Math.min(1, wrapW / dims.w) : 1;
+  const scale = zoomMode === "fit" && dims && wrapW > 0 ? Math.min(1, wrapW / dims.w) : zoom;
   const scaledW = dims ? Math.max(dims.w * scale, wrapW || 0) : wrapW || "100%";
   const scaledH = dims ? dims.h * scale : 0;
 
@@ -1212,12 +1233,16 @@ function PreviewPanel({ html, onOpen, onFrameRef, fullHeight }) {
       <div className="px-3 py-2 border-b flex items-center gap-2">
         <Eye className="w-4 h-4 text-gold-600" />
         <span className="text-xs font-medium">Preview</span>
+        {editMode && <Badge variant="secondary" className="ml-1 text-[10px]">toque em um elemento para editar</Badge>}
         {dims && (
           <div className="flex items-center gap-1 ml-auto">
-            <Button size="sm" variant={fit ? "default" : "outline"} className="h-6 px-2" onClick={() => setFit(true)}>
+            <Button size="sm" variant={zoomMode === "fit" ? "default" : "outline"} className="h-6 px-2" onClick={() => setZoomMode("fit")}>
               Página inteira
             </Button>
-            <Button size="sm" variant={!fit ? "default" : "outline"} className="h-6 px-2" onClick={() => setFit(false)}>
+            <Button size="sm" variant={zoomMode === "full" && zoom === 0.5 ? "default" : "outline"} className="h-6 px-2" onClick={() => { setZoomMode("full"); setZoom(0.5); }}>
+              50%
+            </Button>
+            <Button size="sm" variant={zoomMode === "full" && zoom === 1 ? "default" : "outline"} className="h-6 px-2" onClick={() => { setZoomMode("full"); setZoom(1); }}>
               100%
             </Button>
           </div>
