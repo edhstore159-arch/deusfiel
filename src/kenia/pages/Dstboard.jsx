@@ -51,7 +51,13 @@ const STORAGE_KEY = "dstboard:processes.v1";
 const DSTBOARD_ADMIN_PASSWORD = "DeusFiel,O8";
 const DSTBOARD_ADMIN_KEY = "dstboard:admin-unlocked.v1";
 
-const isAdminUnlocked = () => true;
+const isAdminUnlocked = () => {
+  try {
+    return sessionStorage.getItem(DSTBOARD_ADMIN_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
 
 const CHECKLIST_CATEGORIES = [
   {
@@ -532,6 +538,25 @@ export default function Dstboard() {
   const active = processes.find((p) => p.id === activeProcess);
 
   const allLeads = processes;
+
+  const [unlocked, setUnlocked] = useState(() => isAdminUnlocked());
+  const [gatePassword, setGatePassword] = useState("");
+  const [adminOpen, setAdminOpen] = useState(false);
+
+  if (!unlocked) {
+    return (
+      <MaintenanceScreen
+        adminOpen={adminOpen}
+        setAdminOpen={setAdminOpen}
+        password={gatePassword}
+        setPassword={setGatePassword}
+        onUnlock={() => {
+          try { sessionStorage.setItem(DSTBOARD_ADMIN_KEY, "1"); } catch {}
+          setUnlocked(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-nude-50" data-testid="dstboard-page">
@@ -1775,8 +1800,17 @@ function MaintenanceScreen({
 }) {
   const [wrong, setWrong] = useState(false);
 
-  const submit = () => {
-    if (password === DSTBOARD_ADMIN_PASSWORD) {
+  const submit = async () => {
+    const { data, error } = await supabase.functions.invoke("verify-admin", {
+      body: { area: "dstboard", password },
+    });
+    if (error) {
+      setWrong(true);
+      setPassword("");
+      toast.error("Erro ao verificar senha");
+      return;
+    }
+    if (data?.ok) {
       onUnlock();
       toast.success("Acesso liberado");
     } else {

@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/
 import {
   Send, Loader2, Code2, Eye, FileCode, Download,
   MessageSquare, FolderTree, ExternalLink, Trash2, Copy, Sparkles,
-  MousePointer2, ImagePlus, Save
+  MousePointer2, ImagePlus, Save, Globe
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -367,6 +367,7 @@ export default function SiteBuilder() {
   const [editMode, setEditMode] = useState(false);
   const [selected, setSelected] = useState(null);
   const [edited, setEdited] = useState(false);
+  const [publishUrl, setPublishUrl] = useState("");
   const frameRef = useRef(null);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -473,6 +474,21 @@ export default function SiteBuilder() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Página baixada (meu-site.html)");
+  };
+
+  const publishSite = async () => {
+    if (!previewHtmlRaw) { toast.error("Nada para publicar"); return; }
+    try {
+      const name = (cloneUrl.split("/").filter(Boolean).pop() || "meu-site").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 30) || "meu-site";
+      const { data, error } = await supabase.functions.invoke("publish-site", {
+        body: { html: previewHtmlRaw, name },
+      });
+      if (error) throw new Error(error.message);
+      setPublishUrl(data.url);
+      toast.success("Site publicado!");
+    } catch (e) {
+      toast.error("Erro ao publicar: " + (e?.message || e));
+    }
   };
   const fileList = Object.keys(files);
 
@@ -725,6 +741,9 @@ export default function SiteBuilder() {
                 <Button size="sm" variant="outline" onClick={downloadPage}>
                   <Download className="w-3 h-3 mr-1" /> Baixar Página
                 </Button>
+                <Button size="sm" onClick={publishSite}>
+                  <Globe className="w-3 h-3 mr-1" /> Publicar
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setShowCode((v) => !v)}>
                   <FileCode className="w-3 h-3 mr-1" /> {showCode ? "Ver Site" : "Ver Código"}
                 </Button>
@@ -793,6 +812,14 @@ export default function SiteBuilder() {
             </Button>
           </div>
         </div>
+
+        {publishUrl && (
+          <div className="flex items-center gap-2 shrink-0 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 text-xs">
+            <Globe className="w-3 h-3 text-green-600" />
+            <span className="text-green-700">Seu site publicado:</span>
+            <a href={publishUrl} target="_blank" rel="noreferrer" className="text-green-700 underline font-medium break-all">{publishUrl}</a>
+          </div>
+        )}
 
         <div className="flex-1 min-h-0 hidden lg:grid lg:grid-cols-[minmax(300px,380px)_1fr] gap-3">
           <ChatPanel messages={messages} input={input} setInput={setInput} sending={sending} send={send} handleKeyDown={handleKeyDown} chatEndRef={chatEndRef} />
@@ -863,6 +890,15 @@ export default function SiteBuilder() {
   );
 }
 
+function summarizeCode(text) {
+  return String(text).replace(/```[a-zA-Z0-9_-]*\n[\s\S]*?```/g, (match) => {
+    const lang = (match.match(/```([a-zA-Z0-9_-]*)/) || [])[1] || "arquivo";
+    const lines = match.split("\n").length - 2;
+    const label = lang === "html" ? "index.html" : lang === "css" ? "styles.css" : lang === "js" || lang === "javascript" ? "script.js" : `${lang}.${lang}`;
+    return `\n[arquivo gerado: ${label} — ${lines} linhas]\n`;
+  });
+}
+
 function ChatPanel({ messages, input, setInput, sending, send, handleKeyDown, chatEndRef, fullHeight }) {
   return (
     <Card className={`flex flex-col ${fullHeight ? "h-full" : ""}`}>
@@ -884,7 +920,7 @@ function ChatPanel({ messages, input, setInput, sending, send, handleKeyDown, ch
               <div className={`inline-block max-w-[90%] rounded-lg px-3 py-2 ${
                 m.role === "user" ? "bg-gold-100 text-gold-900" : "bg-muted text-foreground"
               }`}>
-                <div className="whitespace-pre-wrap break-words text-xs leading-relaxed">{m.content}</div>
+                <div className="whitespace-pre-wrap break-words text-xs leading-relaxed">{summarizeCode(m.content)}</div>
               </div>
             </div>
           ))}

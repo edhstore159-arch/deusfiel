@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Lock } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Card } from "@/kenia/components/ui/card";
+import { Input } from "@/kenia/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 
-const ADMIN_PASSWORD = "DeusFiel,O8";
 const STORAGE_KEY = "kenia_admin_unlocked";
 
 function isAdminUnlocked() {
@@ -18,20 +19,33 @@ export default function AdminGuard({ children }) {
   const [unlocked, setUnlocked] = useState(() => isAdminUnlocked());
   const [pwd, setPwd] = useState("");
   const [err, setErr] = useState("");
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     setUnlocked(isAdminUnlocked());
   }, []);
 
-  const tryUnlock = (e) => {
+  const tryUnlock = async (e) => {
     e.preventDefault();
-    if (pwd === ADMIN_PASSWORD) {
-      sessionStorage.setItem(STORAGE_KEY, "1");
-      setUnlocked(true);
-      setErr("");
-      setPwd("");
-    } else {
-      setErr("Senha incorreta.");
+    if (checking) return;
+    setChecking(true);
+    setErr("");
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-admin", {
+        body: { area: "admin", password: pwd },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.ok) {
+        sessionStorage.setItem(STORAGE_KEY, "1");
+        setUnlocked(true);
+        setPwd("");
+      } else {
+        setErr("Senha incorreta.");
+      }
+    } catch (ex) {
+      setErr("Erro ao verificar: " + (ex?.message || ex));
+    } finally {
+      setChecking(false);
     }
   };
 
@@ -58,8 +72,8 @@ export default function AdminGuard({ children }) {
             className="w-full border border-nude-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500"
             autoFocus
           />
-          <Button type="submit" className="w-full bg-gold-600 hover:bg-gold-700 text-white">
-            Acessar
+          <Button type="submit" className="w-full bg-gold-600 hover:bg-gold-700 text-white" disabled={checking}>
+            {checking ? "Verificando..." : "Acessar"}
           </Button>
         </form>
         {err && <div className="text-sm text-rose-600">{err}</div>}
