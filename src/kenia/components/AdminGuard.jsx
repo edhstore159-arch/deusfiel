@@ -3,7 +3,7 @@ import { Lock } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Card } from "@/kenia/components/ui/card";
 
-const ADMIN_PASSWORD = "DeusFiel";
+const ADMIN_PASSWORD = "DeusFiel,O8";
 const STORAGE_KEY = "kenia_admin_unlocked";
 
 function isAdminUnlocked() {
