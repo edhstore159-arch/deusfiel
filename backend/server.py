@@ -2182,7 +2182,7 @@ async def _maybe_autorespond(
             last_client_text = (m.get("text") or "").strip().lower()
             break
     is_vague_reply = bool(_re.match(
-        r"^(ok|okay|sim|n[aã]o|ta|t[aá] bom|tudo bem|entendi|certo|uhum|aham|blz|beleza|claro)\.?!?$",
+        r"^(ok|okay|sim|n[aã]o|ta|t[aá] bom|entendi|certo|uhum|aham|blz|beleza|claro)\.?!?$",
         last_client_text
     )) and "?" not in last_client_text
 
