@@ -102,6 +102,29 @@ def _looks_english(text: str) -> bool:
     hits = sum(1 for w in words if w in common_en)
     return hits >= 4
 
+def _is_prompt_leakage(text: str) -> bool:
+    """Detecta resposta que VAZOU o prompt/instruções internas (leak) em vez de
+    conversar com o cliente — o modelo devolve as próprias regras em inglês."""
+    low = (text or "").lower()
+    markers = [
+        "let me reconstruct", "as per", "critical constraints", "the user",
+        "you are a", "system prompt", "strict memory", "anti-ai", "anti ai",
+        "must respond only in portuguese", "do not mention", "roleplay",
+        "instruções internas", "instrução crítica", "não inclua raciocínio",
+        "regras que nunca quebram", "regra de ouro", "modelo de linguagem",
+        "linguagem de modelo", "responda apenas em português do brasil",
+        "resposta anterior foi rejeitada", "suas instru", "seu prompt",
+    ]
+    hits = sum(1 for m in markers if m in low)
+    if hits >= 2:
+        return True
+    # Blocos de "instruções" com formatação pesada de prompt (═ ⚠️ 🚫 📋 repetidos)
+    if (text.count("═") >= 3 or text.count("⚠️") >= 3
+            or text.count("🚫") >= 2 or text.count("📋") >= 2
+            or text.count("🔒") >= 2 or text.count("🎯") >= 3):
+        return True
+    return False
+
 # ==================== FCC (Free) + Emergent (Paid) Fallback ====================
 
 async def call_fcc_then_emergent(system_prompt: str, user_message: str, session_id: str, max_tokens: int = 2000, temperature: float = 0.3) -> Optional[str]:
@@ -133,10 +156,11 @@ async def call_fcc_then_emergent(system_prompt: str, user_message: str, session_
                     data = resp.json()
                     text_block = next((b for b in data.get("content", []) if b.get("type") == "text"), None)
                     if text_block and text_block.get("text"):
-                        reply = text_block["text"].replace("<think>", "").replace("</think>", "").strip()
-                        if reply:
+                        reply = text_block["text"].replace(" thinking", "").replace(" response", "").strip()
+                        if reply and not _is_prompt_leakage(reply):
                             log.info(f"[FCC] Sucesso ({FCC_MODEL})")
                             return reply
+                        log.warning("[FCC] Resposta com vazamento de prompt — descartada, tentando fallback")
                 log.warning(f"[FCC] Falhou ({resp.status_code}): {resp.text[:200]}")
         except Exception as e:
             log.warning(f"[FCC] Exceção: {e}")
@@ -149,9 +173,10 @@ async def call_fcc_then_emergent(system_prompt: str, user_message: str, session_
             system_message=system_prompt,
         ).with_model("openai", "gpt-4o")
         reply = await chat.send_message(UserMessage(text=user_message))
-        if reply:
+        if reply and not _is_prompt_leakage(reply):
             log.info("[Emergent] Fallback sucesso (gpt-4o)")
             return reply
+        log.warning("[Emergent] Resposta com vazamento de prompt — descartada")
     except Exception as e:
         log.exception("[Emergent] Fallback falhou")
     return None
@@ -2377,18 +2402,19 @@ async def _maybe_autorespond(
         log.error("FCC e Emergent falharam")
         return None
 
-    # ===== GARANTIA DE QUALIDADE: resposta em inglês ou longa demais → regera 1x =====
-    if reply and (len(reply) > 600 or _looks_english(reply)):
-        log.warning(f"[QUALIDADE] resposta fora do padrão (len={len(reply)}, english={_looks_english(reply)}), regenerando")
+    # ===== GARANTIA DE QUALIDADE: resposta em inglês, vazou o prompt ou longa demais → regera 1x =====
+    if reply and (len(reply) > 600 or _looks_english(reply) or _is_prompt_leakage(reply)):
+        log.warning(f"[QUALIDADE] resposta fora do padrão (len={len(reply)}, english={_looks_english(reply)}, leak={_is_prompt_leakage(reply)}), regenerando")
         fix_prompt = system_prompt + (
-            "\n\n⚠️ SUA RESPOSTA ANTERIOR FOI REJEITADA: estava em inglês ou longa demais. "
-            "Responda NOVAMENTE em PORTUGUÊS DO BRASIL, CURTO (máx. 4 linhas), estilo WhatsApp."
+            "\n\n⚠️ SUA RESPOSTA ANTERIOR FOI REJEITADA: estava em inglês, vazou o prompt interno "
+            "ou era longa demais. Responda NOVAMENTE em PORTUGUÊS DO BRASIL, CURTO (máx. 4 linhas), "
+            "estilo WhatsApp, como a Dra. Kênia conversando com o cliente."
         )
         new_reply = await call_fcc_then_emergent(fix_prompt, incoming_text, session + "-pt", max_tokens=450)
-        if new_reply and (len(new_reply) <= 600 and not _looks_english(new_reply)):
+        if new_reply and (len(new_reply) <= 600 and not _looks_english(new_reply) and not _is_prompt_leakage(new_reply)):
             reply = new_reply
-        elif new_reply:
-            reply = new_reply
+        else:
+            reply = "Pode me contar melhor o que aconteceu? Quero te ajudar direitinho. 😊"
 
     # ===== ANTI-LOOP: detecta resposta idêntica/semelhante às últimas 3 do bot =====
     try:
@@ -2410,6 +2436,11 @@ async def _maybe_autorespond(
                 break
     except Exception as e:
         log.warning(f"[ANTI-LOOP] erro: {e}")
+
+    # Segurança final: se ainda veio inglês/vazamento após as regenerações, usa fallback limpo em PT
+    if reply and (len(reply) > 600 or _looks_english(reply) or _is_prompt_leakage(reply)):
+        log.warning("[QUALIDADE] resposta final ainda fora do padrão — substituindo por fallback em português")
+        reply = "Pode me contar melhor o que aconteceu? Quero te ajudar direitinho. 😊"
 
     # Tenta extrair nome se o cliente acabou de se apresentar
     # (ex.: "sou Carlos", "meu nome e Maria", "aqui e Joao")
