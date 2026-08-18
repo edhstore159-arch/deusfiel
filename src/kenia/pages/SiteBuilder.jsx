@@ -7,7 +7,7 @@ import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/tabs";
 import {
   Send, Loader2, Code2, Eye, FileCode, Download,
-  MessageSquare, FolderTree, ExternalLink, Trash2
+  MessageSquare, FolderTree, ExternalLink, Trash2, Copy, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -194,6 +194,48 @@ img { max-width: 100%; height: auto; }
 .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.08); padding: 24px; }
 @media (max-width: 768px) { h1 { font-size: 1.7rem; } }`;
 
+const THEMES = [
+  { id: "none", label: "Sem tema" },
+  { id: "moderno", label: "Moderno", css: `:root { --accent: #2563eb; --accent2: #7c3aed; }
+body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; background: #f8fafc; }
+h1, h2, h3 { font-weight: 800; letter-spacing: -0.02em; }
+h1 { font-size: 2.6rem; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+button, .btn, [class*="button"] { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff !important; border-radius: 12px; box-shadow: 0 8px 24px rgba(37,99,235,.3); }
+button:hover, .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(37,99,235,.4); }
+.card, [class*="card"] { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,.06); }
+nav, header { background: rgba(255,255,255,.85); backdrop-filter: blur(12px); }
+a { color: var(--accent); }` },
+  { id: "elegante", label: "Elegante", css: `:root { --accent: #8a5a2b; --accent2: #d4af7a; }
+body { font-family: Georgia, 'Times New Roman', serif; background: #faf6ef; color: #3b2f22; }
+h1, h2, h3 { font-family: Georgia, serif; font-weight: 400; letter-spacing: .02em; color: #5c3d1e; }
+h1 { font-size: 2.4rem; border-bottom: 1px solid #d4af7a; padding-bottom: .4em; }
+button, .btn { background: #5c3d1e; color: #f5e9d5 !important; border-radius: 2px; letter-spacing: .08em; text-transform: uppercase; font-size: .85rem; }
+.card, [class*="card"] { background: #fffdf8; border: 1px solid #e4d5bb; border-radius: 4px; box-shadow: 0 2px 12px rgba(92,61,30,.08); }
+a { color: #8a5a2b; text-decoration: underline; }` },
+  { id: "vibrante", label: "Vibrante", css: `:root { --accent: #f43f5e; --accent2: #f59e0b; }
+body { font-family: 'Poppins', 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: #fef9e7; }
+h1, h2, h3 { font-weight: 800; color: #fbbf24; text-shadow: 0 2px 20px rgba(244,63,94,.5); }
+h1 { font-size: 2.6rem; }
+button, .btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff !important; font-weight: 700; border-radius: 999px; box-shadow: 0 10px 30px rgba(244,63,94,.45); }
+button:hover, .btn:hover { filter: brightness(1.1); transform: scale(1.03); }
+.card, [class*="card"] { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); border-radius: 20px; backdrop-filter: blur(8px); }
+a { color: #fbbf24; }` },
+  { id: "luxo", label: "Luxo", css: `:root { --accent: #b08d3e; --accent2: #f3e5b8; }
+body { font-family: 'Playfair Display', Georgia, serif; background: #0d0d0d; color: #e8e0ce; }
+h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; color: #d4af37; letter-spacing: .05em; }
+h1 { font-size: 2.6rem; text-shadow: 0 0 40px rgba(212,175,55,.35); }
+button, .btn { background: linear-gradient(135deg, #b08d3e, #d4af37); color: #0d0d0d !important; border-radius: 0; letter-spacing: .1em; text-transform: uppercase; font-family: 'Segoe UI', sans-serif; font-weight: 600; }
+.card, [class*="card"] { background: linear-gradient(160deg, #161616, #1f1f1f); border: 1px solid #b08d3e55; border-radius: 8px; box-shadow: 0 8px 40px rgba(212,175,55,.12); }
+a { color: #d4af37; }` },
+  { id: "minimalista", label: "Minimalista", css: `:root { --accent: #111827; }
+body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #ffffff; color: #111827; }
+h1, h2, h3 { font-weight: 300; letter-spacing: .06em; color: #111827; }
+h1 { font-size: 2.6rem; text-transform: uppercase; }
+button, .btn { background: #111827; color: #fff !important; border-radius: 0; font-weight: 400; letter-spacing: .1em; text-transform: uppercase; }
+.card, [class*="card"] { background: #fff; border: 1px solid #e5e5e5; border-radius: 0; box-shadow: none; }
+a { color: #111827; border-bottom: 1px solid #111827; }` },
+];
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -317,6 +359,10 @@ export default function SiteBuilder() {
   const [activeFile, setActiveFile] = useState(saved.activeFile || "");
   const [mobileTab, setMobileTab] = useState("chat");
   const [provider, setProvider] = useState("fcc");
+  const [cloneUrl, setCloneUrl] = useState("");
+  const [cloning, setCloning] = useState(false);
+  const [theme, setTheme] = useState("none");
+  const [showCode, setShowCode] = useState(false);
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -337,6 +383,92 @@ export default function SiteBuilder() {
 
   const previewHtml = buildPreviewHtml(files);
   const fileList = Object.keys(files);
+
+  const applyTheme = (themeId) => {
+    setTheme(themeId);
+    const t = THEMES.find((x) => x.id === themeId);
+    if (!t || !t.css) return;
+    setFiles((prev) => {
+      const base = prev["styles.css"] || "";
+      const clean = base
+        .split("\n")
+        .filter((l) => !/^\s*\/\* TEMA:/.test(l))
+        .join("\n")
+        .trim();
+      const merged = { ...prev };
+      merged["styles.css"] = (clean ? clean + "\n\n" : "") + `/* TEMA: ${t.label} */\n` + t.css;
+      return merged;
+    });
+    if (!files["index.html"]) {
+      setFiles((prev) => ({
+        ...prev,
+        "index.html": "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Meu Site</title>\n</head>\n<body>\n</body>\n</html>",
+      }));
+    }
+    toast.success(`Tema ${t.label} aplicado`);
+  };
+
+  const cloneSite = async () => {
+    const url = cloneUrl.trim();
+    if (!url) { toast.error("Cole a URL do site que deseja clonar"); return; }
+    setCloning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("fetch-site", { body: { url } });
+      if (error) throw new Error(error.message);
+      if (!data?.html) throw new Error("Nenhum HTML retornado");
+      let html = data.html;
+      let css = "";
+      let js = "";
+      const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+      if (styleMatch) {
+        css = styleMatch[1].trim();
+        html = html.replace(styleMatch[0], "");
+      }
+      const inlineStyles = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+      if (inlineStyles.length > 0) {
+        js = inlineStyles.map((m) => m[1]).join("\n").trim();
+        for (const m of inlineStyles) html = html.replace(m[0], "");
+      }
+      const newFiles = { ...files };
+      newFiles["index.html"] = html;
+      if (css) newFiles["styles.css"] = css;
+      if (js) newFiles["script.js"] = js;
+      setFiles(newFiles);
+      setActiveFile("index.html");
+      setMessages((prev) => [...prev, { role: "assistant", content: `Site clonado de ${data.url || url}. Arquivos: ${Object.keys(newFiles).join(", ")}. Agora posso personalizar: escolha um tema ou peça mudanças pelo chat.` }]);
+      toast.success(`Site clonado de ${data.url || url}`);
+    } catch (e) {
+      toast.error("Erro ao clonar: " + (e?.message || e));
+    } finally {
+      setCloning(false);
+    }
+  };
+
+  const improveDesign = async () => {
+    if (sending) return;
+    const current = fileList.map((f) => `=== ${f} ===\n${files[f]}`).join("\n\n");
+    if (!current) { toast.error("Gere ou clone um site primeiro"); return; }
+    setSending(true);
+    setMessages((prev) => [...prev, { role: "user", content: "Melhore o design deste site (mais bonito, moderno e expressivo)" }]);
+    try {
+      const fullPrompt = `Aqui está o site atual:\n\n${current.slice(0, 18000)}\n\nAgora REESCREVA o site inteiro deixando o design MUITO mais bonito, moderno e expressivo (melhores cores, tipografia, espaçamentos, efeitos de hover, animações sutis, responsividade perfeita). Retorne os arquivos completos em blocos:\n### index.html\n\`\`\`html\n...\n\`\`\`\n### styles.css\n\`\`\`css\n...\n\`\`\`\n### script.js\n\`\`\`js\n...\n\`\`\``;
+      const aiText = await callWithFallback([{ role: "user", content: fullPrompt }]);
+      const newFiles = parseFilesFromCode(aiText);
+      if (Object.keys(newFiles).length === 0) throw new Error("Nenhum arquivo reconhecido");
+      setFiles((prev) => {
+        const merged = { ...prev };
+        for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") merged[k] = v;
+        return merged;
+      });
+      setActiveFile(Object.keys(newFiles)[0]);
+      setMessages((prev) => [...prev, { role: "assistant", content: aiText }]);
+      toast.success("Design melhorado!");
+    } catch (e) {
+      toast.error("Erro ao melhorar: " + (e?.message || e));
+    } finally {
+      setSending(false);
+    }
+  };
 
   const isRateLimit = (msg) => /429|rate limit|limite|FreeUsageLimit|Créditos|credits|payment/i.test(msg);
 
@@ -479,14 +611,14 @@ export default function SiteBuilder() {
 
   return (
     <SiteBuilderErrorBoundary>
-      <div className="p-4 h-[calc(100dvh-4rem)] flex flex-col gap-4">
+      <div className="p-4 h-[calc(100dvh-4rem)] flex flex-col gap-3">
         <div className="flex items-center justify-between shrink-0">
           <div>
             <h1 className="text-xl font-semibold flex items-center gap-2">
               <Code2 className="w-5 h-5" /> Criação
             </h1>
             <p className="text-xs text-muted-foreground">
-              Descreva o site que deseja e a IA gera o codigo para voce.
+              Descreva o site, clone um existente ou aplique um tema — a IA monta tudo para você.
             </p>
           </div>
           <div className="flex gap-2">
@@ -498,6 +630,9 @@ export default function SiteBuilder() {
                 <Button size="sm" variant="outline" onClick={downloadZip}>
                   <Download className="w-3 h-3 mr-1" /> Download
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => setShowCode((v) => !v)}>
+                  <FileCode className="w-3 h-3 mr-1" /> {showCode ? "Ver Site" : "Ver Código"}
+                </Button>
               </>
             )}
             <Button size="sm" variant="ghost" onClick={clearAll}>
@@ -507,50 +642,89 @@ export default function SiteBuilder() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0 flex-wrap bg-card border rounded-lg px-3 py-2">
-          <span className="text-xs font-medium text-muted-foreground">Gerador:</span>
-          {PROVIDERS.map((p) => (
-            <Button
-              key={p.id}
-              size="sm"
-              variant={provider === p.id ? "default" : "outline"}
-              onClick={() => setProvider(p.id)}
-              title={p.desc}
-            >
-              <span className="w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: p.color }} />
-              {p.label}
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Clonar:</span>
+            <Input
+              value={cloneUrl}
+              onChange={(e) => setCloneUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") cloneSite(); }}
+              placeholder="https://site-para-clonar.com"
+              className="h-7 w-52 text-xs"
+            />
+            <Button size="sm" variant="outline" className="h-7" onClick={cloneSite} disabled={cloning}>
+              {cloning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />} Clonar
             </Button>
-          ))}
-          <span className="text-[10px] text-muted-foreground hidden sm:inline">
-            {PROVIDERS.find((p) => p.id === provider)?.desc}
-          </span>
+          </div>
+          <span className="text-muted-foreground">|</span>
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-xs font-medium text-muted-foreground">Gerador:</span>
+            {PROVIDERS.map((p) => (
+              <Button
+                key={p.id}
+                size="sm"
+                variant={provider === p.id ? "default" : "outline"}
+                onClick={() => setProvider(p.id)}
+                title={p.desc}
+                className="h-7"
+              >
+                <span className="w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: p.color }} />
+                {p.label}
+              </Button>
+            ))}
+          </div>
+          <span className="text-muted-foreground">|</span>
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-xs font-medium text-muted-foreground">Tema:</span>
+            {THEMES.map((t) => (
+              <Button
+                key={t.id}
+                size="sm"
+                variant={theme === t.id ? "default" : "outline"}
+                onClick={() => applyTheme(t.id)}
+                className="h-7"
+              >
+                {t.label}
+              </Button>
+            ))}
+          </div>
           <div className="ml-auto flex gap-2">
+            {fileList.length > 0 && (
+              <Button size="sm" variant="outline" onClick={improveDesign} disabled={sending}>
+                <Sparkles className="w-3 h-3 mr-1" /> Melhorar Design
+              </Button>
+            )}
             <Button size="sm" onClick={generateAll} disabled={sending}>
               <Loader2 className={`w-3 h-3 mr-1 ${sending ? "animate-spin" : ""}`} /> Gerar Tudo
             </Button>
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 hidden lg:grid lg:grid-cols-[1fr_1.2fr_1fr] gap-3">
+        <div className="flex-1 min-h-0 hidden lg:grid lg:grid-cols-[minmax(300px,380px)_1fr] gap-3">
           <ChatPanel messages={messages} input={input} setInput={setInput} sending={sending} send={send} handleKeyDown={handleKeyDown} chatEndRef={chatEndRef} />
-          <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} />
-          <PreviewPanel html={previewHtml} onOpen={openInNewTab} />
+          {showCode && fileList.length > 0 ? (
+            <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} />
+          ) : (
+            <PreviewPanel html={previewHtml} onOpen={openInNewTab} />
+          )}
         </div>
 
         <div className="flex-1 min-h-0 lg:hidden">
           <Tabs value={mobileTab} onValueChange={setMobileTab} className="h-full flex flex-col">
             <TabsList className="shrink-0">
               <TabsTrigger value="chat"><MessageSquare className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
-              <TabsTrigger value="editor"><FileCode className="w-3 h-3 mr-1" /> Editor</TabsTrigger>
-              <TabsTrigger value="preview"><Eye className="w-3 h-3 mr-1" /> Preview</TabsTrigger>
+              <TabsTrigger value="preview"><Eye className="w-3 h-3 mr-1" /> Site</TabsTrigger>
+              {fileList.length > 0 && (
+                <TabsTrigger value="editor"><FileCode className="w-3 h-3 mr-1" /> Código</TabsTrigger>
+              )}
             </TabsList>
             <TabsContent value="chat" className="flex-1 min-h-0 mt-2">
               <ChatPanel messages={messages} input={input} setInput={setInput} sending={sending} send={send} handleKeyDown={handleKeyDown} chatEndRef={chatEndRef} fullHeight />
             </TabsContent>
-            <TabsContent value="editor" className="flex-1 min-h-0 mt-2">
-              <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} fullHeight />
-            </TabsContent>
             <TabsContent value="preview" className="flex-1 min-h-0 mt-2">
               <PreviewPanel html={previewHtml} onOpen={openInNewTab} fullHeight />
+            </TabsContent>
+            <TabsContent value="editor" className="flex-1 min-h-0 mt-2">
+              <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} fullHeight />
             </TabsContent>
           </Tabs>
         </div>
