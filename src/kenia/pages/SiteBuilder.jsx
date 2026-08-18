@@ -10,6 +10,7 @@ import {
   MessageSquare, FolderTree, ExternalLink, Trash2
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "site-builder:state";
 
@@ -33,26 +34,17 @@ const PROVIDERS = [
 ];
 
 async function callClaudeFCC(messages) {
-  const res = await fetch(`${FCC_URL}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": FCC_AUTH_TOKEN,
-      "Authorization": `Bearer ${FCC_AUTH_TOKEN}`,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
+  const { data, error } = await supabase.functions.invoke("fcc-proxy", {
+    body: {
       model: FCC_MODEL,
       max_tokens: 4000,
       system: SITE_SYSTEM_PROMPT,
       messages: messages.filter((m) => m.role !== "system"),
-    }),
+    },
   });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`Claude FCC HTTP ${res.status}: ${errText.slice(0, 200)}`);
+  if (error) {
+    throw new Error(`Claude FCC: ${error.message}`);
   }
-  const data = await res.json();
   const blocks = (data?.content || []).filter((b) => b.type === "text");
   const text = blocks.map((b) => b.text || "").join("\n").trim();
   if (!text) throw new Error("Claude FCC retornou resposta vazia");
