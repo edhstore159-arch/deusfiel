@@ -4,7 +4,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SECRET = Deno.env.get("SECRET_ADMIN_PASSWORD") || "DeusFiel,O8";
+const SECRET = Deno.env.get("SECRET_ADMIN_PASSWORD") || "DeusFiel,08";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {

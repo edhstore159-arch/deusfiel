@@ -48,7 +48,7 @@ const readAgents = async () => {
 
 const STORAGE_KEY = "dstboard:processes.v1";
 
-const DSTBOARD_ADMIN_PASSWORD = "DeusFiel,O8";
+const DSTBOARD_ADMIN_PASSWORD = "DeusFiel,08";
 const DSTBOARD_ADMIN_KEY = "dstboard:admin-unlocked.v1";
 
 const isAdminUnlocked = () => {
