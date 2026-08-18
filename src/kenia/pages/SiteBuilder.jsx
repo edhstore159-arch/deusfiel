@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, Component } from "react";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
+import { Label } from "@/kenia/components/ui/label";
 import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/tabs";
@@ -525,26 +526,22 @@ export default function SiteBuilder() {
       if (error) throw new Error(error.message);
       if (!data?.html) throw new Error("Nenhum HTML retornado");
       let html = data.html;
-      let css = "";
-      let js = "";
-      const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-      if (styleMatch) {
-        css = styleMatch[1].trim();
-        html = html.replace(styleMatch[0], "");
-      }
-      const inlineStyles = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
-      if (inlineStyles.length > 0) {
-        js = inlineStyles.map((m) => m[1]).join("\n").trim();
-        for (const m of inlineStyles) html = html.replace(m[0], "");
-      }
+      let css = data.css || "";
+      let js = data.js || "";
+      const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
+      const extractedCss = styleMatches.map((m) => m[1].trim()).filter(Boolean).join("\n");
+      for (const m of styleMatches) html = html.replace(m[0], "");
+      const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+      const extractedJs = inlineScripts.map((m) => m[1].trim()).filter(Boolean).join("\n");
+      for (const m of inlineScripts) html = html.replace(m[0], "");
       const newFiles = { ...files };
       newFiles["index.html"] = html;
-      if (css) newFiles["styles.css"] = css;
-      if (js) newFiles["script.js"] = js;
+      if (extractedCss || css) newFiles["styles.css"] = [extractedCss, css].filter(Boolean).join("\n\n");
+      if (extractedJs || js) newFiles["script.js"] = [extractedJs, js].filter(Boolean).join("\n\n");
       setFiles(newFiles);
       setActiveFile("index.html");
-      setMessages((prev) => [...prev, { role: "assistant", content: `Site clonado de ${data.url || url}. Arquivos: ${Object.keys(newFiles).join(", ")}. Agora posso personalizar: escolha um tema ou peça mudanças pelo chat.` }]);
-      toast.success(`Site clonado de ${data.url || url}`);
+      setMessages((prev) => [...prev, { role: "assistant", content: `Site clonado com sucesso de ${data.url || url}. Arquivos: ${Object.keys(newFiles).join(", ")}. Use a aba Ferramentas ou peça mudanças pelo chat.` }]);
+      toast.success(`Site clonado: ${Object.keys(newFiles).join(", ")}`);
     } catch (e) {
       toast.error("Erro ao clonar: " + (e?.message || e));
     } finally {
