@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback, Component } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
@@ -13,6 +12,109 @@ import {
 import { toast } from "sonner";
 
 const STORAGE_KEY = "site-builder:state";
+
+const FCC_URL = import.meta.env.VITE_FCC_URL || "https://unabashed-vertical-crispness.ngrok-free.dev";
+const FCC_AUTH_TOKEN = import.meta.env.VITE_FCC_AUTH_TOKEN || "freecc";
+const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
+const ZEN_URL = "https://opencode.ai/zen";
+const ZEN_API_KEY = "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
+const ZEN_MODEL = "big-pickle";
+
+const SITE_SYSTEM_PROMPT = `Você é um construtor profissional de sites e aplicativos. 
+Gere código COMPLETO e funcional (HTML, CSS e JavaScript) em português do Brasil.
+Sempre que possível, entregue os arquivos em blocos de código com a linguagem marcada:
+\`\`\`html (index.html), \`\`\`css (styles.css), \`\`\`js (script.js) e \`\`\`js (app.js) para aplicativos.
+Sites responsivos, com boa aparência, cores harmoniosas e textos em português.
+Responda em português, com explicação curta antes do código.`;
+
+const PROVIDERS = [
+  { id: "fcc", label: "Claude FCC", desc: "Grátis via free-claude-code", color: "#d97706" },
+  { id: "opencode", label: "OpenCode", desc: "Zen (gratuito)", color: "#2563eb" },
+];
+
+async function callClaudeFCC(messages) {
+  const res = await fetch(`${FCC_URL}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": FCC_AUTH_TOKEN,
+      "Authorization": `Bearer ${FCC_AUTH_TOKEN}`,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: FCC_MODEL,
+      max_tokens: 4000,
+      system: SITE_SYSTEM_PROMPT,
+      messages: messages.filter((m) => m.role !== "system"),
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Claude FCC HTTP ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const blocks = (data?.content || []).filter((b) => b.type === "text");
+  const text = blocks.map((b) => b.text || "").join("\n").trim();
+  if (!text) throw new Error("Claude FCC retornou resposta vazia");
+  return text;
+}
+
+async function callOpenCode(messages) {
+  const res = await fetch(`${ZEN_URL}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${ZEN_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: ZEN_MODEL,
+      messages: [{ role: "system", content: SITE_SYSTEM_PROMPT }, ...messages.filter((m) => m.role !== "system")],
+      max_tokens: 4000,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`OpenCode HTTP ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  const text = (data?.choices?.[0]?.message?.content || "").trim();
+  if (!text) throw new Error("OpenCode retornou resposta vazia");
+  return text;
+}
+
+function parseFilesFromCode(text) {
+  const files = {};
+  const blockRe = /```([a-zA-Z]+)?\s*\n([\s\S]*?)```/g;
+  let m;
+  const order = [];
+  while ((m = blockRe.exec(text)) !== null) {
+    const lang = (m[1] || "").toLowerCase();
+    const code = m[2].replace(/\n+$/, "");
+    let name = "";
+    if (lang === "html") name = "index.html";
+    else if (lang === "css") name = "styles.css";
+    else if (lang === "js" || lang === "javascript") name = order.includes("script.js") ? "app.js" : "script.js";
+    else if (lang === "ts" || lang === "typescript") name = "app.js";
+    else if (lang) name = `arquivo-${lang}.txt`;
+    if (name) {
+      files[name] = code;
+      if (!order.includes(name)) order.push(name);
+    }
+  }
+  // Se não veio HTML e veio só um bloco de código sem linguagem, assume HTML
+  if (!files["index.html"] && !files["styles.css"] && !files["script.js"]) {
+    const bare = text.replace(/```[\s\S]*?```/g, "").trim();
+    if (bare) files["index.html"] = bare;
+  }
+  if (!files["index.html"] && Object.keys(files).length === 0) {
+    files["index.html"] = text;
+  }
+  // Garante HTML inicial mínimo se só veio CSS/JS
+  if (Object.keys(files).length > 0 && !files["index.html"]) {
+    files["index.html"] = "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Meu Site</title>\n</head>\n<body>\n</body>\n</html>";
+  }
+  return files;
+}
 
 function loadState() {
   try {
@@ -128,6 +230,7 @@ export default function SiteBuilder() {
   const [files, setFiles] = useState(saved.files || {});
   const [activeFile, setActiveFile] = useState(saved.activeFile || "");
   const [mobileTab, setMobileTab] = useState("chat");
+  const [provider, setProvider] = useState("fcc");
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -158,14 +261,11 @@ export default function SiteBuilder() {
 
     try {
       const history = messages.slice(-20).map((m) => ({ role: m.role, content: m.content }));
-      const { data, error } = await supabase.functions.invoke("site-builder", {
-        body: { message: userMsg, history, project_files: files },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const aiText = provider === "opencode"
+        ? await callOpenCode(history.concat([{ role: "user", content: userMsg }]))
+        : await callClaudeFCC(history.concat([{ role: "user", content: userMsg }]));
 
-      const aiText = String(data?.response || "Resposta vazia.");
-      const newFiles = data?.files && typeof data.files === "object" ? data.files : {};
+      const newFiles = parseFilesFromCode(aiText);
 
       setMessages((prev) => [...prev, { role: "assistant", content: aiText }]);
 
@@ -179,12 +279,46 @@ export default function SiteBuilder() {
         });
         const firstNew = Object.keys(newFiles)[0];
         if (firstNew) setActiveFile(firstNew);
-        toast.success(`${Object.keys(newFiles).length} arquivo(s) atualizado(s)`);
+        toast.success(`${Object.keys(newFiles).length} arquivo(s) gerado(s)`);
       }
     } catch (e) {
       const msg = e?.message || String(e);
       toast.error("Erro: " + msg);
-      setMessages((prev) => [...prev, { role: "assistant", content: "Erro ao gerar codigo: " + msg }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Erro ao gerar código: " + msg }]);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const generateAll = async () => {
+    if (sending) return;
+    const prompt = input.trim() || messages.filter((m) => m.role === "user").slice(-1)[0]?.content;
+    const userPrompt = prompt || "Crie uma landing page moderna para um escritório de advocacia chamado Kênia Garcia Advocacia, com seções: início, serviços, equipe, contato e um formulário de contato funcional. Responsiva e bonita.";
+    setSending(true);
+    setMessages((prev) => [...prev, { role: "user", content: userPrompt + "\n\n[Gerar Tudo]" }]);
+    try {
+      const fullPrompt = userPrompt + "\n\nGere o site COMPLETO em blocos: ```html (index.html), ```css (styles.css) e ```js (script.js). Para aplicativos: ```js (app.js). Não omita nenhum arquivo.";
+      const aiText = provider === "opencode"
+        ? await callOpenCode([{ role: "user", content: fullPrompt }])
+        : await callClaudeFCC([{ role: "user", content: fullPrompt }]);
+      const newFiles = parseFilesFromCode(aiText);
+      if (Object.keys(newFiles).length === 0) {
+        throw new Error("Nenhum arquivo reconhecido na resposta");
+      }
+      setFiles((prev) => {
+        const merged = { ...prev };
+        for (const [k, v] of Object.entries(newFiles)) {
+          if (typeof v === "string") merged[k] = v;
+        }
+        return merged;
+      });
+      setActiveFile(Object.keys(newFiles)[0]);
+      setMessages((prev) => [...prev, { role: "assistant", content: aiText }]);
+      toast.success(`Gerado tudo: ${Object.keys(newFiles).join(", ")}`);
+    } catch (e) {
+      const msg = e?.message || String(e);
+      toast.error("Erro ao gerar tudo: " + msg);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Erro ao gerar tudo: " + msg }]);
     } finally {
       setSending(false);
     }
@@ -269,6 +403,30 @@ export default function SiteBuilder() {
             )}
             <Button size="sm" variant="ghost" onClick={clearAll}>
               <Trash2 className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 flex-wrap bg-card border rounded-lg px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">Gerador:</span>
+          {PROVIDERS.map((p) => (
+            <Button
+              key={p.id}
+              size="sm"
+              variant={provider === p.id ? "default" : "outline"}
+              onClick={() => setProvider(p.id)}
+              title={p.desc}
+            >
+              <span className="w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: p.color }} />
+              {p.label}
+            </Button>
+          ))}
+          <span className="text-[10px] text-muted-foreground hidden sm:inline">
+            {PROVIDERS.find((p) => p.id === provider)?.desc}
+          </span>
+          <div className="ml-auto flex gap-2">
+            <Button size="sm" onClick={generateAll} disabled={sending}>
+              <Loader2 className={`w-3 h-3 mr-1 ${sending ? "animate-spin" : ""}`} /> Gerar Tudo
             </Button>
           </div>
         </div>
