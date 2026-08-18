@@ -996,6 +996,9 @@ function EditorPanel({ files, activeFile, setActiveFile, deleteFile, fullHeight 
 
 function PreviewPanel({ html, onOpen, onFrameRef, fullHeight }) {
   const frameRef = useRef(null);
+  const wrapRef = useRef(null);
+  const [dims, setDims] = useState(null);
+  const [fit, setFit] = useState(true);
 
   useEffect(() => {
     if (frameRef.current && html) {
@@ -1009,26 +1012,64 @@ function PreviewPanel({ html, onOpen, onFrameRef, fullHeight }) {
     if (onFrameRef) onFrameRef(frameRef.current);
   }, [onFrameRef]);
 
+  const handleLoad = () => {
+    try {
+      const doc = frameRef.current?.contentDocument;
+      if (!doc) return;
+      setDims({
+        w: Math.max(doc.documentElement.scrollWidth, doc.body?.scrollWidth || 0, 320),
+        h: Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight || 0, 200),
+      });
+    } catch {}
+  };
+
+  const wrapW = wrapRef.current?.clientWidth || 0;
+  const scale = fit && dims && wrapW > 0 ? Math.min(1, wrapW / dims.w) : 1;
+  const scaledW = dims ? Math.max(dims.w * scale, wrapW || 0) : wrapW || "100%";
+  const scaledH = dims ? dims.h * scale : 0;
+
   return (
     <Card className={`flex flex-col ${fullHeight ? "h-full" : ""}`}>
       <div className="px-3 py-2 border-b flex items-center gap-2">
         <Eye className="w-4 h-4 text-gold-600" />
         <span className="text-xs font-medium">Preview</span>
+        {dims && (
+          <div className="flex items-center gap-1 ml-auto">
+            <Button size="sm" variant={fit ? "default" : "outline"} className="h-6 px-2" onClick={() => setFit(true)}>
+              Página inteira
+            </Button>
+            <Button size="sm" variant={!fit ? "default" : "outline"} className="h-6 px-2" onClick={() => setFit(false)}>
+              100%
+            </Button>
+          </div>
+        )}
         {html && (
-          <Button size="sm" variant="ghost" className="ml-auto h-6 px-2" onClick={onOpen}>
+          <Button size="sm" variant="ghost" className="h-6 px-2" onClick={onOpen}>
             <ExternalLink className="w-3 h-3" />
           </Button>
         )}
       </div>
       <div className="flex-1 min-h-0 bg-white">
         {html ? (
-          <iframe
-            ref={frameRef}
-            srcDoc={html}
-            className="w-full h-full border-0"
-            sandbox="allow-scripts allow-same-origin"
-            title="Preview"
-          />
+          <div ref={wrapRef} className="w-full h-full overflow-auto">
+            <div style={{ width: scaledW, height: scaledH, overflow: "hidden", margin: "0 auto" }}>
+              <iframe
+                ref={frameRef}
+                onLoad={handleLoad}
+                srcDoc={html}
+                style={{
+                  width: dims?.w || "100%",
+                  height: dims?.h || "100%",
+                  border: 0,
+                  display: "block",
+                  transform: scale < 1 ? `scale(${scale})` : "none",
+                  transformOrigin: "top left",
+                }}
+                sandbox="allow-scripts allow-same-origin"
+                title="Preview"
+              />
+            </div>
+          </div>
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
             <div className="text-center">
