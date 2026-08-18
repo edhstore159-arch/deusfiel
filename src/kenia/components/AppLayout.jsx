@@ -6,7 +6,7 @@ import {
   BarChart3, LogOut, MessageSquare, Wrench, Radio,
   CalendarDays, Settings as SettingsIcon, Combine,
   ShieldCheck, Bot, Menu, X, Clapperboard, Gavel, Share2,
-  ClipboardCheck, FolderOpen, FileText, GraduationCap, TrendingUp,
+  ClipboardCheck, FolderOpen, FileText, GraduationCap, TrendingUp, Code2,
 } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
@@ -30,6 +30,7 @@ const NAV = [
   { to: "/app/agents", label: "Agentes IA", icon: Bot, testid: "nav-agents" },
   { to: "/app/dstboard", label: "Painel de Controle", icon: ClipboardCheck, testid: "nav-dstboard" },
   { to: "/app/document-builder", label: "Construtor de Documentos", icon: FileText, testid: "nav-document-builder" },
+  { to: "/app/site-builder", label: "Criar Sites e Apps", icon: Code2, testid: "nav-site-builder" },
   { to: "/app/legal-training", label: "Treinamento Jurídico", icon: GraduationCap, testid: "nav-legal-training" },
   { to: "/app/secretary-marketing", label: "Treinamento Secretária", icon: TrendingUp, testid: "nav-secretary-marketing" },
   
@@ -62,6 +63,7 @@ const PREFETCH = {
   "/app/agents": () => import("@/kenia/pages/Agents"),
   "/app/dstboard": () => import("@/kenia/pages/Dstboard"),
   "/app/document-builder": () => import("@/kenia/pages/DocumentBuilder"),
+  "/app/site-builder": () => import("@/kenia/pages/SiteBuilder"),
   "/app/legal-training": () => import("@/kenia/pages/LegalTraining"),
   "/app/secretary-marketing": () => import("@/kenia/pages/SecretaryMarketing"),
   

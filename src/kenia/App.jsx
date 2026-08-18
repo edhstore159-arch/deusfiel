@@ -60,6 +60,7 @@ const Agents = lazyWithReload(() => import("@/kenia/pages/Agents"));
 const SocialConnect = lazyWithReload(() => import("@/kenia/pages/SocialConnect"));
 const Dstboard = lazyWithReload(() => import("@/kenia/pages/Dstboard"));
 const DocumentBuilder = lazyWithReload(() => import("@/kenia/pages/DocumentBuilder"));
+const SiteBuilder = lazyWithReload(() => import("@/kenia/pages/SiteBuilder"));
 const LegalTraining = lazyWithReload(() => import("@/kenia/pages/LegalTraining"));
 const SecretaryMarketing = lazyWithReload(() => import("@/kenia/pages/SecretaryMarketing"));
 
@@ -116,6 +117,7 @@ function App() {
                 <Route path="/app/agents" element={<Agents />} />
                 <Route path="/app/dstboard" element={<Dstboard />} />
                 <Route path="/app/document-builder" element={<DocumentBuilder />} />
+                <Route path="/app/site-builder" element={<SiteBuilder />} />
                 <Route path="/app/legal-training" element={<LegalTraining />} />
                 <Route path="/app/secretary-marketing" element={<SecretaryMarketing />} />
                 
