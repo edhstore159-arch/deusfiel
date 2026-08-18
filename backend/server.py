@@ -2182,15 +2182,9 @@ async def _maybe_autorespond(
             last_client_text = (m.get("text") or "").strip().lower()
             break
     is_vague_reply = bool(_re.match(
-        r"^(ok|okay|sim|n[aã]o|ta|t[aá] bom|entendi|certo|uhum|aham|blz|beleza|claro|tudo bem[.!]?)$",
+        r"^(ok|okay|sim|n[aã]o|ta|t[aá] bom|tudo bem|entendi|certo|uhum|aham|blz|beleza|claro)\.?!?$",
         last_client_text
-    ))
-    # "tudo bem?" (com interrogação) é CUMPRIMENTO, não resposta vaga —
-    # senão a secretaria ignora o "oi" e pula direto pra oferecer horário.
-    is_greeting = bool(_re.match(
-        r"^(oi|oii+|ol[aá]|opa|e a[ií]|eai|bom dia|boa tarde|boa noite|tudo bem\?|tudo bom\?|td bem\?|como vai\??)$",
-        last_client_text
-    ))
+    )) and "?" not in last_client_text
 
     # Bloco DURO listando tudo que ja foi perguntado recentemente
     recent_asked = []
@@ -2209,12 +2203,6 @@ async def _maybe_autorespond(
         tracker_lines.append("")
         tracker_lines.append("❌ É ABSOLUTAMENTE PROIBIDO voltar a fazer qualquer uma das perguntas acima,")
         tracker_lines.append("   mesmo reformulada de jeitos diferentes. Se fizer, vai parecer amador.")
-        tracker_lines.append("")
-
-    if is_greeting:
-        tracker_lines.append("=== 👋 CLIENTE CUMPRIMENTOU ('oi', 'tudo bem?', 'bom dia') ===")
-        tracker_lines.append("Responda o cumprimento normalmente, com simpatia, e pergunte em que pode ajudar.")
-        tracker_lines.append("NÃO avance o roteiro de coleta de dados nem ofereça horário ainda — só cumprimente e pergunte como pode ajudar.")
         tracker_lines.append("")
 
     if is_vague_reply:
