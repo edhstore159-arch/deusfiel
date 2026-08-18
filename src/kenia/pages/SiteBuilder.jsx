@@ -9,7 +9,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/
 import {
   Send, Loader2, Code2, Eye, FileCode, Download,
   MessageSquare, FolderTree, ExternalLink, Trash2, Copy, Sparkles,
-  MousePointer2, ImagePlus, Save, Globe
+  MousePointer2, ImagePlus, Save, Globe, Wrench, Bold, Italic,
+  AlignLeft, AlignCenter, AlignRight, Undo2, Eraser
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -367,8 +368,11 @@ export default function SiteBuilder() {
   const [showCode, setShowCode] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [editText, setEditText] = useState("");
   const [edited, setEdited] = useState(false);
+  const [undoStack, setUndoStack] = useState([]);
   const [publishUrl, setPublishUrl] = useState("");
+  const [leftTab, setLeftTab] = useState("chat");
   const frameRef = useRef(null);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -409,7 +413,8 @@ export default function SiteBuilder() {
     el.classList.add('ke-edit-sel');
     el.setAttribute('contenteditable','true');
     try{ el.focus(); }catch(_){}
-    window.parent.postMessage({type:'ke-select',tag:el.tagName,isImg:el.tagName==='IMG'},'*');
+    var isIn=el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT';
+    window.parent.postMessage({type:'ke-select',tag:el.tagName,isImg:el.tagName==='IMG',isInput:isIn,text:(isIn?(el.value||''):(el.textContent||''))},'*');
   }, true);
   document.addEventListener('input', function(){ if(window.__keEdit) window.parent.postMessage({type:'ke-change'},'*'); });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ window.parent.postMessage({type:'ke-esc'},'*'); } });
@@ -423,13 +428,86 @@ export default function SiteBuilder() {
     const handler = (e) => {
       const d = e.data;
       if (!d || typeof d !== "object" || !d.type) return;
-      if (d.type === "ke-select") setSelected({ tag: d.tag, isImg: !!d.isImg });
+      if (d.type === "ke-select") {
+        setSelected({ tag: d.tag, isImg: !!d.isImg, isInput: !!d.isInput, text: d.text || "" });
+        setEditText(d.text || "");
+      }
       if (d.type === "ke-change") setEdited(true);
       if (d.type === "ke-esc") setSelected(null);
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, []);
+
+  const snapshotForUndo = () => {
+    try {
+      const doc = frameRef.current?.contentDocument;
+      if (doc) setUndoStack((s) => [...s.slice(-19), "<!DOCTYPE html>\n" + doc.documentElement.outerHTML]);
+    } catch {}
+  };
+
+  const withSelected = (fn) => {
+    const frame = frameRef.current;
+    const doc = frame?.contentDocument;
+    const el = doc?.querySelector(".ke-edit-sel");
+    if (!el) { toast.error("Clique em um elemento do site primeiro"); return null; }
+    fn(el, doc);
+    setEdited(true);
+    return el;
+  };
+
+  const toolText = (value) => {
+    const v = String(value || "");
+    if (!selected) { toast.error("Clique em um elemento do site primeiro"); return; }
+    snapshotForUndo();
+    withSelected((el) => {
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") el.value = v;
+      else el.textContent = v;
+    });
+  };
+
+  const toolImage = (file) => {
+    if (!file) return;
+    snapshotForUndo();
+    withSelected((el) => {
+      const r = new FileReader();
+      r.onload = () => { el.src = r.result; };
+      r.readAsDataURL(file);
+    });
+  };
+
+  const toolBgColor = (color) => snapshotForUndo() || withSelected((el) => { el.style.backgroundColor = color; });
+  const toolTextColor = (color) => snapshotForUndo() || withSelected((el) => { el.style.color = color; });
+  const toolFontDelta = (d) => snapshotForUndo() || withSelected((el) => {
+    const cur = parseFloat(getComputedStyle(el).fontSize) || 16;
+    el.style.fontSize = `${Math.max(8, cur + d)}px`;
+  });
+  const toolBold = () => snapshotForUndo() || withSelected((el) => {
+    el.style.fontWeight = el.style.fontWeight === "bold" || el.style.fontWeight === "700" ? "normal" : "bold";
+  });
+  const toolItalic = () => snapshotForUndo() || withSelected((el) => {
+    el.style.fontStyle = el.style.fontStyle === "italic" ? "normal" : "italic";
+  });
+  const toolAlign = (a) => snapshotForUndo() || withSelected((el) => { el.style.textAlign = a; });
+  const toolPadDelta = (d) => snapshotForUndo() || withSelected((el) => {
+    const cur = parseFloat(getComputedStyle(el).paddingTop) || 0;
+    const next = Math.max(0, cur + d);
+    el.style.padding = `${next}px`;
+  });
+  const toolHide = () => snapshotForUndo() || withSelected((el) => { el.style.display = "none"; });
+  const toolRemove = () => snapshotForUndo() || withSelected((el) => { el.remove(); setSelected(null); });
+  const toolClearStyle = () => snapshotForUndo() || withSelected((el) => { el.removeAttribute("style"); });
+
+  const toolUndo = () => {
+    setUndoStack((s) => {
+      if (s.length === 0) return s;
+      const prev = s[s.length - 1];
+      setFiles((f) => ({ ...f, "index.html": prev }));
+      setEdited(false);
+      setSelected(null);
+      return s.slice(0, -1);
+    });
+  };
 
   const saveEdits = () => {
     const frame = frameRef.current;
@@ -444,25 +522,6 @@ export default function SiteBuilder() {
     } catch (e) {
       toast.error("Erro ao salvar: " + (e?.message || e));
     }
-  };
-
-  const replaceImage = (file) => {
-    const frame = frameRef.current;
-    if (!frame || !selected?.isImg) { toast.error("Selecione uma imagem no site primeiro"); return; }
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const el = frame.contentDocument?.querySelector(".ke-edit-sel");
-        if (!el) throw new Error("imagem não encontrada");
-        el.src = reader.result;
-        setEdited(true);
-        toast.success("Imagem trocada — clique em Salvar");
-      } catch (e) {
-        toast.error("Erro ao trocar imagem: " + (e?.message || e));
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const downloadPage = () => {
@@ -717,6 +776,7 @@ export default function SiteBuilder() {
   return (
     <SiteBuilderErrorBoundary>
       <div className="p-4 h-[calc(100dvh-4rem)] flex flex-col gap-3">
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { toolImage(e.target.files?.[0]); e.target.value = ""; }} />
         <div className="flex items-center justify-between shrink-0">
           <div>
             <h1 className="text-xl font-semibold flex items-center gap-2">
@@ -819,24 +879,41 @@ export default function SiteBuilder() {
         )}
 
         <div className="flex-1 min-h-0 hidden lg:grid lg:grid-cols-[minmax(300px,380px)_1fr] gap-3">
-          <ChatPanel messages={messages} input={input} setInput={setInput} sending={sending} send={send} handleKeyDown={handleKeyDown} chatEndRef={chatEndRef} />
+          <Card className="flex flex-col min-h-0">
+            <Tabs value={leftTab} onValueChange={setLeftTab} className="flex flex-col h-full">
+              <TabsList className="shrink-0 mx-3 mt-2">
+                <TabsTrigger value="chat"><MessageSquare className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
+                {editMode && <TabsTrigger value="tools"><Wrench className="w-3 h-3 mr-1" /> Ferramentas</TabsTrigger>}
+              </TabsList>
+              <TabsContent value="chat" className="flex-1 min-h-0 mt-2">
+                <ChatPanel messages={messages} input={input} setInput={setInput} sending={sending} send={send} handleKeyDown={handleKeyDown} chatEndRef={chatEndRef} fullHeight />
+              </TabsContent>
+              <TabsContent value="tools" className="flex-1 min-h-0 mt-2">
+                <EditToolsPanel
+                  selected={selected}
+                  editText={editText}
+                  setEditText={setEditText}
+                  edited={edited}
+                  undoCount={undoStack.length}
+                  onTextApply={toolText}
+                  onPickImage={() => fileInputRef.current?.click()}
+                  onBgColor={toolBgColor}
+                  onTextColor={toolTextColor}
+                  onFontDelta={toolFontDelta}
+                  onBold={toolBold}
+                  onItalic={toolItalic}
+                  onAlign={toolAlign}
+                  onPadDelta={toolPadDelta}
+                  onHide={toolHide}
+                  onRemove={toolRemove}
+                  onClearStyle={toolClearStyle}
+                  onUndo={toolUndo}
+                  onSave={saveEdits}
+                />
+              </TabsContent>
+            </Tabs>
+          </Card>
           <div className="flex flex-col gap-2 min-h-0">
-            {editMode && (
-              <div className="flex items-center gap-2 shrink-0 bg-card border rounded-lg px-3 py-2 flex-wrap">
-                <span className="text-xs text-muted-foreground">
-                  {selected ? `Editando: ${selected.tag.toLowerCase()}` : "Clique em um elemento para editar o texto"}
-                </span>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { replaceImage(e.target.files?.[0]); e.target.value = ""; }} />
-                <div className="ml-auto flex gap-2">
-                  <Button size="sm" variant="outline" disabled={!selected?.isImg} onClick={() => fileInputRef.current?.click()}>
-                    <ImagePlus className="w-3 h-3 mr-1" /> Trocar Imagem
-                  </Button>
-                  <Button size="sm" disabled={!edited} onClick={saveEdits}>
-                    <Save className="w-3 h-3 mr-1" /> Salvar
-                  </Button>
-                </div>
-              </div>
-            )}
             {showCode && fileList.length > 0 ? (
               <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} />
             ) : (
@@ -850,6 +927,7 @@ export default function SiteBuilder() {
             <TabsList className="shrink-0">
               <TabsTrigger value="chat"><MessageSquare className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
               <TabsTrigger value="preview"><Eye className="w-3 h-3 mr-1" /> Site</TabsTrigger>
+              {editMode && <TabsTrigger value="tools"><Wrench className="w-3 h-3 mr-1" /> Ferramentas</TabsTrigger>}
               {fileList.length > 0 && (
                 <TabsTrigger value="editor"><FileCode className="w-3 h-3 mr-1" /> Código</TabsTrigger>
               )}
@@ -858,24 +936,30 @@ export default function SiteBuilder() {
               <ChatPanel messages={messages} input={input} setInput={setInput} sending={sending} send={send} handleKeyDown={handleKeyDown} chatEndRef={chatEndRef} fullHeight />
             </TabsContent>
             <TabsContent value="preview" className="flex-1 min-h-0 mt-2">
-              <div className="h-full flex flex-col gap-2">
-                {editMode && (
-                  <div className="flex items-center gap-2 shrink-0 bg-card border rounded-lg px-3 py-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground">
-                      {selected ? `Editando: ${selected.tag.toLowerCase()}` : "Clique em um elemento para editar"}
-                    </span>
-                    <div className="ml-auto flex gap-2">
-                      <Button size="sm" variant="outline" disabled={!selected?.isImg} onClick={() => fileInputRef.current?.click()}>
-                        <ImagePlus className="w-3 h-3 mr-1" /> Trocar Imagem
-                      </Button>
-                      <Button size="sm" disabled={!edited} onClick={saveEdits}>
-                        <Save className="w-3 h-3 mr-1" /> Salvar
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                <PreviewPanel html={previewHtml} onOpen={openInNewTab} onFrameRef={(r) => { frameRef.current = r; }} fullHeight />
-              </div>
+              <PreviewPanel html={previewHtml} onOpen={openInNewTab} onFrameRef={(r) => { frameRef.current = r; }} fullHeight />
+            </TabsContent>
+            <TabsContent value="tools" className="flex-1 min-h-0 mt-2">
+              <EditToolsPanel
+                selected={selected}
+                editText={editText}
+                setEditText={setEditText}
+                edited={edited}
+                undoCount={undoStack.length}
+                onTextApply={toolText}
+                onPickImage={() => fileInputRef.current?.click()}
+                onBgColor={toolBgColor}
+                onTextColor={toolTextColor}
+                onFontDelta={toolFontDelta}
+                onBold={toolBold}
+                onItalic={toolItalic}
+                onAlign={toolAlign}
+                onPadDelta={toolPadDelta}
+                onHide={toolHide}
+                onRemove={toolRemove}
+                onClearStyle={toolClearStyle}
+                onUndo={toolUndo}
+                onSave={saveEdits}
+              />
             </TabsContent>
             <TabsContent value="editor" className="flex-1 min-h-0 mt-2">
               <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} fullHeight />
@@ -988,6 +1072,104 @@ function EditorPanel({ files, activeFile, setActiveFile, deleteFile, fullHeight 
         </div>
       )}
     </Card>
+  );
+}
+
+function EditToolsPanel({ selected, editText, setEditText, edited, undoCount, onTextApply, onPickImage, onBgColor, onTextColor, onFontDelta, onBold, onItalic, onAlign, onPadDelta, onHide, onRemove, onClearStyle, onUndo, onSave }) {
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="px-3 py-2 border-b flex items-center gap-2 shrink-0">
+        <Wrench className="w-4 h-4 text-gold-600" />
+        <span className="text-xs font-medium">Ferramentas</span>
+        <Badge variant="secondary" className="ml-auto text-[10px]">
+          {selected ? selected.tag.toLowerCase() : "nada selecionado"}
+        </Badge>
+      </div>
+      <ScrollArea className="flex-1 p-3">
+        <div className="space-y-4">
+          {!selected && (
+            <div className="text-xs text-muted-foreground text-center py-6">
+              <MousePointer2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p>Clique em um elemento do site para editá-lo.</p>
+              <p className="text-[10px] mt-1">Textos, imagens, cores, fontes e mais.</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label className="text-[11px] font-medium text-muted-foreground">Texto</Label>
+            <Input
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") onTextApply(editText); }}
+              placeholder="Novo texto do elemento..."
+              className="h-8 text-xs"
+              disabled={!selected}
+            />
+            <Button size="sm" className="h-7 w-full" disabled={!selected} onClick={() => onTextApply(editText)}>
+              Aplicar texto
+            </Button>
+          </div>
+
+          {selected?.isImg && (
+            <div className="space-y-2">
+              <Label className="text-[11px] font-medium text-muted-foreground">Imagem</Label>
+              <Button size="sm" variant="outline" className="h-7 w-full" onClick={onPickImage}>
+                <ImagePlus className="w-3 h-3 mr-1" /> Trocar imagem
+              </Button>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label className="text-[11px] font-medium text-muted-foreground">Cores</Label>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
+                <input type="color" className="w-6 h-6 rounded cursor-pointer" disabled={!selected} onChange={(e) => onBgColor(e.target.value)} />
+                Fundo
+              </label>
+              <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
+                <input type="color" className="w-6 h-6 rounded cursor-pointer" disabled={!selected} onChange={(e) => onTextColor(e.target.value)} />
+                Texto
+              </label>
+              <Button size="sm" variant="ghost" className="h-6 text-[10px" disabled={!selected} onClick={onClearStyle}>
+                <Eraser className="w-3 h-3 mr-1" /> Limpar
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[11px] font-medium text-muted-foreground">Tipografia</Label>
+            <div className="flex flex-wrap gap-1">
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={() => onFontDelta(-2)}>A−</Button>
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={() => onFontDelta(2)}>A+</Button>
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={onBold} title="Negrito"><Bold className="w-3 h-3" /></Button>
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={onItalic} title="Itálico"><Italic className="w-3 h-3" /></Button>
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={() => onAlign("left")} title="Esquerda"><AlignLeft className="w-3 h-3" /></Button>
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={() => onAlign("center")} title="Centro"><AlignCenter className="w-3 h-3" /></Button>
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={() => onAlign("right")} title="Direita"><AlignRight className="w-3 h-3" /></Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[11px] font-medium text-muted-foreground">Layout</Label>
+            <div className="flex flex-wrap gap-1">
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={() => onPadDelta(-4)}>Pad −</Button>
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={() => onPadDelta(4)}>Pad +</Button>
+              <Button size="sm" variant="outline" className="h-7 px-2" disabled={!selected} onClick={onHide}>Ocultar</Button>
+              <Button size="sm" variant="outline" className="h-7 px-2 text-rose-600" disabled={!selected} onClick={onRemove}>Remover</Button>
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t pt-3">
+            <Button size="sm" variant="outline" className="h-7 w-full" disabled={undoCount === 0} onClick={onUndo}>
+              <Undo2 className="w-3 h-3 mr-1" /> Desfazer
+            </Button>
+            <Button size="sm" className="h-7 w-full" disabled={!edited} onClick={onSave}>
+              <Save className="w-3 h-3 mr-1" /> Salvar alterações
+            </Button>
+          </div>
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 
