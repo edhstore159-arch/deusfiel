@@ -7,6 +7,7 @@ import makeWASocket, {
   useMultiFileAuthState,
   WASocket,
   proto,
+  downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import path from "path";
@@ -28,7 +29,10 @@ Diretrizes:
 - Para urgências, direcione para atendimento imediato
 - Nunca dê parecer definitivo, sempre sugira consulta presencial
 - Use linguagem acessível, sem jargão excessivo
-- Em orações, seja respeitosa e acolhedora`;
+- Em orações, seja respeitosa e acolhedora
+- RESPONDA SEMPRE EM PORTUGUÊS DO BRASIL — nunca em inglês
+- Respostas CURTAS de WhatsApp: no máximo 4 linhas (2 a 4 frases)
+- Uma pergunta por mensagem`;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error("❌ Missing SUPABASE_URL or SUPABASE_KEY");
@@ -151,9 +155,9 @@ async function generateReply(strategy: string, message: string, history: { role:
           { role: "system", content: SECRETARY_SYSTEM },
           { role: "system", content: `Contexto da estratégia: ${contextMsg}` },
           ...history.slice(-10),
-          { role: "user", content: message },
+          { role: "user", content: "Responda APENAS em português do Brasil, com resposta CURTA de WhatsApp (máx. 4 linhas).\n\n" + message },
         ],
-        max_tokens: 300,
+        max_tokens: 250,
       }),
     });
 
@@ -213,10 +217,36 @@ async function connectWhatsApp() {
     const msg = messages[0];
     if (!msg.key.fromMe && msg.message) {
       const phone = msg.key.remoteJid?.replace("@s.whatsapp.net", "") || "";
-      const text =
+      let text =
         msg.message.conversation ||
         msg.message.extendedTextMessage?.text ||
         "";
+
+      let mediaNote = "";
+      if (msg.message.imageMessage) {
+        mediaNote = "[O cliente enviou uma IMAGEM] ";
+        try {
+          const buf = await downloadMediaMessage(msg, "buffer", {}, {});
+          void buf;
+        } catch (e) {
+          console.warn("[WA] image download failed:", (e as Error).message);
+        }
+        text = text || mediaNote + (msg.message.imageMessage.caption || "");
+        if (text === mediaNote) text = text + "Peça para ele descrever a imagem ou enviar o texto do documento.";
+      } else if (msg.message.audioMessage) {
+        mediaNote = "[O cliente enviou um ÁUDIO] Peça para ele repetir por texto ou áudio mais claro. ";
+        try {
+          const buf = await downloadMediaMessage(msg, "buffer", {}, {});
+          void buf;
+        } catch (e) {
+          console.warn("[WA] audio download failed:", (e as Error).message);
+        }
+        text = mediaNote;
+      } else if (msg.message.documentMessage) {
+        text = "[O cliente enviou um DOCUMENTO: " + (msg.message.documentMessage.fileName || "arquivo") + "] Pergunte o que é o documento.";
+      } else if (msg.message.videoMessage) {
+        text = "[O cliente enviou um VÍDEO] Pergunte o que ele queria mostrar.";
+      }
 
       if (!text || !phone) return;
 
@@ -228,7 +258,12 @@ async function connectWhatsApp() {
 
       await storeMessage(convId, "incoming", text, strategy);
 
-      const reply = await generateReply(strategy, text);
+      let reply = await generateReply(strategy, text);
+      if (reply.length > 500) {
+        reply = reply.slice(0, 500).trim();
+        const lastBreak = Math.max(reply.lastIndexOf("\n"), reply.lastIndexOf("."), reply.lastIndexOf("?"));
+        if (lastBreak > 250) reply = reply.slice(0, lastBreak + 1);
+      }
       await sock.sendMessage(msg.key.remoteJid!, { text: reply });
       await storeMessage(convId, "outgoing", reply, strategy);
     }

@@ -78,6 +78,30 @@ def _raise_on_insufficient_balance(e: Exception):
             )
     return  # not a balance error, let caller handle
 
+def _similarity(a: str, b: str) -> float:
+    """Similaridade simples entre duas strings (0.0 a 1.0)."""
+    import difflib
+    a = (a or "").strip().lower()
+    b = (b or "").strip().lower()
+    if not a or not b:
+        return 0.0
+    return difflib.SequenceMatcher(None, a, b).ratio()
+
+def _looks_english(text: str) -> bool:
+    """Heurística: detecta respostas longas escritas em inglês."""
+    t = (text or "").strip()
+    if len(t) < 60:
+        return False
+    common_en = {
+        "the", "and", "you", "your", "for", "with", "this", "that", "have",
+        "please", "here", "what", "how", "would", "need", "can", "will",
+        "not", "from", "about", "let", "me", "know", "hello", "thanks",
+        "advice", "help", "schedule", "appointment", "lawyer", "information",
+    }
+    words = [w.strip(".,!?;:()[]\"'“”‘’") for w in t.lower().split()]
+    hits = sum(1 for w in words if w in common_en)
+    return hits >= 4
+
 # ==================== FCC (Free) + Emergent (Paid) Fallback ====================
 
 async def call_fcc_then_emergent(system_prompt: str, user_message: str, session_id: str, max_tokens: int = 2000, temperature: float = 0.3) -> Optional[str]:
@@ -2337,12 +2361,34 @@ async def _maybe_autorespond(
         + tracker_block.strip()
         + "\n\n⚠️⚠️⚠️ FIM DAS REGRAS CRÍTICAS ⚠️⚠️⚠️\n\n"
     )
-    system_prompt = critical_top + base_prompt + style_hint + name_hint + kb_hint + agenda_block + history_block
+    # REGRA RÍGIDA DE IDIOMA E TAMANHO: WhatsApp curto, sempre em português
+    pt_short_rule = (
+        "\n\n⚠️⚠️⚠️ IDIOMA E TAMANHO (REGRAS ABSOLUTAS) ⚠️⚠️⚠️\n"
+        "- Responda SEMPRE em PORTUGUÊS DO BRASIL. NUNCA escreva em inglês, "
+        "nem palavras/expressões em inglês.\n"
+        "- Resposta CURTA de WhatsApp: no MÁXIMO 4 linhas (2 a 4 frases). "
+        "Nada de textos longos, listas enormes ou explicações acadêmicas.\n"
+        "- Uma pergunta por mensagem, terminando com pergunta direta ou proposta concreta.\n"
+    )
+    system_prompt = critical_top + base_prompt + style_hint + name_hint + kb_hint + pt_short_rule + agenda_block + history_block
     session = f"wa-bot-{contact['id']}"
-    reply = await call_fcc_then_emergent(system_prompt, incoming_text, session)
+    reply = await call_fcc_then_emergent(system_prompt, incoming_text, session, max_tokens=450)
     if not reply:
         log.error("FCC e Emergent falharam")
         return None
+
+    # ===== GARANTIA DE QUALIDADE: resposta em inglês ou longa demais → regera 1x =====
+    if reply and (len(reply) > 600 or _looks_english(reply)):
+        log.warning(f"[QUALIDADE] resposta fora do padrão (len={len(reply)}, english={_looks_english(reply)}), regenerando")
+        fix_prompt = system_prompt + (
+            "\n\n⚠️ SUA RESPOSTA ANTERIOR FOI REJEITADA: estava em inglês ou longa demais. "
+            "Responda NOVAMENTE em PORTUGUÊS DO BRASIL, CURTO (máx. 4 linhas), estilo WhatsApp."
+        )
+        new_reply = await call_fcc_then_emergent(fix_prompt, incoming_text, session + "-pt", max_tokens=450)
+        if new_reply and (len(new_reply) <= 600 and not _looks_english(new_reply)):
+            reply = new_reply
+        elif new_reply:
+            reply = new_reply
 
     # ===== ANTI-LOOP: detecta resposta idêntica/semelhante às últimas 3 do bot =====
     try:
@@ -2358,7 +2404,7 @@ async def _maybe_autorespond(
                 log.warning(f"[ANTI-LOOP] Resposta repetida detectada, forçando regeneração. similarity={_similarity(reply_norm, old):.2f}")
                 # Tenta uma vez com prompt corretivo
                 corrected_prompt = system_prompt + "\n\n⚠️ CORREÇÃO OBRIGATÓRIA: sua resposta anterior repetiu o que você já disse. Gere uma resposta NOVA, curta, que AVANCE a conversa. Não repita 'perfeito', 'já registrei', 'vou analisar'. Ofereça horário ou faça pergunta nova."
-                reply = await call_fcc_then_emergent(corrected_prompt, incoming_text, session + "-retry")
+                reply = await call_fcc_then_emergent(corrected_prompt, incoming_text, session + "-retry", max_tokens=450)
                 if not reply:
                     reply = "Desculpe, pode repetir? Quero te ajudar direito."
                 break
@@ -3019,6 +3065,8 @@ async def baileys_webhook(request: Request):
     # Se recebemos IMAGEM (documento, RG, contrato, rescisao), analisa com GPT-4o Vision
     doc_analysis = None
     if image_b64:
+        if not EMERGENT_LLM_KEY:
+            log.warning("[Baileys] visao indisponivel: EMERGENT_LLM_KEY/EMERGENT_API_KEY vazia")
         try:
             from emergentintegrations.llm.chat import LlmChat as _Chat, UserMessage as _UM, ImageContent as _IC
             vision_sys = (
@@ -3057,6 +3105,14 @@ async def baileys_webhook(request: Request):
             log.info(f"[Baileys vision] doc analysis: {str(doc_analysis)[:200]}")
         except Exception:
             log.exception("vision analyze failed")
+        if not doc_analysis and image_b64:
+            # Fallback: bot nao "ve" a imagem, mas precisa reagir direito.
+            text = (
+                f"[O cliente enviou uma IMAGEM"
+                + (f" com a legenda: {image_caption}" if image_caption else "")
+                + ". A imagem nao pode ser analisada automaticamente agora. "
+                "Peca gentilmente que ele descreva o que esta na imagem ou digite o texto do documento.]"
+            )
 
     # Se recebemos audio, transcreve usando Whisper
     transcribed = None
@@ -3117,7 +3173,10 @@ async def baileys_webhook(request: Request):
     # — sinalizar que ele falou, persistir como audio inaudivel, e deixar o bot
     # responder em audio (o usuario vai pedir pra repetir, mas a conversa segue).
     if audio_b64 and not text:
-        text = "[áudio inaudível — pedir ao cliente para repetir]"
+        text = (
+            "[O cliente enviou um áudio, mas ele não pôde ser transcrito agora. "
+            "Peça educadamente que ele envie a mensagem por texto ou repita o áudio mais devagar.]"
+        )
         stored_text = "🎙️ (áudio recebido — sem transcrição)"
 
     if not phone or not text:
