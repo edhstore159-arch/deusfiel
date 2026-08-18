@@ -7,7 +7,8 @@ import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/kenia/components/ui/tabs";
 import {
   Send, Loader2, Code2, Eye, FileCode, Download,
-  MessageSquare, FolderTree, ExternalLink, Trash2, Copy, Sparkles
+  MessageSquare, FolderTree, ExternalLink, Trash2, Copy, Sparkles,
+  MousePointer2, ImagePlus, Save
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -363,6 +364,11 @@ export default function SiteBuilder() {
   const [cloning, setCloning] = useState(false);
   const [theme, setTheme] = useState("none");
   const [showCode, setShowCode] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [edited, setEdited] = useState(false);
+  const frameRef = useRef(null);
+  const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -381,7 +387,93 @@ export default function SiteBuilder() {
     } catch {}
   }, [files]);
 
-  const previewHtml = buildPreviewHtml(files);
+  const previewHtmlRaw = buildPreviewHtml(files);
+
+  const injectEditor = (html) => {
+    if (!html) return html;
+    const script = `<script>window.__keEdit=true;(function(){
+  var s=document.createElement('style');
+  s.textContent='.ke-edit-sel{outline:3px solid #2563eb !important;outline-offset:2px;border-radius:4px;cursor:pointer;} .ke-edit-sel:hover{outline-color:#7c3aed !important;}';
+  document.head.appendChild(s);
+  document.addEventListener('click', function(e){
+    if(!window.__keEdit) return;
+    e.preventDefault(); e.stopPropagation();
+    var old=document.querySelector('.ke-edit-sel');
+    if(old){ try{old.removeAttribute('contenteditable');}catch(_){}
+      if(old.tagName==='A'){ try{old.removeAttribute('href');}catch(_){} }
+      old.classList.remove('ke-edit-sel'); }
+    var el=e.target;
+    if(el===document.body||el===document.documentElement){ window.parent.postMessage({type:'ke-select',tag:'BODY',isImg:false},'*'); return; }
+    el.classList.add('ke-edit-sel');
+    el.setAttribute('contenteditable','true');
+    try{ el.focus(); }catch(_){}
+    window.parent.postMessage({type:'ke-select',tag:el.tagName,isImg:el.tagName==='IMG'},'*');
+  }, true);
+  document.addEventListener('input', function(){ if(window.__keEdit) window.parent.postMessage({type:'ke-change'},'*'); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ window.parent.postMessage({type:'ke-esc'},'*'); } });
+})();<\/script>`;
+    return html.replace(/<\/body>/i, script + "\n</body>");
+  };
+
+  const previewHtml = editMode ? injectEditor(previewHtmlRaw) : previewHtmlRaw;
+
+  useEffect(() => {
+    const handler = (e) => {
+      const d = e.data;
+      if (!d || typeof d !== "object" || !d.type) return;
+      if (d.type === "ke-select") setSelected({ tag: d.tag, isImg: !!d.isImg });
+      if (d.type === "ke-change") setEdited(true);
+      if (d.type === "ke-esc") setSelected(null);
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
+  const saveEdits = () => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    try {
+      const doc = frame.contentDocument;
+      if (!doc) throw new Error("documento indisponível");
+      const html = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
+      setFiles((prev) => ({ ...prev, "index.html": html }));
+      setEdited(false);
+      toast.success("Alterações salvas no projeto");
+    } catch (e) {
+      toast.error("Erro ao salvar: " + (e?.message || e));
+    }
+  };
+
+  const replaceImage = (file) => {
+    const frame = frameRef.current;
+    if (!frame || !selected?.isImg) { toast.error("Selecione uma imagem no site primeiro"); return; }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const el = frame.contentDocument?.querySelector(".ke-edit-sel");
+        if (!el) throw new Error("imagem não encontrada");
+        el.src = reader.result;
+        setEdited(true);
+        toast.success("Imagem trocada — clique em Salvar");
+      } catch (e) {
+        toast.error("Erro ao trocar imagem: " + (e?.message || e));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const downloadPage = () => {
+    if (!previewHtmlRaw) { toast.error("Nada para baixar"); return; }
+    const blob = new Blob([previewHtmlRaw], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "meu-site.html";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Página baixada (meu-site.html)");
+  };
   const fileList = Object.keys(files);
 
   const applyTheme = (themeId) => {
@@ -624,11 +716,14 @@ export default function SiteBuilder() {
           <div className="flex gap-2">
             {fileList.length > 0 && (
               <>
+                <Button size="sm" variant={editMode ? "default" : "outline"} onClick={() => setEditMode((v) => !v)}>
+                  <MousePointer2 className="w-3 h-3 mr-1" /> {editMode ? "Concluir Edição" : "Editar Site"}
+                </Button>
                 <Button size="sm" variant="outline" onClick={openInNewTab}>
                   <ExternalLink className="w-3 h-3 mr-1" /> Abrir
                 </Button>
-                <Button size="sm" variant="outline" onClick={downloadZip}>
-                  <Download className="w-3 h-3 mr-1" /> Download
+                <Button size="sm" variant="outline" onClick={downloadPage}>
+                  <Download className="w-3 h-3 mr-1" /> Baixar Página
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setShowCode((v) => !v)}>
                   <FileCode className="w-3 h-3 mr-1" /> {showCode ? "Ver Site" : "Ver Código"}
@@ -701,11 +796,29 @@ export default function SiteBuilder() {
 
         <div className="flex-1 min-h-0 hidden lg:grid lg:grid-cols-[minmax(300px,380px)_1fr] gap-3">
           <ChatPanel messages={messages} input={input} setInput={setInput} sending={sending} send={send} handleKeyDown={handleKeyDown} chatEndRef={chatEndRef} />
-          {showCode && fileList.length > 0 ? (
-            <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} />
-          ) : (
-            <PreviewPanel html={previewHtml} onOpen={openInNewTab} />
-          )}
+          <div className="flex flex-col gap-2 min-h-0">
+            {editMode && (
+              <div className="flex items-center gap-2 shrink-0 bg-card border rounded-lg px-3 py-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">
+                  {selected ? `Editando: ${selected.tag.toLowerCase()}` : "Clique em um elemento para editar o texto"}
+                </span>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { replaceImage(e.target.files?.[0]); e.target.value = ""; }} />
+                <div className="ml-auto flex gap-2">
+                  <Button size="sm" variant="outline" disabled={!selected?.isImg} onClick={() => fileInputRef.current?.click()}>
+                    <ImagePlus className="w-3 h-3 mr-1" /> Trocar Imagem
+                  </Button>
+                  <Button size="sm" disabled={!edited} onClick={saveEdits}>
+                    <Save className="w-3 h-3 mr-1" /> Salvar
+                  </Button>
+                </div>
+              </div>
+            )}
+            {showCode && fileList.length > 0 ? (
+              <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} />
+            ) : (
+              <PreviewPanel html={previewHtml} onOpen={openInNewTab} onFrameRef={(r) => { frameRef.current = r; }} />
+            )}
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 lg:hidden">
@@ -721,7 +834,24 @@ export default function SiteBuilder() {
               <ChatPanel messages={messages} input={input} setInput={setInput} sending={sending} send={send} handleKeyDown={handleKeyDown} chatEndRef={chatEndRef} fullHeight />
             </TabsContent>
             <TabsContent value="preview" className="flex-1 min-h-0 mt-2">
-              <PreviewPanel html={previewHtml} onOpen={openInNewTab} fullHeight />
+              <div className="h-full flex flex-col gap-2">
+                {editMode && (
+                  <div className="flex items-center gap-2 shrink-0 bg-card border rounded-lg px-3 py-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">
+                      {selected ? `Editando: ${selected.tag.toLowerCase()}` : "Clique em um elemento para editar"}
+                    </span>
+                    <div className="ml-auto flex gap-2">
+                      <Button size="sm" variant="outline" disabled={!selected?.isImg} onClick={() => fileInputRef.current?.click()}>
+                        <ImagePlus className="w-3 h-3 mr-1" /> Trocar Imagem
+                      </Button>
+                      <Button size="sm" disabled={!edited} onClick={saveEdits}>
+                        <Save className="w-3 h-3 mr-1" /> Salvar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <PreviewPanel html={previewHtml} onOpen={openInNewTab} onFrameRef={(r) => { frameRef.current = r; }} fullHeight />
+              </div>
             </TabsContent>
             <TabsContent value="editor" className="flex-1 min-h-0 mt-2">
               <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} fullHeight />
@@ -828,7 +958,7 @@ function EditorPanel({ files, activeFile, setActiveFile, deleteFile, fullHeight 
   );
 }
 
-function PreviewPanel({ html, onOpen, fullHeight }) {
+function PreviewPanel({ html, onOpen, onFrameRef, fullHeight }) {
   const frameRef = useRef(null);
 
   useEffect(() => {
@@ -838,6 +968,10 @@ function PreviewPanel({ html, onOpen, fullHeight }) {
       } catch {}
     }
   }, [html]);
+
+  useEffect(() => {
+    if (onFrameRef) onFrameRef(frameRef.current);
+  }, [onFrameRef]);
 
   return (
     <Card className={`flex flex-col ${fullHeight ? "h-full" : ""}`}>
