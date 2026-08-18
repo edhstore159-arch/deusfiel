@@ -14,19 +14,33 @@ import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "site-builder:state";
 
-const FCC_URL = import.meta.env.VITE_FCC_URL || "https://unabashed-vertical-crispness.ngrok-free.dev";
-const FCC_AUTH_TOKEN = import.meta.env.VITE_FCC_AUTH_TOKEN || "freecc";
 const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
-const ZEN_URL = "https://opencode.ai/zen";
-const ZEN_API_KEY = "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
-const ZEN_MODEL = "big-pickle";
 
-const SITE_SYSTEM_PROMPT = `Você é um construtor profissional de sites e aplicativos. 
-Gere código COMPLETO e funcional (HTML, CSS e JavaScript) em português do Brasil.
-Sempre que possível, entregue os arquivos em blocos de código com a linguagem marcada:
-\`\`\`html (index.html), \`\`\`css (styles.css), \`\`\`js (script.js) e \`\`\`js (app.js) para aplicativos.
-Sites responsivos, com boa aparência, cores harmoniosas e textos em português.
-Responda em português, com explicação curta antes do código.`;
+const SITE_SYSTEM_PROMPT = `Você é um construtor profissional de sites e aplicativos web.
+Sempre que receber um pedido, responda APENAS com o código completo e funcional do site, organizado em blocos com o nome do arquivo em um título (###) logo acima do bloco:
+
+### index.html
+\`\`\`html
+<!DOCTYPE html>
+...
+\`\`\`
+
+### styles.css
+\`\`\`css
+...
+\`\`\`
+
+### script.js
+\`\`\`js
+...
+\`\`\`
+
+REGRAS OBRIGATÓRIAS:
+- Todo site DEVE ter personalização visual: CSS completo (cores harmoniosas, tipografia agradável, layout moderno e responsivo, espaçamentos, bordas arredondadas, efeitos de hover).
+- Para aplicativos, use app.js com funções que interagem com a página.
+- Textos sempre em português do Brasil.
+- Nunca responda com texto corrido descrevendo o site: SEMPRE entregue o código completo em blocos.
+- Explicação: no máximo 1 linha curta antes dos blocos.`;
 
 const PROVIDERS = [
   { id: "fcc", label: "Claude FCC", desc: "Grátis via free-claude-code", color: "#d97706" },
@@ -36,8 +50,9 @@ const PROVIDERS = [
 async function callClaudeFCC(messages) {
   const { data, error } = await supabase.functions.invoke("fcc-proxy", {
     body: {
+      provider: "fcc",
       model: FCC_MODEL,
-      max_tokens: 4000,
+      max_tokens: 8000,
       system: SITE_SYSTEM_PROMPT,
       messages: messages.filter((m) => m.role !== "system"),
     },
@@ -52,23 +67,16 @@ async function callClaudeFCC(messages) {
 }
 
 async function callOpenCode(messages) {
-  const res = await fetch(`${ZEN_URL}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${ZEN_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: ZEN_MODEL,
+  const { data, error } = await supabase.functions.invoke("fcc-proxy", {
+    body: {
+      provider: "opencode",
+      max_tokens: 8000,
       messages: [{ role: "system", content: SITE_SYSTEM_PROMPT }, ...messages.filter((m) => m.role !== "system")],
-      max_tokens: 4000,
-    }),
+    },
   });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`OpenCode HTTP ${res.status}: ${errText.slice(0, 200)}`);
+  if (error) {
+    throw new Error(`OpenCode: ${error.message}`);
   }
-  const data = await res.json();
   const text = (data?.choices?.[0]?.message?.content || "").trim();
   if (!text) throw new Error("OpenCode retornou resposta vazia");
   return text;
@@ -76,37 +84,115 @@ async function callOpenCode(messages) {
 
 function parseFilesFromCode(text) {
   const files = {};
-  const blockRe = /```([a-zA-Z]+)?\s*\n([\s\S]*?)```/g;
-  let m;
   const order = [];
+
+  const assign = (name, code) => {
+    const clean = String(code || "").replace(/\n+$/, "").trim();
+    if (!clean) return;
+    if (!files[name]) {
+      files[name] = clean;
+      order.push(name);
+    }
+  };
+
+  const guessName = (lang) => {
+    if (!lang) return "";
+    const l = lang.toLowerCase();
+    if (l.includes("html")) return "index.html";
+    if (l.includes("css")) return "styles.css";
+    if (l.includes("js")) return order.includes("script.js") ? "app.js" : "script.js";
+    if (l.includes("ts")) return "app.js";
+    return "";
+  };
+
+  const nameFromHeader = (header) => {
+    const m = String(header || "").match(/(?:[a-zA-Z0-9_\-./]+\/)*([a-zA-Z0-9_\-]+\.(?:html?|css|js|ts))/i);
+    return m ? m[1].toLowerCase() : "";
+  };
+
+const blockRe = /```([a-zA-Z0-9_\-+]*)\s*\n([\s\S]*?)```/g;
+
+  let m;
   while ((m = blockRe.exec(text)) !== null) {
     const lang = (m[1] || "").toLowerCase();
-    const code = m[2].replace(/\n+$/, "");
+    const code = m[2];
+    const before = text.slice(0, m.index);
     let name = "";
-    if (lang === "html") name = "index.html";
-    else if (lang === "css") name = "styles.css";
-    else if (lang === "js" || lang === "javascript") name = order.includes("script.js") ? "app.js" : "script.js";
-    else if (lang === "ts" || lang === "typescript") name = "app.js";
-    else if (lang) name = `arquivo-${lang}.txt`;
+    let lastHeader = "";
+    const hRe = /^#{1,4}\s*(.+)$/gm;
+    let hh;
+    while ((hh = hRe.exec(before)) !== null) lastHeader = hh[1];
+    if (lastHeader) name = nameFromHeader(lastHeader);
+    if (!name && lang) name = guessName(lang);
+    if (!name && /<!DOCTYPE|^<html/i.test(code.trim())) name = "index.html";
     if (name) {
-      files[name] = code;
-      if (!order.includes(name)) order.push(name);
+      assign(name, code);
     }
   }
-  // Se não veio HTML e veio só um bloco de código sem linguagem, assume HTML
-  if (!files["index.html"] && !files["styles.css"] && !files["script.js"]) {
-    const bare = text.replace(/```[\s\S]*?```/g, "").trim();
-    if (bare) files["index.html"] = bare;
+
+  if (!files["index.html"]) {
+    const bareHtml = (text || "").replace(/```[\s\S]*?```/g, "");
+    if (/<!DOCTYPE/i.test(bareHtml) || /^<html[\s>]/i.test(bareHtml.trim())) {
+      assign("index.html", bareHtml);
+    }
   }
-  if (!files["index.html"] && Object.keys(files).length === 0) {
-    files["index.html"] = text;
+
+  if (Object.keys(files).length === 0) {
+    const bare = (text || "").replace(/```[\s\S]*?```/g, "").trim();
+    if (bare) {
+      assign("index.html", buildStyledFallback(bare));
+    }
   }
-  // Garante HTML inicial mínimo se só veio CSS/JS
+
   if (Object.keys(files).length > 0 && !files["index.html"]) {
-    files["index.html"] = "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Meu Site</title>\n</head>\n<body>\n</body>\n</html>";
+    assign("index.html", "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Meu Site</title>\n</head>\n<body>\n</body>\n</html>");
   }
+
   return files;
 }
+
+function buildStyledFallback(text) {
+  const lines = String(text || "").split("\n").filter((l) => l.trim());
+  const title = lines[0]?.replace(/^#+\s*/, "").trim() || "Meu Site";
+  const body = lines.slice(1).join("\n") || text;
+  const paragraphs = String(body)
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p>${p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`)
+    .join("\n");
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title}</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #1e3a5f 0%, #0f2b46 100%); min-height: 100vh; color: #eef4fb; line-height: 1.7; }
+main { max-width: 820px; margin: 0 auto; padding: 64px 24px; }
+h1 { font-size: 2.2rem; color: #ffd98a; margin-bottom: 24px; border-bottom: 2px solid #ffd98a55; padding-bottom: 16px; }
+p { margin-bottom: 16px; font-size: 1.05rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>${title}</h1>
+${paragraphs}
+</main>
+</body>
+</html>`;
+}
+
+const DEFAULT_CSS = `* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f4f6fa; color: #1f2937; line-height: 1.6; }
+h1, h2, h3 { color: #1e3a5f; line-height: 1.3; }
+button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 18px; font-size: 1rem; transition: all .2s; }
+a { color: #2563eb; text-decoration: none; }
+img { max-width: 100%; height: auto; }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+.card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.08); padding: 24px; }
+@media (max-width: 768px) { h1 { font-size: 1.7rem; } }`;
 
 function loadState() {
   try {
@@ -134,7 +220,7 @@ function buildPreviewHtml(files) {
     if (!html && !css && !js) return "";
 
     // Se já tem HTML completo com tudo inline, retorna direto
-    if (html && html.includes("<!DOCTYPE") && !css && !js) return html;
+    if (html && html.includes("<!DOCTYPE") && !css && !js && /<style/i.test(html)) return html;
 
     // Sempre monta um HTML completo e auto-contido
     const hasHead = /<head[\s>]/i.test(html);
@@ -186,6 +272,14 @@ ${css ? `<style>\n${css}\n</style>` : ""}
 ${js ? `<script>\n${js}\n</script>` : ""}
 </body>
 </html>`;
+    }
+
+    if (!/<style[\s>]/i.test(fullHtml) && !css) {
+      if (fullHtml.includes("</head>")) {
+        fullHtml = fullHtml.replace("</head>", `<style>\n${DEFAULT_CSS}\n</style>\n</head>`);
+      } else {
+        fullHtml = fullHtml.replace("<head", `<head\n<style>\n${DEFAULT_CSS}\n</style>`);
+      }
     }
 
     return fullHtml;
@@ -244,6 +338,23 @@ export default function SiteBuilder() {
   const previewHtml = buildPreviewHtml(files);
   const fileList = Object.keys(files);
 
+  const isRateLimit = (msg) => /429|rate limit|limite|FreeUsageLimit|Créditos|credits|payment/i.test(msg);
+
+  const callWithFallback = async (messages) => {
+    if (provider === "opencode") {
+      try {
+        return await callOpenCode(messages);
+      } catch (e) {
+        if (isRateLimit(String(e?.message || e))) {
+          toast.info("OpenCode com limite de uso — usando Claude FCC como alternativa");
+          return await callClaudeFCC(messages);
+        }
+        throw e;
+      }
+    }
+    return await callClaudeFCC(messages);
+  };
+
   const send = async () => {
     if (!input.trim() || sending) return;
     const userMsg = input.trim();
@@ -253,9 +364,7 @@ export default function SiteBuilder() {
 
     try {
       const history = messages.slice(-20).map((m) => ({ role: m.role, content: m.content }));
-      const aiText = provider === "opencode"
-        ? await callOpenCode(history.concat([{ role: "user", content: userMsg }]))
-        : await callClaudeFCC(history.concat([{ role: "user", content: userMsg }]));
+      const aiText = await callWithFallback(history.concat([{ role: "user", content: userMsg }]));
 
       const newFiles = parseFilesFromCode(aiText);
 
@@ -289,10 +398,8 @@ export default function SiteBuilder() {
     setSending(true);
     setMessages((prev) => [...prev, { role: "user", content: userPrompt + "\n\n[Gerar Tudo]" }]);
     try {
-      const fullPrompt = userPrompt + "\n\nGere o site COMPLETO em blocos: ```html (index.html), ```css (styles.css) e ```js (script.js). Para aplicativos: ```js (app.js). Não omita nenhum arquivo.";
-      const aiText = provider === "opencode"
-        ? await callOpenCode([{ role: "user", content: fullPrompt }])
-        : await callClaudeFCC([{ role: "user", content: fullPrompt }]);
+      const fullPrompt = userPrompt + "\n\nGere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
+      const aiText = await callWithFallback([{ role: "user", content: fullPrompt }]);
       const newFiles = parseFilesFromCode(aiText);
       if (Object.keys(newFiles).length === 0) {
         throw new Error("Nenhum arquivo reconhecido na resposta");
@@ -376,7 +483,7 @@ export default function SiteBuilder() {
         <div className="flex items-center justify-between shrink-0">
           <div>
             <h1 className="text-xl font-semibold flex items-center gap-2">
-              <Code2 className="w-5 h-5" /> Construtor de Sites
+              <Code2 className="w-5 h-5" /> Criação
             </h1>
             <p className="text-xs text-muted-foreground">
               Descreva o site que deseja e a IA gera o codigo para voce.

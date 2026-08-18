@@ -30,7 +30,7 @@ const NAV = [
   { to: "/app/agents", label: "Agentes IA", icon: Bot, testid: "nav-agents" },
   { to: "/app/dstboard", label: "Painel de Controle", icon: ClipboardCheck, testid: "nav-dstboard" },
   { to: "/app/document-builder", label: "Construtor de Documentos", icon: FileText, testid: "nav-document-builder" },
-  { to: "/app/site-builder", label: "Criar Sites e Apps", icon: Code2, testid: "nav-site-builder" },
+  { to: "/app/site-builder", label: "Criação", icon: Code2, testid: "nav-site-builder" },
   { to: "/app/legal-training", label: "Treinamento Jurídico", icon: GraduationCap, testid: "nav-legal-training" },
   { to: "/app/secretary-marketing", label: "Treinamento Secretária", icon: TrendingUp, testid: "nav-secretary-marketing" },
   
