@@ -124,8 +124,9 @@ Responda APENAS com o código completo e funcional do site, organizado em blocos
 - Explicação: no máximo 1 linha curta antes dos blocos.`;
 
 const PROVIDERS = [
-  { id: "fcc", label: "Claude FCC", desc: "Grátis via free-claude-code", color: "#d97706" },
   { id: "opencode", label: "OpenCode", desc: "Zen (gratuito)", color: "#2563eb" },
+  { id: "emergent", label: "Emergent", desc: "Claude Sonnet (grátis)", color: "#059669" },
+  { id: "fcc", label: "Claude FCC", desc: "free-claude-code", color: "#d97706" },
 ];
 
 const OPENCODE_MODELS = [
@@ -181,6 +182,28 @@ async function callOpenCode(messages, model) {
   }
   const text = (data?.choices?.[0]?.message?.content || data?.content?.[0]?.text || "").trim();
   if (!text) throw new Error("OpenCode retornou resposta vazia");
+  return text;
+}
+
+async function callEmergent(messages, model) {
+  const { data, error } = await supabase.functions.invoke("fcc-proxy", {
+    timeout: 300000,
+    body: {
+      provider: "emergent",
+      model: model || "anthropic/claude-sonnet-4-20250514",
+      max_tokens: 8000,
+      system: SITE_SYSTEM_PROMPT,
+      messages: messages.filter((m) => m.role !== "system"),
+    },
+  });
+  if (data?.error) {
+    throw new Error(`Emergent: ${data.error}`);
+  }
+  if (error) {
+    throw new Error(`Emergent: ${error.message}`);
+  }
+  const text = (data?.choices?.[0]?.message?.content || data?.content?.[0]?.text || "").trim();
+  if (!text) throw new Error("Emergent retornou resposta vazia");
   return text;
 }
 
@@ -1027,30 +1050,29 @@ export default function SiteBuilder() {
   const isRateLimit = (msg) => /429|rate limit|limite|FreeUsageLimit|Créditos|credits|payment|quota|exceeded|too many|402/i.test(msg);
 
   const callWithFallback = async (messages) => {
-    if (provider === "opencode") {
+    const tryAll = async (primary, primaryLabel, primaryFn) => {
       try {
-        return await callOpenCode(messages, openCodeModel);
+        return await primaryFn();
       } catch (e) {
         const msg = String(e?.message || e);
-        try {
-          toast.info("OpenCode indisponível — usando Claude FCC como alternativa");
-          return await callClaudeFCC(messages);
-        } catch (fccErr) {
-          throw new Error(`OpenCode: ${msg} | Claude FCC: ${String(fccErr?.message || fccErr)}`);
+        const fallbacks = [
+          { label: "Emergent", fn: () => callEmergent(messages) },
+          { label: "OpenCode", fn: () => callOpenCode(messages, openCodeModel) },
+          { label: "Claude FCC", fn: () => callClaudeFCC(messages) },
+        ].filter((f) => f.label !== primaryLabel);
+        for (const fb of fallbacks) {
+          try {
+            toast.info(`${primaryLabel} indisponível — tentando ${fb.label}`);
+            return await fb.fn();
+          } catch {}
         }
+        throw new Error(`${primaryLabel}: ${msg} (todos os providers falharam)`);
       }
-    }
-    try {
-      return await callClaudeFCC(messages);
-    } catch (e) {
-      const msg = String(e?.message || e);
-      try {
-        toast.info("Claude FCC indisponível — usando OpenCode como alternativa");
-        return await callOpenCode(messages, openCodeModel);
-      } catch (ocErr) {
-        throw new Error(`Claude FCC: ${msg} | OpenCode: ${String(ocErr?.message || ocErr)}`);
-      }
-    }
+    };
+
+    if (provider === "opencode") return tryAll(provider, "OpenCode", () => callOpenCode(messages, openCodeModel));
+    if (provider === "emergent") return tryAll(provider, "Emergent", () => callEmergent(messages));
+    return tryAll(provider, "Claude FCC", () => callClaudeFCC(messages));
   };
 
   const fetchDesignRef = async (text) => {

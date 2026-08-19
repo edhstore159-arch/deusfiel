@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const provider = body.provider === "opencode" ? "opencode" : "fcc";
+    const provider = body.provider || "fcc";
 
     if (provider === "opencode") {
       const zenUrl = Deno.env.get("ZEN_URL") || "https://opencode.ai/zen/v1/chat/completions";
@@ -54,9 +54,44 @@ Deno.serve(async (req) => {
       });
     }
 
-    const fccUrl = Deno.env.get("FCC_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev";
+    if (provider === "emergent") {
+      const emUrl = Deno.env.get("EMERGENT_URL") || "https://integrations.emergentagent.com/llm";
+      const emKey = Deno.env.get("EMERGENT_API_KEY") || "";
+      const emModel = body.model || "anthropic/claude-sonnet-4-20250514";
+      const userMessages = Array.isArray(body.messages) ? body.messages : [];
+      const systemPrompt = body.system || "";
+      const messages = systemPrompt
+        ? [{ role: "system", content: systemPrompt }, ...userMessages]
+        : userMessages;
+      const emRes = await fetch(emUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${emKey}`,
+        },
+        body: JSON.stringify({
+          model: emModel,
+          max_tokens: body.max_tokens || 8000,
+          messages,
+        }),
+      });
+      const emData = await emRes.json().catch(() => null);
+      if (!emRes.ok || emData?.error) {
+        const errMsg = emData?.error?.message || emData?.error || `HTTP ${emRes.status}`;
+        return new Response(JSON.stringify({ error: `Emergent: ${errMsg}` }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify(emData), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const fccUrl = Deno.env.get("FCC_URL") || "https://fcc-server.onrender.com";
     const fccToken = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-    const fccModel = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
+    const fccModel = Deno.env.get("FCC_MODEL") || "claude-3-5-sonnet-20241022";
 
     const res = await fetch(`${fccUrl}/v1/messages?beta=true`, {
       method: "POST",
