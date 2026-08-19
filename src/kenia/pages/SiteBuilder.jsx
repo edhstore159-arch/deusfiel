@@ -128,6 +128,14 @@ const PROVIDERS = [
   { id: "opencode", label: "OpenCode", desc: "Zen (gratuito)", color: "#2563eb" },
 ];
 
+const OPENCODE_MODELS = [
+  { id: "big-pickle", label: "Big Pickle", desc: "Padrão" },
+  { id: "gpt-4o", label: "GPT-4o", desc: "OpenAI" },
+  { id: "gpt-4o-mini", label: "GPT-4o Mini", desc: "Rápido" },
+  { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", desc: "Anthropic" },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "Google" },
+];
+
 async function callClaudeFCC(messages) {
   const { data, error } = await supabase.functions.invoke("fcc-proxy", {
     timeout: 300000,
@@ -154,13 +162,15 @@ async function callClaudeFCC(messages) {
 }
 
 
-async function callOpenCode(messages) {
+async function callOpenCode(messages, model) {
   const { data, error } = await supabase.functions.invoke("fcc-proxy", {
     timeout: 300000,
     body: {
       provider: "opencode",
+      model: model || undefined,
       max_tokens: 8000,
-      messages: [{ role: "system", content: SITE_SYSTEM_PROMPT }, ...messages.filter((m) => m.role !== "system")],
+      system: SITE_SYSTEM_PROMPT,
+      messages: messages.filter((m) => m.role !== "system"),
     },
   });
   if (data?.error) {
@@ -169,7 +179,7 @@ async function callOpenCode(messages) {
   if (error) {
     throw new Error(`OpenCode: ${error.message}`);
   }
-  const text = (data?.choices?.[0]?.message?.content || "").trim();
+  const text = (data?.choices?.[0]?.message?.content || data?.content?.[0]?.text || "").trim();
   if (!text) throw new Error("OpenCode retornou resposta vazia");
   return text;
 }
@@ -592,6 +602,7 @@ export default function SiteBuilder() {
   const [activeFile, setActiveFile] = useState(saved.activeFile || "");
   const [mobileTab, setMobileTab] = useState("chat");
   const [provider, setProvider] = useState("fcc");
+  const [openCodeModel, setOpenCodeModel] = useState("big-pickle");
   const [cloneUrl, setCloneUrl] = useState("");
   const [cloning, setCloning] = useState(false);
   const [theme, setTheme] = useState("none");
@@ -1018,7 +1029,7 @@ export default function SiteBuilder() {
   const callWithFallback = async (messages) => {
     if (provider === "opencode") {
       try {
-        return await callOpenCode(messages);
+        return await callOpenCode(messages, openCodeModel);
       } catch (e) {
         const msg = String(e?.message || e);
         try {
@@ -1251,6 +1262,26 @@ export default function SiteBuilder() {
               </Button>
             ))}
           </div>
+          {provider === "opencode" && (
+            <>
+              <span className="text-muted-foreground shrink-0">|</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-xs font-medium text-muted-foreground">Modelo:</span>
+                {OPENCODE_MODELS.map((m) => (
+                  <Button
+                    key={m.id}
+                    size="sm"
+                    variant={openCodeModel === m.id ? "default" : "outline"}
+                    onClick={() => setOpenCodeModel(m.id)}
+                    title={m.desc}
+                    className="h-8"
+                  >
+                    {m.label}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
           <span className="text-muted-foreground shrink-0">|</span>
           <div className="flex items-center gap-1 shrink-0">
             <span className="text-xs font-medium text-muted-foreground">Tema:</span>

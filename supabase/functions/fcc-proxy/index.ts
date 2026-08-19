@@ -23,6 +23,11 @@ Deno.serve(async (req) => {
       const zenUrl = Deno.env.get("ZEN_URL") || "https://opencode.ai/zen/v1/chat/completions";
       const zenKey = Deno.env.get("ZEN_API_KEY") || "";
       const zenModel = Deno.env.get("ZEN_MODEL") || "big-pickle";
+      const userMessages = Array.isArray(body.messages) ? body.messages : [];
+      const systemPrompt = body.system || "";
+      const messages = systemPrompt
+        ? [{ role: "system", content: systemPrompt }, ...userMessages]
+        : userMessages;
       const zenRes = await fetch(zenUrl, {
         method: "POST",
         headers: {
@@ -32,17 +37,18 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: body.model || zenModel,
           max_tokens: body.max_tokens || 8000,
-          messages: Array.isArray(body.messages) ? body.messages : [],
+          messages,
         }),
       });
-      const zenText = await zenRes.text();
-      if (!zenRes.ok) {
-        return new Response(JSON.stringify({ error: `OpenCode HTTP ${zenRes.status}: ${zenText.slice(0, 300)}` }), {
+      const zenData = await zenRes.json().catch(() => null);
+      if (!zenRes.ok || zenData?.error) {
+        const errMsg = zenData?.error?.message || zenData?.error || `HTTP ${zenRes.status}`;
+        return new Response(JSON.stringify({ error: `OpenCode: ${errMsg}` }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return new Response(zenText, {
+      return new Response(JSON.stringify(zenData), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -52,7 +58,7 @@ Deno.serve(async (req) => {
     const fccToken = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
     const fccModel = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
 
-    const res = await fetch(`${fccUrl}/v1/messages`, {
+    const res = await fetch(`${fccUrl}/v1/messages?beta=true`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
