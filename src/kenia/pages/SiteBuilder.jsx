@@ -1246,7 +1246,7 @@ function PreviewPanel({ html, onOpen, onFrameRef, fullHeight, editMode }) {
   const frameRef = useRef(null);
   const wrapRef = useRef(null);
   const [dims, setDims] = useState(null);
-  const [zoomMode, setZoomMode] = useState("fit");
+  const [zoomMode, setZoomMode] = useState("page");
   const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
@@ -1277,7 +1277,11 @@ function PreviewPanel({ html, onOpen, onFrameRef, fullHeight, editMode }) {
   };
 
   const wrapW = wrapRef.current?.clientWidth || 0;
-  const scale = zoomMode === "fit" && dims && wrapW > 0 ? Math.min(1, wrapW / dims.w) : zoom;
+  const wrapH = wrapRef.current?.clientHeight || 0;
+  const scale =
+    zoomMode === "fit" && dims && wrapW > 0 ? Math.min(1, wrapW / dims.w)
+    : zoomMode === "page" && dims && wrapW > 0 && wrapH > 0 ? Math.min(1, wrapW / dims.w, wrapH / dims.h)
+    : zoom;
   const scaledW = dims ? Math.max(dims.w * scale, wrapW || 0) : wrapW || "100%";
   const scaledH = dims ? dims.h * scale : 0;
 
@@ -1289,6 +1293,9 @@ function PreviewPanel({ html, onOpen, onFrameRef, fullHeight, editMode }) {
         {editMode && <Badge variant="secondary" className="ml-1 text-[10px]">toque em um elemento para editar</Badge>}
         {dims && (
           <div className="flex items-center gap-1 ml-auto">
+            <Button size="sm" variant={zoomMode === "page" ? "default" : "outline"} className="h-6 px-2" onClick={() => setZoomMode("page")}>
+              Completa
+            </Button>
             <Button size="sm" variant={zoomMode === "fit" ? "default" : "outline"} className="h-6 px-2" onClick={() => setZoomMode("fit")}>
               Página inteira
             </Button>

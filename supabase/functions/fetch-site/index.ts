@@ -6,6 +6,8 @@ const corsHeaders = {
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
+const imgMap = new Map();
+
 function rewriteRelative(html, base) {
   const attrs = ["src", "href", "srcset", "poster", "data-src", "data-bg", "action", "data-original"];
   let out = html;
@@ -17,6 +19,94 @@ function rewriteRelative(html, base) {
     });
   }
   return out;
+}
+
+function collectImageUrls(html, css, seen) {
+  const urls = [];
+  const add = (u) => {
+    if (!/^https?:/i.test(u)) return;
+    if (!seen.has(u)) { seen.add(u); urls.push(u); }
+  };
+  const attrRe = /(src|poster|data-src|data-bg)=["']([^"']+)["']/gi;
+  let m;
+  while ((m = attrRe.exec(html)) !== null) add(m[2]);
+  const srcsetRe = /srcset=["']([^"']+)["']/gi;
+  while ((m = srcsetRe.exec(html)) !== null) {
+    for (const part of m[1].split(",")) {
+      const u = part.trim().split(/\s+/)[0];
+      add(u);
+    }
+  }
+  const styleRe = /style=["'][^"']*url\((["']?)([^)"']+)\1\)/gi;
+  while ((m = styleRe.exec(html)) !== null) add(m[2].trim());
+  const cssRe = /url\((["']?)([^)"']+)\1\)/gi;
+  while ((m = cssRe.exec(css)) !== null) add(m[2].trim());
+  return urls;
+}
+
+async function downloadImages(urls) {
+  const results = [];
+  const batch = 5;
+  for (let i = 0; i < urls.length; i += batch) {
+    const chunk = urls.slice(i, i + batch);
+    const done = await Promise.all(chunk.map(async (u) => {
+      try {
+        const r = await fetch(u, {
+          headers: { "User-Agent": UA, "Referer": "https://www.google.com/", "Accept": "image/*,*/*;q=0.8" },
+          signal: AbortSignal.timeout(6000),
+        });
+        if (!r.ok) return null;
+        const buf = await r.arrayBuffer();
+        if (!buf.byteLength || buf.byteLength > 700000) return null;
+        const ct = r.headers.get("content-type") || "image/jpeg";
+        const bytes = new Uint8Array(buf);
+        let bin = "";
+        const CH = 0x8000;
+        for (let j = 0; j < bytes.length; j += CH) bin += String.fromCharCode(...bytes.subarray(j, j + CH));
+        return { u, data: `data:${ct};base64,${btoa(bin)}` };
+      } catch {
+        return null;
+      }
+    }));
+    for (const d of done) if (d) results.push(d);
+  }
+  for (const d of results) imgMap.set(d.u, d.data);
+  return results.length;
+}
+
+function inlineImages(html, css) {
+  let out = html;
+  out = out.replace(/(src|poster|data-src|data-bg)=["']([^"']+)["']/gi, (m, attr, val) =>
+    imgMap.has(val) ? `${attr}="${imgMap.get(val)}"` : m);
+  out = out.replace(/srcset=["'][^"']*["']/gi, (m) => {
+    const val = m.slice(8, -1);
+    let replaced = false;
+    const parts = val.split(",").map((p) => p.trim());
+    const newParts = parts.map((p) => {
+      const sp = p.split(/\s+/);
+      if (imgMap.has(sp[0])) { replaced = true; return `${imgMap.get(sp[0])} ${sp.slice(1).join(" ")}`.trim(); }
+      return p;
+    });
+    return replaced ? `srcset="${newParts.join(", ")}"` : m;
+  });
+  out = out.replace(/(style=["'])([^"']*)(["'])/gi, (m, pre, style, post) => {
+    if (!/url\(/i.test(style)) return m;
+    let changed = false;
+    const ns = style.replace(/url\((["']?)([^)"']+)\1\)/gi, (u, q, url) => {
+      const uu = url.trim();
+      if (imgMap.has(uu)) { changed = true; return `url(${q}${imgMap.get(uu)}${q})`; }
+      return u;
+    });
+    return changed ? pre + ns + post : m;
+  });
+  let ncss = css;
+  if (css && /url\(/i.test(css)) {
+    ncss = css.replace(/url\((["']?)([^)"']+)\1\)/gi, (u, q, url) => {
+      const uu = url.trim();
+      return imgMap.has(uu) ? `url(${q}${imgMap.get(uu)}${q})` : u;
+    });
+  }
+  return { html: out, css: ncss };
 }
 
 async function fetchPage(url) {
@@ -77,6 +167,13 @@ async function fetchPage(url) {
       // mantém o script original
     }
   }
+
+  const seen = new Set();
+  const urls = collectImageUrls(html, css, seen);
+  if (urls.length > 0) await downloadImages(urls);
+  const inlined = inlineImages(html, css);
+  html = inlined.html;
+  css = inlined.css;
 
   if (!/<base[^>]*>/i.test(html)) {
     html = html.replace(/<head([^>]*)>/i, `<head$1>\n<base href="${base}">`);
