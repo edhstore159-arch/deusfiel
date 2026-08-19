@@ -18,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 const STORAGE_KEY = "site-builder:state";
 
 const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
-const FCC_DIRECT_URL = import.meta.env.VITE_FCC_URL || "https://unabashed-vertical-crispness.ngrok-free.dev";
+const FCC_DIRECT_URL = import.meta.env.VITE_FCC_URL || "https://fcc-server.onrender.com";
 
 const SITE_SYSTEM_PROMPT = `# SISTEMA DE GERAÇÃO DE SITES PROFISSIONAIS
 
@@ -129,29 +129,21 @@ const PROVIDERS = [
 ];
 
 async function callClaudeFCC(messages) {
-  const res = await fetch(`${FCC_DIRECT_URL}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": "freecc",
-      "Authorization": "Bearer freecc",
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
+  const { data, error } = await supabase.functions.invoke("fcc-proxy", {
+    timeout: 300000,
+    body: {
+      provider: "fcc",
       model: FCC_MODEL,
       max_tokens: 8000,
       system: SITE_SYSTEM_PROMPT,
       messages: messages.filter((m) => m.role !== "system"),
-    }),
+    },
   });
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error(`Claude FCC: HTTP ${res.status} (resposta inválida)`);
+  if (data?.error) {
+    throw new Error(`Claude FCC: ${data.error}`);
   }
-  if (!res.ok || data?.error) {
-    throw new Error(`Claude FCC: ${data?.error || `HTTP ${res.status}`}`);
+  if (error) {
+    throw new Error(`Claude FCC: ${error.message}`);
   }
   const blocks = (data?.content || []);
   const textBlocks = blocks.filter((b) => b.type === "text").map((b) => b.text || "").join("\n").trim();
@@ -160,6 +152,7 @@ async function callClaudeFCC(messages) {
   if (!text) throw new Error("Claude FCC retornou resposta vazia");
   return text;
 }
+
 
 async function callOpenCode(messages) {
   const { data, error } = await supabase.functions.invoke("fcc-proxy", {
