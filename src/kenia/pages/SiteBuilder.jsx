@@ -10,7 +10,7 @@ import {
   Send, Loader2, Code2, Eye, FileCode, Download,
   MessageSquare, FolderTree, ExternalLink, Trash2, Copy, Sparkles,
   MousePointer2, ImagePlus, Save, Globe, Wrench, Bold, Italic,
-  AlignLeft, AlignCenter, AlignRight, Undo2, Eraser
+  AlignLeft, AlignCenter, AlignRight, Undo2, Eraser, AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -389,12 +389,23 @@ export default function SiteBuilder() {
   const [undoStack, setUndoStack] = useState([]);
   const [publishUrl, setPublishUrl] = useState("");
   const [leftTab, setLeftTab] = useState("chat");
+  const [saveWarning, setSaveWarning] = useState(false);
   const frameRef = useRef(null);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, files, activeFile })); } catch {}
+    try {
+      const payload = JSON.stringify({ messages, files, activeFile });
+      if (payload.length > 3500000) {
+        setSaveWarning(true);
+      } else {
+        localStorage.setItem(STORAGE_KEY, payload);
+        setSaveWarning(false);
+      }
+    } catch {
+      setSaveWarning(true);
+    }
   }, [messages, files, activeFile]);
 
   useEffect(() => {
@@ -920,6 +931,13 @@ export default function SiteBuilder() {
             </Button>
           </div>
         </div>
+
+        {saveWarning && (
+          <div className="flex items-center gap-2 shrink-0 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 text-xs">
+            <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+            <span className="text-amber-700">Projeto muito grande para salvar automaticamente — use Baixar Página ou Publicar para não perder o trabalho.</span>
+          </div>
+        )}
 
         {publishUrl && (
           <div className="flex items-center gap-2 shrink-0 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 text-xs">
