@@ -409,6 +409,7 @@ export default function SiteBuilder() {
     } catch {}
   }, [files]);
 
+  const fileList = Object.keys(files);
   const htmlPages = fileList.filter((f) => f.endsWith(".html"));
   const previewHtmlRaw = buildPreviewHtml(files, activeFile);
 
@@ -567,8 +568,6 @@ export default function SiteBuilder() {
       toast.error("Erro ao publicar: " + (e?.message || e));
     }
   };
-  const fileList = Object.keys(files);
-
   const applyTheme = (themeId) => {
     setTheme(themeId);
     const t = THEMES.find((x) => x.id === themeId);
