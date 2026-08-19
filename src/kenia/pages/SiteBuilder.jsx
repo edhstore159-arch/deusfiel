@@ -53,7 +53,7 @@ REGRAS OBRIGATÓRIAS:
 - Todo site DEVE ter personalização visual: CSS completo (cores harmoniosas, tipografia agradável, layout moderno e responsivo, espaçamentos, bordas arredondadas, efeitos de hover).
 - Para aplicativos, use app.js com funções que interagem com a página.
 - Textos sempre em português do Brasil.
-- Use SEMPRE imagens reais com URL completa (ex.: https://picsum.photos/800/600 ou https://images.unsplash.com/...). NUNCA use caminhos relativos para imagens.
+- Use SEMPRE imagens reais com URL completa do serviço https://picsum.photos (ex.: https://picsum.photos/seed/empresa/800/600 ou https://picsum.photos/800/600). NUNCA use caminhos relativos, "imagem.jpg" ou placeholders vazios para imagens.
 - Nunca responda com texto corrido descrevendo o site: SEMPRE entregue o código completo em blocos.
 - Explicação: no máximo 1 linha curta antes dos blocos.`;
 
@@ -227,66 +227,61 @@ nav a:hover, header a:hover { background: rgba(37,99,235,.08); }
 .hero, section > * { animation: fadeUp .6s ease both; }
 @media (max-width: 768px) { section { padding: 56px 18px; } .hero { min-height: auto; padding: 64px 20px; } }`;
 
+const stripThemeBlock = (css) => {
+  const idx = String(css || "").indexOf("/* TEMA:");
+  return idx === -1 ? css : String(css).slice(0, idx).trim();
+};
+
 const THEMES = [
   { id: "none", label: "Sem tema" },
-  { id: "moderno", label: "Moderno", css: `:root { --accent: #2563eb; --accent2: #7c3aed; --bg: #f8fafc; }
-body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; background: var(--bg); }
-h1, h2, h3 { font-weight: 800; letter-spacing: -0.03em; }
-h1 { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-button, .btn, [class*="button"] { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff !important; border-radius: 999px; box-shadow: 0 8px 24px rgba(37,99,235,.3); transition: all .25s ease; }
-button:hover, .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(37,99,235,.45); }
-.card, [class*="card"] { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 20px rgba(2,6,23,.06); transition: all .3s ease; }
-.card:hover, [class*="card"]:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(2,6,23,.12); }
-nav, header { background: rgba(255,255,255,.8); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(226,232,240,.7); }
-a { color: var(--accent); }` },
-  { id: "elegante", label: "Elegante", css: `:root { --accent: #8a5a2b; --accent2: #d4af7a; }
-body { font-family: Georgia, 'Times New Roman', serif; background: #faf6ef; color: #3b2f22; }
-h1, h2, h3 { font-family: Georgia, serif; font-weight: 400; letter-spacing: .02em; color: #5c3d1e; }
-h1 { border-bottom: 1px solid #d4af7a; padding-bottom: .4em; }
-button, .btn { background: #5c3d1e; color: #f5e9d5 !important; border-radius: 2px; letter-spacing: .08em; text-transform: uppercase; font-size: .85rem; }
-.card, [class*="card"] { background: #fffdf8; border: 1px solid #e4d5bb; border-radius: 4px; box-shadow: 0 2px 12px rgba(92,61,30,.08); }
-a { color: #8a5a2b; text-decoration: underline; }` },
-  { id: "vibrante", label: "Vibrante", css: `:root { --accent: #f43f5e; --accent2: #f59e0b; }
-body { font-family: 'Poppins', 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: #fef9e7; }
-h1, h2, h3 { font-weight: 800; color: #fbbf24; text-shadow: 0 2px 20px rgba(244,63,94,.5); }
-button, .btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff !important; font-weight: 700; border-radius: 999px; box-shadow: 0 10px 30px rgba(244,63,94,.45); }
-button:hover, .btn:hover { filter: brightness(1.1); transform: scale(1.03); }
-.card, [class*="card"] { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); border-radius: 20px; backdrop-filter: blur(8px); }
-nav, header { background: rgba(30,27,75,.7); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.1); }
-a { color: #fbbf24; }` },
-  { id: "luxo", label: "Luxo", css: `:root { --accent: #b08d3e; --accent2: #f3e5b8; }
-body { font-family: 'Playfair Display', Georgia, serif; background: #0d0d0d; color: #e8e0ce; }
-h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; color: #d4af37; letter-spacing: .05em; }
-h1 { text-shadow: 0 0 40px rgba(212,175,55,.35); }
-button, .btn { background: linear-gradient(135deg, #b08d3e, #d4af37); color: #0d0d0d !important; border-radius: 0; letter-spacing: .1em; text-transform: uppercase; font-family: 'Segoe UI', sans-serif; font-weight: 600; }
-.card, [class*="card"] { background: linear-gradient(160deg, #161616, #1f1f1f); border: 1px solid #b08d3e55; border-radius: 8px; box-shadow: 0 8px 40px rgba(212,175,55,.12); }
-nav, header { background: rgba(13,13,13,.8); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(212,175,55,.2); }
-a { color: #d4af37; }` },
-  { id: "minimalista", label: "Minimalista", css: `:root { --accent: #111827; }
-body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #ffffff; color: #111827; }
-h1, h2, h3 { font-weight: 300; letter-spacing: .06em; color: #111827; }
-h1 { text-transform: uppercase; }
-button, .btn { background: #111827; color: #fff !important; border-radius: 0; font-weight: 400; letter-spacing: .1em; text-transform: uppercase; }
-.card, [class*="card"] { background: #fff; border: 1px solid #e5e5e5; border-radius: 0; box-shadow: none; }
-a { color: #111827; border-bottom: 1px solid #111827; }` },
-  { id: "neon", label: "Neon", css: `:root { --accent: #22d3ee; --accent2: #a855f7; }
-body { font-family: 'Inter', 'Segoe UI', sans-serif; background: #05060f; color: #e2e8f0; }
-h1, h2, h3 { font-weight: 900; letter-spacing: -0.02em; color: #f1f5f9; }
-h1 { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 60px rgba(34,211,238,.25); }
-button, .btn { background: transparent; border: 1px solid var(--accent); color: var(--accent) !important; border-radius: 10px; box-shadow: 0 0 20px rgba(34,211,238,.35), inset 0 0 12px rgba(34,211,238,.15); text-transform: uppercase; letter-spacing: .08em; font-size: .85rem; }
-button:hover, .btn:hover { background: rgba(34,211,238,.12); box-shadow: 0 0 32px rgba(34,211,238,.6); }
-.card, [class*="card"] { background: rgba(255,255,255,.04); border: 1px solid rgba(34,211,238,.25); border-radius: 14px; backdrop-filter: blur(10px); box-shadow: 0 0 24px rgba(34,211,238,.08); }
-nav, header { background: rgba(5,6,15,.75); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(34,211,238,.2); }
-a { color: var(--accent); }` },
-  { id: "saude", label: "Bem-estar", css: `:root { --accent: #059669; --accent2: #34d399; }
-body { font-family: 'Inter', 'Segoe UI', sans-serif; background: #f0fdf4; color: #14532d; }
-h1, h2, h3 { font-weight: 800; letter-spacing: -0.02em; color: #064e3b; }
-h1 { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-button, .btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff !important; border-radius: 999px; box-shadow: 0 8px 24px rgba(5,150,105,.3); }
-button:hover, .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(5,150,105,.45); }
-.card, [class*="card"] { background: #ffffff; border: 1px solid #d1fae5; border-radius: 20px; box-shadow: 0 4px 20px rgba(5,150,105,.08); }
-nav, header { background: rgba(240,253,244,.8); backdrop-filter: blur(14px); border-bottom: 1px solid #d1fae5; }
-a { color: var(--accent); }` },
+  { id: "moderno", label: "Moderno", css: `body { background: #f8fafc !important; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif !important; color: #0f172a !important; }
+h1, h2, h3 { font-weight: 800 !important; letter-spacing: -0.03em !important; color: #0f172a !important; }
+h1 { background: linear-gradient(135deg, #2563eb, #7c3aed) !important; -webkit-background-clip: text !important; background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+button, .btn, [class*="button"] { background: linear-gradient(135deg, #2563eb, #7c3aed) !important; color: #fff !important; border-radius: 999px !important; box-shadow: 0 8px 24px rgba(37,99,235,.35) !important; border: none !important; }
+.card, [class*="card"] { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 16px !important; box-shadow: 0 4px 20px rgba(2,6,23,.08) !important; }
+nav, header { background: rgba(255,255,255,.85) !important; backdrop-filter: blur(14px) !important; -webkit-backdrop-filter: blur(14px) !important; border-bottom: 1px solid rgba(226,232,240,.7) !important; }
+a { color: #2563eb !important; }` },
+  { id: "elegante", label: "Elegante", css: `body { background: #faf6ef !important; font-family: Georgia, 'Times New Roman', serif !important; color: #3b2f22 !important; }
+h1, h2, h3 { font-family: Georgia, serif !important; font-weight: 400 !important; letter-spacing: .02em !important; color: #5c3d1e !important; }
+h1 { border-bottom: 1px solid #d4af7a !important; padding-bottom: .4em !important; }
+button, .btn, [class*="button"] { background: #5c3d1e !important; color: #f5e9d5 !important; border-radius: 2px !important; letter-spacing: .08em !important; text-transform: uppercase !important; font-size: .85rem !important; border: none !important; }
+.card, [class*="card"] { background: #fffdf8 !important; border: 1px solid #e4d5bb !important; border-radius: 4px !important; box-shadow: 0 2px 12px rgba(92,61,30,.08) !important; }
+nav, header { background: rgba(250,246,239,.9) !important; backdrop-filter: blur(10px) !important; border-bottom: 1px solid #e4d5bb !important; }
+a { color: #8a5a2b !important; text-decoration: underline !important; }` },
+  { id: "vibrante", label: "Vibrante", css: `body { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%) !important; font-family: 'Poppins', 'Segoe UI', sans-serif !important; color: #fef9e7 !important; }
+h1, h2, h3 { font-weight: 800 !important; color: #fbbf24 !important; text-shadow: 0 2px 20px rgba(244,63,94,.5) !important; }
+button, .btn, [class*="button"] { background: linear-gradient(135deg, #f43f5e, #f59e0b) !important; color: #fff !important; font-weight: 700 !important; border-radius: 999px !important; box-shadow: 0 10px 30px rgba(244,63,94,.45) !important; border: none !important; }
+.card, [class*="card"] { background: rgba(255,255,255,.08) !important; border: 1px solid rgba(255,255,255,.15) !important; border-radius: 20px !important; backdrop-filter: blur(8px) !important; }
+nav, header { background: rgba(30,27,75,.7) !important; backdrop-filter: blur(14px) !important; border-bottom: 1px solid rgba(255,255,255,.1) !important; }
+a { color: #fbbf24 !important; }` },
+  { id: "luxo", label: "Luxo", css: `body { background: #0d0d0d !important; font-family: 'Playfair Display', Georgia, serif !important; color: #e8e0ce !important; }
+h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif !important; color: #d4af37 !important; letter-spacing: .05em !important; }
+h1 { text-shadow: 0 0 40px rgba(212,175,55,.35) !important; }
+button, .btn, [class*="button"] { background: linear-gradient(135deg, #b08d3e, #d4af37) !important; color: #0d0d0d !important; border-radius: 0 !important; letter-spacing: .1em !important; text-transform: uppercase !important; font-family: 'Segoe UI', sans-serif !important; font-weight: 600 !important; border: none !important; }
+.card, [class*="card"] { background: linear-gradient(160deg, #161616, #1f1f1f) !important; border: 1px solid #b08d3e55 !important; border-radius: 8px !important; box-shadow: 0 8px 40px rgba(212,175,55,.12) !important; }
+nav, header { background: rgba(13,13,13,.8) !important; backdrop-filter: blur(14px) !important; border-bottom: 1px solid rgba(212,175,55,.2) !important; }
+a { color: #d4af37 !important; }` },
+  { id: "minimalista", label: "Minimalista", css: `body { background: #ffffff !important; font-family: 'Helvetica Neue', Arial, sans-serif !important; color: #111827 !important; }
+h1, h2, h3 { font-weight: 300 !important; letter-spacing: .06em !important; color: #111827 !important; }
+h1 { text-transform: uppercase !important; }
+button, .btn, [class*="button"] { background: #111827 !important; color: #fff !important; border-radius: 0 !important; font-weight: 400 !important; letter-spacing: .1em !important; text-transform: uppercase !important; border: none !important; }
+.card, [class*="card"] { background: #fff !important; border: 1px solid #e5e5e5 !important; border-radius: 0 !important; box-shadow: none !important; }
+nav, header { background: rgba(255,255,255,.95) !important; border-bottom: 1px solid #e5e5e5 !important; }
+a { color: #111827 !important; border-bottom: 1px solid #111827 !important; }` },
+  { id: "neon", label: "Neon", css: `body { background: #05060f !important; font-family: 'Inter', 'Segoe UI', sans-serif !important; color: #e2e8f0 !important; }
+h1, h2, h3 { font-weight: 900 !important; letter-spacing: -0.02em !important; color: #f1f5f9 !important; }
+h1 { background: linear-gradient(135deg, #22d3ee, #a855f7) !important; -webkit-background-clip: text !important; background-clip: text !important; -webkit-text-fill-color: transparent !important; text-shadow: 0 0 60px rgba(34,211,238,.25) !important; }
+button, .btn, [class*="button"] { background: transparent !important; border: 1px solid #22d3ee !important; color: #22d3ee !important; border-radius: 10px !important; box-shadow: 0 0 20px rgba(34,211,238,.35), inset 0 0 12px rgba(34,211,238,.15) !important; text-transform: uppercase !important; letter-spacing: .08em !important; font-size: .85rem !important; }
+.card, [class*="card"] { background: rgba(255,255,255,.04) !important; border: 1px solid rgba(34,211,238,.25) !important; border-radius: 14px !important; backdrop-filter: blur(10px) !important; box-shadow: 0 0 24px rgba(34,211,238,.08) !important; }
+nav, header { background: rgba(5,6,15,.75) !important; backdrop-filter: blur(14px) !important; border-bottom: 1px solid rgba(34,211,238,.2) !important; }
+a { color: #22d3ee !important; }` },
+  { id: "saude", label: "Bem-estar", css: `body { background: #f0fdf4 !important; font-family: 'Inter', 'Segoe UI', sans-serif !important; color: #14532d !important; }
+h1, h2, h3 { font-weight: 800 !important; letter-spacing: -0.02em !important; color: #064e3b !important; }
+h1 { background: linear-gradient(135deg, #059669, #34d399) !important; -webkit-background-clip: text !important; background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+button, .btn, [class*="button"] { background: linear-gradient(135deg, #059669, #34d399) !important; color: #fff !important; border-radius: 999px !important; box-shadow: 0 8px 24px rgba(5,150,105,.3) !important; border: none !important; }
+.card, [class*="card"] { background: #ffffff !important; border: 1px solid #d1fae5 !important; border-radius: 20px !important; box-shadow: 0 4px 20px rgba(5,150,105,.08) !important; }
+nav, header { background: rgba(240,253,244,.8) !important; backdrop-filter: blur(14px) !important; border-bottom: 1px solid #d1fae5 !important; }
+a { color: #059669 !important; }` },
 ];
 
 function loadState() {
@@ -320,6 +315,35 @@ const injectImgFallback = (html) => {
   }
   return IMG_FALLBACK_SCRIPT + "\n" + html;
 };
+
+const MODERN_IMG_SEEDS = ["empresa","negocio","tecnologia","natureza","cidade","equipe","produto","viagem","arquitetura","moda","esporte","saude","inovacao","criatividade","conexao","sucesso","energia"];
+
+const modernImageUrl = () =>
+  `https://picsum.photos/seed/${MODERN_IMG_SEEDS[Math.floor(Math.random() * MODERN_IMG_SEEDS.length)]}${Math.floor(Math.random() * 97) + 1}/800/600`;
+
+function ensureImages(html) {
+  if (!html) return html;
+  let out = html;
+  const relativeSrc = /^(\.\.?\/|[a-z0-9_-]+\.(png|jpe?g|gif|svg|webp|avif)(\?|$))/i;
+  const fixUrl = (css) =>
+    css.replace(/url\(\s*["']?([^)"']*)["']?\s*\)/gi, (m, u) => {
+      const s = String(u || "").trim();
+      if (!s || relativeSrc.test(s) || (!/^(https?:|data:|#)/i.test(s) && s !== "none")) return `url('${modernImageUrl()}')`;
+      return m;
+    });
+  out = out.replace(/<img([^>]*?)src=["']([^"']*)["']([^>]*)>/gi, (m, pre, src, post) => {
+    const s = String(src || "").trim();
+    if (s.startsWith("//")) return `<img${pre}src="https:${s}"${post}>`;
+    if (!s || s.startsWith("#") || relativeSrc.test(s) || !/^https?:|data:/i.test(s)) {
+      return `<img${pre}src="${modernImageUrl()}"${post}>`;
+    }
+    return m;
+  });
+  out = out.replace(/<img([^>]*)>/gi, (m, attrs) => (/src\s*=/.test(attrs) ? m : `<img src="${modernImageUrl()}"${attrs}>`));
+  out = out.replace(/(style=["'])([^"']*)(["'])/gi, (m, pre, style, post) => (/url\(/i.test(style) ? pre + fixUrl(style) + post : m));
+  out = out.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (m, attrs, css) => (/url\(/i.test(css) ? `<style${attrs}>${fixUrl(css)}</style>` : m));
+  return out;
+}
 
 function buildPreviewHtml(files, activeFile) {
   try {
@@ -487,15 +511,35 @@ export default function SiteBuilder() {
       if(old.tagName==='A'){ try{old.removeAttribute('href');}catch(_){} }
       old.classList.remove('ke-edit-sel'); }
     var el=e.target;
-    if(el===document.body||el===document.documentElement){ window.parent.postMessage({type:'ke-select',tag:'BODY',isImg:false},'*'); return; }
+    if(el===document.body||el===document.documentElement){ window.parent.postMessage({type:'ke-select',tag:'BODY',isImg:false,isBgImg:false},'*'); return; }
     el.classList.add('ke-edit-sel');
     el.setAttribute('contenteditable','true');
     try{ el.focus(); }catch(_){}
     var isIn=el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT';
-    window.parent.postMessage({type:'ke-select',tag:el.tagName,isImg:el.tagName==='IMG',isInput:isIn,text:(isIn?(el.value||''):(el.textContent||''))},'*');
+    var cs=window.getComputedStyle(el);
+    window.parent.postMessage({type:'ke-select',tag:el.tagName,isImg:el.tagName==='IMG',isInput:isIn,isBgImg:!!(cs&&/url\(/.test(cs.backgroundImage||'')),text:(isIn?(el.value||''):(el.textContent||''))},'*');
   }, true);
   document.addEventListener('input', function(){ if(window.__keEdit) window.parent.postMessage({type:'ke-change'},'*'); });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ window.parent.postMessage({type:'ke-esc'},'*'); } });
+  window.addEventListener('message', function(e){
+    var d=e.data||{};
+    if(!d.type||!window.__keEdit) return;
+    if(d.type==='ke-add-img'){
+      var img=document.createElement('img');
+      img.src=d.src||''; img.alt=''; img.style.maxWidth='100%'; img.style.borderRadius='12px';
+      var sel=document.querySelector('.ke-edit-sel');
+      if(sel&&sel.tagName!=='BODY'&&sel.tagName!=='HTML'){ sel.parentNode.insertBefore(img, sel.nextSibling); }
+      else { var t=document.body.firstChild; document.body.insertBefore(img, t); }
+      window.parent.postMessage({type:'ke-change'},'*');
+    }
+    if(d.type==='ke-set-img'){
+      var cur=document.querySelector('.ke-edit-sel');
+      var el=(cur&&cur.tagName==='IMG')?cur:null;
+      if(!el&&cur){ el={_bg:cur}; }
+      if(!el){ var imgs=document.querySelectorAll('img'); if(imgs.length) el=imgs[Math.floor(Math.random()*imgs.length)]; }
+      if(el){ if(el._bg){ el._bg.style.backgroundImage="url('"+(d.src||'')+"')"; } else { el.src=d.src||el.src; el.removeAttribute('srcset'); } window.parent.postMessage({type:'ke-change'},'*'); }
+    }
+  });
 })();<\/script>`;
     return html.replace(/<\/body>/i, script + "\n</body>");
   };
@@ -507,7 +551,7 @@ export default function SiteBuilder() {
       const d = e.data;
       if (!d || typeof d !== "object" || !d.type) return;
       if (d.type === "ke-select") {
-        setSelected({ tag: d.tag, isImg: !!d.isImg, isInput: !!d.isInput, text: d.text || "" });
+        setSelected({ tag: d.tag, isImg: !!d.isImg, isInput: !!d.isInput, isBgImg: !!d.isBgImg, text: d.text || "" });
         setEditText(d.text || "");
       }
       if (d.type === "ke-change") setEdited(true);
@@ -549,9 +593,32 @@ export default function SiteBuilder() {
     snapshotForUndo();
     withSelected((el) => {
       const r = new FileReader();
-      r.onload = () => { el.src = r.result; };
+      r.onload = () => {
+        if (selected?.isBgImg && el.tagName !== "IMG") el.style.backgroundImage = `url("${r.result}")`;
+        else el.src = r.result;
+      };
       r.readAsDataURL(file);
     });
+  };
+
+  const postEditMsg = (type, extra) => {
+    try {
+      frameRef.current?.contentWindow?.postMessage({ type, ...extra }, "*");
+    } catch {}
+  };
+
+  const toolAddImage = () => {
+    snapshotForUndo();
+    postEditMsg("ke-add-img", { src: modernImageUrl() });
+    setEdited(true);
+    toast.success("Imagem moderna adicionada — clique em Salvar alterações");
+  };
+
+  const toolRandomImage = () => {
+    snapshotForUndo();
+    postEditMsg("ke-set-img", { src: modernImageUrl() });
+    setEdited(true);
+    toast.success("Imagem moderna aplicada — clique em Salvar alterações");
   };
 
   const toolBgColor = (color) => snapshotForUndo() || withSelected((el) => { el.style.backgroundColor = color; });
@@ -631,25 +698,20 @@ export default function SiteBuilder() {
   const applyTheme = (themeId) => {
     setTheme(themeId);
     const t = THEMES.find((x) => x.id === themeId);
-    if (!t || !t.css) return;
     setFiles((prev) => {
-      const base = prev["styles.css"] || "";
-      const clean = base
-        .split("\n")
-        .filter((l) => !/^\s*\/\* TEMA:/.test(l))
-        .join("\n")
-        .trim();
       const merged = { ...prev };
-      merged["styles.css"] = (clean ? clean + "\n\n" : "") + `/* TEMA: ${t.label} */\n` + t.css;
+      const base = stripThemeBlock(merged["styles.css"]);
+      if (t && t.css) {
+        merged["styles.css"] = (base ? base + "\n\n" : "") + `/* TEMA: ${t.label} */\n` + t.css;
+      } else {
+        merged["styles.css"] = base;
+      }
+      if (!merged["index.html"]) {
+        merged["index.html"] = "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Meu Site</title>\n</head>\n<body>\n</body>\n</html>";
+      }
       return merged;
     });
-    if (!files["index.html"]) {
-      setFiles((prev) => ({
-        ...prev,
-        "index.html": "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Meu Site</title>\n</head>\n<body>\n</body>\n</html>",
-      }));
-    }
-    toast.success(`Tema ${t.label} aplicado`);
+    toast.success(t && t.css ? `Tema ${t.label} aplicado` : "Tema removido");
   };
 
   const cloneSite = async () => {
@@ -737,7 +799,7 @@ export default function SiteBuilder() {
       if (Object.keys(newFiles).length === 0) throw new Error("Nenhum arquivo reconhecido");
       setFiles((prev) => {
         const merged = { ...prev };
-        for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") merged[k] = v;
+        for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") merged[k] = k.endsWith(".html") ? ensureImages(v) : v;
         return merged;
       });
       setActiveFile(Object.keys(newFiles)[0]);
@@ -767,6 +829,19 @@ export default function SiteBuilder() {
     return await callClaudeFCC(messages);
   };
 
+  const fetchDesignRef = async (text) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("site-referencia", { body: { prompt: String(text || "").slice(0, 300) } });
+      if (error || !data?.brief) return "";
+      return data.brief;
+    } catch {
+      return "";
+    }
+  };
+
+  const isCreateIntent = (text) =>
+    /cri(a|e|ar)?\s+(um\s+|o\s+|meu\s+)?(site|landing|p[aá]gina|blog|loja)|f[aá]?a\s+(um\s+|meu\s+)?(site|landing)|gerar?\s+(um\s+)?(site|landing)|site\s+de/i.test(text);
+
   const send = async () => {
     if (!input.trim() || sending) return;
     const userMsg = input.trim();
@@ -776,7 +851,12 @@ export default function SiteBuilder() {
 
     try {
       const history = messages.slice(-20).map((m) => ({ role: m.role, content: m.content }));
-      const aiText = await callWithFallback(history.concat([{ role: "user", content: userMsg }]));
+      let finalUser = userMsg;
+      if (isCreateIntent(userMsg)) {
+        const brief = await fetchDesignRef(userMsg);
+        if (brief) finalUser = "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" + userMsg;
+      }
+      const aiText = await callWithFallback(history.concat([{ role: "user", content: finalUser }]));
 
       const newFiles = parseFilesFromCode(aiText);
 
@@ -786,7 +866,7 @@ export default function SiteBuilder() {
         setFiles((prev) => {
           const merged = { ...prev };
           for (const [k, v] of Object.entries(newFiles)) {
-            if (typeof v === "string") merged[k] = v;
+            if (typeof v === "string") merged[k] = k.endsWith(".html") ? ensureImages(v) : v;
           }
           return merged;
         });
@@ -810,7 +890,9 @@ export default function SiteBuilder() {
     setSending(true);
     setMessages((prev) => [...prev, { role: "user", content: userPrompt + "\n\n[Gerar Tudo]" }]);
     try {
-      const fullPrompt = userPrompt + "\n\nGere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
+      const brief = await fetchDesignRef(userPrompt);
+      const refBlock = brief ? "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" : "";
+      const fullPrompt = refBlock + userPrompt + "\n\nGere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
       const aiText = await callWithFallback([{ role: "user", content: fullPrompt }]);
       const newFiles = parseFilesFromCode(aiText);
       if (Object.keys(newFiles).length === 0) {
@@ -819,7 +901,7 @@ export default function SiteBuilder() {
       setFiles((prev) => {
         const merged = { ...prev };
         for (const [k, v] of Object.entries(newFiles)) {
-          if (typeof v === "string") merged[k] = v;
+          if (typeof v === "string") merged[k] = k.endsWith(".html") ? ensureImages(v) : v;
         }
         return merged;
       });
@@ -1216,7 +1298,7 @@ function EditorPanel({ files, activeFile, setActiveFile, deleteFile, fullHeight 
   );
 }
 
-function EditToolsPanel({ selected, editText, setEditText, edited, undoCount, onTextApply, onPickImage, onBgColor, onTextColor, onFontDelta, onBold, onItalic, onAlign, onPadDelta, onHide, onRemove, onClearStyle, onUndo, onSave }) {
+function EditToolsPanel({ selected, editText, setEditText, edited, undoCount, onTextApply, onPickImage, onBgColor, onTextColor, onFontDelta, onBold, onItalic, onAlign, onPadDelta, onHide, onRemove, onClearStyle, onUndo, onSave, onAddImage, onRandomImage }) {
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="px-3 py-2 border-b flex items-center gap-2 shrink-0">
@@ -1251,14 +1333,21 @@ function EditToolsPanel({ selected, editText, setEditText, edited, undoCount, on
             </Button>
           </div>
 
-          {selected?.isImg && (
-            <div className="space-y-2">
-              <Label className="text-[11px] font-medium text-muted-foreground">Imagem</Label>
-              <Button size="sm" variant="outline" className="h-7 w-full" onClick={onPickImage}>
-                <ImagePlus className="w-3 h-3 mr-1" /> Trocar imagem
+          <div className="space-y-2">
+            <Label className="text-[11px] font-medium text-muted-foreground">Imagem</Label>
+            <div className="flex flex-wrap gap-1">
+              <Button size="sm" className="h-7 flex-1 min-w-[120px]" onClick={onAddImage}>
+                <ImagePlus className="w-3 h-3 mr-1" /> Adicionar imagem moderna
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 flex-1 min-w-[120px]" onClick={onRandomImage}>
+                <RefreshCw className="w-3 h-3 mr-1" /> Imagem aleatória
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 flex-1 min-w-[120px]" onClick={onPickImage} disabled={!selected}>
+                Trocar (arquivo)
               </Button>
             </div>
-          )}
+            {!selected?.isImg && !selected?.isBgImg && <p className="text-[10px] text-muted-foreground">Selecione uma imagem ou um elemento com imagem de fundo para trocá-la por arquivo.</p>}
+          </div>
 
           <div className="space-y-2">
             <Label className="text-[11px] font-medium text-muted-foreground">Cores</Label>
