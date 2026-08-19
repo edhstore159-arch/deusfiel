@@ -39,6 +39,17 @@ Sempre que receber um pedido, responda APENAS com o código completo e funcional
 \`\`\`
 
 REGRAS OBRIGATÓRIAS:
+- DESIGN MODERNO E PREMIUM (obrigatório em todo site): visual profissional 2026 com:
+  • Tipografia bold e legível (fontes como Inter, Poppins ou system-ui; títulos com peso 700-900 e letter-spacing negativo)
+  • Paleta de cores harmoniosa (2-3 cores principais + neutros), gradientes sutis nos destaques
+  • Navbar/header fixo com glassmorphism (fundo semi-transparente + blur) e menu responsivo
+  • Hero impactante: título grande em gradiente, subtítulo, botão CTA com sombra e hover animado
+  • Cards com cantos arredondados (12-24px), sombras suaves e hover com elevação
+  • Espaçamento generoso entre seções (padding 80-120px no desktop, menos no mobile)
+  • Animações sutis: fade-in ao rolar, transições em botões/links/cards, hover com transform
+  • Responsividade perfeita: mobile-first, menu hambúrguer em telas pequenas
+  • Footer completo e estilizado
+- Estrutura ideal: hero + seção de serviços/produtos/características (com cards) + depoimentos ou contato + footer.
 - Todo site DEVE ter personalização visual: CSS completo (cores harmoniosas, tipografia agradável, layout moderno e responsivo, espaçamentos, bordas arredondadas, efeitos de hover).
 - Para aplicativos, use app.js com funções que interagem com a página.
 - Textos sempre em português do Brasil.
@@ -173,71 +184,109 @@ function buildStyledFallback(text) {
 <title>${title}</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #1e3a5f 0%, #0f2b46 100%); min-height: 100vh; color: #eef4fb; line-height: 1.7; }
-main { max-width: 820px; margin: 0 auto; padding: 64px 24px; }
-h1 { font-size: 2.2rem; color: #ffd98a; margin-bottom: 24px; border-bottom: 2px solid #ffd98a55; padding-bottom: 16px; }
-p { margin-bottom: 16px; font-size: 1.05rem; }
+body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; background: linear-gradient(160deg, #0f172a 0%, #1e293b 60%, #312e81 100%); min-height: 100vh; color: #e2e8f0; line-height: 1.7; }
+main { max-width: 860px; margin: 0 auto; padding: 72px 24px; }
+h1 { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 800; letter-spacing: -0.03em; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 32px; }
+p { margin-bottom: 16px; font-size: 1.05rem; color: #cbd5e1; }
+.card { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 28px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,.25); }
 </style>
 </head>
 <body>
 <main>
+<div class="card">
 <h1>${title}</h1>
 ${paragraphs}
+</div>
 </main>
 </body>
 </html>`;
 }
 
-const DEFAULT_CSS = `* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f4f6fa; color: #1f2937; line-height: 1.6; }
-h1, h2, h3 { color: #1e3a5f; line-height: 1.3; }
-button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 18px; font-size: 1rem; transition: all .2s; }
-a { color: #2563eb; text-decoration: none; }
-img { max-width: 100%; height: auto; }
-.container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
-.card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.08); padding: 24px; }
-@media (max-width: 768px) { h1 { font-size: 1.7rem; } }`;
+const DEFAULT_CSS = `:root { --accent: #2563eb; --accent2: #7c3aed; --ink: #0f172a; --muted: #64748b; --bg: #f8fafc; --card: #ffffff; --radius: 16px; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { color: var(--ink); line-height: 1.2; font-weight: 800; letter-spacing: -0.02em; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem; }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin-bottom: 1rem; }
+button, .btn { cursor: pointer; border: none; border-radius: 999px; padding: 12px 26px; font-size: 1rem; font-weight: 600; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 8px 24px rgba(37,99,235,.3); transition: all .25s ease; }
+button:hover, .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(37,99,235,.45); }
+a { color: var(--accent); text-decoration: none; }
+img { max-width: 100%; height: auto; border-radius: var(--radius); }
+.container { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+section { padding: 90px 24px; }
+.card, [class*="card"] { background: var(--card); border: 1px solid #e2e8f0; border-radius: var(--radius); padding: 28px; box-shadow: 0 4px 20px rgba(2,6,23,.06); transition: all .3s ease; }
+.card:hover, [class*="card"]:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(2,6,23,.12); }
+nav, header { background: rgba(255,255,255,.8); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(226,232,240,.7); position: sticky; top: 0; z-index: 50; }
+nav a, header a { font-weight: 600; padding: 8px 14px; border-radius: 8px; transition: background .2s; }
+nav a:hover, header a:hover { background: rgba(37,99,235,.08); }
+.hero { display: grid; place-items: center; text-align: center; min-height: 78vh; padding: 60px 24px; background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(37,99,235,.12), transparent), linear-gradient(180deg, #fdfdff, var(--bg)); }
+.hero p { font-size: 1.15rem; color: var(--muted); max-width: 640px; margin: 0 auto 2rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+.hero, section > * { animation: fadeUp .6s ease both; }
+@media (max-width: 768px) { section { padding: 56px 18px; } .hero { min-height: auto; padding: 64px 20px; } }`;
 
 const THEMES = [
   { id: "none", label: "Sem tema" },
-  { id: "moderno", label: "Moderno", css: `:root { --accent: #2563eb; --accent2: #7c3aed; }
-body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; background: #f8fafc; }
-h1, h2, h3 { font-weight: 800; letter-spacing: -0.02em; }
-h1 { font-size: 2.6rem; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-button, .btn, [class*="button"] { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff !important; border-radius: 12px; box-shadow: 0 8px 24px rgba(37,99,235,.3); }
-button:hover, .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(37,99,235,.4); }
-.card, [class*="card"] { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,.06); }
-nav, header { background: rgba(255,255,255,.85); backdrop-filter: blur(12px); }
+  { id: "moderno", label: "Moderno", css: `:root { --accent: #2563eb; --accent2: #7c3aed; --bg: #f8fafc; }
+body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; background: var(--bg); }
+h1, h2, h3 { font-weight: 800; letter-spacing: -0.03em; }
+h1 { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+button, .btn, [class*="button"] { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff !important; border-radius: 999px; box-shadow: 0 8px 24px rgba(37,99,235,.3); transition: all .25s ease; }
+button:hover, .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(37,99,235,.45); }
+.card, [class*="card"] { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 20px rgba(2,6,23,.06); transition: all .3s ease; }
+.card:hover, [class*="card"]:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(2,6,23,.12); }
+nav, header { background: rgba(255,255,255,.8); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(226,232,240,.7); }
 a { color: var(--accent); }` },
   { id: "elegante", label: "Elegante", css: `:root { --accent: #8a5a2b; --accent2: #d4af7a; }
 body { font-family: Georgia, 'Times New Roman', serif; background: #faf6ef; color: #3b2f22; }
 h1, h2, h3 { font-family: Georgia, serif; font-weight: 400; letter-spacing: .02em; color: #5c3d1e; }
-h1 { font-size: 2.4rem; border-bottom: 1px solid #d4af7a; padding-bottom: .4em; }
+h1 { border-bottom: 1px solid #d4af7a; padding-bottom: .4em; }
 button, .btn { background: #5c3d1e; color: #f5e9d5 !important; border-radius: 2px; letter-spacing: .08em; text-transform: uppercase; font-size: .85rem; }
 .card, [class*="card"] { background: #fffdf8; border: 1px solid #e4d5bb; border-radius: 4px; box-shadow: 0 2px 12px rgba(92,61,30,.08); }
 a { color: #8a5a2b; text-decoration: underline; }` },
   { id: "vibrante", label: "Vibrante", css: `:root { --accent: #f43f5e; --accent2: #f59e0b; }
 body { font-family: 'Poppins', 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: #fef9e7; }
 h1, h2, h3 { font-weight: 800; color: #fbbf24; text-shadow: 0 2px 20px rgba(244,63,94,.5); }
-h1 { font-size: 2.6rem; }
 button, .btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff !important; font-weight: 700; border-radius: 999px; box-shadow: 0 10px 30px rgba(244,63,94,.45); }
 button:hover, .btn:hover { filter: brightness(1.1); transform: scale(1.03); }
 .card, [class*="card"] { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); border-radius: 20px; backdrop-filter: blur(8px); }
+nav, header { background: rgba(30,27,75,.7); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.1); }
 a { color: #fbbf24; }` },
   { id: "luxo", label: "Luxo", css: `:root { --accent: #b08d3e; --accent2: #f3e5b8; }
 body { font-family: 'Playfair Display', Georgia, serif; background: #0d0d0d; color: #e8e0ce; }
 h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; color: #d4af37; letter-spacing: .05em; }
-h1 { font-size: 2.6rem; text-shadow: 0 0 40px rgba(212,175,55,.35); }
+h1 { text-shadow: 0 0 40px rgba(212,175,55,.35); }
 button, .btn { background: linear-gradient(135deg, #b08d3e, #d4af37); color: #0d0d0d !important; border-radius: 0; letter-spacing: .1em; text-transform: uppercase; font-family: 'Segoe UI', sans-serif; font-weight: 600; }
 .card, [class*="card"] { background: linear-gradient(160deg, #161616, #1f1f1f); border: 1px solid #b08d3e55; border-radius: 8px; box-shadow: 0 8px 40px rgba(212,175,55,.12); }
+nav, header { background: rgba(13,13,13,.8); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(212,175,55,.2); }
 a { color: #d4af37; }` },
   { id: "minimalista", label: "Minimalista", css: `:root { --accent: #111827; }
 body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #ffffff; color: #111827; }
 h1, h2, h3 { font-weight: 300; letter-spacing: .06em; color: #111827; }
-h1 { font-size: 2.6rem; text-transform: uppercase; }
+h1 { text-transform: uppercase; }
 button, .btn { background: #111827; color: #fff !important; border-radius: 0; font-weight: 400; letter-spacing: .1em; text-transform: uppercase; }
 .card, [class*="card"] { background: #fff; border: 1px solid #e5e5e5; border-radius: 0; box-shadow: none; }
 a { color: #111827; border-bottom: 1px solid #111827; }` },
+  { id: "neon", label: "Neon", css: `:root { --accent: #22d3ee; --accent2: #a855f7; }
+body { font-family: 'Inter', 'Segoe UI', sans-serif; background: #05060f; color: #e2e8f0; }
+h1, h2, h3 { font-weight: 900; letter-spacing: -0.02em; color: #f1f5f9; }
+h1 { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 60px rgba(34,211,238,.25); }
+button, .btn { background: transparent; border: 1px solid var(--accent); color: var(--accent) !important; border-radius: 10px; box-shadow: 0 0 20px rgba(34,211,238,.35), inset 0 0 12px rgba(34,211,238,.15); text-transform: uppercase; letter-spacing: .08em; font-size: .85rem; }
+button:hover, .btn:hover { background: rgba(34,211,238,.12); box-shadow: 0 0 32px rgba(34,211,238,.6); }
+.card, [class*="card"] { background: rgba(255,255,255,.04); border: 1px solid rgba(34,211,238,.25); border-radius: 14px; backdrop-filter: blur(10px); box-shadow: 0 0 24px rgba(34,211,238,.08); }
+nav, header { background: rgba(5,6,15,.75); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(34,211,238,.2); }
+a { color: var(--accent); }` },
+  { id: "saude", label: "Bem-estar", css: `:root { --accent: #059669; --accent2: #34d399; }
+body { font-family: 'Inter', 'Segoe UI', sans-serif; background: #f0fdf4; color: #14532d; }
+h1, h2, h3 { font-weight: 800; letter-spacing: -0.02em; color: #064e3b; }
+h1 { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+button, .btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff !important; border-radius: 999px; box-shadow: 0 8px 24px rgba(5,150,105,.3); }
+button:hover, .btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(5,150,105,.45); }
+.card, [class*="card"] { background: #ffffff; border: 1px solid #d1fae5; border-radius: 20px; box-shadow: 0 4px 20px rgba(5,150,105,.08); }
+nav, header { background: rgba(240,253,244,.8); backdrop-filter: blur(14px); border-bottom: 1px solid #d1fae5; }
+a { color: var(--accent); }` },
 ];
 
 function loadState() {
@@ -682,7 +731,7 @@ export default function SiteBuilder() {
     setSending(true);
     setMessages((prev) => [...prev, { role: "user", content: "Melhore o design deste site (mais bonito, moderno e expressivo)" }]);
     try {
-      const fullPrompt = `Aqui está o site atual:\n\n${current.slice(0, 18000)}\n\nAgora REESCREVA o site inteiro deixando o design MUITO mais bonito, moderno e expressivo (melhores cores, tipografia, espaçamentos, efeitos de hover, animações sutis, responsividade perfeita). Retorne os arquivos completos em blocos:\n### index.html\n\`\`\`html\n...\n\`\`\`\n### styles.css\n\`\`\`css\n...\n\`\`\`\n### script.js\n\`\`\`js\n...\n\`\`\``;
+      const fullPrompt = `Aqui está o site atual:\n\n${current.slice(0, 18000)}\n\nAgora REESCREVA o site inteiro deixando o design MUITO mais bonito e moderno (nível 2026): navbar com glassmorphism, hero com título em gradiente e CTA, cards arredondados com sombras e hover, paleta de cores harmoniosa, tipografia bold, espaçamentos generosos, animações sutis de fade-in, menu responsivo com hambúrguer no mobile e footer estilizado. Retorne os arquivos completos em blocos:\n### index.html\n\`\`\`html\n...\n\`\`\`\n### styles.css\n\`\`\`css\n...\n\`\`\`\n### script.js\n\`\`\`js\n...\n\`\`\``;
       const aiText = await callWithFallback([{ role: "user", content: fullPrompt }]);
       const newFiles = parseFilesFromCode(aiText);
       if (Object.keys(newFiles).length === 0) throw new Error("Nenhum arquivo reconhecido");
