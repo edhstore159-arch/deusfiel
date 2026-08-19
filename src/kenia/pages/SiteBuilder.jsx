@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "site-builder:state";
 
-const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
+const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "nvidia/nemotron-3-super-120b-a12b:free";
 const FCC_DIRECT_URL = import.meta.env.VITE_FCC_URL || "https://fcc-server.onrender.com";
 
 const SITE_SYSTEM_PROMPT = `# SISTEMA DE GERAÇÃO DE SITES PROFISSIONAIS
@@ -130,11 +130,17 @@ const PROVIDERS = [
 ];
 
 const OPENCODE_MODELS = [
-  { id: "big-pickle", label: "Big Pickle", desc: "Padrão" },
-  { id: "gpt-4o", label: "GPT-4o", desc: "OpenAI" },
-  { id: "gpt-4o-mini", label: "GPT-4o Mini", desc: "Rápido" },
-  { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet", desc: "Anthropic" },
-  { id: "gemini/gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "Google" },
+  { id: "big-pickle", label: "Big Pickle", desc: "Gratuito" },
+  { id: "nemotron-3-ultra-free", label: "Nemotron Ultra", desc: "Gratuito" },
+  { id: "deepseek-v4-flash-free", label: "DeepSeek V4", desc: "Gratuito" },
+  { id: "hy3-free", label: "Hy3", desc: "Gratuito" },
+  { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5", desc: "Anthropic" },
+  { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", desc: "Anthropic rápido" },
+  { id: "gpt-5", label: "GPT-5", desc: "OpenAI" },
+  { id: "gpt-5.5", label: "GPT-5.5", desc: "OpenAI avançado" },
+  { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", desc: "Google" },
+  { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", desc: "Google premium" },
+  { id: "grok-4.5", label: "Grok 4.5", desc: "xAI" },
 ];
 
 async function callClaudeFCC(messages) {
@@ -624,7 +630,7 @@ export default function SiteBuilder() {
   const [files, setFiles] = useState(saved.files || {});
   const [activeFile, setActiveFile] = useState(saved.activeFile || "");
   const [mobileTab, setMobileTab] = useState("chat");
-  const [provider, setProvider] = useState("emergent");
+  const [provider, setProvider] = useState("opencode");
   const [openCodeModel, setOpenCodeModel] = useState("big-pickle");
   const [cloneUrl, setCloneUrl] = useState("");
   const [cloning, setCloning] = useState(false);
