@@ -129,6 +129,7 @@ async function fetchPage(url) {
     },
     signal: AbortSignal.timeout(8000),
   });
+  if (!res.ok) return null;
   const finalUrl = res.url || url;
   const contentType = res.headers.get("content-type") || "";
   if (!contentType.includes("html")) return null;
@@ -196,8 +197,8 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "method not allowed" }), {
-      status: 405,
+    return new Response(JSON.stringify({ ok: false, error: "method not allowed" }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -206,8 +207,8 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const url = String(body.url || "").trim();
     if (!/^https?:\/\//i.test(url)) {
-      return new Response(JSON.stringify({ error: "URL inválida" }), {
-        status: 400,
+      return new Response(JSON.stringify({ ok: false, error: "URL inválida" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -226,18 +227,24 @@ Deno.serve(async (req) => {
     clearTimeout(timer);
 
     const finalUrl = res.url || url;
+    if (!res.ok) {
+      return new Response(JSON.stringify({ ok: false, error: `Site bloqueou o acesso (HTTP ${res.status})` }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.includes("html")) {
-      return new Response(JSON.stringify({ error: `O site não retornou HTML (${contentType.split(";")[0]})` }), {
-        status: 400,
+      return new Response(JSON.stringify({ ok: false, error: `O site não retornou HTML (${contentType.split(";")[0]})` }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const mainHtml = await res.text();
     if (!mainHtml || mainHtml.length < 50) {
-      return new Response(JSON.stringify({ error: "Conteúdo vazio ou bloqueado" }), {
-        status: 400,
+      return new Response(JSON.stringify({ ok: false, error: "Conteúdo vazio ou bloqueado" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -297,6 +304,8 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
+      ok: true,
+      scraped: pages.length > 0,
       url: finalUrl,
       origin,
       pages,
@@ -309,8 +318,8 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     const msg = String(e?.message || e);
-    return new Response(JSON.stringify({ error: msg.includes("abort") ? "Tempo esgotado ao buscar o site" : `Erro ao buscar: ${msg.slice(0, 200)}` }), {
-      status: 500,
+    return new Response(JSON.stringify({ ok: false, error: msg.includes("abort") ? "Tempo esgotado ao buscar o site" : `Erro ao buscar: ${msg.slice(0, 200)}` }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

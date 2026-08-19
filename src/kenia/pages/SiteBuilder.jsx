@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 const STORAGE_KEY = "site-builder:state";
 
 const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
+const FCC_DIRECT_URL = import.meta.env.VITE_FCC_URL || "https://unabashed-vertical-crispness.ngrok-free.dev";
 
 const SITE_SYSTEM_PROMPT = `# SISTEMA DE GERAÇÃO DE SITES PROFISSIONAIS
 
@@ -128,29 +129,41 @@ const PROVIDERS = [
 ];
 
 async function callClaudeFCC(messages) {
-  const { data, error } = await supabase.functions.invoke("fcc-proxy", {
-    body: {
-      provider: "fcc",
+  const res = await fetch(`${FCC_DIRECT_URL}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": "freecc",
+      "Authorization": "Bearer freecc",
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
       model: FCC_MODEL,
       max_tokens: 8000,
       system: SITE_SYSTEM_PROMPT,
       messages: messages.filter((m) => m.role !== "system"),
-    },
+    }),
   });
-  if (data?.error) {
-    throw new Error(`Claude FCC: ${data.error}`);
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`Claude FCC: HTTP ${res.status} (resposta inválida)`);
   }
-  if (error) {
-    throw new Error(`Claude FCC: ${error.message}`);
+  if (!res.ok || data?.error) {
+    throw new Error(`Claude FCC: ${data?.error || `HTTP ${res.status}`}`);
   }
-  const blocks = (data?.content || []).filter((b) => b.type === "text");
-  const text = blocks.map((b) => b.text || "").join("\n").trim();
+  const blocks = (data?.content || []);
+  const textBlocks = blocks.filter((b) => b.type === "text").map((b) => b.text || "").join("\n").trim();
+  const thinkingText = blocks.filter((b) => b.type === "thinking").map((b) => b.thinking || "").join("\n").trim();
+  const text = textBlocks || thinkingText;
   if (!text) throw new Error("Claude FCC retornou resposta vazia");
   return text;
 }
 
 async function callOpenCode(messages) {
   const { data, error } = await supabase.functions.invoke("fcc-proxy", {
+    timeout: 300000,
     body: {
       provider: "opencode",
       max_tokens: 8000,
@@ -845,19 +858,42 @@ export default function SiteBuilder() {
     toast.success(t && t.css ? `Tema ${t.label} aplicado` : "Tema removido");
   };
 
+  const cloneViaRadar = async (target) => {
+    toast.info("Scraping indisponível (site protegido/SPA) — usando radar de modelos do nicho...");
+    const brief = await fetchDesignRef(String(target).replace(/^https?:\/\//, "").split("/")[0] + " website profissional moderno");
+    const refBlock = brief ? "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" : "";
+    const fullPrompt = refBlock + `Gere um site profissional equivalente ao site ${target}, com seções, textos e estilo adequados ao segmento e público dele. ` + "Gere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
+    const { newFiles } = await generateFilesWithRetry([{ role: "user", content: fullPrompt }]);
+    if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) {
+      throw new Error("Não foi possível clonar nem gerar a partir do modelo do nicho");
+    }
+    const built = { ...files };
+    for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") built[k] = postProcessFile(k, v);
+    const fixed = await fidelityCheck(built, brief);
+    if (fixed) {
+      for (const [k, v] of Object.entries(fixed)) built[k] = postProcessFile(k, v);
+      toast.success("Revisão de fidelidade aplicada (cores, fontes, seções e estilos conferidos)");
+    }
+    commitGenerated(built, "Site gerado do nicho");
+    toast.success(`Clone via radar: gerado a partir do modelo do nicho de ${target}`);
+  };
+
   const cloneSite = async () => {
     const url = cloneUrl.trim();
     if (!url) { toast.error("Cole a URL do site que deseja clonar"); return; }
     setCloning(true);
     try {
       let { data, error } = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
-      if (error || !data?.pages?.length) {
+      if (error || !data?.scraped) {
         const retry = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
         data = retry.data;
         error = retry.error;
       }
       if (error) throw new Error(error.message);
-      if (!data?.pages?.length) throw new Error("Nenhuma página retornada");
+      if (!data?.scraped || !data?.pages?.length) {
+        await cloneViaRadar(data?.origin || url);
+        return;
+      }
       const origin = data.origin || new URL(data.url || url).origin;
 
       const pageName = (path) => {
@@ -979,18 +1015,24 @@ export default function SiteBuilder() {
     }
   };
 
-  const isRateLimit = (msg) => /429|rate limit|limite|FreeUsageLimit|Créditos|credits|payment/i.test(msg);
+  const isRateLimit = (msg) => /429|rate limit|limite|FreeUsageLimit|Créditos|credits|payment|quota|exceeded|too many|402/i.test(msg);
 
   const callWithFallback = async (messages) => {
     if (provider === "opencode") {
       try {
         return await callOpenCode(messages);
       } catch (e) {
-        if (isRateLimit(String(e?.message || e))) {
-          toast.info("OpenCode com limite de uso — usando Claude FCC como alternativa");
+        const msg = String(e?.message || e);
+        try {
+          if (isRateLimit(msg)) {
+            toast.info("OpenCode com limite de uso — usando Claude FCC como alternativa");
+          } else {
+            toast.info("OpenCode indisponível — usando Claude FCC como alternativa");
+          }
           return await callClaudeFCC(messages);
+        } catch (fccErr) {
+          throw new Error(`OpenCode: ${msg} | Claude FCC: ${String(fccErr?.message || fccErr)}`);
         }
-        throw e;
       }
     }
     return await callClaudeFCC(messages);
