@@ -18,16 +18,16 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const provider = body.provider || "fcc";
+    const userMessages = Array.isArray(body.messages) ? body.messages : [];
+    const systemPrompt = body.system || "";
+    const messages = systemPrompt
+      ? [{ role: "system", content: systemPrompt }, ...userMessages]
+      : userMessages;
 
     if (provider === "opencode") {
       const zenUrl = Deno.env.get("ZEN_URL") || "https://opencode.ai/zen/v1/chat/completions";
       const zenKey = Deno.env.get("ZEN_API_KEY") || "";
       const zenModel = Deno.env.get("ZEN_MODEL") || "big-pickle";
-      const userMessages = Array.isArray(body.messages) ? body.messages : [];
-      const systemPrompt = body.system || "";
-      const messages = systemPrompt
-        ? [{ role: "system", content: systemPrompt }, ...userMessages]
-        : userMessages;
       const zenRes = await fetch(zenUrl, {
         method: "POST",
         headers: {
@@ -55,14 +55,9 @@ Deno.serve(async (req) => {
     }
 
     if (provider === "emergent") {
-      const emUrl = Deno.env.get("EMERGENT_URL") || "https://integrations.emergentagent.com/llm";
+      const emUrl = Deno.env.get("EMERGENT_URL") || "https://integrations.emergentagent.com/llm/v1/chat/completions";
       const emKey = Deno.env.get("EMERGENT_API_KEY") || "";
-      const emModel = body.model || "anthropic/claude-sonnet-4-20250514";
-      const userMessages = Array.isArray(body.messages) ? body.messages : [];
-      const systemPrompt = body.system || "";
-      const messages = systemPrompt
-        ? [{ role: "system", content: systemPrompt }, ...userMessages]
-        : userMessages;
+      const emModel = body.model || "gpt-4o";
       const emRes = await fetch(emUrl, {
         method: "POST",
         headers: {
@@ -105,7 +100,7 @@ Deno.serve(async (req) => {
         model: body.model || fccModel,
         max_tokens: body.max_tokens || 8000,
         system: body.system || "",
-        messages: Array.isArray(body.messages) ? body.messages : [],
+        messages: userMessages,
       }),
     });
 

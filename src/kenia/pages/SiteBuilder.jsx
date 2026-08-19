@@ -133,8 +133,8 @@ const OPENCODE_MODELS = [
   { id: "big-pickle", label: "Big Pickle", desc: "Padrão" },
   { id: "gpt-4o", label: "GPT-4o", desc: "OpenAI" },
   { id: "gpt-4o-mini", label: "GPT-4o Mini", desc: "Rápido" },
-  { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", desc: "Anthropic" },
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "Google" },
+  { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet", desc: "Anthropic" },
+  { id: "gemini/gemini-2.5-flash", label: "Gemini 2.5 Flash", desc: "Google" },
 ];
 
 async function callClaudeFCC(messages) {
@@ -190,7 +190,7 @@ async function callEmergent(messages, model) {
     timeout: 300000,
     body: {
       provider: "emergent",
-      model: model || "anthropic/claude-sonnet-4-20250514",
+      model: model || "gpt-4o",
       max_tokens: 8000,
       system: SITE_SYSTEM_PROMPT,
       messages: messages.filter((m) => m.role !== "system"),
