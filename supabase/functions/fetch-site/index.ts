@@ -160,23 +160,35 @@ async function fetchPage(url) {
   }
 
   let js = "";
+  let jsBytes = 0;
   const scriptRe = /<script[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
   let sm;
-  while ((sm = scriptRe.exec(html)) !== null && js.length < 400000) {
+  let inlinedCount = 0;
+  while ((sm = scriptRe.exec(html)) !== null && inlinedCount < 10) {
     const src = sm[1];
-    if (!/^https?:/i.test(src)) continue;
+    if (!/^https?:/i.test(src)) { scriptRe.lastIndex = sm.index + sm[0].length; continue; }
     try {
-      const sr = await fetch(src, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
+      const sr = await fetch(src, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(20000) });
       if (sr.ok) {
         const text = await sr.text();
-        if (!/<\s*\/\s*script/i.test(text)) {
-          js += "\n/* fonte: " + src + " */\n" + text;
-          html = html.replace(sm[0], "<script>\n/* fonte: " + src + " */\n" + text + "\n</script>");
+        if (text.length < 800000) {
+          const safe = text.replace(/<\/script/gi, "<\\x3C/script");
+          const inline = "<script>\n/* fonte: " + src + " */\n" + safe + "\n</script>";
+          html = html.slice(0, sm.index) + inline + html.slice(sm.index + sm[0].length);
+          scriptRe.lastIndex = sm.index + inline.length;
+          if (jsBytes < 300000) {
+            const take = Math.min(safe.length, 300000 - jsBytes);
+            js += "\n/* fonte: " + src + " */\n" + safe.slice(0, take);
+            jsBytes += take;
+          }
+          inlinedCount++;
+          continue;
         }
       }
     } catch {
       // mantém o script original
     }
+    scriptRe.lastIndex = sm.index + sm[0].length;
   }
 
   const urls = collectImageUrls(html, css);

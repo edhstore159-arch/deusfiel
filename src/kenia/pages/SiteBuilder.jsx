@@ -489,11 +489,13 @@ const postProcessFile = (name, content) => {
   return content;
 };
 
+const safeInlineJs = (js) => (js || "").replace(/<\/script/gi, "<\\x3C/script");
+
 function buildPreviewHtml(files, activeFile) {
   try {
     const html = (activeFile && activeFile.endsWith(".html") && files[activeFile]) || files["index.html"] || "";
     const css = files["styles.css"] || "";
-    const js = files["script.js"] || "";
+    let js = safeInlineJs(files["script.js"] || "");
 
     if (!html && !css && !js) return "";
 
@@ -508,17 +510,19 @@ function buildPreviewHtml(files, activeFile) {
 
     if (html && hasHead && hasBody) {
       // HTML estruturado — injeta CSS no head e JS no body
+      // uso de função de substituição: conteúdo (js/css) pode conter "$`", "$&" etc.,
+      // que o replace com string expandiria e corromperia o preview
       fullHtml = html;
       if (css) {
         if (fullHtml.includes("</head>")) {
-          fullHtml = fullHtml.replace("</head>", `<style>\n${css}\n</style>\n</head>`);
+          fullHtml = fullHtml.replace("</head>", () => `<style>\n${css}\n</style>\n</head>`);
         } else {
-          fullHtml = fullHtml.replace("<head", `<head\n<style>\n${css}\n</style>`);
+          fullHtml = fullHtml.replace("<head", () => `<head\n<style>\n${css}\n</style>`);
         }
       }
       if (js) {
         if (fullHtml.includes("</body>")) {
-          fullHtml = fullHtml.replace("</body>", `<script>\n${js}\n</script>\n</body>`);
+          fullHtml = fullHtml.replace("</body>", () => `<script>\n${js}\n</script>\n</body>`);
         } else {
           fullHtml += `\n<script>\n${js}\n</script>`;
         }
@@ -554,9 +558,9 @@ ${js ? `<script>\n${js}\n</script>` : ""}
 
     if (!/<style[\s>]/i.test(fullHtml) && !css) {
       if (fullHtml.includes("</head>")) {
-        fullHtml = fullHtml.replace("</head>", `<style>\n${DEFAULT_CSS}\n</style>\n</head>`);
+        fullHtml = fullHtml.replace("</head>", () => `<style>\n${DEFAULT_CSS}\n</style>\n</head>`);
       } else {
-        fullHtml = fullHtml.replace("<head", `<head\n<style>\n${DEFAULT_CSS}\n</style>`);
+        fullHtml = fullHtml.replace("<head", () => `<head\n<style>\n${DEFAULT_CSS}\n</style>`);
       }
     }
 
@@ -685,7 +689,7 @@ export default function SiteBuilder() {
     }
   });
 })();<\/script>`;
-    return html.replace(/<\/body>/i, script + "\n</body>");
+    return html.replace(/<\/body>/i, () => script + "\n</body>");
   };
 
   const previewHtml = editMode ? injectEditor(previewHtmlRaw) : previewHtmlRaw;
@@ -928,10 +932,11 @@ export default function SiteBuilder() {
         const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
         const extractedCss = styleMatches.map((m) => m[1].trim()).filter(Boolean).join("\n");
         for (const m of styleMatches) html = html.replace(m[0], "");
-        const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+        const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)(?<!\\)<\/script>/gi)];
         const extractedJs = inlineScripts.map((m) => m[1].trim()).filter(Boolean).join("\n");
         for (const m of inlineScripts) html = html.replace(m[0], "");
         html = rewriteLocalLinks(html, page.path);
+        html = html.replace(/<base\b[^>]*>/gi, () => `<base href="${origin}">`);
         const name = pageName(page.path);
         pageNames.add(name);
         newFiles[name] = html;

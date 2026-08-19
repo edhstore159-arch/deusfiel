@@ -133,7 +133,7 @@ function buildDocumentPreviewHtml(documents) {
       fullHtml = html;
       if (css) {
         if (fullHtml.includes("</head>")) {
-          fullHtml = fullHtml.replace("</head>", `<style>\n${css}\n</style>\n</head>`);
+          fullHtml = fullHtml.replace("</head>", () => `<style>\n${css}\n</style>\n</head>`);
         }
       }
     } else if (html) {
