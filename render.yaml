@@ -80,6 +80,14 @@ services:
         value: claude-3-5-sonnet-20241022
       - key: ZEN_API_KEY
         value: sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: espirito_santo
+      - key: JWT_SECRET
+        sync: false
       - key: NVIDIA_NIM_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
