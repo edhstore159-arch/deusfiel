@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       const zenText = await zenRes.text();
       if (!zenRes.ok) {
         return new Response(JSON.stringify({ error: `OpenCode HTTP ${zenRes.status}: ${zenText.slice(0, 300)}` }), {
-          status: zenRes.status === 429 ? 429 : 502,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     const text = await res.text();
     if (!res.ok) {
       return new Response(JSON.stringify({ error: `FCC HTTP ${res.status}: ${text.slice(0, 300)}` }), {
-        status: 502,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e?.message || e) }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

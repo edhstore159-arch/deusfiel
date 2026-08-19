@@ -137,6 +137,9 @@ async function callClaudeFCC(messages) {
       messages: messages.filter((m) => m.role !== "system"),
     },
   });
+  if (data?.error) {
+    throw new Error(`Claude FCC: ${data.error}`);
+  }
   if (error) {
     throw new Error(`Claude FCC: ${error.message}`);
   }
@@ -154,6 +157,9 @@ async function callOpenCode(messages) {
       messages: [{ role: "system", content: SITE_SYSTEM_PROMPT }, ...messages.filter((m) => m.role !== "system")],
     },
   });
+  if (data?.error) {
+    throw new Error(`OpenCode: ${data.error}`);
+  }
   if (error) {
     throw new Error(`OpenCode: ${error.message}`);
   }
