@@ -624,7 +624,7 @@ export default function SiteBuilder() {
   const [files, setFiles] = useState(saved.files || {});
   const [activeFile, setActiveFile] = useState(saved.activeFile || "");
   const [mobileTab, setMobileTab] = useState("chat");
-  const [provider, setProvider] = useState("opencode");
+  const [provider, setProvider] = useState("emergent");
   const [openCodeModel, setOpenCodeModel] = useState("big-pickle");
   const [cloneUrl, setCloneUrl] = useState("");
   const [cloning, setCloning] = useState(false);
