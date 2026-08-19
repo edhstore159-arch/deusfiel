@@ -19,6 +19,72 @@ function rewriteRelative(html, base) {
   return out;
 }
 
+async function fetchPage(url) {
+  const res = await fetch(url, {
+    redirect: "follow",
+    headers: {
+      "User-Agent": UA,
+      "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+      "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+    },
+    signal: AbortSignal.timeout(8000),
+  });
+  const finalUrl = res.url || url;
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("html")) return null;
+
+  let html = await res.text();
+  if (!html || html.length < 50) return null;
+
+  const baseUrl = new URL(finalUrl);
+  const base = baseUrl.origin + (baseUrl.pathname.replace(/[^/]*$/, "") || "/");
+  html = rewriteRelative(html, base);
+
+  let css = "";
+  const linkRe = /<link[^>]*rel=["']?stylesheet["']?[^>]*href=["']([^"']+)["'][^>]*>/gi;
+  let lm;
+  while ((lm = linkRe.exec(html)) !== null && css.length < 250000) {
+    const href = lm[1];
+    if (!/^https?:/i.test(href)) continue;
+    try {
+      const cr = await fetch(href, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
+      const ct = cr.headers.get("content-type") || "";
+      if (cr.ok && (ct.includes("text/css") || cr.url.endsWith(".css"))) {
+        css += "\n/* fonte: " + href + " */\n" + (await cr.text());
+      }
+      html = html.replace(lm[0], "");
+    } catch {
+      // mantém o link original
+    }
+  }
+
+  let js = "";
+  const scriptRe = /<script[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
+  let sm;
+  while ((sm = scriptRe.exec(html)) !== null && js.length < 400000) {
+    const src = sm[1];
+    if (!/^https?:/i.test(src)) continue;
+    try {
+      const sr = await fetch(src, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
+      if (sr.ok) {
+        const text = await sr.text();
+        if (!/<\s*\/\s*script/i.test(text)) {
+          js += "\n/* fonte: " + src + " */\n" + text;
+          html = html.replace(sm[0], "<script>\n/* fonte: " + src + " */\n" + text + "\n</script>");
+        }
+      }
+    } catch {
+      // mantém o script original
+    }
+  }
+
+  if (!/<base[^>]*>/i.test(html)) {
+    html = html.replace(/<head([^>]*)>/i, `<head$1>\n<base href="${base}">`);
+  }
+
+  return { url: finalUrl, html, css, js };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -42,7 +108,6 @@ Deno.serve(async (req) => {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 25000);
-
     const res = await fetch(url, {
       signal: controller.signal,
       redirect: "follow",
@@ -63,61 +128,58 @@ Deno.serve(async (req) => {
       });
     }
 
-    let html = await res.text();
-    if (!html || html.length < 50) {
+    const mainHtml = await res.text();
+    if (!mainHtml || mainHtml.length < 50) {
       return new Response(JSON.stringify({ error: "Conteúdo vazio ou bloqueado" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const baseUrl = new URL(finalUrl);
-    const base = baseUrl.origin + (baseUrl.pathname.replace(/[^/]*$/, "") || "/");
-    html = rewriteRelative(html, base);
+    const origin = new URL(finalUrl).origin;
 
-    let css = "";
-    const linkRe = /<link[^>]*rel=["']?stylesheet["']?[^>]*href=["']([^"']+)["'][^>]*>/gi;
-    let lm;
-    while ((lm = linkRe.exec(html)) !== null && css.length < 250000) {
-      const href = lm[1];
-      if (!/^https?:/i.test(href)) continue;
-      try {
-        const cr = await fetch(href, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
-        const ct = cr.headers.get("content-type") || "";
-        if (cr.ok && (ct.includes("text/css") || cr.headers.get("content-length") || cr.url.endsWith(".css"))) {
-          css += "\n/* fonte: " + href + " */\n" + (await cr.text());
+    const paths = [];
+    if (body.crawl) {
+      const seen = new Set(["/", "/index.html"]);
+      const linkRe = /<a[^>]*href=["']([^"']+)["']/gi;
+      let m;
+      while ((m = linkRe.exec(mainHtml)) !== null) {
+        const val = m[1];
+        if (!val.startsWith(origin)) continue;
+        const path = val.slice(origin.length).split("#")[0].split("?")[0];
+        if (!path) continue;
+        const norm = path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+        if (!seen.has(norm)) {
+          seen.add(norm);
+          paths.push(norm);
         }
-        html = html.replace(lm[0], "");
-      } catch {
-        // mantém o link se não conseguir baixar
+        if (seen.size >= 10) break;
       }
     }
 
-    let js = "";
-    const scriptRe = /<script[^>]*src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
-    let sm;
-    while ((sm = scriptRe.exec(html)) !== null && js.length < 400000) {
-      const src = sm[1];
-      if (!/^https?:/i.test(src)) continue;
+    const pages = [];
+    pages.push({ path: "/", html: mainHtml, css: "", js: "" });
+
+    for (const p of paths) {
       try {
-        const sr = await fetch(src, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
-        if (sr.ok) {
-          const text = await sr.text();
-          if (!/<\s*\/\s*script/i.test(text)) {
-            js += "\n/* fonte: " + src + " */\n" + text;
-            html = html.replace(sm[0], "<script>\n/* fonte: " + src + " */\n" + text + "\n</script>");
-          }
+        const page = await fetchPage(origin + p);
+        if (page) {
+          pages.push({ path: p, ...page });
         }
       } catch {
-        // mantém o script original
+        // página inacessível — ignora
       }
+      if (pages.length >= 10) break;
     }
 
-    if (!/<base[^>]*>/i.test(html)) {
-      html = html.replace(/<head([^>]*)>/i, `<head$1>\n<base href="${base}">`);
-    }
-
-    return new Response(JSON.stringify({ url: finalUrl, html, css, js }), {
+    return new Response(JSON.stringify({
+      url: finalUrl,
+      origin,
+      pages,
+      html: pages[0].html,
+      css: pages[0].css,
+      js: pages[0].js,
+    }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

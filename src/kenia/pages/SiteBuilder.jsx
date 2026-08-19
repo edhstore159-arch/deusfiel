@@ -272,9 +272,9 @@ const injectImgFallback = (html) => {
   return IMG_FALLBACK_SCRIPT + "\n" + html;
 };
 
-function buildPreviewHtml(files) {
+function buildPreviewHtml(files, activeFile) {
   try {
-    const html = files["index.html"] || "";
+    const html = (activeFile && activeFile.endsWith(".html") && files[activeFile]) || files["index.html"] || "";
     const css = files["styles.css"] || "";
     const js = files["script.js"] || "";
 
@@ -409,7 +409,8 @@ export default function SiteBuilder() {
     } catch {}
   }, [files]);
 
-  const previewHtmlRaw = buildPreviewHtml(files);
+  const htmlPages = fileList.filter((f) => f.endsWith(".html"));
+  const previewHtmlRaw = buildPreviewHtml(files, activeFile);
 
   const injectEditor = (html) => {
     if (!html) return html;
@@ -597,26 +598,61 @@ export default function SiteBuilder() {
     if (!url) { toast.error("Cole a URL do site que deseja clonar"); return; }
     setCloning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-site", { body: { url } });
+      const { data, error } = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
       if (error) throw new Error(error.message);
-      if (!data?.html) throw new Error("Nenhum HTML retornado");
-      let html = data.html;
-      let css = data.css || "";
-      let js = data.js || "";
-      const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
-      const extractedCss = styleMatches.map((m) => m[1].trim()).filter(Boolean).join("\n");
-      for (const m of styleMatches) html = html.replace(m[0], "");
-      const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
-      const extractedJs = inlineScripts.map((m) => m[1].trim()).filter(Boolean).join("\n");
-      for (const m of inlineScripts) html = html.replace(m[0], "");
+      if (!data?.pages?.length) throw new Error("Nenhuma página retornada");
+      const origin = data.origin || new URL(data.url || url).origin;
+
+      const pageName = (path) => {
+        const p = String(path || "").replace(/^\/+|\/+$/g, "");
+        if (!p || p === "index.html") return "index.html";
+        const base = p.split("/").pop() || p;
+        return (base.endsWith(".html") ? base : `${base}.html`).toLowerCase();
+      };
+      const rewriteLocalLinks = (html, pagePath) => {
+        const self = pageName(pagePath);
+        return html.replace(/(href|src)=["']([^"']+)["']/gi, (m, attr, val) => {
+          if (!val.startsWith(origin)) return m;
+          const path = val.slice(origin.length).split("#")[0].split("?")[0];
+          if (!path || path === "/" || path === "/index.html") return `${attr}="index.html"`;
+          const target = pageName(path);
+          if (target === self) return m;
+          return `${attr}="${target}"`;
+        });
+      };
+
+      const mergeUnique = (existing, chunk) =>
+        chunk && !(existing || "").includes(chunk) ? [existing, chunk].filter(Boolean).join("\n\n") : existing;
+
       const newFiles = { ...files };
-      newFiles["index.html"] = html;
-      if (extractedCss || css) newFiles["styles.css"] = [extractedCss, css].filter(Boolean).join("\n\n");
-      if (extractedJs || js) newFiles["script.js"] = [extractedJs, js].filter(Boolean).join("\n\n");
+      let globalCss = "";
+      let globalJs = "";
+      const pageNames = new Set();
+      for (const page of data.pages) {
+        let html = page.html || "";
+        let css = page.css || "";
+        let js = page.js || "";
+        const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
+        const extractedCss = styleMatches.map((m) => m[1].trim()).filter(Boolean).join("\n");
+        for (const m of styleMatches) html = html.replace(m[0], "");
+        const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+        const extractedJs = inlineScripts.map((m) => m[1].trim()).filter(Boolean).join("\n");
+        for (const m of inlineScripts) html = html.replace(m[0], "");
+        html = rewriteLocalLinks(html, page.path);
+        const name = pageName(page.path);
+        pageNames.add(name);
+        newFiles[name] = html;
+        globalCss = mergeUnique(globalCss, [extractedCss, css].filter(Boolean).join("\n\n"));
+        globalJs = mergeUnique(globalJs, [extractedJs, js].filter(Boolean).join("\n\n"));
+      }
+      if (globalCss) newFiles["styles.css"] = mergeUnique(newFiles["styles.css"], globalCss);
+      if (globalJs) newFiles["script.js"] = mergeUnique(newFiles["script.js"], globalJs);
+
       setFiles(newFiles);
       setActiveFile("index.html");
-      setMessages((prev) => [...prev, { role: "assistant", content: `Site clonado com sucesso de ${data.url || url}. Arquivos: ${Object.keys(newFiles).join(", ")}. Use a aba Ferramentas ou peça mudanças pelo chat.` }]);
-      toast.success(`Site clonado: ${Object.keys(newFiles).join(", ")}`);
+      const pagesMsg = [...pageNames].join(", ");
+      setMessages((prev) => [...prev, { role: "assistant", content: `Site clonado com sucesso de ${data.url || url} (${pageNames.size} página(s)). Arquivos: ${pagesMsg}. Use a aba Ferramentas, o seletor de páginas acima do preview ou peça mudanças pelo chat.` }]);
+      toast.success(`Clonado: ${pageNames.size} página(s) salvas`);
     } catch (e) {
       toast.error("Erro ao clonar: " + (e?.message || e));
     } finally {
@@ -930,6 +966,24 @@ export default function SiteBuilder() {
             </Tabs>
           </Card>
           <div className="flex flex-col gap-2 min-h-0">
+            {htmlPages.length > 1 && (
+              <div className="flex items-center gap-1 shrink-0 bg-card border rounded-lg px-2 py-1 overflow-x-auto">
+                <Globe className="w-3.5 h-3.5 text-gold-600 shrink-0" />
+                <span className="text-[10px] font-medium text-muted-foreground shrink-0">Páginas:</span>
+                {htmlPages.map((p) => (
+                  <Button
+                    key={p}
+                    size="sm"
+                    variant={activeFile === p ? "default" : "outline"}
+                    className="h-6 px-2 text-[11px] shrink-0"
+                    onClick={() => setActiveFile(p)}
+                    title={p}
+                  >
+                    {p === "index.html" ? "Início" : p.replace(".html", "")}
+                  </Button>
+                ))}
+              </div>
+            )}
             {showCode && fileList.length > 0 ? (
               <EditorPanel files={files} activeFile={activeFile} setActiveFile={setActiveFile} deleteFile={deleteFile} />
             ) : (
