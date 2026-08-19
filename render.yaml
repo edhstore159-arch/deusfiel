@@ -24,7 +24,7 @@ services:
       - key: VITE_BACKEND_URL
         value: https://kenia-whatsapp-backend.onrender.com
       - key: VITE_FCC_URL
-        value: https://unabashed-vertical-crispness.ngrok-free.dev
+        value: https://fcc-server.onrender.com
       - key: VITE_GROQ_API_KEY
         value: ""
   - type: web
@@ -51,7 +51,7 @@ services:
       - key: SUPABASE_ANON_KEY
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6emJnandwZnhva2FncnZtZG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDk2NzgsImV4cCI6MjA5OTgyNTY3OH0.4lX8OydcmKTx_U2A0MvMCs1-ZBKpQUcKFjSFsNfBttc
       - key: OLLAMA_URL
-        value: https://unabashed-vertical-crispness.ngrok-free.dev
+        value: https://fcc-server.onrender.com
       - key: OLLAMA_MODEL
         value: qwen2.5:3b-instruct
       - key: AI_REQUEST_TIMEOUT_MS
@@ -73,11 +73,13 @@ services:
       - key: RECONNECT_MAX_DELAY_MS
         value: "300000"
       - key: FCC_BASE_URL
-        value: https://unabashed-vertical-crispness.ngrok-free.dev
+        value: https://fcc-server.onrender.com
       - key: FCC_AUTH_TOKEN
         value: freecc
       - key: FCC_MODEL
         value: claude-3-5-sonnet-20241022
+      - key: ZEN_API_KEY
+        value: sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8
       - key: NVIDIA_NIM_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
@@ -104,6 +106,18 @@ services:
         value: freecc
       - key: FCC_MODEL
         value: claude-3-5-sonnet-20241022
+      - key: NVIDIA_NIM_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: EMERGENT_API_KEY
+        value: sk-emergent-b8cEdA5822d14C0638
+        sync: false
+      - key: EMERGENT_LLM_KEY
+        value: sk-emergent-b8cEdA5822d14C0638
+        sync: false
+      - key: EMERGENT_ENABLED
+        value: "true"
 
   # baileys-service standalone (sidecar para o FastAPI backend) - 24/7 no Render
   - type: web

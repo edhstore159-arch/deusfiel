@@ -21,7 +21,7 @@ import {
   downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://wfycqufqdheluvzhgvfw.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://uzzbgjwpfxokagrvmdoa.supabase.co";
 const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY ||
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
