@@ -608,7 +608,12 @@ export default function SiteBuilder() {
     if (!url) { toast.error("Cole a URL do site que deseja clonar"); return; }
     setCloning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
+      let { data, error } = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
+      if (error || !data?.pages?.length) {
+        const retry = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
+        data = retry.data;
+        error = retry.error;
+      }
       if (error) throw new Error(error.message);
       if (!data?.pages?.length) throw new Error("Nenhuma página retornada");
       const origin = data.origin || new URL(data.url || url).origin;

@@ -8,9 +8,9 @@ const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 
 const imgMap = new Map();
 
-const MAX_IMAGES = 24;
-const MAX_TOTAL_BYTES = 1500000;
-const MAX_PER_IMAGE = 250000;
+const MAX_IMAGES = 20;
+const MAX_TOTAL_BYTES = 1200000;
+const MAX_PER_IMAGE = 200000;
 
 function rewriteRelative(html, base) {
   const attrs = ["src", "href", "srcset", "poster", "data-src", "data-bg", "action", "data-original"];
@@ -264,13 +264,26 @@ Deno.serve(async (req) => {
     }
 
     const pages = [];
-    pages.push({ path: "/", html: mainHtml, css: "", js: "" });
+    const seenCss = new Set();
+    const seenJs = new Set();
+
+    const mainPage = await fetchPage(finalUrl);
+    if (mainPage) {
+      pages.push({ path: "/", ...mainPage });
+      if (mainPage.css) seenCss.add(mainPage.css);
+      if (mainPage.js) seenJs.add(mainPage.js);
+    } else {
+      pages.push({ path: "/", html: mainHtml, css: "", js: "" });
+    }
 
     for (const p of paths) {
       try {
         const page = await fetchPage(origin + p);
         if (page) {
-          pages.push({ path: p, ...page });
+          const out = { path: p, url: page.url, html: page.html };
+          if (page.css && !seenCss.has(page.css)) { seenCss.add(page.css); out.css = page.css; } else { out.css = ""; }
+          if (page.js && !seenJs.has(page.js)) { seenJs.add(page.js); out.js = page.js; } else { out.js = ""; }
+          pages.push(out);
         }
       } catch {
         // página inacessível — ignora
