@@ -69,9 +69,11 @@ const FAMOUS_SITES = {
     { name: "Figma", url: "https://www.figma.com" },
   ],
   igreja: [
-    { name: "Igreja de Jesus Cristo dos Santos dos Últimos Dias", url: "https://www.churchofjesuschrist.org" },
+    { name: "Elevation Church", url: "https://elevationchurch.org" },
     { name: "Hillsong", url: "https://hillsong.com" },
-    { name: "Bíblia Online", url: "https://www.bibliaonline.com.br" },
+    { name: "Gateway Church", url: "https://gatewaypeople.com" },
+    { name: "Bíblia Sagrada Online", url: "https://www.bibliaonline.com.br" },
+    { name: "Igreja de Jesus Cristo dos Santos dos Últimos Dias", url: "https://www.churchofjesuschrist.org" },
   ],
   agencia: [
     { name: "Awwwards", url: "https://www.awwwards.com" },
@@ -90,7 +92,7 @@ const GENRE_PATTERNS = [
   { re: /moda|roupa|loja de|vestuario|estilista|sapatos/i, key: "moda" },
   { re: /clinica|saude|medico|dentista|hospital|fisioterapia|psicolog/i, key: "saude" },
   { re: /tecnologia|startup|software|aplicativo|ti |sistema|inteligencia artificial|tech/i, key: "tecnologia" },
-  { re: /igreja|ministerio|culto|evangelic|catolic|paroquia/i, key: "igreja" },
+  { re: /igreja|crist[aã]o|crente|ministerio|culto|evangelic|catolic|paroquia|b[ií]blia|jesus|gospel|adorac|capela/i, key: "igreja" },
   { re: /agencia|criativ|marketing|digital|publicidade|design/i, key: "agencia" },
 ];
 

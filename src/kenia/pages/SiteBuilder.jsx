@@ -416,6 +416,66 @@ function ensureImages(html) {
   return out;
 }
 
+const RESPONSIVE_CSS = `
+/* Responsivo automático */
+@media (max-width: 900px) {
+  [class*="grid"], [class*="cards"], .row, .features, .services, .team, .gallery, .portfolio, .stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .container, [class*="container"], .wrapper, .wrap, .inner, section, .section {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+  h1 { font-size: 2.4rem !important; }
+  h2 { font-size: 1.8rem !important; }
+  nav, header, .navbar, .menu, [class*="nav"] { flex-wrap: wrap !important; gap: 8px !important; }
+}
+@media (max-width: 600px) {
+  [class*="grid"], [class*="cards"], .row, .features, .services, .team, .gallery, .portfolio, .stats {
+    grid-template-columns: 1fr !important;
+  }
+  body { font-size: 16px !important; }
+  h1 { font-size: 1.9rem !important; }
+  h2 { font-size: 1.45rem !important; }
+  h3 { font-size: 1.2rem !important; }
+  .container, [class*="container"], .wrapper, .wrap, .inner, section, .section {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    width: 100% !important;
+  }
+  img, video, iframe, table { max-width: 100% !important; height: auto !important; }
+  form, [class*="form"] { width: 100% !important; min-width: 0 !important; }
+  input, select, textarea, button { max-width: 100% !important; font-size: 16px !important; }
+  header, nav, footer, .navbar, .menu, [class*="nav"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    text-align: center !important;
+    position: static !important;
+  }
+  .hero, [class*="hero"] { padding: 40px 16px !important; text-align: center !important; }
+  [class*="button"], .btn, button { width: auto !important; min-width: 0 !important; }
+}
+`;
+
+function ensureResponsiveCss(css) {
+  if (!css) return css;
+  if (/@media\s*\(/i.test(css)) return css;
+  return css.replace(/\s*$/, "") + RESPONSIVE_CSS;
+}
+
+function ensureViewport(html) {
+  if (!html) return html;
+  if (/name=["']viewport["']/i.test(html)) return html;
+  return html.replace(/<head([^>]*)>/i, '<head$1>\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
+}
+
+const postProcessFile = (name, content) => {
+  if (typeof content !== "string") return content;
+  if (name.endsWith(".html")) return ensureViewport(ensureImages(content));
+  if (name.endsWith(".css")) return ensureResponsiveCss(content);
+  return content;
+};
+
 function buildPreviewHtml(files, activeFile) {
   try {
     const html = (activeFile && activeFile.endsWith(".html") && files[activeFile]) || files["index.html"] || "";
@@ -884,7 +944,7 @@ export default function SiteBuilder() {
       if (Object.keys(newFiles).length === 0) throw new Error("Nenhum arquivo reconhecido");
       setFiles((prev) => {
         const merged = { ...prev };
-        for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") merged[k] = k.endsWith(".html") ? ensureImages(v) : v;
+        for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") merged[k] = postProcessFile(k, v);
         return merged;
       });
       setActiveFile(Object.keys(newFiles)[0]);
@@ -940,7 +1000,7 @@ export default function SiteBuilder() {
     setFiles((prev) => {
       const merged = { ...prev };
       for (const [k, v] of Object.entries(newFiles)) {
-        if (typeof v === "string") merged[k] = k.endsWith(".html") ? ensureImages(v) : v;
+        if (typeof v === "string") merged[k] = postProcessFile(k, v);
       }
       return merged;
     });
@@ -998,7 +1058,7 @@ export default function SiteBuilder() {
       setFiles((prev) => {
         const merged = { ...prev };
         for (const [k, v] of Object.entries(newFiles)) {
-          if (typeof v === "string") merged[k] = k.endsWith(".html") ? ensureImages(v) : v;
+          if (typeof v === "string") merged[k] = postProcessFile(k, v);
         }
         return merged;
       });
