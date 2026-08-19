@@ -15,6 +15,7 @@ const GENRE_PRESETS = {
   moda: "Referência: site elegante de moda — paleta minimalista (branco, bege, preto), tipografia fina com muito espaçamento, imagens de produtos em grande escala, layout editorial com grid assimétrico, hover com zoom suave nas fotos.",
   saude: "Referência: site confiável de saúde/clínica — paleta verde-água e branco, cards suaves arredondados, fotos de equipe médica, seções de especialidades com ícones, depoimentos de pacientes, agendamento com CTA.",
   tecnologia: "Referência: site futurista de tecnologia/startup — fundo escuro com gradientes neon (azul/roxo), glassmorphism em cards, animações de fade-in, seção de recursos com ícones, métricas em destaque, CTA em gradiente brilhante.",
+  saas: "Referência (lógica Ozyxtraker): SaaS/app premium dark — design system em variáveis CSS (--background escuro, --foreground claro, --primary vibrante, --surface-2, --card, --border, --muted-foreground), fundo com radial-gradient do primary no topo + gradiente linear, fonte display (Outfit) para títulos e sans (IBM Plex Sans) para texto, cards rounded-2xl com borda e sombra suave, botões min-h-12 rounded-xl/2xl font-semibold com active:scale-[0.98] e sombra flutuante, inputs rounded-2xl com ícone à esquerda e foco com ring, labels 12px uppercase com letter-spacing, divisor com 'ou', botão social com border-2, badge de segurança (Conexão Segura · Criptografia), logo no topo e marca opaca no rodapé, animação fade-in-up ao carregar, coluna max-w-md centrada com safe-area, micro-interações sutis e foco visível.",
   igreja: "Referência: site acolhedor de igreja — paleta dourada e tons de madeira/branco, tipografia serifada com toque clássico, seção de cultos com horários, galeria de fotos, versículo em destaque no hero, formulário de contato.",
   agencia: "Referência: site criativo de agência digital — fundo claro com elementos em gradiente colorido, tipografia bold grande, portfólio em grid com hover animado, marcas em carrossel, seção de serviços em cards com ícones.",
 };
@@ -63,10 +64,16 @@ const FAMOUS_SITES = {
     { name: "Hospital Sírio-Libanês", url: "https://www.hospitalsiriolibanes.org.br" },
   ],
   tecnologia: [
-    { name: "Apple", url: "https://www.apple.com" },
+    { name: "Ozyxtraker", url: "https://ozyxapp.com.br" },
     { name: "Stripe", url: "https://stripe.com" },
     { name: "Linear", url: "https://linear.app" },
-    { name: "Figma", url: "https://www.figma.com" },
+    { name: "Vercel", url: "https://vercel.com" },
+  ],
+  saas: [
+    { name: "Ozyxtraker", url: "https://ozyxapp.com.br" },
+    { name: "Stripe", url: "https://stripe.com" },
+    { name: "Linear", url: "https://linear.app" },
+    { name: "Notion", url: "https://www.notion.so" },
   ],
   igreja: [
     { name: "Elevation Church", url: "https://elevationchurch.org" },
@@ -92,6 +99,7 @@ const GENRE_PATTERNS = [
   { re: /moda|roupa|loja de|vestuario|estilista|sapatos/i, key: "moda" },
   { re: /clinica|saude|medico|dentista|hospital|fisioterapia|psicolog/i, key: "saude" },
   { re: /tecnologia|startup|software|aplicativo|ti |sistema|inteligencia artificial|tech/i, key: "tecnologia" },
+  { re: /saas|app |aplicativo|plataforma|radar|marketplace|dashboard|ferramenta/i, key: "saas" },
   { re: /igreja|crist[aã]o|crente|ministerio|culto|evangelic|catolic|paroquia|b[ií]blia|jesus|gospel|adorac|capela/i, key: "igreja" },
   { re: /agencia|criativ|marketing|digital|publicidade|design/i, key: "agencia" },
 ];
@@ -103,27 +111,91 @@ function detectGenre(prompt) {
   return "";
 }
 
-function extractBrief(html, url) {
+function extractBlueprint(html, url) {
   if (!html || html.length < 200) return "";
   const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]?.trim().slice(0, 90) || "";
   const desc = (html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)/i) || [])[1]?.trim().slice(0, 180) || "";
   const body = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
-  const hexRaw = body.match(/#[0-9a-fA-F]{6}\b/g) || [];
-  const hexes = [...new Set(hexRaw)].slice(0, 6);
-  const fontRaw = body.match(/font-family\s*:\s*([^;}]{2,40})/gi) || [];
+  const cssRaw = (html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || []).join(" ");
+
+  const colorCounts = {};
+  (body.match(/#[0-9a-fA-F]{6}\b/g) || []).forEach((c) => {
+    const k = c.toLowerCase();
+    colorCounts[k] = (colorCounts[k] || 0) + 1;
+  });
+  const colors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c);
+
+  const fontRaw = (body.match(/font-family\s*:\s*([^;}]{2,40})/gi) || []).concat(cssRaw.match(/font-family\s*:\s*([^;}]{2,40})/gi) || []);
   const fontList = [];
   for (const fx of fontRaw) {
     const name = fx.replace(/font-family\s*:\s*/i, "").split(",")[0].trim().replace(/['"]/g, "").slice(0, 30);
-    if (name && !fontList.includes(name)) fontList.push(name);
+    if (name && name !== "sans-serif" && name !== "serif" && !fontList.includes(name)) fontList.push(name);
   }
   const fonts = fontList.slice(0, 4);
-  const hCount = (body.match(/<h1\b/gi) || []).length + (body.match(/<h2\b/gi) || []).length;
+
+  const headings = [...body.matchAll(/<(h[1-3])[^>]*>([\s\S]{0,90}?)<\/\1>/gi)]
+    .map((m) => `${m[1]}: ${m[2].replace(/<[^>]+>/g, "").trim().slice(0, 60)}`)
+    .filter(Boolean)
+    .slice(0, 14);
+
   const hasNav = /<nav\b|<header\b/i.test(body);
-  const hasFooter = /<footer\b/i.test(body);
   const hasHero = /hero|banner|hero-section/i.test(body);
-  const hasCards = /grid|card/i.test(body);
+  const hasCards = /card|feature|servi[çc]o|product|grid/i.test(body);
+  const hasStats = /stat|n[uú]mero|metric|counter/i.test(body);
+  const hasTestimonials = /testimonial|depoiment|review|aval/i.test(body);
+  const hasPricing = /pricing|planos|pre[çc]o|mensalidade|assinatura/i.test(body);
+  const hasFaq = /faq|perguntas|accordion|duvidas/i.test(body);
+  const hasForm = /<form\b/i.test(body);
+  const hasGallery = /galer|gallery|portfolio|projetos/i.test(body);
+  const hasFooter = /<footer\b/i.test(body);
+
+  const ctas = [];
+  for (const m of body.matchAll(/<button[^>]*>([\s\S]{0,60}?)<\/button>/gi)) {
+    const t = m[1].replace(/<[^>]+>/g, "").trim();
+    if (t && t.length < 40 && !ctas.includes(t)) ctas.push(t);
+  }
+  for (const m of body.matchAll(/<a[^>]*(?:btn|button|cta)[^>]*>([\s\S]{0,60}?)<\/a>/gi)) {
+    const t = m[1].replace(/<[^>]+>/g, "").trim();
+    if (t && t.length < 40 && !ctas.includes(t)) ctas.push(t);
+  }
+
+  const radii = [...new Set((cssRaw.match(/border-radius\s*:\s*(\d+(?:\.\d+)?px)/gi) || []).slice(0, 12))].map((r) => r.replace(/border-radius\s*:\s*/i, ""));
+  const paddings = [...new Set((cssRaw.match(/padding\s*:\s*(\d+(?:\.\d+)?px)/gi) || []).slice(0, 10))].map((p) => p.replace(/padding\s*:\s*/i, ""));
+  const responsive = /@media\s*\(/i.test(cssRaw);
+
+  const imgs = [...body.matchAll(/<img[^>]*alt=["']([^"']{2,50})["']/gi)].map((m) => m[1]).filter(Boolean).slice(0, 10);
   const imgCount = (body.match(/<img\b/gi) || []).length;
-  return `Modelo real pesquisado na internet: ${url}${title ? ` — "${title}"` : ""}${desc ? ` (${desc})` : ""}${hexes.length ? ` | Cores usadas: ${hexes.join(", ")}` : ""}${fonts.length ? ` | Fontes: ${fonts.join(", ")}` : ""} | Estrutura: ${hasNav ? "navbar, " : ""}${hasHero ? "hero, " : ""}${hasCards ? "cards, " : ""}${hasFooter ? "footer" : ""} | ${hCount} títulos, ${imgCount} imagens. Use esse modelo como referência de layout e combine com as regras de design moderno.`;
+
+  const sections = [];
+  if (hasNav) sections.push("navbar/header");
+  if (hasHero) sections.push("hero");
+  if (hasStats) sections.push("estatísticas");
+  if (hasCards) sections.push("cards/features");
+  if (hasGallery) sections.push("galeria/portfólio");
+  if (hasTestimonials) sections.push("depoimentos");
+  if (hasPricing) sections.push("planos/preços");
+  if (hasFaq) sections.push("FAQ");
+  if (hasForm) sections.push("formulário");
+  if (hasFooter) sections.push("footer");
+
+  return `Modelo conceituado: ${url}${title ? ` — "${title}"` : ""}${desc ? ` (${desc})` : ""} | Paleta de cores (por frequência): ${colors.join(", ") || "não detectada"} | Fontes: ${fonts.join(", ") || "não detectadas"} | Seções em ordem estratégica: ${sections.join(" → ") || "não detectadas"} | Estrutura: ${hasNav ? "navbar, " : ""}${hasHero ? "hero, " : ""}${hasCards ? "cards, " : ""}${hasStats ? "stats, " : ""}${hasTestimonials ? "depoimentos, " : ""}${hasPricing ? "preços, " : ""}${hasForm ? "formulário, " : ""}${hasFooter ? "footer" : ""} | Botões/CTAs: ${ctas.join(", ") || "não detectados"} | Cantos arredondados: ${radii.slice(0, 4).join(", ") || "não detectados"} | Espaçamentos: ${paddings.slice(0, 4).join(", ") || "não detectados"} | Responsivo: ${responsive ? "sim (media queries)" : "não detectado"} | ${headings.length} títulos, ${imgCount} imagens${imgs.length ? ` (temas: ${imgs.slice(0, 6).join(" | ")})` : ""}.
+
+FIDELIDADE: ao gerar o site, reproduza fielmente esta paleta de cores (na mesma proporção), as fontes, a ordem e a estrutura de seções, os textos dos botões/CTAs, o estilo de cantos e espaçamentos, e use imagens dos mesmos temas.`;
+}
+
+function scoreHtml(html) {
+  if (!html || html.length < 1000) return 0;
+  const body = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
+  let s = 0;
+  s += Math.min(10, (body.match(/<h[1-3]\b/gi) || []).length);
+  s += Math.min(8, (body.match(/<img\b/gi) || []).length);
+  s += ((body.match(/<nav\b|<header\b/i) || []).length) * 2;
+  s += ((body.match(/<footer\b/i) || []).length) * 2;
+  s += ((body.match(/#[0-9a-fA-F]{6}\b/g) || []).length > 4 ? 3 : 0);
+  s += (/@media\s*\(/i.test(html) ? 2 : 0);
+  s += ((body.match(/<form\b/i) || []).length) * 2;
+  s += ((body.match(/<section\b/i) || []).length);
+  return s;
 }
 
 async function searchLite(q) {
@@ -174,44 +246,55 @@ Deno.serve(async (req) => {
     const genre = detectGenre(prompt);
     const preset = genre ? GENRE_PRESETS[genre] : "";
 
-    let brief = "";
-    let searchedUrl = "";
+    let best = { brief: "", url: "", score: -1, name: "" };
     let source = "";
 
     if (genre && FAMOUS_SITES[genre]) {
       for (const famous of FAMOUS_SITES[genre]) {
         const html = await tryFetch(famous.url);
-        if (html) {
-          const b = extractBrief(html, famous.url);
-          brief = `Use como referência conceitual o site ${famous.name} (${famous.url}), reconhecido mundialmente${b.length > 60 ? ` — ${b}` : ""}.`;
-          searchedUrl = famous.url;
+        if (!html) continue;
+        const score = scoreHtml(html);
+        const b = extractBlueprint(html, famous.url);
+        if (b.length > 60 && score > best.score) {
+          best = { brief: b, url: famous.url, score, name: famous.name };
           source = "famoso";
-          break;
         }
       }
     }
 
-    if (!brief) {
-      const query = `${genre ? GENRE_PRESETS[genre].slice(0, 60).replace("Referência: ", "") : prompt} melhor site ${genre ? "" : "modelo "}design award premiado`;
-      const links = await searchLite(query);
-      for (const link of links.slice(0, 4)) {
-        const html = await tryFetch(link);
-        if (html) {
-          const b = extractBrief(html, link);
-          if (b.length > 60) { brief = "Referência pesquisada na internet: " + b; searchedUrl = link; source = "busca"; break; }
+    if (!best.brief) {
+      const queries = [
+        `${genre ? GENRE_PRESETS[genre].slice(0, 60).replace("Referência: ", "") : prompt} melhor site ${genre ? "" : "modelo "}design award premiado`,
+        `${genre ? GENRE_PRESETS[genre].slice(0, 60).replace("Referência: ", "") : prompt} website design inspiração top`,
+      ];
+      for (const query of queries) {
+        const links = await searchLite(query);
+        for (const link of links.slice(0, 4)) {
+          const html = await tryFetch(link);
+          if (!html) continue;
+          const score = scoreHtml(html);
+          const b = extractBlueprint(html, link);
+          if (b.length > 60 && score > best.score) {
+            best = { brief: b, url: link, score, name: "" };
+            source = "busca";
+          }
         }
+        if (best.brief) break;
       }
     }
 
-    if (!brief && preset) {
+    let brief = "";
+    if (best.brief) {
+      brief = best.name
+        ? `Use como referência conceitual o site ${best.name} (${best.url}), reconhecido mundialmente — ${best.brief}`
+        : `Referência pesquisada na internet: ${best.brief}`;
+      if (genre && preset) brief += "\n\nDireção de design para este segmento:\n" + preset.replace("Referência: ", "");
+    } else if (preset) {
       brief = preset + (genre ? ` | Gênero detectado: ${genre}.` : "");
       source = "preset";
-    } else if (source === "famoso" && preset) {
-      brief += "\n\nDireção de design para este segmento:\n" + preset.replace("Referência: ", "");
-      source = "famoso";
     }
 
-    return new Response(JSON.stringify({ genre, searchedUrl, source, brief }), {
+    return new Response(JSON.stringify({ genre, searchedUrl: best.url, source, score: best.score, brief }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

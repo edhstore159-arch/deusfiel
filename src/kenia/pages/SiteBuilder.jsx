@@ -932,6 +932,28 @@ export default function SiteBuilder() {
     return { aiText, newFiles };
   };
 
+  const fidelityCheck = async (builtFiles, brief) => {
+    if (!brief || Object.keys(builtFiles).length === 0) return null;
+    const current = Object.entries(builtFiles).map(([k, v]) => `=== ${k} ===\n${v}`).join("\n\n");
+    if (current.length > 26000) return null;
+    const prompt = `REFERÊNCIA DE FIDELIDADE (modelo conceituado):\n${brief.slice(0, 2500)}\n\nSITE GERADO (compare item por item com a referência):\n${current}\n\nREVISÃO DE FIDELIDADE — compare e corrija TODAS as diferenças: 1) cores exatas da paleta da referência, 2) fontes, 3) ordem e estrutura das seções, 4) textos dos botões/CTAs, 5) cantos arredondados e espaçamentos, 6) temas das imagens, 7) responsividade mobile. REESCREVA os arquivos completos corrigidos no formato obrigatório:\n### index.html\n\`\`\`html\n...\n\`\`\`\n### styles.css\n\`\`\`css\n...\n\`\`\`\n### script.js\n\`\`\`js\n...\n\`\`\`\nSem texto corrido.`;
+    try {
+      const { newFiles } = await generateFilesWithRetry([{ role: "user", content: prompt }]);
+      if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) return null;
+      return newFiles;
+    } catch {
+      return null;
+    }
+  };
+
+  const commitGenerated = (final, actionLabel) => {
+    setFiles(final);
+    const firstNew = Object.keys(final)[0] || "index.html";
+    if (firstNew) setActiveFile(firstNew);
+    setMessages((prev) => [...prev, { role: "assistant", content: friendlySummary(Object.keys(final), actionLabel) }]);
+    toast.success(`${Object.keys(final).length} arquivo(s) ${actionLabel.toLowerCase()}`);
+  };
+
   const improveDesign = async () => {
     if (sending) return;
     const current = fileList.map((f) => `=== ${f} ===\n${files[f]}`).join("\n\n");
@@ -992,25 +1014,6 @@ export default function SiteBuilder() {
     return `✅ ${action} com sucesso:\n${list}\n\nVocê pode editar tudo no preview (toque em qualquer elemento), aplicar temas e trocar imagens na aba Ferramentas, ou pedir novas mudanças aqui no chat.`;
   };
 
-  const applyGeneratedFiles = (newFiles, aiText) => {
-    if (!newFiles || Object.keys(newFiles).length === 0) {
-      setMessages((prev) => [...prev, { role: "assistant", content: aiText }]);
-      return false;
-    }
-    setFiles((prev) => {
-      const merged = { ...prev };
-      for (const [k, v] of Object.entries(newFiles)) {
-        if (typeof v === "string") merged[k] = postProcessFile(k, v);
-      }
-      return merged;
-    });
-    const firstNew = Object.keys(newFiles)[0];
-    if (firstNew) setActiveFile(firstNew);
-    setMessages((prev) => [...prev, { role: "assistant", content: friendlySummary(Object.keys(newFiles), "Site gerado") }]);
-    toast.success(`${Object.keys(newFiles).length} arquivo(s) gerado(s)`);
-    return true;
-  };
-
   const send = async () => {
     if (!input.trim() || sending) return;
     const userMsg = input.trim();
@@ -1021,8 +1024,9 @@ export default function SiteBuilder() {
     try {
       const history = messages.slice(-20).map((m) => ({ role: m.role, content: m.content }));
       let finalUser = userMsg;
+      let brief = "";
       if (isCreateIntent(userMsg)) {
-        const brief = await fetchDesignRef(userMsg);
+        brief = await fetchDesignRef(userMsg);
         if (brief) finalUser = "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" + userMsg;
       }
       const aiText = await callWithFallback(history.concat([{ role: "user", content: finalUser }]));
@@ -1031,7 +1035,18 @@ export default function SiteBuilder() {
         const retried = await generateFilesWithRetry(history.concat([{ role: "user", content: finalUser }]));
         newFiles = retried.newFiles;
       }
-      applyGeneratedFiles(newFiles, aiText);
+      if (Object.keys(newFiles).length === 0) {
+        setMessages((prev) => [...prev, { role: "assistant", content: aiText }]);
+        return;
+      }
+      const built = { ...files };
+      for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") built[k] = postProcessFile(k, v);
+      const fixed = await fidelityCheck(built, brief);
+      if (fixed) {
+        for (const [k, v] of Object.entries(fixed)) built[k] = postProcessFile(k, v);
+        toast.success("Revisão de fidelidade aplicada (cores, fontes, seções e estilos conferidos)");
+      }
+      commitGenerated(built, "Site gerado");
     } catch (e) {
       const msg = e?.message || String(e);
       toast.error("Erro: " + msg);
@@ -1055,16 +1070,14 @@ export default function SiteBuilder() {
       if (Object.keys(newFiles).length === 0) {
         throw new Error("Nenhum arquivo reconhecido na resposta");
       }
-      setFiles((prev) => {
-        const merged = { ...prev };
-        for (const [k, v] of Object.entries(newFiles)) {
-          if (typeof v === "string") merged[k] = postProcessFile(k, v);
-        }
-        return merged;
-      });
-      setActiveFile(Object.keys(newFiles)[0]);
-      setMessages((prev) => [...prev, { role: "assistant", content: friendlySummary(Object.keys(newFiles), "Tudo gerado") }]);
-      toast.success(`Gerado tudo: ${Object.keys(newFiles).join(", ")}`);
+      const built = { ...files };
+      for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") built[k] = postProcessFile(k, v);
+      const fixed = await fidelityCheck(built, brief);
+      if (fixed) {
+        for (const [k, v] of Object.entries(fixed)) built[k] = postProcessFile(k, v);
+        toast.success("Revisão de fidelidade aplicada (cores, fontes, seções e estilos conferidos)");
+      }
+      commitGenerated(built, "Tudo gerado");
     } catch (e) {
       const msg = e?.message || String(e);
       toast.error("Erro ao gerar tudo: " + msg);
