@@ -266,20 +266,25 @@ Deno.serve(async (req) => {
     const pages = [];
     const seenCss = new Set();
     const seenJs = new Set();
+    const seenHtml = new Set();
 
     const mainPage = await fetchPage(finalUrl);
     if (mainPage) {
       pages.push({ path: "/", ...mainPage });
+      seenHtml.add(mainPage.html);
       if (mainPage.css) seenCss.add(mainPage.css);
       if (mainPage.js) seenJs.add(mainPage.js);
     } else {
       pages.push({ path: "/", html: mainHtml, css: "", js: "" });
+      seenHtml.add(mainHtml);
     }
 
     for (const p of paths) {
       try {
         const page = await fetchPage(origin + p);
         if (page) {
+          if (seenHtml.has(page.html)) continue;
+          seenHtml.add(page.html);
           const out = { path: p, url: page.url, html: page.html };
           if (page.css && !seenCss.has(page.css)) { seenCss.add(page.css); out.css = page.css; } else { out.css = ""; }
           if (page.js && !seenJs.has(page.js)) { seenJs.add(page.js); out.js = page.js; } else { out.js = ""; }
