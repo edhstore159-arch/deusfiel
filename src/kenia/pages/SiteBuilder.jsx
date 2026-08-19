@@ -601,7 +601,7 @@ export default function SiteBuilder() {
   const [files, setFiles] = useState(saved.files || {});
   const [activeFile, setActiveFile] = useState(saved.activeFile || "");
   const [mobileTab, setMobileTab] = useState("chat");
-  const [provider, setProvider] = useState("fcc");
+  const [provider, setProvider] = useState("opencode");
   const [openCodeModel, setOpenCodeModel] = useState("big-pickle");
   const [cloneUrl, setCloneUrl] = useState("");
   const [cloning, setCloning] = useState(false);
@@ -1033,18 +1033,24 @@ export default function SiteBuilder() {
       } catch (e) {
         const msg = String(e?.message || e);
         try {
-          if (isRateLimit(msg)) {
-            toast.info("OpenCode com limite de uso — usando Claude FCC como alternativa");
-          } else {
-            toast.info("OpenCode indisponível — usando Claude FCC como alternativa");
-          }
+          toast.info("OpenCode indisponível — usando Claude FCC como alternativa");
           return await callClaudeFCC(messages);
         } catch (fccErr) {
           throw new Error(`OpenCode: ${msg} | Claude FCC: ${String(fccErr?.message || fccErr)}`);
         }
       }
     }
-    return await callClaudeFCC(messages);
+    try {
+      return await callClaudeFCC(messages);
+    } catch (e) {
+      const msg = String(e?.message || e);
+      try {
+        toast.info("Claude FCC indisponível — usando OpenCode como alternativa");
+        return await callOpenCode(messages, openCodeModel);
+      } catch (ocErr) {
+        throw new Error(`Claude FCC: ${msg} | OpenCode: ${String(ocErr?.message || ocErr)}`);
+      }
+    }
   };
 
   const fetchDesignRef = async (text) => {
