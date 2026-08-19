@@ -19,6 +19,68 @@ const GENRE_PRESETS = {
   agencia: "Referência: site criativo de agência digital — fundo claro com elementos em gradiente colorido, tipografia bold grande, portfólio em grid com hover animado, marcas em carrossel, seção de serviços em cards com ícones.",
 };
 
+const FAMOUS_SITES = {
+  esportes: [
+    { name: "ESPN", url: "https://www.espn.com" },
+    { name: "Nike", url: "https://www.nike.com" },
+    { name: "Globo Esporte", url: "https://ge.globo.com" },
+    { name: "Adidas", url: "https://www.adidas.com" },
+  ],
+  advocacia: [
+    { name: "Pinheiro Neto Advogados", url: "https://www.pinheironeto.com.br" },
+    { name: "TozziniFreire", url: "https://www.tozzinifreire.com.br" },
+    { name: "Skadden", url: "https://www.skadden.com" },
+    { name: "White & Case", url: "https://www.whitecase.com" },
+  ],
+  restaurante: [
+    { name: "Fogo de Chão", url: "https://fogodechao.com.br" },
+    { name: "Outback Steakhouse", url: "https://www.outback.com" },
+    { name: "Nando's", url: "https://www.nandos.co.uk" },
+    { name: "Madero", url: "https://www.madero.com.br" },
+  ],
+  imobiliaria: [
+    { name: "Zillow", url: "https://www.zillow.com" },
+    { name: "CBRE", url: "https://www.cbre.com" },
+    { name: "JLL", url: "https://www.us.jll.com" },
+    { name: "Lopes Imóveis", url: "https://www.lopes.com.br" },
+  ],
+  academia: [
+    { name: "Equinox", url: "https://www.equinox.com" },
+    { name: "Gold's Gym", url: "https://www.goldsgym.com" },
+    { name: "CrossFit", url: "https://www.crossfit.com" },
+    { name: "Smart Fit", url: "https://www.smartfit.com.br" },
+  ],
+  moda: [
+    { name: "Louis Vuitton", url: "https://www.louisvuitton.com" },
+    { name: "Gucci", url: "https://www.gucci.com" },
+    { name: "Farfetch", url: "https://www.farfetch.com" },
+    { name: "Renner", url: "https://www.lojasrenner.com.br" },
+  ],
+  saude: [
+    { name: "Mayo Clinic", url: "https://www.mayoclinic.org" },
+    { name: "Cleveland Clinic", url: "https://my.clevelandclinic.org" },
+    { name: "Hospital Albert Einstein", url: "https://www.einstein.br" },
+    { name: "Hospital Sírio-Libanês", url: "https://www.hospitalsiriolibanes.org.br" },
+  ],
+  tecnologia: [
+    { name: "Apple", url: "https://www.apple.com" },
+    { name: "Stripe", url: "https://stripe.com" },
+    { name: "Linear", url: "https://linear.app" },
+    { name: "Figma", url: "https://www.figma.com" },
+  ],
+  igreja: [
+    { name: "Igreja de Jesus Cristo dos Santos dos Últimos Dias", url: "https://www.churchofjesuschrist.org" },
+    { name: "Hillsong", url: "https://hillsong.com" },
+    { name: "Bíblia Online", url: "https://www.bibliaonline.com.br" },
+  ],
+  agencia: [
+    { name: "Awwwards", url: "https://www.awwwards.com" },
+    { name: "R/GA", url: "https://www.rga.com" },
+    { name: "Futura", url: "https://www.futura.com.br" },
+    { name: "TBWA", url: "https://www.tbwa.com" },
+  ],
+};
+
 const GENRE_PATTERNS = [
   { re: /esport|futebol|fitness|academia|basquete|clube/i, key: "esportes" },
   { re: /advocaci|juridic|advogad|escritorio de/i, key: "advocacia" },
@@ -112,21 +174,42 @@ Deno.serve(async (req) => {
 
     let brief = "";
     let searchedUrl = "";
-    const query = `${genre ? GENRE_PRESETS[genre].slice(0, 60).replace("Referência: ", "") : prompt} melhor site modelo design`;
-    const links = await searchLite(query);
-    for (const link of links.slice(0, 4)) {
-      const html = await tryFetch(link);
-      if (html) {
-        const b = extractBrief(html, link);
-        if (b.length > 60) { brief = b; searchedUrl = link; break; }
+    let source = "";
+
+    if (genre && FAMOUS_SITES[genre]) {
+      for (const famous of FAMOUS_SITES[genre]) {
+        const html = await tryFetch(famous.url);
+        if (html) {
+          const b = extractBrief(html, famous.url);
+          brief = `Use como referência conceitual o site ${famous.name} (${famous.url}), reconhecido mundialmente${b.length > 60 ? ` — ${b}` : ""}.`;
+          searchedUrl = famous.url;
+          source = "famoso";
+          break;
+        }
+      }
+    }
+
+    if (!brief) {
+      const query = `${genre ? GENRE_PRESETS[genre].slice(0, 60).replace("Referência: ", "") : prompt} melhor site ${genre ? "" : "modelo "}design award premiado`;
+      const links = await searchLite(query);
+      for (const link of links.slice(0, 4)) {
+        const html = await tryFetch(link);
+        if (html) {
+          const b = extractBrief(html, link);
+          if (b.length > 60) { brief = "Referência pesquisada na internet: " + b; searchedUrl = link; source = "busca"; break; }
+        }
       }
     }
 
     if (!brief && preset) {
       brief = preset + (genre ? ` | Gênero detectado: ${genre}.` : "");
+      source = "preset";
+    } else if (source === "famoso" && preset) {
+      brief += "\n\nDireção de design para este segmento:\n" + preset.replace("Referência: ", "");
+      source = "famoso";
     }
 
-    return new Response(JSON.stringify({ genre, searchedUrl, brief }), {
+    return new Response(JSON.stringify({ genre, searchedUrl, source, brief }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
