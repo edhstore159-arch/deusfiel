@@ -91,7 +91,7 @@ const GENRE_PATTERNS = [
   { re: /clinica|saude|medico|dentista|hospital|fisioterapia|psicolog/i, key: "saude" },
   { re: /tecnologia|startup|software|aplicativo|ti |sistema|inteligencia artificial|tech/i, key: "tecnologia" },
   { re: /igreja|ministerio|culto|evangelic|catolic|paroquia/i, key: "igreja" },
-  { re: /agencia|marketing|digital|publicidade|design/i, key: "agencia" },
+  { re: /agencia|criativ|marketing|digital|publicidade|design/i, key: "agencia" },
 ];
 
 function detectGenre(prompt) {

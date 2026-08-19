@@ -857,6 +857,21 @@ export default function SiteBuilder() {
     }
   };
 
+  const RETRY_HINT =
+    "ATENÇÃO: sua resposta anterior não trouxe os arquivos completos (faltou o index.html com o HTML inteiro da página). Agora responda APENAS com o site completo no formato obrigatório: ### index.html (HTML completo com <!DOCTYPE html>) seguido do bloco de código, depois ### styles.css e ### script.js. Não escreva explicações nem texto corrido.";
+
+  const generateFilesWithRetry = async (messages) => {
+    let aiText = await callWithFallback(messages);
+    let newFiles = parseFilesFromCode(aiText);
+    let attempts = 1;
+    while (attempts < 3 && (!newFiles["index.html"] || Object.keys(newFiles).length === 0)) {
+      attempts++;
+      aiText = await callWithFallback(messages.concat([{ role: "user", content: RETRY_HINT }]));
+      newFiles = parseFilesFromCode(aiText);
+    }
+    return { aiText, newFiles };
+  };
+
   const improveDesign = async () => {
     if (sending) return;
     const current = fileList.map((f) => `=== ${f} ===\n${files[f]}`).join("\n\n");
@@ -865,8 +880,7 @@ export default function SiteBuilder() {
     setMessages((prev) => [...prev, { role: "user", content: "Melhore o design deste site (mais bonito, moderno e expressivo)" }]);
     try {
       const fullPrompt = `Aqui está o site atual:\n\n${current.slice(0, 18000)}\n\nAgora REESCREVA o site inteiro deixando o design MUITO mais bonito e moderno (nível 2026): navbar com glassmorphism, hero com título em gradiente e CTA, cards arredondados com sombras e hover, paleta de cores harmoniosa, tipografia bold, espaçamentos generosos, animações sutis de fade-in, menu responsivo com hambúrguer no mobile e footer estilizado. Retorne os arquivos completos em blocos:\n### index.html\n\`\`\`html\n...\n\`\`\`\n### styles.css\n\`\`\`css\n...\n\`\`\`\n### script.js\n\`\`\`js\n...\n\`\`\``;
-      const aiText = await callWithFallback([{ role: "user", content: fullPrompt }]);
-      const newFiles = parseFilesFromCode(aiText);
+      const { newFiles } = await generateFilesWithRetry([{ role: "user", content: fullPrompt }]);
       if (Object.keys(newFiles).length === 0) throw new Error("Nenhum arquivo reconhecido");
       setFiles((prev) => {
         const merged = { ...prev };
@@ -918,6 +932,25 @@ export default function SiteBuilder() {
     return `✅ ${action} com sucesso:\n${list}\n\nVocê pode editar tudo no preview (toque em qualquer elemento), aplicar temas e trocar imagens na aba Ferramentas, ou pedir novas mudanças aqui no chat.`;
   };
 
+  const applyGeneratedFiles = (newFiles, aiText) => {
+    if (!newFiles || Object.keys(newFiles).length === 0) {
+      setMessages((prev) => [...prev, { role: "assistant", content: aiText }]);
+      return false;
+    }
+    setFiles((prev) => {
+      const merged = { ...prev };
+      for (const [k, v] of Object.entries(newFiles)) {
+        if (typeof v === "string") merged[k] = k.endsWith(".html") ? ensureImages(v) : v;
+      }
+      return merged;
+    });
+    const firstNew = Object.keys(newFiles)[0];
+    if (firstNew) setActiveFile(firstNew);
+    setMessages((prev) => [...prev, { role: "assistant", content: friendlySummary(Object.keys(newFiles), "Site gerado") }]);
+    toast.success(`${Object.keys(newFiles).length} arquivo(s) gerado(s)`);
+    return true;
+  };
+
   const send = async () => {
     if (!input.trim() || sending) return;
     const userMsg = input.trim();
@@ -933,27 +966,12 @@ export default function SiteBuilder() {
         if (brief) finalUser = "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" + userMsg;
       }
       const aiText = await callWithFallback(history.concat([{ role: "user", content: finalUser }]));
-
-      const newFiles = parseFilesFromCode(aiText);
-
-      if (Object.keys(newFiles).length > 0) {
-        setMessages((prev) => [...prev, { role: "assistant", content: friendlySummary(Object.keys(newFiles), "Site gerado") }]);
-      } else {
-        setMessages((prev) => [...prev, { role: "assistant", content: aiText }]);
+      let newFiles = parseFilesFromCode(aiText);
+      if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) {
+        const retried = await generateFilesWithRetry(history.concat([{ role: "user", content: finalUser }]));
+        newFiles = retried.newFiles;
       }
-
-      if (Object.keys(newFiles).length > 0) {
-        setFiles((prev) => {
-          const merged = { ...prev };
-          for (const [k, v] of Object.entries(newFiles)) {
-            if (typeof v === "string") merged[k] = k.endsWith(".html") ? ensureImages(v) : v;
-          }
-          return merged;
-        });
-        const firstNew = Object.keys(newFiles)[0];
-        if (firstNew) setActiveFile(firstNew);
-        toast.success(`${Object.keys(newFiles).length} arquivo(s) gerado(s)`);
-      }
+      applyGeneratedFiles(newFiles, aiText);
     } catch (e) {
       const msg = e?.message || String(e);
       toast.error("Erro: " + msg);
@@ -973,8 +991,7 @@ export default function SiteBuilder() {
       const brief = await fetchDesignRef(userPrompt);
       const refBlock = brief ? "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" : "";
       const fullPrompt = refBlock + userPrompt + "\n\nGere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
-      const aiText = await callWithFallback([{ role: "user", content: fullPrompt }]);
-      const newFiles = parseFilesFromCode(aiText);
+      const { newFiles } = await generateFilesWithRetry([{ role: "user", content: fullPrompt }]);
       if (Object.keys(newFiles).length === 0) {
         throw new Error("Nenhum arquivo reconhecido na resposta");
       }

@@ -1,10 +1,93 @@
 import "@/kenia/App.css";
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import { DebugErrorThrower } from "@/components/DebugErrorThrower";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/kenia/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/kenia/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import "@/kenia/storage"; // registra window.__keniaStorage e mantém persistência das secretárias
+
+const CLONE_UNLOCK_KEY = "dstboard_unlocked";
+const CLONE_PASS_HASH = "276c71a960ec3937e02ed0a0ac6a3fd298d82c41483c51e43831e842bf6b85a6";
+
+async function sha256(text) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function CloneGate({ children }) {
+  const [unlocked, setUnlocked] = useState(() => {
+    try { return localStorage.getItem(CLONE_UNLOCK_KEY) === "1"; } catch { return false; }
+  });
+  const [pass, setPass] = useState("");
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    try { localStorage.setItem(CLONE_UNLOCK_KEY, "1"); } catch {}
+  }, [unlocked]);
+
+  if (unlocked) return children;
+
+  const unlock = () => {
+    try { localStorage.setItem(CLONE_UNLOCK_KEY, "1"); setUnlocked(true); } catch {}
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!pass || checking) return;
+    setChecking(true);
+    setError("");
+    try {
+      const hash = await sha256(pass);
+      if (hash === CLONE_PASS_HASH) return unlock();
+      const { data } = await supabase.functions.invoke("check-clone-pass", { body: { password: pass } });
+      if (data?.ok) return unlock();
+      setError("Senha incorreta. Acesso negado.");
+    } catch {
+      setError("Não foi possível validar. Verifique a senha.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-[radial-gradient(ellipse_at_top,#1e1b4b_0%,#05060f_70%)] text-white p-4">
+      <div className="w-full max-w-sm text-center">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 shadow-[0_0_40px_rgba(124,58,237,.5)]">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+        <h1 className="text-xl font-bold tracking-tight">Acesso protegido</h1>
+        <p className="mt-2 text-sm text-white/60">
+          Este site é protegido. Digite a senha de acesso para continuar.
+        </p>
+        <form onSubmit={submit} className="mt-6 space-y-3">
+          <input
+            type="password"
+            value={pass}
+            onChange={(e) => setPass(e.target.value)}
+            placeholder="Senha de acesso"
+            autoFocus
+            className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/40 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30"
+          />
+          {error && <p className="text-sm text-rose-400">{error}</p>}
+          <button
+            type="submit"
+            disabled={checking || !pass}
+            className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+          >
+            {checking ? "Verificando..." : "Desbloquear"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 
 // Eager: landing + login para first paint rápido
 import Landing from "@/kenia/pages/Landing";
@@ -85,14 +168,15 @@ function PageFallback() {
 
 function App() {
   return (
-    <div className="App">
-      <DebugErrorThrower />
-      <AuthProvider>
-        <BrowserRouter>
-          <ScrollToTop />
+    <CloneGate>
+      <div className="App">
+        <DebugErrorThrower />
+        <AuthProvider>
+          <BrowserRouter>
+            <ScrollToTop />
 
 
-          <Suspense fallback={<PageFallback />}>
+            <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
@@ -147,6 +231,7 @@ function App() {
         <Toaster position="top-right" richColors />
       </AuthProvider>
     </div>
+    </CloneGate>
   );
 }
 
