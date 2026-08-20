@@ -4356,6 +4356,30 @@ async def ctr_upload(file: UploadFile = File(...)):
         raise HTTPException(400, str(e))
 
 
+@app.post("/api/ctr/form")
+async def ctr_form(payload: dict):
+    """Submit form data for CTR prediction."""
+    rows = payload.get("rows", [])
+    if not rows:
+        raise HTTPException(400, "Nenhuma linha fornecida")
+
+    import pandas as pd
+    from ctr_predictor import create_job, process_upload
+
+    job_id = create_job()
+    try:
+        df = pd.DataFrame(rows)
+        # Convert numeric columns
+        for col in df.columns:
+            if col != "click":
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+        result = process_upload(job_id, csv_bytes, "form_data.csv")
+        return {"ok": True, "job_id": job_id, "preview": result}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
 @app.post("/api/ctr/train/{job_id}")
 async def ctr_train(job_id: str, click_col: Optional[str] = None):
     """Train CTR model and generate predictions."""
