@@ -202,7 +202,7 @@ async function searchLite(q) {
   const url = "https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(q);
   const res = await fetch(url, {
     headers: { "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9" },
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) return [];
   const html = await res.text();
@@ -223,7 +223,7 @@ async function tryFetch(url) {
     const res = await fetch(url, {
       headers: { "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9", "Accept": "text/html" },
       redirect: "follow",
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(4000),
     });
     const ct = res.headers.get("content-type") || "";
     if (!res.ok || !ct.includes("html")) return null;
@@ -250,13 +250,21 @@ Deno.serve(async (req) => {
     let source = "";
 
     if (genre && FAMOUS_SITES[genre]) {
-      for (const famous of FAMOUS_SITES[genre]) {
-        const html = await tryFetch(famous.url);
-        if (!html) continue;
-        const score = scoreHtml(html);
-        const b = extractBlueprint(html, famous.url);
-        if (b.length > 60 && score > best.score) {
-          best = { brief: b, url: famous.url, score, name: famous.name };
+      const results = await Promise.allSettled(
+        FAMOUS_SITES[genre].map(async (famous) => {
+          const html = await tryFetch(famous.url);
+          if (!html) return null;
+          const score = scoreHtml(html);
+          const b = extractBlueprint(html, famous.url);
+          if (b.length > 60 && score > best.score) {
+            return { brief: b, url: famous.url, score, name: famous.name };
+          }
+          return null;
+        })
+      );
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value && r.value.score > best.score) {
+          best = r.value;
           source = "famoso";
         }
       }

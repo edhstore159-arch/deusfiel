@@ -936,11 +936,6 @@ export default function SiteBuilder() {
     }
     const built = { ...files };
     for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") built[k] = postProcessFile(k, v);
-    const fixed = await fidelityCheck(built, brief);
-    if (fixed) {
-      for (const [k, v] of Object.entries(fixed)) built[k] = postProcessFile(k, v);
-      toast.success("Revisão de fidelidade aplicada (cores, fontes, seções e estilos conferidos)");
-    }
     commitGenerated(built, "Site gerado do nicho");
     toast.success(`Clone via radar: gerado a partir do modelo do nicho de ${target}`);
   };
@@ -1028,7 +1023,7 @@ export default function SiteBuilder() {
     let aiText = await callWithFallback(messages);
     let newFiles = parseFilesFromCode(aiText);
     let attempts = 1;
-    while (attempts < 3 && (!newFiles["index.html"] || Object.keys(newFiles).length === 0)) {
+    while (attempts < 2 && (!newFiles["index.html"] || Object.keys(newFiles).length === 0)) {
       attempts++;
       aiText = await callWithFallback(messages.concat([{ role: "user", content: RETRY_HINT }]));
       newFiles = parseFilesFromCode(aiText);
@@ -1143,7 +1138,11 @@ export default function SiteBuilder() {
       let finalUser = userMsg;
       let brief = "";
       if (isCreateIntent(userMsg)) {
-        brief = await fetchDesignRef(userMsg);
+        const [refResult] = await Promise.all([
+          fetchDesignRef(userMsg),
+          Promise.resolve(),
+        ]);
+        brief = refResult;
         if (brief) finalUser = "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" + userMsg;
       }
       const aiText = await callWithFallback(history.concat([{ role: "user", content: finalUser }]));
@@ -1158,11 +1157,6 @@ export default function SiteBuilder() {
       }
       const built = { ...files };
       for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") built[k] = postProcessFile(k, v);
-      const fixed = await fidelityCheck(built, brief);
-      if (fixed) {
-        for (const [k, v] of Object.entries(fixed)) built[k] = postProcessFile(k, v);
-        toast.success("Revisão de fidelidade aplicada (cores, fontes, seções e estilos conferidos)");
-      }
       commitGenerated(built, "Site gerado");
     } catch (e) {
       const msg = e?.message || String(e);
@@ -1189,11 +1183,6 @@ export default function SiteBuilder() {
       }
       const built = { ...files };
       for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") built[k] = postProcessFile(k, v);
-      const fixed = await fidelityCheck(built, brief);
-      if (fixed) {
-        for (const [k, v] of Object.entries(fixed)) built[k] = postProcessFile(k, v);
-        toast.success("Revisão de fidelidade aplicada (cores, fontes, seções e estilos conferidos)");
-      }
       commitGenerated(built, "Tudo gerado");
     } catch (e) {
       const msg = e?.message || String(e);
