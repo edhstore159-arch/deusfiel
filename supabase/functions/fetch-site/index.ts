@@ -278,7 +278,29 @@ Deno.serve(async (req) => {
           seen.add(norm);
           paths.push(norm);
         }
-        if (seen.size >= 10) break;
+        if (seen.size >= 25) break;
+      }
+      // Also discover pages from nav/menu structures
+      const navPatterns = [
+        /<nav[\s\S]*?<\/nav>/gi,
+        /<header[\s\S]*?<\/header>/gi,
+        /<ul\s+class="[^"]*menu[^"]*"[\s\S]*?<\/ul>/gi,
+        /<ul\s+class="[^"]*nav[^"]*"[\s\S]*?<\/ul>/gi,
+      ];
+      for (const pat of navPatterns) {
+        let nm;
+        while ((nm = pat.exec(mainHtml)) !== null) {
+          const section = nm[0];
+          const innerLinks = section.matchAll(/<a[^>]*href=["']([^"']+)["']/gi);
+          for (const il of innerLinks) {
+            const val = il[1];
+            if (!val.startsWith(origin)) continue;
+            const path = val.slice(origin.length).split("#")[0].split("?")[0];
+            if (!path || path === "/") continue;
+            const norm = path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+            if (!seen.has(norm)) { seen.add(norm); paths.push(norm); }
+          }
+        }
       }
     }
 
@@ -312,8 +334,23 @@ Deno.serve(async (req) => {
       } catch {
         // página inacessível — ignora
       }
-      if (pages.length >= 10) break;
+      if (pages.length >= 20) break;
     }
+
+    // Extract site map with topics for each page
+    const siteMap = pages.map((p) => {
+      const body = p.html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
+      const headings = [...body.matchAll(/<(h[1-6])[^>]*>([\s\S]{0,120}?)<\/\1>/gi)]
+        .map((m) => ({ tag: m[1], text: m[2].replace(/<[^>]+>/g, "").trim().slice(0, 100) }))
+        .filter((h) => h.text.length > 2)
+        .slice(0, 15);
+      const title = (p.html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]?.replace(/<[^>]+>/g, "").trim().slice(0, 120) || "";
+      const sections = [...body.matchAll(/<section[^>]*class=["']([^"']+)["'][^>]*>/gi)]
+        .map((m) => m[1].replace(/[^a-z0-9\s-]/gi, "").trim().slice(0, 60))
+        .filter(Boolean)
+        .slice(0, 10);
+      return { path: p.path, title, headings, sections };
+    });
 
     return new Response(JSON.stringify({
       ok: true,
@@ -321,6 +358,7 @@ Deno.serve(async (req) => {
       url: finalUrl,
       origin,
       pages,
+      siteMap,
       html: pages[0].html,
       css: pages[0].css,
       js: pages[0].js,
