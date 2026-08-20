@@ -51,22 +51,32 @@ Antes de construir o site, crie internamente um design system: cores (primary, s
 
 Nunca use o mesmo layout para todos os negócios. Adapte automaticamente layout, cores, imagens, tipografia, formato dos cards, navegação, espaçamentos, animações, ordem das seções e quantidade de conteúdo. Exemplos: empresa de tecnologia → dark mode, gradientes, elementos tecnológicos; clínica → visual limpo, cores suaves, confiança, agendamento; restaurante → imagens grandes, cardápio, reservas, ambiente sofisticado.
 
-## 5-B. CÓPIA EXATA DE REFERÊNCIA (OBRIGATÓRIO)
+## 5-B. CÓPIA EXATA DE REFERÊNCIA (REGRAS INEGOCIÁVEIS)
 
-Quando receber uma REFERÊNCIA DE MODELO no prompt, você DEVE reproduzir o site de forma IDÊNTICA ao modelo referenciado. Copie EXATAMENTE:
-1. **Cores** — usa as mesmas cores exatas na mesma proporção (primary, secondary, background, accent)
-2. **Fontes** — use as mesmas famílias de fonte, tamanhos e pesos
-3. **Espaçamentos** — reproduza os mesmos paddings, margins e gaps
-4. **Bordas** — use os mesmos border-radius e border styles
-5. **Sombras** — aplique as mesmas box-shadow
-6. **Gradientes** — reproduza os mesmos gradients de fundo
-7. **Animações** — use as mesmas transições e efeitos
-8. **Ordem das seções** — siga EXATAMENTE a ordem listada
-9. **Textos** — use os mesmos textos de botões, CTAs e títulos quando fornecidos
-10. **Estrutura** — navbar, hero, cards, footer — tudo na mesma posição e estilo
-11. **Imagens** — use imagens dos mesmos temas/assuntos listados
+**ATENÇÃO: Esta seção tem PRIORIDADE MÁXIMA. Quando receber "SITE DE REFERÊNCIA" no prompt, as regras abaixo são OBRIGATÓRIAS e INEGOCIÁVEIS.**
 
-NÃO crie um design genérico quando uma referência é fornecida. O site gerado deve parecer que foi extraído do site original.
+O site que você gerar DEVE ser visualmente IDÊNTICO ao site de referência. NÃO invente design. NÃO crie layout genérico. NÃO mude cores. NÃO mude fontes. COPIE FIELMENTE.
+
+### O que copiar EXATAMENTE:
+1. **CORES** — Use as mesmas cores hex (#xxx) listadas em "PAleta DE CORES". Não troque por cores similares.
+2. **FONTES** — Use as mesmas famílias de fonte listadas em "TIPOGRAFIA". Se não detectou, use Google Fonts modernas adequadas ao nicho.
+3. **SEÇÕES** — Siga EXATAMENTE a ordem listada em "SEÇÕES". Não reordene. Não adicione seções extras. Não remova seções.
+4. **TÍTULOS** — Use os mesmos textos de títulos (h1, h2, h3) listados em "TÍTULOS". Adapte levemente se necessário, mas mantenha o tom e estilo.
+5. **TEXTOS** — Use os textos de parágrafo listados em "TEXTOS" como base para o conteúdo.
+6. **BOTÕES** — Use os mesmos textos de botões/CTAs listados em "BOTÕES/CTAs".
+7. **NAVEGAÇÃO** — Use os mesmos links de navegação listados em "NAVEGAÇÃO".
+8. **ESTILO VISUAL** — Copie bordas arredondadas, sombras, gradientes, animações e responsividade listados em "ESTILO VISUAL".
+9. **FUNDO** — Se o site de referência tem fundo escuro, use fundo escuro. Se tem gradiente, use gradiente. Se tem parallax, use parallax.
+
+### PROIBIDO:
+- NÃO usar fundo branco se a referência tem fundo escuro
+- NÃO trocar cores "porque ficou mais bonito"
+- NÃO simplificar o layout "para ficar mais limpo"
+- NÃO mudar a ordem das seções
+- NÃO remover seções que existem na referência
+- NÃO adicionar seções que não existem na referência
+- NÃO usar fontes diferentes das listadas
+- NÃO ignorar o bloco "SITE DE REFERÊNCIA" — ele é OBRIGATÓRIO
 
 ## 6. ESTRUTURA DE PÁGINA
 
@@ -943,10 +953,10 @@ export default function SiteBuilder() {
   };
 
   const cloneViaRadar = async (target) => {
-    toast.info("Scraping indisponível (site protegido/SPA) — usando radar de modelos do nicho...");
+    toast.info("Buscando sites de referência do nicho...");
     const brief = await fetchDesignRef(String(target).replace(/^https?:\/\//, "").split("/")[0] + " website profissional moderno");
-    const refBlock = brief ? "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" : "";
-    const fullPrompt = refBlock + `Gere um site profissional equivalente ao site ${target}, com seções, textos e estilo adequados ao segmento e público dele. ` + "Gere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
+    const refBlock = brief ? brief + "\n\n" : "";
+    const fullPrompt = refBlock + `PEDIDO DO CLIENTE: Gere um site profissional equivalente ao site ${target}, com seções, textos e estilo adequados ao segmento e público dele. ` + "Gere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
     const { newFiles } = await generateFilesWithRetry([{ role: "user", content: fullPrompt }]);
     if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) {
       throw new Error("Não foi possível clonar nem gerar a partir do modelo do nicho");
@@ -1160,7 +1170,7 @@ export default function SiteBuilder() {
           Promise.resolve(),
         ]);
         brief = refResult;
-        if (brief) finalUser = "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" + userMsg;
+        if (brief) finalUser = brief + "\n\nPEDIDO DO CLIENTE:\n" + userMsg;
       }
       const aiText = await callWithFallback(history.concat([{ role: "user", content: finalUser }]));
       let newFiles = parseFilesFromCode(aiText);
@@ -1192,8 +1202,8 @@ export default function SiteBuilder() {
     setMessages((prev) => [...prev, { role: "user", content: userPrompt + "\n\n[Gerar Tudo]" }]);
     try {
       const brief = await fetchDesignRef(userPrompt);
-      const refBlock = brief ? "REFERÊNCIA DE MODELO (pesquisada na internet, use como base de layout):\n" + brief + "\n\n" : "";
-      const fullPrompt = refBlock + userPrompt + "\n\nGere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
+      const refBlock = brief ? brief + "\n\n" : "";
+      const fullPrompt = refBlock + "PEDIDO DO CLIENTE: " + userPrompt + "\n\nGere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
       const { newFiles } = await generateFilesWithRetry([{ role: "user", content: fullPrompt }]);
       if (Object.keys(newFiles).length === 0) {
         throw new Error("Nenhum arquivo reconhecido na resposta");
