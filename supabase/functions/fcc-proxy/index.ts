@@ -115,9 +115,21 @@ Deno.serve(async (req) => {
 
     const fccUrl = Deno.env.get("FCC_URL") || "https://fcc-server.onrender.com";
     const fccToken = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-    const fccModel = Deno.env.get("FCC_MODEL") || "nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
+    const fccModel = Deno.env.get("FCC_MODEL") || "anthropic/claude-sonnet-4";
 
-    const res = await fetch(`${fccUrl}/v1/messages?beta=true`, {
+    const rawModel = body.model || fccModel;
+    const modelMap: Record<string, string> = {
+      "claude-3-5-sonnet-20241022": "anthropic/claude-sonnet-4",
+      "claude-3-5-haiku-20241022": "anthropic/claude-haiku-4-5",
+      "claude-3-7-sonnet-20250219": "anthropic/claude-3-7-sonnet-20250219",
+      "claude-sonnet-4": "anthropic/claude-sonnet-4",
+      "claude-haiku-4-5": "anthropic/claude-haiku-4-5",
+      "claude-opus-4-5": "anthropic/claude-opus-4-5-20251101",
+    };
+    const baseName = rawModel.replace(/^anthropic\//, "");
+    const fccModelName = modelMap[baseName] || (rawModel.includes("/") ? rawModel : `anthropic/${rawModel}`);
+
+    const res = await fetch(`${fccUrl}/v1/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -126,21 +138,34 @@ Deno.serve(async (req) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: body.model || fccModel,
+        model: fccModelName,
         max_tokens: body.max_tokens || 8000,
         system: body.system || "",
         messages: userMessages,
       }),
     });
 
-    const text = await res.text();
+    const rawText = await res.text();
     if (!res.ok) {
-      return new Response(JSON.stringify({ error: `FCC HTTP ${res.status}: ${text.slice(0, 300)}` }), {
+      return new Response(JSON.stringify({ error: `FCC HTTP ${res.status}: ${rawText.slice(0, 300)}` }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    return new Response(text, {
+
+    let cleanedText = rawText;
+    try {
+      const fccData = JSON.parse(rawText);
+      if (fccData.type === "message" && Array.isArray(fccData.content)) {
+        const textParts = fccData.content
+          .filter((c: any) => c.type === "text")
+          .map((c: any) => c.text);
+        fccData.content = [{ type: "text", text: textParts.join("") }];
+        cleanedText = JSON.stringify(fccData);
+      }
+    } catch {}
+
+    return new Response(cleanedText, {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
