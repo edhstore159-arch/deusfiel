@@ -1039,7 +1039,7 @@ export default function SiteBuilder() {
     toast.info("Buscando site de referência e copiando design...");
     const brief = await fetchDesignRef(String(target).replace(/^https?:\/\//, "").split("/")[0] + " website profissional moderno");
     const refBlock = brief ? brief + "\n\n" : "";
-    const fullPrompt = refBlock + `PEDIDO DO CLIENTE: CLONE O SITE ${target} de forma IDÊNTICA. Copie EXATAMENTE: estrutura HTML, layout, cores, fontes, seções, textos, botões, navegação, imagens, footer — tudo fiel ao original. Não crie um site novo. Copie o site referenciado.\n\nGere o site COMPLETO no formato:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nHTML completo com <!DOCTYPE html>, CSS completo, JS funcional. Não omita nada. Sem texto corrido.";
+    const fullPrompt = refBlock + "PEDIDO DO CLIENTE: CLONE O SITE " + target + " de forma IDÊNTICA. Copie EXATAMENTE: estrutura HTML, layout, cores, fontes, seções, textos, botões, navegação, imagens, footer — tudo fiel ao original. Não crie um site novo. Copie o site referenciado.\n\nGere o site COMPLETO no formato:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nHTML completo com <!DOCTYPE html>, CSS completo, JS funcional. Não omita nada. Sem texto corrido.";
     const { newFiles } = await generateFilesWithRetry([{ role: "user", content: fullPrompt }]);
     if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) {
       throw new Error("Não foi possível clonar nem gerar a partir do modelo do nicho");
