@@ -1185,68 +1185,18 @@ export default function SiteBuilder() {
         cleanHtml = cleanHtml.replace(/<head([^>]*)>/i, '<head$1>\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
       }
 
-      // Send to Claude for identical recreation with ALL the CSS context
-      const clonePrompt = `CLONE IDENTICO DO SITE: ${origin}
-
-VOCE DEVE REPRODUZIR O SITE ABAIXO DE FORMA 100% IDENTICA. NAO MUDENADA. NAO CRIE UM SITE NOVO. COPIE EXATAMENTE.
-
-CSS COMPLETO DO SITE ORIGINAL (todas as variaveis, classes, estilos):
-\`\`\`css
-${allCss.slice(0, 15000)}
-\`\`\`
-
-HTML COMPLETO DO SITE ORIGINAL (estrutura, classes, ids, conteudo):
-\`\`\`html
-${cleanHtml.slice(0, 20000)}
-\`\`\`
-
-INSTRUCAO CRITICA:
-1. O CSS acima contem TODAS as variaveis CSS (cores, fontes, espacamentos) — COPIE EXATAMENTE
-2. O HTML acima contem TODAS as classes Tailwind/utility — MANTENHA EXATAMENTE
-3. NAO troque cores, fontes, espacamentos ou layouts
-4. NAO adicione secoes que nao existem
-5. NAO remova secoes existentes
-6. Mantenha TODOS os textos, botoes, icons SVG
-7. Mantenha o mesmo layout (flex, grid, gaps, paddings)
-8. Mantenha o mesmo background, gradients, efeitos
-9. Se o site usa CSS variables, mantenha as mesmas variaveis
-10. Inclua Google Fonts que estao no original
-11. Responda APENAS com os blocos de codigo
-
-FORMATO:
-### index.html
-\`\`\`html
-<!DOCTYPE html>...
-\`\`\`
-
-### styles.css
-\`\`\`css
-...
-\`\`\`
-
-### script.js
-\`\`\`js
-...
-\`\`\``;
-
-      toast.info("Claude vai reproduzir o site identico...");
-      const { newFiles } = await generateFilesWithRetry([{ role: "user", content: clonePrompt }]);
-
-      if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) {
-        // Fallback: use scraped HTML with inlined CSS
-        const fallbackFiles = { ...files };
-        fallbackFiles["index.html"] = cleanHtml;
-        if (allCss) fallbackFiles["styles.css"] = allCss;
-        setFiles(fallbackFiles);
-        setActiveFile("index.html");
-        toast.success(`Clone (HTML original) de ${data.url || url}`);
-        return;
-      }
-
-      const built = { ...files };
-      for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") built[k] = postProcessFile(k, v);
+      // Clone IDENTICO: usar HTML original diretamente — NÃO enviar para Claude recriar
+      const fallbackFiles = { ...files };
+      fallbackFiles["index.html"] = cleanHtml;
+      if (allCss) fallbackFiles["styles.css"] = allCss;
+      // Try to extract JS
+      const scriptMatches = [...(page.html || "").matchAll(/<script(?:\s[^>]*)?>([^<]*(?:<(?!\/script>)[^<]*)*)<\/script>/gi)];
+      const inlineJs = scriptMatches.map((m) => m[1].trim()).filter((j) => j.length > 20 && !j.includes("gtag") && !j.includes("analytics")).join("\n\n");
+      if (inlineJs) fallbackFiles["script.js"] = inlineJs;
+      const built = { ...fallbackFiles };
+      for (const [k, v] of Object.entries(built)) if (typeof v === "string") built[k] = postProcessFile(k, v);
       commitGenerated(built, "Clone identico");
-      toast.success(`Clone identico de ${data.url || url}`);
+      toast.success(`Clone identico de ${data.url || url} — HTML original preservado`);
     } catch (e) {
       toast.error("Erro ao clonar: " + (e?.message || e));
     } finally {
@@ -1311,6 +1261,32 @@ FORMATO:
       toast.success("Design melhorado!");
     } catch (e) {
       toast.error("Erro ao melhorar: " + (e?.message || e));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const translateSite = async (targetLang) => {
+    if (sending) return;
+    const current = fileList.map((f) => `=== ${f} ===\n${files[f]}`).join("\n\n");
+    if (!current) { toast.error("Gere ou clone um site primeiro"); return; }
+    setSending(true);
+    const langLabel = targetLang === "en" ? "inglês" : targetLang === "es" ? "espanhol" : "português";
+    setMessages((prev) => [...prev, { role: "user", content: `Traduza o site para ${langLabel}` }]);
+    try {
+      const fullPrompt = `Traduza TODO o texto visível deste site para ${langLabel}. Regras:\n- NÃO altere NADA no layout, cores, fontes, imagens, classes CSS ou estrutura HTML\n- NÃO remova ou adicione elementos\n- NÃO troque URLs de imagens\n- Altere APENAS os textos visíveis (títulos, parágrafos, botões, menu, footer, alt de imagens)\n- Mantenha textos técnicos (emails, telefones, URLs) no idioma original\n- Responda APENAS com os blocos de código atualizados\n\nSite atual:\n\n${current.slice(0, 20000)}\n\nRetorne os arquivos completos no formato:\n### index.html\n\`\`\`html\n...\n\`\`\`\n### styles.css\n\`\`\`css\n...\n\`\`\`\n### script.js\n\`\`\`js\n...\n\`\`\``;
+      const { newFiles } = await generateFilesWithRetry([{ role: "user", content: fullPrompt }]);
+      if (Object.keys(newFiles).length === 0) throw new Error("Nenhum arquivo reconhecido");
+      setFiles((prev) => {
+        const merged = { ...prev };
+        for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") merged[k] = postProcessFile(k, v);
+        return merged;
+      });
+      setActiveFile(Object.keys(newFiles)[0]);
+      setMessages((prev) => [...prev, { role: "assistant", content: `Site traduzido para ${langLabel} com sucesso!\n• index.html\n• styles.css\n• script.js\n\nTodo o conteúdo foi revisado e adaptado para ${langLabel}, mantendo a identidade visual profissional. Você pode editar tudo no preview ou solicitar ajustes adicionais.` }]);
+      toast.success(`Traduzido para ${langLabel}!`);
+    } catch (e) {
+      toast.error("Erro ao traduzir: " + (e?.message || e));
     } finally {
       setSending(false);
     }
@@ -1612,9 +1588,20 @@ FORMATO:
           </div>
           <div className="ml-auto flex gap-2 shrink-0">
             {fileList.length > 0 && (
-              <Button size="sm" variant="outline" onClick={improveDesign} disabled={sending}>
-                <Sparkles className="w-3 h-3 mr-1" /> Melhorar Design
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={() => translateSite("pt")} disabled={sending} title="Traduzir para Português">
+                  🇧🇷 PT
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => translateSite("en")} disabled={sending} title="Traduzir para Inglês">
+                  🇺🇸 EN
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => translateSite("es")} disabled={sending} title="Traduzir para Espanhol">
+                  🇪🇸 ES
+                </Button>
+                <Button size="sm" variant="outline" onClick={improveDesign} disabled={sending}>
+                  <Sparkles className="w-3 h-3 mr-1" /> Melhorar Design
+                </Button>
+              </>
             )}
             <Button size="sm" onClick={generateAll} disabled={sending}>
               <Loader2 className={`w-3 h-3 mr-1 ${sending ? "animate-spin" : ""}`} /> Gerar Tudo
