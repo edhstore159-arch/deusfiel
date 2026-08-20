@@ -95,6 +95,17 @@ Imagens devem ser: Profissionais, Relevantes, Modernas, De alta qualidade, Coere
 
 Use URLs completas do https://picsum.photos com seed contextual (ex: https://picsum.photos/seed/restaurante-prato/800/600). Nunca use caminhos relativos, placeholders como solução final, imagens quebradas ou URLs inexistentes.
 
+### REGRAS PARA IMAGENS (OBRIGATÓRIO):
+- **IMG deve ser SEMPRE** \`display: block; width: 100%; height: auto; object-fit: cover;\` — imagens DEVEM ocupar toda a largura do container
+- **Container de imagem deve usar** \`overflow: hidden; border-radius:\` para imagens recortadas profissionalmente
+- **NUNCA** use \`text-align: left\` ou \`margin: 0\` para alinhar imagens à esquerda — imagens devem ser centralizadas com \`margin: 0 auto\` ou dentro de flexbox/grid com \`justify-content: center\`
+- **Hero images** devem ser full-width com \`width: 100%; height: 100%; object-fit: cover;\`
+- **Galerias** devem usar grid com \`gap:\` uniforme e imagens com \`aspect-ratio: 16/9\` ou \`3/2\`
+- **Imagens em seções de conteúdo** devem ter \`max-width: 100%; margin: 0 auto; display: block;\`
+- **figure/figcaption** deve usar \`text-align: center; margin: 2rem auto;\`
+- **Seção com imagem + texto** use grid 2 colunas: \`grid-template-columns: 1fr 1fr; gap: 3rem;\` com imagem em \`object-fit: cover; border-radius: 12px;\`
+- **Background images** use \`background-size: cover; background-position: center; background-repeat: no-repeat;\`
+
 ---
 
 ## 7. COMPONENTES
@@ -600,6 +611,19 @@ function ensureImages(html) {
   return out;
 }
 
+function ensureImageCenteringCss(css) {
+  if (!css) return css;
+  const imgRules = `
+/* Auto-center images */
+img { display: block; max-width: 100%; height: auto; }
+figure { text-align: center; margin: 2rem auto; max-width: 100%; }
+figure img { margin: 0 auto; }
+[class*="hero"] img, [class*="banner"] img, header img { width: 100%; object-fit: cover; }
+`;
+  if (css.includes("/* Auto-center images */")) return css;
+  return css + "\n" + imgRules;
+}
+
 const RESPONSIVE_CSS = `
 /* Responsivo automático */
 @media (max-width: 900px) {
@@ -656,7 +680,7 @@ function ensureViewport(html) {
 const postProcessFile = (name, content) => {
   if (typeof content !== "string") return content;
   if (name.endsWith(".html")) return ensureViewport(ensureImages(content));
-  if (name.endsWith(".css")) return ensureResponsiveCss(content);
+  if (name.endsWith(".css")) return ensureResponsiveCss(ensureImageCenteringCss(content));
   return content;
 };
 
