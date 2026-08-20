@@ -51,6 +51,23 @@ Antes de construir o site, crie internamente um design system: cores (primary, s
 
 Nunca use o mesmo layout para todos os negócios. Adapte automaticamente layout, cores, imagens, tipografia, formato dos cards, navegação, espaçamentos, animações, ordem das seções e quantidade de conteúdo. Exemplos: empresa de tecnologia → dark mode, gradientes, elementos tecnológicos; clínica → visual limpo, cores suaves, confiança, agendamento; restaurante → imagens grandes, cardápio, reservas, ambiente sofisticado.
 
+## 5-B. CÓPIA EXATA DE REFERÊNCIA (OBRIGATÓRIO)
+
+Quando receber uma REFERÊNCIA DE MODELO no prompt, você DEVE reproduzir o site de forma IDÊNTICA ao modelo referenciado. Copie EXATAMENTE:
+1. **Cores** — usa as mesmas cores exatas na mesma proporção (primary, secondary, background, accent)
+2. **Fontes** — use as mesmas famílias de fonte, tamanhos e pesos
+3. **Espaçamentos** — reproduza os mesmos paddings, margins e gaps
+4. **Bordas** — use os mesmos border-radius e border styles
+5. **Sombras** — aplique as mesmas box-shadow
+6. **Gradientes** — reproduza os mesmos gradients de fundo
+7. **Animações** — use as mesmas transições e efeitos
+8. **Ordem das seções** — siga EXATAMENTE a ordem listada
+9. **Textos** — use os mesmos textos de botões, CTAs e títulos quando fornecidos
+10. **Estrutura** — navbar, hero, cards, footer — tudo na mesma posição e estilo
+11. **Imagens** — use imagens dos mesmos temas/assuntos listados
+
+NÃO crie um design genérico quando uma referência é fornecida. O site gerado deve parecer que foi extraído do site original.
+
 ## 6. ESTRUTURA DE PÁGINA
 
 Não gere apenas hero → 3 cards → footer. Crie arquitetura completa, escolhendo as seções que fazem sentido para o negócio em ordem estratégica entre: Header, Hero, Benefícios, Serviços, Produtos, Sobre, Diferenciais, Processo de trabalho, Galeria, Portfólio, Depoimentos, Estatísticas, Equipe, FAQ, CTA, Contato, Footer.

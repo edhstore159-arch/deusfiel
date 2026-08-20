@@ -6,150 +6,163 @@ const corsHeaders = {
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
-const GENRE_PRESETS = {
-  esportes: "Referência: site moderno de esportes — hero escuro com gradiente, cards de modalidades (futebol, basquete, academia), placares/tabelas em destaque, seção de atletas com fotos, cores vibrantes (verde/lima, laranja) sobre fundo escuro, tipografia bold condensada, navbar fixa com logo esportivo.",
-  advocacia: "Referência: site premium de escritório de advocacia — paleta sóbria (azul-marinho, dourado), tipografia serifada elegante, hero institucional com foto do escritório, seções de áreas de atuação em cards, depoimentos, formulário de contato destacado, rodapé completo com endereço.",
-  restaurante: "Referência: site apetitoso de restaurante — fundo escuro com fotos de pratos grandes, tipografia display arredondada, menu em cards com preços, reservas com CTA em gradiente, seção de avaliações com estrelas, paleta quente (vermelho/laranja/âmbar).",
-  imobiliaria: "Referência: site clean de imobiliária — paleta neutra com destaque verde/esmeralda, grid de imóveis com fotos e preços em cards, filtros de busca no hero, seções de localização e depoimentos, tipografia geométrica moderna.",
-  academia: "Referência: site energético de academia/fitness — fundo escuro com fotos de treinos em alta energia, destaques em vermelho/amarelo neon, planos de mensalidade em cards, contador de membros, seção de treinadores com fotos.",
-  moda: "Referência: site elegante de moda — paleta minimalista (branco, bege, preto), tipografia fina com muito espaçamento, imagens de produtos em grande escala, layout editorial com grid assimétrico, hover com zoom suave nas fotos.",
-  saude: "Referência: site confiável de saúde/clínica — paleta verde-água e branco, cards suaves arredondados, fotos de equipe médica, seções de especialidades com ícones, depoimentos de pacientes, agendamento com CTA.",
-  tecnologia: "Referência: site futurista de tecnologia/startup — fundo escuro com gradientes neon (azul/roxo), glassmorphism em cards, animações de fade-in, seção de recursos com ícones, métricas em destaque, CTA em gradiente brilhante.",
-  saas: "Referência (lógica Ozyxtraker): SaaS/app premium dark — design system em variáveis CSS (--background escuro, --foreground claro, --primary vibrante, --surface-2, --card, --border, --muted-foreground), fundo com radial-gradient do primary no topo + gradiente linear, fonte display (Outfit) para títulos e sans (IBM Plex Sans) para texto, cards rounded-2xl com borda e sombra suave, botões min-h-12 rounded-xl/2xl font-semibold com active:scale-[0.98] e sombra flutuante, inputs rounded-2xl com ícone à esquerda e foco com ring, labels 12px uppercase com letter-spacing, divisor com 'ou', botão social com border-2, badge de segurança (Conexão Segura · Criptografia), logo no topo e marca opaca no rodapé, animação fade-in-up ao carregar, coluna max-w-md centrada com safe-area, micro-interações sutis e foco visível.",
-  igreja: "Referência: site acolhedor de igreja — paleta dourada e tons de madeira/branco, tipografia serifada com toque clássico, seção de cultos com horários, galeria de fotos, versículo em destaque no hero, formulário de contato.",
-  agencia: "Referência: site criativo de agência digital — fundo claro com elementos em gradiente colorido, tipografia bold grande, portfólio em grid com hover animado, marcas em carrossel, seção de serviços em cards com ícones.",
+const GENRE_PRESETS: Record<string, string> = {
+  esportes: "site moderno de esportes — hero escuro com gradiente, cards de modalidades, placares/tabelas em destaque, seção de atletas com fotos, cores vibrantes (verde/lima, laranja) sobre fundo escuro, tipografia bold condensada, navbar fixa.",
+  advocacia: "site premium de escritório de advocacia — paleta sóbria (azul-marinho, dourado), tipografia serifada elegante, hero institucional, seções de áreas de atuação em cards, depoimentos, formulário de contato, rodapé completo.",
+  restaurante: "site apetitoso de restaurante — fundo escuro com fotos de pratos grandes, tipografia display, menu em cards com preços, reservas com CTA, seção de avaliações, paleta quente (vermelho/laranja/âmbar).",
+  imobiliaria: "site clean de imobiliária — paleta neutra com destaque verde/esmeralda, grid de imóveis com fotos e preços, filtros de busca, seções de localização e depoimentos, tipografia geométrica.",
+  academia: "site energético de academia — fundo escuro com fotos de treinos, destaques em vermelho/amarelo neon, planos em cards, contador de membros, seção de treinadores.",
+  moda: "site elegante de moda — paleta minimalista (branco, bege, preto), tipografia fina com espaçamento, imagens grandes, layout editorial, hover com zoom.",
+  saude: "site confiável de saúde — paleta verde-água e branco, cards arredondados, fotos de equipe médica, seções de especialidades, depoimentos, agendamento.",
+  tecnologia: "site futurista de tecnologia — fundo escuro com gradientes neon (azul/roxo), glassmorphism, animações fade-in, seção de recursos, métricas, CTA gradiente.",
+  saas: "SaaS/app premium dark — design system em variáveis CSS, fundo com radial-gradient, fonte display para títulos, cards rounded-2xl com borda e sombra, botões rounded-xl, inputs rounded-2xl, animação fade-in-up.",
+  igreja: "site acolhedor de igreja — paleta dourada e madeira/branco, tipografia serifada, seção de cultos, galeria, versículo em destaque, formulário.",
+  agencia: "site criativo de agência digital — fundo claro com gradientes coloridos, tipografia bold grande, portfólio em grid com hover, marcas em carrossel, serviços em cards.",
 };
 
-const FAMOUS_SITES = {
+const FAMOUS_SITES: Record<string, Array<{name: string; url: string}>> = {
   esportes: [
     { name: "ESPN", url: "https://www.espn.com" },
     { name: "Nike", url: "https://www.nike.com" },
-    { name: "Globo Esporte", url: "https://ge.globo.com" },
     { name: "Adidas", url: "https://www.adidas.com" },
+    { name: "Under Armour", url: "https://www.underarmour.com" },
   ],
   advocacia: [
-    { name: "Pinheiro Neto Advogados", url: "https://www.pinheironeto.com.br" },
+    { name: "Pinheiro Neto", url: "https://www.pinheironeto.com.br" },
     { name: "TozziniFreire", url: "https://www.tozzinifreire.com.br" },
     { name: "Skadden", url: "https://www.skadden.com" },
     { name: "White & Case", url: "https://www.whitecase.com" },
   ],
   restaurante: [
     { name: "Fogo de Chão", url: "https://fogodechao.com.br" },
-    { name: "Outback Steakhouse", url: "https://www.outback.com" },
+    { name: "Outback", url: "https://www.outback.com" },
     { name: "Nando's", url: "https://www.nandos.co.uk" },
     { name: "Madero", url: "https://www.madero.com.br" },
   ],
   imobiliaria: [
     { name: "Zillow", url: "https://www.zillow.com" },
     { name: "CBRE", url: "https://www.cbre.com" },
-    { name: "JLL", url: "https://www.us.jll.com" },
-    { name: "Lopes Imóveis", url: "https://www.lopes.com.br" },
+    { name: "Lopes", url: "https://www.lopes.com.br" },
+    { name: "Redfin", url: "https://www.redfin.com" },
   ],
   academia: [
     { name: "Equinox", url: "https://www.equinox.com" },
     { name: "Gold's Gym", url: "https://www.goldsgym.com" },
-    { name: "CrossFit", url: "https://www.crossfit.com" },
     { name: "Smart Fit", url: "https://www.smartfit.com.br" },
+    { name: "CrossFit", url: "https://www.crossfit.com" },
   ],
   moda: [
-    { name: "Louis Vuitton", url: "https://www.louisvuitton.com" },
-    { name: "Gucci", url: "https://www.gucci.com" },
-    { name: "Farfetch", url: "https://www.farfetch.com" },
+    { name: "Zara", url: "https://www.zara.com" },
+    { name: "H&M", url: "https://www.hm.com" },
     { name: "Renner", url: "https://www.lojasrenner.com.br" },
+    { name: "Net-a-Porter", url: "https://www.net-a-porter.com" },
   ],
   saude: [
     { name: "Mayo Clinic", url: "https://www.mayoclinic.org" },
-    { name: "Cleveland Clinic", url: "https://my.clevelandclinic.org" },
-    { name: "Hospital Albert Einstein", url: "https://www.einstein.br" },
-    { name: "Hospital Sírio-Libanês", url: "https://www.hospitalsiriolibanes.org.br" },
+    { name: "Einstein", url: "https://www.einstein.br" },
+    { name: "Fleury", url: "https://www.fleury.com.br" },
+    { name: "Dasa", url: "https://www.dasa.com.br" },
   ],
   tecnologia: [
-    { name: "Ozyxtraker", url: "https://ozyxapp.com.br" },
     { name: "Stripe", url: "https://stripe.com" },
     { name: "Linear", url: "https://linear.app" },
     { name: "Vercel", url: "https://vercel.com" },
+    { name: "Supabase", url: "https://supabase.com" },
   ],
   saas: [
-    { name: "Ozyxtraker", url: "https://ozyxapp.com.br" },
     { name: "Stripe", url: "https://stripe.com" },
     { name: "Linear", url: "https://linear.app" },
     { name: "Notion", url: "https://www.notion.so" },
+    { name: "Slack", url: "https://slack.com" },
   ],
   igreja: [
     { name: "Elevation Church", url: "https://elevationchurch.org" },
     { name: "Hillsong", url: "https://hillsong.com" },
     { name: "Gateway Church", url: "https://gatewaypeople.com" },
-    { name: "Bíblia Sagrada Online", url: "https://www.bibliaonline.com.br" },
-    { name: "Igreja de Jesus Cristo dos Santos dos Últimos Dias", url: "https://www.churchofjesuschrist.org" },
+    { name: "LDS Church", url: "https://www.churchofjesuschrist.org" },
   ],
   agencia: [
-    { name: "Awwwards", url: "https://www.awwwards.com" },
     { name: "R/GA", url: "https://www.rga.com" },
     { name: "Futura", url: "https://www.futura.com.br" },
     { name: "TBWA", url: "https://www.tbwa.com" },
+    { name: "Wieden+Kennedy", url: "https://www.wk.com" },
   ],
 };
 
 const GENRE_PATTERNS = [
-  { re: /esport|futebol|fitness|academia|basquete|clube/i, key: "esportes" },
-  { re: /advocaci|juridic|advogad|escritorio de/i, key: "advocacia" },
-  { re: /restaurant|comida|pizza|lanchonete|delivery|bufe|confeitaria|padaria/i, key: "restaurante" },
-  { re: /imobiliar|imovel|apartamento|casa|corretor|empreendimento/i, key: "imobiliaria" },
-  { re: /academia|personal|treino|fitness|musculacao|crossfit/i, key: "academia" },
-  { re: /moda|roupa|loja de|vestuario|estilista|sapatos/i, key: "moda" },
-  { re: /clinica|saude|medico|dentista|hospital|fisioterapia|psicolog/i, key: "saude" },
+  { re: /esport|futebol|fitness|academia|basquete|clube|gym/i, key: "esportes" },
+  { re: /advocaci|juridic|advogad|escritorio de|law/i, key: "advocacia" },
+  { re: /restaurant|comida|pizza|lanchonete|delivery|bufe|confeitaria|padaria|food/i, key: "restaurante" },
+  { re: /imobiliar|imovel|apartamento|casa|corretor|empreendimento|real estate/i, key: "imobiliaria" },
+  { re: /academia|personal|treino|fitness|musculacao|crossfit|gym/i, key: "academia" },
+  { re: /moda|roupa|loja de|vestuario|estilista|sapatos|fashion/i, key: "moda" },
+  { re: /clinica|saude|medico|dentista|hospital|fisioterapia|psicolog|health/i, key: "saude" },
   { re: /tecnologia|startup|software|aplicativo|ti |sistema|inteligencia artificial|tech/i, key: "tecnologia" },
   { re: /saas|app |aplicativo|plataforma|radar|marketplace|dashboard|ferramenta/i, key: "saas" },
-  { re: /igreja|crist[aã]o|crente|ministerio|culto|evangelic|catolic|paroquia|b[ií]blia|jesus|gospel|adorac|capela/i, key: "igreja" },
-  { re: /agencia|criativ|marketing|digital|publicidade|design/i, key: "agencia" },
+  { re: /igreja|crist[aã]o|crente|ministerio|culto|evangelic|catolic|paroquia|b[ií]blia|jesus|gospel|adorac|capela|church/i, key: "igreja" },
+  { re: /agencia|criativ|marketing|digital|publicidade|design|agency/i, key: "agencia" },
 ];
 
-function detectGenre(prompt) {
+function detectGenre(prompt: string): string {
   for (const p of GENRE_PATTERNS) {
     if (p.re.test(prompt)) return p.key;
   }
   return "";
 }
 
-function extractBlueprint(html, url) {
+function extractDeepBlueprint(html: string, url: string): string {
   if (!html || html.length < 200) return "";
-  const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]?.trim().slice(0, 90) || "";
-  const desc = (html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)/i) || [])[1]?.trim().slice(0, 180) || "";
+  const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]?.trim().slice(0, 100) || "";
+  const desc = (html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)/i) || [])[1]?.trim().slice(0, 200) || "";
   const body = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
   const cssRaw = (html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi) || []).join(" ");
 
-  const colorCounts = {};
-  (body.match(/#[0-9a-fA-F]{6}\b/g) || []).forEach((c) => {
-    const k = c.toLowerCase();
+  const colorCounts: Record<string, number> = {};
+  (body.match(/#[0-9a-fA-F]{3,8}\b/g) || []).forEach((c) => {
+    const k = c.toLowerCase().slice(0, 7);
     colorCounts[k] = (colorCounts[k] || 0) + 1;
   });
-  const colors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c]) => c);
+  const colors = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([c]) => c);
 
-  const fontRaw = (body.match(/font-family\s*:\s*([^;}]{2,40})/gi) || []).concat(cssRaw.match(/font-family\s*:\s*([^;}]{2,40})/gi) || []);
-  const fontList = [];
+  const rgbColors = [...new Set((body.match(/rgba?\(\d+,\s*\d+,\s*\d+(?:,\s*[\d.]+)?\)/gi) || []))].slice(0, 6);
+
+  const gradients = [...new Set((cssRaw.match(/background(?:-image)?\s*:\s*(linear-gradient|radial-gradient)[^;]{10,80}/gi) || []))].slice(0, 4).map((g) => g.replace(/background(?:-image)?\s*:\s*/i, "").trim().slice(0, 80));
+
+  const fontRaw = (body.match(/font-family\s*:\s*([^;}]{2,50})/gi) || []).concat(cssRaw.match(/font-family\s*:\s*([^;}]{2,50})/gi) || []);
+  const fontList: string[] = [];
   for (const fx of fontRaw) {
     const name = fx.replace(/font-family\s*:\s*/i, "").split(",")[0].trim().replace(/['"]/g, "").slice(0, 30);
-    if (name && name !== "sans-serif" && name !== "serif" && !fontList.includes(name)) fontList.push(name);
+    if (name && !["sans-serif", "serif", "monospace", "cursive", "system-ui"].includes(name.toLowerCase()) && !fontList.includes(name)) fontList.push(name);
   }
-  const fonts = fontList.slice(0, 4);
+  const fonts = fontList.slice(0, 5);
 
-  const headings = [...body.matchAll(/<(h[1-3])[^>]*>([\s\S]{0,90}?)<\/\1>/gi)]
-    .map((m) => `${m[1]}: ${m[2].replace(/<[^>]+>/g, "").trim().slice(0, 60)}`)
+  const fontSizes = [...new Set((cssRaw.match(/font-size\s*:\s*\d+(?:\.\d+)?(?:px|rem|em)/gi) || []))].slice(0, 8).map((f) => f.replace(/font-size\s*:\s*/i, ""));
+  const fontWeights = [...new Set((cssRaw.match(/font-weight\s*:\s*\d{3}/gi) || []))].slice(0, 5).map((f) => f.replace(/font-weight\s*:\s*/i, ""));
+
+  const headings = [...body.matchAll(/<(h[1-6])[^>]*>([\s\S]{0,120}?)<\/\1>/gi)]
+    .map((m) => `${m[1]}: ${m[2].replace(/<[^>]+>/g, "").trim().slice(0, 80)}`)
     .filter(Boolean)
-    .slice(0, 14);
+    .slice(0, 16);
+
+  const paragraphs = [...body.matchAll(/<p[^>]*>([\s\S]{20,200}?)<\/p>/gi)]
+    .map((m) => m[1].replace(/<[^>]+>/g, "").trim().slice(0, 120))
+    .filter(Boolean)
+    .slice(0, 8);
 
   const hasNav = /<nav\b|<header\b/i.test(body);
-  const hasHero = /hero|banner|hero-section/i.test(body);
+  const hasHero = /hero|banner|jumbotron|hero-section|hero-section/i.test(body);
   const hasCards = /card|feature|servi[çc]o|product|grid/i.test(body);
-  const hasStats = /stat|n[uú]mero|metric|counter/i.test(body);
+  const hasStats = /stat|n[uú]mero|metric|counter|count/i.test(body);
   const hasTestimonials = /testimonial|depoiment|review|aval/i.test(body);
   const hasPricing = /pricing|planos|pre[çc]o|mensalidade|assinatura/i.test(body);
   const hasFaq = /faq|perguntas|accordion|duvidas/i.test(body);
   const hasForm = /<form\b/i.test(body);
   const hasGallery = /galer|gallery|portfolio|projetos/i.test(body);
   const hasFooter = /<footer\b/i.test(body);
+  const hasVideo = /<video|youtube|vimeo/i.test(body);
+  const hasMap = /maps|google.*map|iframe.*map/i.test(body);
 
-  const ctas = [];
+  const ctas: string[] = [];
   for (const m of body.matchAll(/<button[^>]*>([\s\S]{0,60}?)<\/button>/gi)) {
     const t = m[1].replace(/<[^>]+>/g, "").trim();
     if (t && t.length < 40 && !ctas.includes(t)) ctas.push(t);
@@ -159,14 +172,26 @@ function extractBlueprint(html, url) {
     if (t && t.length < 40 && !ctas.includes(t)) ctas.push(t);
   }
 
-  const radii = [...new Set((cssRaw.match(/border-radius\s*:\s*(\d+(?:\.\d+)?px)/gi) || []).slice(0, 12))].map((r) => r.replace(/border-radius\s*:\s*/i, ""));
-  const paddings = [...new Set((cssRaw.match(/padding\s*:\s*(\d+(?:\.\d+)?px)/gi) || []).slice(0, 10))].map((p) => p.replace(/padding\s*:\s*/i, ""));
+  const radii = [...new Set((cssRaw.match(/border-radius\s*:\s*[\d.]+(?:px|rem|%)/gi) || []))].slice(0, 8).map((r) => r.replace(/border-radius\s*:\s*/i, ""));
+  const paddings = [...new Set((cssRaw.match(/padding\s*:\s*[\d.]+(?:px|rem|em)/gi) || []))].slice(0, 8).map((p) => p.replace(/padding\s*:\s*/i, ""));
+  const margins = [...new Set((cssRaw.match(/margin(?:-(?:top|bottom|left|right))?\s*:\s*[\d.]+(?:px|rem|em|auto)/gi) || []))].slice(0, 6).map((m) => m.trim());
+  const shadows = [...new Set((cssRaw.match(/box-shadow\s*:\s*[^;]{5,60}/gi) || []))].slice(0, 4).map((s) => s.replace(/box-shadow\s*:\s*/i, "").trim().slice(0, 50));
   const responsive = /@media\s*\(/i.test(cssRaw);
+  const animations = [...new Set((cssRaw.match(/(?:animation|transition)\s*:\s*[^;]{5,60}/gi) || []))].slice(0, 4).map((a) => a.trim().slice(0, 50));
+  const cssVars = [...new Set((cssRaw.match(/--[\w-]+\s*:\s*[^;]{2,40}/gi) || []))].slice(0, 10).map((v) => v.trim());
 
-  const imgs = [...body.matchAll(/<img[^>]*alt=["']([^"']{2,50})["']/gi)].map((m) => m[1]).filter(Boolean).slice(0, 10);
+  const imgs = [...body.matchAll(/<img[^>]*(?:alt=["']([^"']{2,60})["'])?[^>]*>/gi)]
+    .map((m) => ({ alt: m[1] || "", src: (m[0].match(/src=["']([^"']+)/i) || [])[1] || "" }))
+    .filter((i) => i.alt)
+    .slice(0, 12);
   const imgCount = (body.match(/<img\b/gi) || []).length;
 
-  const sections = [];
+  const links = [...body.matchAll(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,60}?)<\/a>/gi)]
+    .map((m) => ({ href: m[1].slice(0, 60), text: m[2].replace(/<[^>]+>/g, "").trim().slice(0, 40) }))
+    .filter((l) => l.text && l.text.length > 1 && l.text.length < 30)
+    .slice(0, 12);
+
+  const sections: string[] = [];
   if (hasNav) sections.push("navbar/header");
   if (hasHero) sections.push("hero");
   if (hasStats) sections.push("estatísticas");
@@ -176,29 +201,57 @@ function extractBlueprint(html, url) {
   if (hasPricing) sections.push("planos/preços");
   if (hasFaq) sections.push("FAQ");
   if (hasForm) sections.push("formulário");
+  if (hasVideo) sections.push("vídeo");
+  if (hasMap) sections.push("mapa/localização");
   if (hasFooter) sections.push("footer");
 
-  return `Modelo conceituado: ${url}${title ? ` — "${title}"` : ""}${desc ? ` (${desc})` : ""} | Paleta de cores (por frequência): ${colors.join(", ") || "não detectada"} | Fontes: ${fonts.join(", ") || "não detectadas"} | Seções em ordem estratégica: ${sections.join(" → ") || "não detectadas"} | Estrutura: ${hasNav ? "navbar, " : ""}${hasHero ? "hero, " : ""}${hasCards ? "cards, " : ""}${hasStats ? "stats, " : ""}${hasTestimonials ? "depoimentos, " : ""}${hasPricing ? "preços, " : ""}${hasForm ? "formulário, " : ""}${hasFooter ? "footer" : ""} | Botões/CTAs: ${ctas.join(", ") || "não detectados"} | Cantos arredondados: ${radii.slice(0, 4).join(", ") || "não detectados"} | Espaçamentos: ${paddings.slice(0, 4).join(", ") || "não detectados"} | Responsivo: ${responsive ? "sim (media queries)" : "não detectado"} | ${headings.length} títulos, ${imgCount} imagens${imgs.length ? ` (temas: ${imgs.slice(0, 6).join(" | ")})` : ""}.
+  let brief = `MODELO DE REFERÊNCIA: ${url}`;
+  if (title) brief += `\nTÍTULO: "${title}"`;
+  if (desc) brief += `\nDESCRIÇÃO: ${desc}`;
+  brief += `\n\nCORES (por frequência): ${colors.join(", ") || "não detectada"}`;
+  if (rgbColors.length) brief += `\nCORES RGB: ${rgbColors.join(", ")}`;
+  if (gradients.length) brief += `\nGRADIENTES: ${gradients.join(" | ")}`;
+  brief += `\n\nFONTES: ${fonts.join(", ") || "não detectadas"}`;
+  if (fontSizes.length) brief += `\nTAMANHOS: ${fontSizes.join(", ")}`;
+  if (fontWeights.length) brief += `\nPESOS: ${fontWeights.join(", ")}`;
+  brief += `\n\nSEÇÕES (ordem): ${sections.join(" → ") || "não detectadas"}`;
+  brief += `\nESTRUTURA: ${sections.join(", ")}`;
+  if (ctas.length) brief += `\nBOTÕES/CTAs: ${ctas.join(", ")}`;
+  if (links.length) brief += `\nNAVEGAÇÃO: ${links.map((l) => l.text).join(", ")}`;
+  if (headings.length) brief += `\nTÍTULOS: ${headings.slice(0, 10).join(" | ")}`;
+  if (paragraphs.length) brief += `\nTEXTOS: ${paragraphs.slice(0, 5).join(" | ")}`;
+  if (radii.length) brief += `\nBORDAS ARREDONDADAS: ${radii.join(", ")}`;
+  if (paddings.length) brief += `\nPADDINGS: ${paddings.join(", ")}`;
+  if (margins.length) brief += `\nMARGENS: ${margins.join(", ")}`;
+  if (shadows.length) brief += `\nSOBRAS: ${shadows.join(" | ")}`;
+  if (animations.length) brief += `\nANIMAÇÕES: ${animations.join(" | ")}`;
+  if (cssVars.length) brief += `\nCSS VARS: ${cssVars.join(", ")}`;
+  brief += `\nRESPONSIVO: ${responsive ? "SIM (media queries)" : "NÃO"}`;
+  brief += `\nTOTAL: ${headings.length} títulos, ${imgCount} imagens${imgs.length ? `, imagens: ${imgs.map((i) => i.alt).join(", ")}` : ""}`;
+  brief += `\n\nINSTRUÇÃO DE FIDELIDADE: Ao gerar este site, REPRODUZA EXATAMENTE esta paleta de cores, fontes, tamanhos, pesos, espaçamentos, bordas, sombras, gradientes, animações, ordem de seções, textos dos botões, títulos e textos. O site gerado deve parecer IDÊNTICO ao modelo de referência em termos de design, cores, tipografia e estrutura.`;
 
-FIDELIDADE: ao gerar o site, reproduza fielmente esta paleta de cores (na mesma proporção), as fontes, a ordem e a estrutura de seções, os textos dos botões/CTAs, o estilo de cantos e espaçamentos, e use imagens dos mesmos temas.`;
+  return brief;
 }
 
-function scoreHtml(html) {
+function scoreHtml(html: string): number {
   if (!html || html.length < 1000) return 0;
   const body = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
   let s = 0;
-  s += Math.min(10, (body.match(/<h[1-3]\b/gi) || []).length);
-  s += Math.min(8, (body.match(/<img\b/gi) || []).length);
-  s += ((body.match(/<nav\b|<header\b/i) || []).length) * 2;
-  s += ((body.match(/<footer\b/i) || []).length) * 2;
-  s += ((body.match(/#[0-9a-fA-F]{6}\b/g) || []).length > 4 ? 3 : 0);
-  s += (/@media\s*\(/i.test(html) ? 2 : 0);
+  s += Math.min(12, (body.match(/<h[1-3]\b/gi) || []).length);
+  s += Math.min(10, (body.match(/<img\b/gi) || []).length);
+  s += ((body.match(/<nav\b|<header\b/i) || []).length) * 3;
+  s += ((body.match(/<footer\b/i) || []).length) * 3;
+  s += ((body.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length > 6 ? 4 : 0);
+  s += (/@media\s*\(/i.test(html) ? 3 : 0);
   s += ((body.match(/<form\b/i) || []).length) * 2;
-  s += ((body.match(/<section\b/i) || []).length);
+  s += ((body.match(/<section\b/i) || []).length) * 2;
+  s += ((body.match(/animation|transition/gi) || []).length > 2 ? 2 : 0);
+  s += ((body.match(/box-shadow/gi) || []).length > 1 ? 2 : 0);
+  s += ((body.match(/linear-gradient|radial-gradient/gi) || []).length > 1 ? 2 : 0);
   return s;
 }
 
-async function searchLite(q) {
+async function searchLite(q: string): Promise<string[]> {
   const url = "https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(q);
   const res = await fetch(url, {
     headers: { "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9" },
@@ -206,22 +259,22 @@ async function searchLite(q) {
   });
   if (!res.ok) return [];
   const html = await res.text();
-  const links = [];
+  const links: string[] = [];
   const re = /<a[^>]*rel="nofollow"[^>]*href="([^"]+)"[^>]*>/gi;
   let m;
-  while ((m = re.exec(html)) !== null && links.length < 8) {
+  while ((m = re.exec(html) !== null && links.length < 10)) {
     const href = m[1];
-    if (/^https?:\/\//i.test(href) && !/duckduckgo\.com|youtube\.com|facebook\.com|instagram\.com|twitter\.com|t\.me/i.test(href)) {
+    if (/^https?:\/\//i.test(href) && !/duckduckgo\.com|youtube\.com|facebook\.com|instagram\.com|twitter\.com|t\.me|pinterest|tiktok/i.test(href)) {
       links.push(href);
     }
   }
   return links;
 }
 
-async function tryFetch(url) {
+async function tryFetch(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9", "Accept": "text/html" },
+      headers: { "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8", "Accept": "text/html,application/xhtml+xml" },
       redirect: "follow",
       signal: AbortSignal.timeout(4000),
     });
@@ -229,7 +282,7 @@ async function tryFetch(url) {
     if (!res.ok || !ct.includes("html")) return null;
     const html = await res.text();
     if (!html || html.length < 1000) return null;
-    return html.slice(0, 120000);
+    return html.slice(0, 150000);
   } catch {
     return null;
   }
@@ -246,8 +299,7 @@ Deno.serve(async (req) => {
     const genre = detectGenre(prompt);
     const preset = genre ? GENRE_PRESETS[genre] : "";
 
-    let best = { brief: "", url: "", score: -1, name: "" };
-    let source = "";
+    const allBriefs: Array<{ brief: string; url: string; score: number; name: string }> = [];
 
     if (genre && FAMOUS_SITES[genre]) {
       const results = await Promise.allSettled(
@@ -255,54 +307,66 @@ Deno.serve(async (req) => {
           const html = await tryFetch(famous.url);
           if (!html) return null;
           const score = scoreHtml(html);
-          const b = extractBlueprint(html, famous.url);
-          if (b.length > 60 && score > best.score) {
+          const b = extractDeepBlueprint(html, famous.url);
+          if (b.length > 100 && score > 5) {
             return { brief: b, url: famous.url, score, name: famous.name };
           }
           return null;
         })
       );
       for (const r of results) {
-        if (r.status === "fulfilled" && r.value && r.value.score > best.score) {
-          best = r.value;
-          source = "famoso";
+        if (r.status === "fulfilled" && r.value) {
+          allBriefs.push(r.value);
         }
       }
+      allBriefs.sort((a, b) => b.score - a.score);
     }
 
-    if (!best.brief) {
+    if (allBriefs.length === 0) {
       const queries = [
-        `${genre ? GENRE_PRESETS[genre].slice(0, 60).replace("Referência: ", "") : prompt} melhor site ${genre ? "" : "modelo "}design award premiado`,
-        `${genre ? GENRE_PRESETS[genre].slice(0, 60).replace("Referência: ", "") : prompt} website design inspiração top`,
+        `${genre ? preset.slice(0, 60) : prompt} melhor site design award premiado 2024 2025`,
+        `${genre ? preset.slice(0, 60) : prompt} website inspiração top profissional`,
       ];
       for (const query of queries) {
         const links = await searchLite(query);
-        for (const link of links.slice(0, 4)) {
-          const html = await tryFetch(link);
-          if (!html) continue;
-          const score = scoreHtml(html);
-          const b = extractBlueprint(html, link);
-          if (b.length > 60 && score > best.score) {
-            best = { brief: b, url: link, score, name: "" };
-            source = "busca";
+        const searchResults = await Promise.allSettled(
+          links.slice(0, 5).map(async (link) => {
+            const html = await tryFetch(link);
+            if (!html) return null;
+            const score = scoreHtml(html);
+            const b = extractDeepBlueprint(html, link);
+            if (b.length > 100 && score > 5) {
+              return { brief: b, url: link, score, name: "" };
+            }
+            return null;
+          })
+        );
+        for (const r of searchResults) {
+          if (r.status === "fulfilled" && r.value) {
+            allBriefs.push(r.value);
           }
         }
-        if (best.brief) break;
+        if (allBriefs.length >= 2) break;
       }
+      allBriefs.sort((a, b) => b.score - a.score);
     }
 
     let brief = "";
-    if (best.brief) {
-      brief = best.name
-        ? `Use como referência conceitual o site ${best.name} (${best.url}), reconhecido mundialmente — ${best.brief}`
-        : `Referência pesquisada na internet: ${best.brief}`;
-      if (genre && preset) brief += "\n\nDireção de design para este segmento:\n" + preset.replace("Referência: ", "");
+    if (allBriefs.length > 0) {
+      const top = allBriefs[0];
+      brief = top.name
+        ? `Use como referência o site ${top.name} (${top.url}), mundialmente reconhecido:\n\n${top.brief}`
+        : `Referência encontrada na internet (${top.url}):\n\n${top.brief}`;
+
+      if (allBriefs.length > 1) {
+        const second = allBriefs[1];
+        brief += `\n\nSEGUNDA REFERÊNCIA (${second.name || second.url}):\n${second.brief.slice(0, 1500)}`;
+      }
     } else if (preset) {
-      brief = preset + (genre ? ` | Gênero detectado: ${genre}.` : "");
-      source = "preset";
+      brief = `DIREÇÃO DE DESIGN: ${preset}`;
     }
 
-    return new Response(JSON.stringify({ genre, searchedUrl: best.url, source, score: best.score, brief }), {
+    return new Response(JSON.stringify({ genre, searchedUrl: allBriefs[0]?.url || "", source: allBriefs.length > 0 ? "web" : "preset", score: allBriefs[0]?.score || 0, brief, referencesFound: allBriefs.length }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

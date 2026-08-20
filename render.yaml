@@ -114,7 +114,7 @@ services:
       - key: FCC_AUTH_TOKEN
         value: freecc
       - key: FCC_MODEL
-        value: nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+        value: claude-3-5-sonnet-20241022
       - key: NVIDIA_NIM_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
