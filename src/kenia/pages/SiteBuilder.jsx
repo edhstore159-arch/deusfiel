@@ -1351,7 +1351,13 @@ export default function SiteBuilder() {
       const history = messages.slice(-20).map((m) => ({ role: m.role, content: m.content }));
       let finalUser = userMsg;
       let brief = "";
-      if (isCreateIntent(userMsg)) {
+      const hasFiles = fileList.length > 0;
+
+      // Se ja existem arquivos, incluir o site atual no prompt para a IA modificar
+      if (hasFiles && !isCreateIntent(userMsg)) {
+        const currentSite = fileList.map((f) => `=== ${f} ===\n${files[f]}`).join("\n\n");
+        finalUser = `SITE ATUAL:\n\n${currentSite.slice(0, 18000)}\n\n---\n\nPEDIDO DO CLIENTE: ${userMsg}\n\nIMPORTANTE: Modifique o site acima conforme o pedido. Retorne TODOS os arquivos completos (index.html, styles.css, script.js) com as alteracoes aplicadas. NAO crie um site novo — modifique o existente.`;
+      } else if (isCreateIntent(userMsg)) {
         const [refResult] = await Promise.all([
           fetchDesignRef(userMsg),
           Promise.resolve(),
@@ -1359,6 +1365,7 @@ export default function SiteBuilder() {
         brief = refResult;
         if (brief) finalUser = brief + "\n\nPEDIDO DO CLIENTE:\n" + userMsg;
       }
+
       const aiText = await callWithFallback(history.concat([{ role: "user", content: finalUser }]));
       let newFiles = parseFilesFromCode(aiText);
       if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) {
@@ -1371,7 +1378,7 @@ export default function SiteBuilder() {
       }
       const built = { ...files };
       for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") built[k] = postProcessFile(k, v);
-      commitGenerated(built, "Site gerado");
+      commitGenerated(built, hasFiles ? "Site atualizado" : "Site gerado");
     } catch (e) {
       const msg = e?.message || String(e);
       toast.error("Erro: " + msg);
