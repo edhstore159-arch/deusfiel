@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "site-builder:state";
 
-const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-sonnet-4";
+const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-haiku-4-5";
 const FCC_DIRECT_URL = import.meta.env.VITE_FCC_URL || "https://fcc-server.onrender.com";
 
 const SITE_SYSTEM_PROMPT = `# SISTEMA DE GERAÇÃO DE SITES PROFISSIONAIS
