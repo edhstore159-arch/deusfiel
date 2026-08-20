@@ -1055,17 +1055,21 @@ export default function SiteBuilder() {
     if (!url) { toast.error("Cole a URL do site que deseja clonar"); return; }
     setCloning(true);
     try {
-      // Try crawl first (multiple pages), fall back to single page if too large
-      let { data, error } = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
-      if (error || !data?.scraped) {
-        // Crawl failed (site too large?) → try single page only
-        const single = await supabase.functions.invoke("fetch-site", { body: { url, crawl: false } });
-        data = single.data;
-        error = single.error;
+      let data = null;
+      // Try crawl first (multiple pages)
+      try {
+        const crawl = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
+        if (crawl.data?.scraped && crawl.data?.pages?.length) data = crawl.data;
+      } catch (_) { /* site too large, fall through */ }
+      // Fall back to single page if crawl failed
+      if (!data) {
+        try {
+          const single = await supabase.functions.invoke("fetch-site", { body: { url, crawl: false } });
+          if (single.data?.scraped) data = single.data;
+        } catch (_) { /* even single page failed */ }
       }
-      if (error) throw new Error(error.message);
-      if (!data?.scraped || !data?.pages?.length) {
-        await cloneViaRadar(data?.origin || url);
+      if (!data) {
+        await cloneViaRadar(url);
         return;
       }
       const origin = data.origin || new URL(data.url || url).origin;
