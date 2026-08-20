@@ -21,7 +21,7 @@ INSERT INTO public.wa_strategies (name, label, color, description) VALUES
   ('urgencia', 'Urgência', '#ef4444', 'Situação que precisa de atendimento imediato'),
   ('oracao', 'Oração', '#ec4899', 'Momento de oração e acolhimento espiritual'),
   ('agendamento', 'Agendamento', '#14b8a6', 'Marcação de reunião ou compromisso'),
-  ('pos_atendimento', 'Pós-Atendimento', '#6366f1', 'Verificação e acompanhamento');
+  ('pos_atendimento', 'Pós-Atendimento', '#6366f1', 'Verificação e acompanhamento')
 ON CONFLICT (name) DO NOTHING;
 
 -- WhatsApp conversations (one per phone number interaction)
