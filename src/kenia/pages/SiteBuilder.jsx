@@ -125,8 +125,9 @@ Responda APENAS com o código completo e funcional do site, organizado em blocos
 
 const PROVIDERS = [
   { id: "opencode", label: "OpenCode", desc: "Zen (gratuito)", color: "#2563eb" },
-  { id: "emergent", label: "Emergent", desc: "Claude Sonnet (grátis)", color: "#059669" },
+  { id: "ollama", label: "llama.cpp", desc: "Local (gratuito)", color: "#7c3aed" },
   { id: "fcc", label: "Claude FCC", desc: "free-claude-code", color: "#d97706" },
+  { id: "emergent", label: "Emergent", desc: "GPT-4o (gratis)", color: "#059669" },
 ];
 
 const OPENCODE_MODELS = [
@@ -141,6 +142,12 @@ const OPENCODE_MODELS = [
   { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", desc: "Google" },
   { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", desc: "Google premium" },
   { id: "grok-4.5", label: "Grok 4.5", desc: "xAI" },
+];
+
+const OLLAMA_MODELS = [
+  { id: "qwen2.5:3b-instruct", label: "Qwen 2.5 3B", desc: "Rápido" },
+  { id: "gemma4:12b", label: "Gemma 4 12B", desc: "Google" },
+  { id: "qwen-hermes:latest", label: "Qwen Hermes", desc: "Chat" },
 ];
 
 async function callClaudeFCC(messages) {
@@ -210,6 +217,28 @@ async function callEmergent(messages, model) {
   }
   const text = (data?.choices?.[0]?.message?.content || data?.content?.[0]?.text || "").trim();
   if (!text) throw new Error("Emergent retornou resposta vazia");
+  return text;
+}
+
+async function callOllama(messages, model) {
+  const { data, error } = await supabase.functions.invoke("fcc-proxy", {
+    timeout: 300000,
+    body: {
+      provider: "ollama",
+      model: model || "qwen2.5:3b-instruct",
+      max_tokens: 8000,
+      system: SITE_SYSTEM_PROMPT,
+      messages: messages.filter((m) => m.role !== "system"),
+    },
+  });
+  if (data?.error) {
+    throw new Error(`Ollama: ${data.error}`);
+  }
+  if (error) {
+    throw new Error(`Ollama: ${error.message}`);
+  }
+  const text = (data?.choices?.[0]?.message?.content || data?.content?.[0]?.text || "").trim();
+  if (!text) throw new Error("Ollama retornou resposta vazia");
   return text;
 }
 
@@ -632,6 +661,7 @@ export default function SiteBuilder() {
   const [mobileTab, setMobileTab] = useState("chat");
   const [provider, setProvider] = useState("opencode");
   const [openCodeModel, setOpenCodeModel] = useState("big-pickle");
+  const [ollamaModel, setOllamaModel] = useState("qwen2.5:3b-instruct");
   const [cloneUrl, setCloneUrl] = useState("");
   const [cloning, setCloning] = useState(false);
   const [theme, setTheme] = useState("none");
@@ -1062,8 +1092,9 @@ export default function SiteBuilder() {
       } catch (e) {
         const msg = String(e?.message || e);
         const fallbacks = [
-          { label: "Emergent", fn: () => callEmergent(messages) },
           { label: "OpenCode", fn: () => callOpenCode(messages, openCodeModel) },
+          { label: "llama.cpp", fn: () => callOllama(messages, ollamaModel) },
+          { label: "Emergent", fn: () => callEmergent(messages) },
           { label: "Claude FCC", fn: () => callClaudeFCC(messages) },
         ].filter((f) => f.label !== primaryLabel);
         for (const fb of fallbacks) {
@@ -1077,6 +1108,7 @@ export default function SiteBuilder() {
     };
 
     if (provider === "opencode") return tryAll(provider, "OpenCode", () => callOpenCode(messages, openCodeModel));
+    if (provider === "ollama") return tryAll(provider, "llama.cpp", () => callOllama(messages, ollamaModel));
     if (provider === "emergent") return tryAll(provider, "Emergent", () => callEmergent(messages));
     return tryAll(provider, "Claude FCC", () => callClaudeFCC(messages));
   };
@@ -1307,6 +1339,26 @@ export default function SiteBuilder() {
                     size="sm"
                     variant={openCodeModel === m.id ? "default" : "outline"}
                     onClick={() => setOpenCodeModel(m.id)}
+                    title={m.desc}
+                    className="h-8"
+                  >
+                    {m.label}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
+          {provider === "ollama" && (
+            <>
+              <span className="text-muted-foreground shrink-0">|</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-xs font-medium text-muted-foreground">Modelo:</span>
+                {OLLAMA_MODELS.map((m) => (
+                  <Button
+                    key={m.id}
+                    size="sm"
+                    variant={ollamaModel === m.id ? "default" : "outline"}
+                    onClick={() => setOllamaModel(m.id)}
                     title={m.desc}
                     className="h-8"
                   >

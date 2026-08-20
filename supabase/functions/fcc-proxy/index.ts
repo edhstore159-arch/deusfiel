@@ -84,6 +84,35 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (provider === "ollama") {
+      const ollamaUrl = Deno.env.get("OLLAMA_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev";
+      const ollamaModel = body.model || "qwen2.5:3b-instruct";
+      const ollamaRes = await fetch(`${ollamaUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify({
+          model: ollamaModel,
+          max_tokens: body.max_tokens || 8000,
+          messages,
+        }),
+      });
+      const ollamaData = await ollamaRes.json().catch(() => null);
+      if (!ollamaRes.ok || ollamaData?.error) {
+        const errMsg = ollamaData?.error?.message || ollamaData?.error || `HTTP ${ollamaRes.status}`;
+        return new Response(JSON.stringify({ error: `Ollama: ${errMsg}` }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify(ollamaData), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const fccUrl = Deno.env.get("FCC_URL") || "https://fcc-server.onrender.com";
     const fccToken = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
     const fccModel = Deno.env.get("FCC_MODEL") || "nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
