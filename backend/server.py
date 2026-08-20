@@ -4419,3 +4419,63 @@ async def ctr_export(job_id: str):
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=ctr_predictions_{job_id}.csv"},
     )
+
+
+# ─── FCC PROXY (Anthropic Messages API → Emergent) ────────────────────────
+# Proxy gratuito que traduz requests do formato Anthropic para Emergent,
+# permitindo que Supabase Edge Functions e outros clientes usem /v1/messages.
+
+FCC_AUTH = os.environ.get('FCC_AUTH_TOKEN', 'freecc')
+
+@app.post("/v1/messages")
+async def fcc_proxy_messages(request: Request):
+    """Proxy no formato Anthropic Messages API → Emergent (Claude 3.5 Sonnet)."""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "JSON inválido")
+
+    api_key = request.headers.get("x-api-key") or request.headers.get("Authorization", "").replace("Bearer ", "")
+    if api_key != FCC_AUTH:
+        raise HTTPException(401, "Token inválido")
+
+    model = body.get("model", FCC_MODEL)
+    messages = body.get("messages", [])
+    system = body.get("system", "")
+    max_tokens = body.get("max_tokens", 2000)
+    temperature = body.get("temperature", 0.3)
+
+    emergent_model = "claude-3-5-sonnet-20241022"
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(500, "EMERGENT_LLM_KEY não configurado")
+
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            model=emergent_model,
+            system_message=system,
+        )
+        user_content = "\n".join(
+            m.get("content", "") if isinstance(m.get("content"), str)
+            else " ".join(
+                block.get("text", "")
+                for block in (m.get("content") if isinstance(m.get("content"), list) else [])
+            )
+            for m in messages if m.get("role") == "user"
+        )
+        if not user_content:
+            user_content = str(messages[-1].get("content", "")) if messages else ""
+
+        response = await chat.send_message(UserMessage(text=user_content))
+        text = str(response) if response else ""
+        return {
+            "id": f"msg_{uuid.uuid4().hex[:24]}",
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "text", "text": text}],
+            "model": emergent_model,
+            "stop_reason": "end_turn",
+        }
+    except Exception as e:
+        logging.error(f"FCC proxy error: {e}")
+        raise HTTPException(502, f"Erro ao chamar LLM: {str(e)[:200]}")
