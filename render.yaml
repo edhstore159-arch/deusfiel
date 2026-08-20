@@ -105,6 +105,7 @@ services:
     name: fcc-server
     runtime: python
     plan: starter
+    autoDeploy: true
     buildCommand: pip install free-claude-code
     startCommand: fcc-server
     envVars:
@@ -113,17 +114,15 @@ services:
       - key: FCC_AUTH_TOKEN
         value: freecc
       - key: FCC_MODEL
-        value: claude-3-5-sonnet-20241022
+        value: nvidia_nim/nvidia/nemotron-3-super-120b-a12b
       - key: NVIDIA_NIM_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
       - key: EMERGENT_API_KEY
         value: sk-emergent-b8cEdA5822d14C0638
-        sync: false
       - key: EMERGENT_LLM_KEY
         value: sk-emergent-b8cEdA5822d14C0638
-        sync: false
       - key: EMERGENT_ENABLED
         value: "true"
 

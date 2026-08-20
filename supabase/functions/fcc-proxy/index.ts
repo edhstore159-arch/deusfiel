@@ -84,31 +84,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    const orKey = Deno.env.get("OPENROUTER_API_KEY") || "";
-    const orModel = body.model || "nvidia/nemotron-3-super-120b-a12b:free";
+    const fccUrl = Deno.env.get("FCC_URL") || "https://fcc-server.onrender.com";
+    const fccToken = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
+    const fccModel = Deno.env.get("FCC_MODEL") || "nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const res = await fetch(`${fccUrl}/v1/messages?beta=true`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${orKey}`,
+        "x-api-key": fccToken,
+        "Authorization": `Bearer ${fccToken}`,
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: orModel,
+        model: body.model || fccModel,
         max_tokens: body.max_tokens || 8000,
-        messages,
+        system: body.system || "",
+        messages: userMessages,
       }),
     });
 
-    const orData = await res.json().catch(() => null);
-    if (!res.ok || orData?.error) {
-      const errMsg = orData?.error?.message || orData?.error || `HTTP ${res.status}`;
-      return new Response(JSON.stringify({ error: `OpenRouter: ${errMsg}` }), {
+    const text = await res.text();
+    if (!res.ok) {
+      return new Response(JSON.stringify({ error: `FCC HTTP ${res.status}: ${text.slice(0, 300)}` }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    return new Response(JSON.stringify(orData), {
+    return new Response(text, {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
