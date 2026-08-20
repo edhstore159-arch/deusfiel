@@ -1080,17 +1080,15 @@ export default function SiteBuilder() {
     setCloning(true);
     try {
       let data = null;
-      // Try crawl first (multiple pages)
       try {
         const crawl = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
         if (crawl.data?.scraped && crawl.data?.pages?.length) data = crawl.data;
-      } catch (_) { /* site too large, fall through */ }
-      // Fall back to single page if crawl failed
+      } catch (_) {}
       if (!data) {
         try {
           const single = await supabase.functions.invoke("fetch-site", { body: { url, crawl: false } });
           if (single.data?.scraped) data = single.data;
-        } catch (_) { /* even single page failed */ }
+        } catch (_) {}
       }
       if (!data) {
         await cloneViaRadar(url);
@@ -1098,69 +1096,157 @@ export default function SiteBuilder() {
       }
       const origin = data.origin || new URL(data.url || url).origin;
 
-      const pageName = (path) => {
-        const p = String(path || "").replace(/^\/+|\/+$/g, "");
-        if (!p || p === "index.html") return "index.html";
-        const base = p.split("/").pop() || p;
-        return (base.endsWith(".html") ? base : `${base}.html`).toLowerCase();
+      // Fetch external CSS files referenced in the HTML
+      const fetchExternalCss = async (htmlContent) => {
+        const cssUrls = [...htmlContent.matchAll(/href=["']([^"']+\.css[^"']*)["']/gi)]
+          .map((m) => m[1])
+          .filter((u) => u.startsWith("http") || u.startsWith("/"));
+        let allCss = "";
+        for (const cssUrl of cssUrls) {
+          try {
+            const fullUrl = cssUrl.startsWith("http") ? cssUrl : origin + cssUrl;
+            const resp = await fetch(fullUrl);
+            if (resp.ok) {
+              const text = await resp.text();
+              allCss += "\n/* Fetched from: " + fullUrl + " */\n" + text;
+            }
+          } catch (_) {}
+        }
+        return allCss;
       };
 
-      const mergeUnique = (existing, chunk) =>
-        chunk && !(existing || "").includes(chunk) ? [existing, chunk].filter(Boolean).join("\n\n") : existing;
+      // Fetch Google Fonts referenced in the HTML
+      const fetchGoogleFonts = (htmlContent) => {
+        const fontUrls = [...htmlContent.matchAll(/href=["'](https:\/\/fonts\.googleapis\.com[^"']*)["']/gi)]
+          .map((m) => m[1]);
+        return fontUrls.map((u) => `<link rel="stylesheet" href="${u}">`).join("\n");
+      };
 
-      // ALWAYS use scraped HTML directly — faithful to the original site
-      const newFiles = { ...files };
-      let globalCss = "";
-      let globalJs = "";
-      const pageNames = new Set();
-
-      for (const page of data.pages) {
-        let html = page.html || "";
-        let css = page.css || "";
-        let js = page.js || "";
-
-        // Extract inline styles
-        const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
-        const extractedCss = styleMatches.map((m) => m[1].trim()).filter(Boolean).join("\n");
-        for (const m of styleMatches) html = html.replace(m[0], "");
-
-        // Extract inline scripts
-        const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)(?<!\\)<\/script>/gi)];
-        const extractedJs = inlineScripts.map((m) => m[1].trim()).filter(Boolean).join("\n");
-        for (const m of inlineScripts) html = html.replace(m[0], "");
-
-        // Rewrite links to local files
-        html = html.replace(/(href|src)=["']([^"']+)["']/gi, (m, attr, val) => {
-          if (!val.startsWith(origin)) return m;
-          const path = val.slice(origin.length).split("#")[0].split("?")[0];
-          if (!path || path === "/" || path === "/index.html") return `${attr}="index.html"`;
-          const target = pageName(path);
-          return `${attr}="${target}"`;
-        });
-
-        // Keep base href pointing to original for external resources
-        html = html.replace(/<base\b[^>]*>/gi, () => `<base href="${origin}">`);
-
-        // Ensure viewport meta
-        if (!/<meta[^>]*viewport/i.test(html)) {
-          html = html.replace(/<head([^>]*)>/i, '<head$1>\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
+      // Extract CSS variables from HTML inline styles
+      const extractCssVars = (htmlContent) => {
+        const vars = {};
+        const varMatches = [...htmlContent.matchAll(/--([a-zA-Z0-9_-]+)\s*:\s*([^;]+)/gi)];
+        for (const m of varMatches) {
+          if (!vars[m[1]]) vars[m[1]] = m[2].trim();
         }
+        return vars;
+      };
 
-        const name = pageName(page.path);
-        pageNames.add(name);
-        newFiles[name] = html;
-        globalCss = mergeUnique(globalCss, [extractedCss, css].filter(Boolean).join("\n\n"));
-        globalJs = mergeUnique(globalJs, [extractedJs, js].filter(Boolean).join("\n\n"));
+      // Build complete HTML with all CSS inlined for Claude to recreate identically
+      const page = data.pages[0] || {};
+      let html = page.html || "";
+      let inlineCss = "";
+      const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
+      inlineCss = styleMatches.map((m) => m[1].trim()).filter(Boolean).join("\n");
+
+      // Fetch external CSS files
+      const externalCss = await fetchExternalCss(html);
+      const googleFonts = fetchGoogleFonts(html);
+      const cssVars = extractCssVars(html);
+
+      // Build CSS variable root
+      let cssVarRoot = "";
+      if (Object.keys(cssVars).length > 0) {
+        cssVarRoot = ":root {\n" + Object.entries(cssVars).map(([k, v]) => `  --${k}: ${v};`).join("\n") + "\n}\n";
       }
 
-      if (globalCss) newFiles["styles.css"] = mergeUnique(newFiles["styles.css"], globalCss);
-      if (globalJs) newFiles["script.js"] = mergeUnique(newFiles["script.js"], globalJs);
+      // Combine all CSS
+      const allCss = [cssVarRoot, inlineCss, externalCss].filter(Boolean).join("\n\n");
+      // Remove inline <style> tags from HTML (we'll inject combined CSS)
+      let cleanHtml = html;
+      for (const m of styleMatches) cleanHtml = cleanHtml.replace(m[0], "");
 
-      setFiles(newFiles);
-      setActiveFile("index.html");
-      const pagesMsg = [...pageNames].join(", ");
-      setMessages((prev) => [...prev, { role: "assistant", content: `Site clonado fielmente de ${data.url || url} (${pageNames.size} página(s)). Arquivos: ${pagesMsg}. O HTML/CSS/JS original foi preservado. Clique em qualquer página no seletor para editar.` }]);
-      toast.success(`Clonado: ${pageNames.size} página(s) — HTML original preservado`);
+      // Remove external CSS link tags (we inlined them)
+      cleanHtml = cleanHtml.replace(/<link[^>]*href=["'][^"']*\.css[^"']*["'][^>]*\/?>/gi, "");
+
+      // Remove Google Fonts link tags (we'll re-add them)
+      cleanHtml = cleanHtml.replace(/<link[^>]*href=["']https:\/\/fonts\.googleapis\.com[^"']*["'][^>]*\/?>/gi, "");
+
+      // Inject Google Fonts + combined CSS into <head>
+      const headInjection = [
+        googleFonts,
+        allCss ? `<style>\n${allCss}\n</style>` : ""
+      ].filter(Boolean).join("\n");
+
+      if (/<head[\s>]/i.test(cleanHtml)) {
+        cleanHtml = cleanHtml.replace(/<head([^>]*)>/i, `<head$1>\n${headInjection}`);
+      }
+
+      // Remove scripts that won't work locally (module scripts, analytics, etc.)
+      cleanHtml = cleanHtml.replace(/<script[^>]*src=["'][^"']*\/assets\/[^"']*["'][^>]*><\/script>/gi, "");
+      cleanHtml = cleanHtml.replace(/<script[^>]*src=["'][^"']*\/~[a-z]+\.js[^"']*["'][^>]*><\/script>/gi, "");
+      cleanHtml = cleanHtml.replace(/<script[^>]*type="module"[^>]*><\/script>/gi, "");
+
+      // Rewrite image paths to absolute URLs
+      cleanHtml = cleanHtml.replace(/(src|href)=["'](\/__[^"']+)["']/gi, (m, attr, path) => `${attr}="${origin}${path}"`);
+
+      // Ensure viewport meta
+      if (!/<meta[^>]*viewport/i.test(cleanHtml)) {
+        cleanHtml = cleanHtml.replace(/<head([^>]*)>/i, '<head$1>\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
+      }
+
+      // Send to Claude for identical recreation with ALL the CSS context
+      const clonePrompt = `CLONE IDENTICO DO SITE: ${origin}
+
+VOCE DEVE REPRODUZIR O SITE ABAIXO DE FORMA 100% IDENTICA. NAO MUDENADA. NAO CRIE UM SITE NOVO. COPIE EXATAMENTE.
+
+CSS COMPLETO DO SITE ORIGINAL (todas as variaveis, classes, estilos):
+\`\`\`css
+${allCss.slice(0, 15000)}
+\`\`\`
+
+HTML COMPLETO DO SITE ORIGINAL (estrutura, classes, ids, conteudo):
+\`\`\`html
+${cleanHtml.slice(0, 20000)}
+\`\`\`
+
+INSTRUCAO CRITICA:
+1. O CSS acima contem TODAS as variaveis CSS (cores, fontes, espacamentos) — COPIE EXATAMENTE
+2. O HTML acima contem TODAS as classes Tailwind/utility — MANTENHA EXATAMENTE
+3. NAO troque cores, fontes, espacamentos ou layouts
+4. NAO adicione secoes que nao existem
+5. NAO remova secoes existentes
+6. Mantenha TODOS os textos, botoes, icons SVG
+7. Mantenha o mesmo layout (flex, grid, gaps, paddings)
+8. Mantenha o mesmo background, gradients, efeitos
+9. Se o site usa CSS variables, mantenha as mesmas variaveis
+10. Inclua Google Fonts que estao no original
+11. Responda APENAS com os blocos de codigo
+
+FORMATO:
+### index.html
+\`\`\`html
+<!DOCTYPE html>...
+\`\`\`
+
+### styles.css
+\`\`\`css
+...
+\`\`\`
+
+### script.js
+\`\`\`js
+...
+\`\`\``;
+
+      toast.info("Claude vai reproduzir o site identico...");
+      const { newFiles } = await generateFilesWithRetry([{ role: "user", content: clonePrompt }]);
+
+      if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) {
+        // Fallback: use scraped HTML with inlined CSS
+        const fallbackFiles = { ...files };
+        fallbackFiles["index.html"] = cleanHtml;
+        if (allCss) fallbackFiles["styles.css"] = allCss;
+        setFiles(fallbackFiles);
+        setActiveFile("index.html");
+        toast.success(`Clone (HTML original) de ${data.url || url}`);
+        return;
+      }
+
+      const built = { ...files };
+      for (const [k, v] of Object.entries(newFiles)) if (typeof v === "string") built[k] = postProcessFile(k, v);
+      commitGenerated(built, "Clone identico");
+      toast.success(`Clone identico de ${data.url || url}`);
     } catch (e) {
       toast.error("Erro ao clonar: " + (e?.message || e));
     } finally {
