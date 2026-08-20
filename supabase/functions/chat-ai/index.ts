@@ -715,9 +715,10 @@ async function callOpenRouterClaude(messages: Array<{ role: string; content: str
 async function callClaudeFCC(messages: Array<{ role: string; content: string }>): Promise<string> {
   const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "";
   const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-  const FCC_MODEL = Deno.env.get("FCC_MODEL") || "openrouter/anthropic/claude-opus-5-20250620";
+  const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-5-sonnet-20241022";
   if (!FCC_BASE_URL) throw new Error("FCC_BASE_URL não configurado");
-  const systemMsg = messages.find((m) => m.role === "system")?.content || SECRETARIA_JURIDICA_PROMPT;
+  const systemMsg = (messages.find((m) => m.role === "system")?.content || SECRETARIA_JURIDICA_PROMPT)
+    + "\n\nREGRA ABSOLUTA: Responda APENAS em português do Brasil. NUNCA use inglês. NÃO inclua raciocínio interno em inglês. Se a mensagem do cliente for em português, a resposta DEVE ser inteiramente em português.";
   const apiMessages = messages
     .filter((m) => m.role !== "system")
     .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "") }));
@@ -775,7 +776,14 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
     }
   }
 
-  // Fallback: tentar os melhores modelos disponíveis
+  // 1ª prioridade: Claude FCC (gratuito, direto)
+  try {
+    return await callClaudeFCC(messages);
+  } catch (err) {
+    console.warn("Claude FCC indisponível:", err);
+  }
+
+  // 2ª prioridade: Claude via chatCompletion (fallback chain do llm.ts)
   try {
     const response = await chatCompletion({
       model: "anthropic/claude-haiku-4-5",
@@ -790,6 +798,7 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
     console.warn("Claude Haiku indisponível:", err);
   }
 
+  // 3ª prioridade: Gemini
   try {
     const response = await chatCompletion({
       model: "google/gemini-3-flash-preview",
@@ -804,7 +813,7 @@ async function callAssistantLLM(messages: Array<{ role: string; content: string 
     console.warn("Gemini indisponível:", err);
   }
 
-  // Fallback: Hermes cloud via OpenRouter
+  // 4ª prioridade: Hermes cloud via OpenRouter
   try {
     return await callHermes(messages, fmtDate, fmtTime);
   } catch (err) {

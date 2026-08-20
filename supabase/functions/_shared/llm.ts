@@ -30,7 +30,7 @@ const OLLAMA_API_KEY = Deno.env.get("OLLAMA_API_KEY");
 
 const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL")?.trim().replace(/\/+$/, "") || "";
 const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
+const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-5-sonnet-20241022";
 
 // Emergent é último recurso e SÓ é usado quando habilitado (painel) ou via EMERGENT_ENABLED,
 // exceto quando o caller força explicitamente preferProvider === "emergent".
