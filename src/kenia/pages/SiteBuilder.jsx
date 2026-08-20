@@ -1193,10 +1193,22 @@ export default function SiteBuilder() {
       const scriptMatches = [...(page.html || "").matchAll(/<script(?:\s[^>]*)?>([^<]*(?:<(?!\/script>)[^<]*)*)<\/script>/gi)];
       const inlineJs = scriptMatches.map((m) => m[1].trim()).filter((j) => j.length > 20 && !j.includes("gtag") && !j.includes("analytics")).join("\n\n");
       if (inlineJs) fallbackFiles["script.js"] = inlineJs;
+
+      // Incluir siteMap (topicos/secoes) como referencia
+      if (data.siteMap && data.siteMap.length > 0) {
+        const topicSummary = data.siteMap.map(p => {
+          const title = p.title || p.path;
+          const headings = (p.headings || []).map(h => `${h.tag}: ${h.text}`).join(", ");
+          const sections = (p.sections || []).join(", ");
+          return `${title} | ${headings} | Seções: ${sections}`;
+        }).join("\n");
+        fallbackFiles["site-topics.md"] = `# Tópicos e Seções do Site Clonado\n\n${topicSummary}`;
+      }
+
       const built = { ...fallbackFiles };
       for (const [k, v] of Object.entries(built)) if (typeof v === "string") built[k] = postProcessFile(k, v);
       commitGenerated(built, "Clone identico");
-      toast.success(`Clone identico de ${data.url || url} — HTML original preservado`);
+      toast.success(`Clone identico de ${data.url || url} — ${data.siteMap?.length || 0} páginas, ${(data.siteMap || []).reduce((a, p) => a + (p.headings?.length || 0), 0)} tópicos preservados`);
     } catch (e) {
       toast.error("Erro ao clonar: " + (e?.message || e));
     } finally {

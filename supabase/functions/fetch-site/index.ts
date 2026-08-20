@@ -8,9 +8,9 @@ const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 
 const imgMap = new Map();
 
-const MAX_IMAGES = 20;
-const MAX_TOTAL_BYTES = 1200000;
-const MAX_PER_IMAGE = 200000;
+const MAX_IMAGES = 60;
+const MAX_TOTAL_BYTES = 4000000;
+const MAX_PER_IMAGE = 500000;
 
 function rewriteRelative(html, base) {
   const attrs = ["src", "href", "srcset", "poster", "data-src", "data-bg", "action", "data-original"];
@@ -31,20 +31,28 @@ function collectImageUrls(html, css) {
   const urls = [];
   const add = (u) => {
     if (!/^https?:/i.test(u)) return;
+    if (/\.(svg)/i.test(u)) return;
     if (!collectedUrls.has(u) && !imgMap.has(u)) { collectedUrls.add(u); urls.push(u); }
   };
-  const attrRe = /(src|poster|data-src|data-bg)=["']([^"']+)["']/gi;
+  const attrRe = /(src|poster|data-src|data-bg|data-original|data-lazy)=["']([^"']+)["']/gi;
   let m;
   while ((m = attrRe.exec(html)) !== null) add(m[2]);
   const srcsetRe = /srcset=["']([^"']+)["']/gi;
   while ((m = srcsetRe.exec(html)) !== null) {
-    const first = m[1].split(",")[0].trim().split(/\s+/)[0];
-    add(first);
+    const parts = m[1].split(",");
+    for (const p of parts) {
+      const url = p.trim().split(/\s+/)[0];
+      if (url) add(url);
+    }
   }
   const styleRe = /style=["'][^"']*url\((["']?)([^)"']+)\1\)/gi;
   while ((m = styleRe.exec(html)) !== null) add(m[2].trim());
+  const bgImageRe = /background(?:-image)?\s*:\s*url\((["']?)([^)"']+)\1\)/gi;
+  while ((m = bgImageRe.exec(html)) !== null) add(m[2].trim());
   const cssRe = /url\((["']?)([^)"']+)\1\)/gi;
   while ((m = cssRe.exec(css)) !== null) add(m[2].trim());
+  const cssBgRe = /background(?:-image)?\s*:\s*url\((["']?)([^)"']+)\1\)/gi;
+  while ((m = cssBgRe.exec(css)) !== null) add(m[2].trim());
   return urls;
 }
 
@@ -86,7 +94,7 @@ async function downloadImages(urls) {
 
 function inlineImages(html, css) {
   let out = html;
-  out = out.replace(/(src|poster|data-src|data-bg)=["']([^"']+)["']/gi, (m, attr, val) =>
+  out = out.replace(/(src|poster|data-src|data-bg|data-original|data-lazy)=["']([^"']+)["']/gi, (m, attr, val) =>
     imgMap.has(val) ? `${attr}="${imgMap.get(val)}"` : m);
   out = out.replace(/srcset=["'][^"']*["']/gi, (m) => {
     const val = m.slice(8, -1);
