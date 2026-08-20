@@ -24,7 +24,7 @@ async def proxy_messages(request: Request):
     max_tokens = body.get("max_tokens", 2000)
     temperature = body.get("temperature", 0.3)
 
-    emergent_model = "claude-3-5-sonnet-20241022"
+    emergent_model = EMERGENT_MODEL
 
     api_messages = []
     if system:
