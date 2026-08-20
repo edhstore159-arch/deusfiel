@@ -14,7 +14,7 @@ import {
   ClipboardCheck, Kanban, Plus, Trash2, ChevronDown, ChevronRight,
   CheckCircle2, Circle, Clock, ArrowRight, Sparkles, Eye, EyeOff,
   Scale, Printer, RefreshCcw, Loader2, Target, User, Bot, BarChart3,
-  Image, Download, Lock, Wrench, ShieldCheck, KeyRound,
+  Image, Download, Lock, Wrench, ShieldCheck, KeyRound, Search, Globe, Code2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -655,6 +655,16 @@ export default function Dstboard() {
               <Image className="w-3.5 h-3.5 mr-1.5 inline" />
               Criativos
             </button>
+            <button
+              onClick={() => setView("engenharia-reversa")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                view === "engenharia-reversa" ? "bg-white text-nude-900 shadow-sm" : "text-nude-500 hover:text-nude-700"
+              }`}
+              data-testid="view-engenharia-reversa"
+            >
+              <Search className="w-3.5 h-3.5 mr-1.5 inline" />
+              Engenharia Reversa
+            </button>
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -747,6 +757,8 @@ export default function Dstboard() {
           <AnalisesView />
         ) : view === "criativos" ? (
           <CriativosView />
+        ) : view === "engenharia-reversa" ? (
+          <ReverseEngineeringView />
         ) : (
           <PipelineView
             processes={allLeads}
@@ -1914,6 +1926,176 @@ function MaintenanceScreen({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────── */
+/* REVERSE ENGINEERING VIEW                    */
+/* ──────────────────────────────────────────── */
+function ReverseEngineeringView() {
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+
+  const analyze = async () => {
+    if (!url.trim()) { setError("Cole uma URL"); return; }
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke("fetch-site", {
+        body: { url: url.trim(), crawl: true },
+      });
+      if (fnErr) throw new Error(fnErr.message);
+      if (!data?.scraped) throw new Error(data?.error || "Não foi possível acessar o site");
+      setResult(data);
+    } catch (e) {
+      setError(e?.message || "Erro ao analisar site");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const siteMap = result?.siteMap || [];
+  const pages = result?.pages || [];
+  const totalPages = pages.length;
+  const totalImages = pages.reduce((a, p) => {
+    const imgCount = (p.html || "").match(/<img\s/gi)?.length || 0;
+    const bgCount = (p.css || "").match(/background(-image)?:\s*url\(/gi)?.length || 0;
+    return a + imgCount + bgCount;
+  }, 0);
+  const totalCssSize = pages.reduce((a, p) => a + (p.css || "").length, 0);
+  const totalHtmlSize = pages.reduce((a, p) => a + (p.html || "").length, 0);
+  const allHeadings = siteMap.flatMap(p => p.headings || []);
+  const allSections = [...new Set(siteMap.flatMap(p => p.sections || []))];
+
+  return (
+    <div className="flex-1 flex flex-col p-4 sm:p-6 overflow-auto">
+      <div className="mb-6">
+        <div className="text-xs tracking-widest uppercase text-gold-600 font-semibold">Engenharia Reversa</div>
+        <h2 className="font-serif text-2xl text-nude-900 mt-1">Análise de Sites</h2>
+        <p className="text-xs text-nude-500 mt-1">Cole a URL de qualquer site para extrair estrutura, imagens, CSS, tópicos e conteúdo.</p>
+      </div>
+
+      {/* Input */}
+      <div className="flex gap-2 mb-6">
+        <Input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && analyze()}
+          placeholder="https://exemplo.com"
+          className="flex-1"
+          data-testid="re-url-input"
+        />
+        <Button onClick={analyze} disabled={loading} className="bg-nude-900 hover:bg-nude-800" data-testid="re-analyze-btn">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Search className="w-4 h-4 mr-1.5" />}
+          Analisar
+        </Button>
+      </div>
+
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-sm text-rose-700 mb-4">{error}</div>
+      )}
+
+      {result && (
+        <div className="space-y-6">
+          {/* Resumo */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Páginas", value: totalPages, icon: Globe },
+              { label: "Imagens", value: totalImages, icon: Image },
+              { label: "Tópicos (H1-H6)", value: allHeadings.length, icon: Code2 },
+              { label: "Seções CSS", value: allSections.length, icon: Wrench },
+            ].map(({ label, value, icon: Icon }) => (
+              <Card key={label} className="p-3 border-nude-200">
+                <div className="flex items-center gap-2">
+                  <Icon className="w-4 h-4 text-gold-600" />
+                  <div>
+                    <div className="text-lg font-bold text-nude-900">{value}</div>
+                    <div className="text-[10px] text-nude-500 uppercase tracking-wider">{label}</div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Tópicos por página */}
+          <Card className="p-4 border-nude-200">
+            <h3 className="text-sm font-semibold text-nude-800 mb-3 flex items-center gap-2">
+              <Code2 className="w-4 h-4 text-gold-600" /> Tópicos por Página
+            </h3>
+            <div className="space-y-3">
+              {siteMap.map((p, i) => (
+                <div key={i} className="border-l-2 border-gold-300 pl-3">
+                  <div className="text-xs font-semibold text-nude-700">{p.title || p.path}</div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {(p.headings || []).map((h, j) => (
+                      <Badge key={j} variant="outline" className="text-[10px] text-nude-600">
+                        {h.tag}: {h.text}
+                      </Badge>
+                    ))}
+                  </div>
+                  {(p.sections || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {p.sections.map((s, j) => (
+                        <Badge key={j} variant="secondary" className="text-[10px]">{s}</Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Tamanho */}
+          <Card className="p-4 border-nude-200">
+            <h3 className="text-sm font-semibold text-nude-800 mb-2 flex items-center gap-2">
+              <Download className="w-4 h-4 text-gold-600" /> Tamanho dos Dados
+            </h3>
+            <div className="grid grid-cols-2 gap-3 text-xs text-nude-600">
+              <div>HTML total: <span className="font-semibold text-nude-800">{(totalHtmlSize / 1024).toFixed(1)} KB</span></div>
+              <div>CSS total: <span className="font-semibold text-nude-800">{(totalCssSize / 1024).toFixed(1)} KB</span></div>
+              <div>Páginas: <span className="font-semibold text-nude-800">{totalPages}</span></div>
+              <div>Imagens: <span className="font-semibold text-nude-800">{totalImages}</span></div>
+            </div>
+          </Card>
+
+          {/* Navegação */}
+          <Card className="p-4 border-nude-200">
+            <h3 className="text-sm font-semibold text-nude-800 mb-2 flex items-center gap-2">
+              <Globe className="w-4 h-4 text-gold-600" /> Páginas Encontradas
+            </h3>
+            <div className="space-y-1">
+              {pages.map((p, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs text-nude-600 hover:text-nude-800">
+                  <Circle className="w-2 h-2 text-gold-400 shrink-0" />
+                  <span className="font-mono">{p.path}</span>
+                  <span className="text-nude-400">({((p.html || "").length / 1024).toFixed(1)} KB)</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Link para SiteBuilder */}
+          <div className="text-center pt-2">
+            <a href="/app/site-builder" className="text-xs text-gold-600 hover:underline">
+              Abrir no SiteBuilder para clonar este site →
+            </a>
+          </div>
+        </div>
+      )}
+
+      {!result && !loading && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-nude-400">
+            <Search className="w-12 h-12 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">Cole uma URL e clique em Analisar</p>
+            <p className="text-xs mt-1">Ex: https://site-do-concorrente.com</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
