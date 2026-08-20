@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO)
 
 FCC_AUTH = os.environ.get('FCC_AUTH_TOKEN', 'freecc')
 EMERGENT_KEY = os.environ.get('EMERGENT_API_KEY', '')
-EMERGENT_MODEL = os.environ.get('FCC_MODEL', 'claude-3-5-sonnet-20241022')
+EMERGENT_MODEL = os.environ.get('FCC_MODEL', 'claude-sonnet-4-5')
 
 @app.post("/v1/messages")
 async def proxy_messages(request: Request):

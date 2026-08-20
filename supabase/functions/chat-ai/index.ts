@@ -715,7 +715,7 @@ async function callOpenRouterClaude(messages: Array<{ role: string; content: str
 async function callClaudeFCC(messages: Array<{ role: string; content: string }>): Promise<string> {
   const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "";
   const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-  const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-3-5-sonnet-20241022";
+  const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-sonnet-4-5";
   if (!FCC_BASE_URL) throw new Error("FCC_BASE_URL não configurado");
   const systemMsg = (messages.find((m) => m.role === "system")?.content || SECRETARIA_JURIDICA_PROMPT)
     + "\n\nREGRA ABSOLUTA: Responda APENAS em português do Brasil. NUNCA use inglês. NÃO inclua raciocínio interno em inglês. Se a mensagem do cliente for em português, a resposta DEVE ser inteiramente em português.";
