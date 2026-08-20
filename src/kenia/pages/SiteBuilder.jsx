@@ -1055,11 +1055,13 @@ export default function SiteBuilder() {
     if (!url) { toast.error("Cole a URL do site que deseja clonar"); return; }
     setCloning(true);
     try {
+      // Try crawl first (multiple pages), fall back to single page if too large
       let { data, error } = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
       if (error || !data?.scraped) {
-        const retry = await supabase.functions.invoke("fetch-site", { body: { url, crawl: true } });
-        data = retry.data;
-        error = retry.error;
+        // Crawl failed (site too large?) → try single page only
+        const single = await supabase.functions.invoke("fetch-site", { body: { url, crawl: false } });
+        data = single.data;
+        error = single.error;
       }
       if (error) throw new Error(error.message);
       if (!data?.scraped || !data?.pages?.length) {
