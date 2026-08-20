@@ -12,7 +12,7 @@ echo "==> Atualizando pip"
 pip install --upgrade pip
 
 echo "==> Instalando dependencias do requirements.txt"
-pip install -r requirements.txt
+pip install -r requirements.txt --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
 
 echo "==> Instalando emergentintegrations (index alternativo)"
 pip install emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
