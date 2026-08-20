@@ -1067,7 +1067,6 @@ export default function SiteBuilder() {
         return;
       }
       const origin = data.origin || new URL(data.url || url).origin;
-      const siteMap = data.siteMap || [];
 
       const pageName = (path) => {
         const p = String(path || "").replace(/^\/+|\/+$/g, "");
@@ -1076,164 +1075,62 @@ export default function SiteBuilder() {
         return (base.endsWith(".html") ? base : `${base}.html`).toLowerCase();
       };
 
-      // Build site structure description for Claude
-      const siteStructure = siteMap.map((s) => {
-        const topics = s.headings.map((h) => `${h.tag}: ${h.text}`).join(", ");
-        return `- ${s.path} → "${s.title}" | Tópicos: ${topics || "sem tópicos extras"}`;
-      }).join("\n");
+      const mergeUnique = (existing, chunk) =>
+        chunk && !(existing || "").includes(chunk) ? [existing, chunk].filter(Boolean).join("\n\n") : existing;
 
-      // Extract content summary from each page for Claude reference
-      const pageSummaries = data.pages.map((p) => {
-        const body = (p.html || "").replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ");
-        const headings = [...body.matchAll(/<(h[1-6])[^>]*>([\s\S]{0,120}?)<\/\1>/gi)]
-          .map((m) => `${m[1]}: ${m[2].replace(/<[^>]+>/g, "").trim()}`)
-          .filter((h) => h.length > 4)
-          .slice(0, 10);
-        const paragraphs = [...body.matchAll(/<p[^>]*>([\s\S]{20,300}?)<\/p>/gi)]
-          .map((m) => m[1].replace(/<[^>]+>/g, "").trim().slice(0, 150))
-          .filter((p) => p.length > 20)
-          .slice(0, 5);
-        const links = [...body.matchAll(/<a[^>]*href=["']([^"']+)["'][^>]*>([\s\S]{0,60}?)<\/a>/gi)]
-          .map((m) => `${m[2].replace(/<[^>]+>/g, "").trim()} → ${m[1]}`)
-          .filter((l) => l.length > 3)
-          .slice(0, 10);
-        const name = pageName(p.path);
-        return `=== ${name} (${p.path}) ===\nTítulos: ${headings.join("; ")}\nTextos: ${paragraphs.join("; ")}\nLinks: ${links.join("; ")}`;
-      }).join("\n\n");
+      // ALWAYS use scraped HTML directly — faithful to the original site
+      const newFiles = { ...files };
+      let globalCss = "";
+      let globalJs = "";
+      const pageNames = new Set();
 
-      toast.info(`${data.pages.length} páginas encontradas. Claude vai recrear todas editáveis...`);
+      for (const page of data.pages) {
+        let html = page.html || "";
+        let css = page.css || "";
+        let js = page.js || "";
 
-      // Use Claude to recreate all pages with full content
-      const clonePrompt = `CLONE COMPLETO DO SITE: ${origin}
+        // Extract inline styles
+        const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
+        const extractedCss = styleMatches.map((m) => m[1].trim()).filter(Boolean).join("\n");
+        for (const m of styleMatches) html = html.replace(m[0], "");
 
-ESTRUTURA DO SITE (${data.pages.length} páginas):
-${siteStructure}
+        // Extract inline scripts
+        const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)(?<!\\)<\/script>/gi)];
+        const extractedJs = inlineScripts.map((m) => m[1].trim()).filter(Boolean).join("\n");
+        for (const m of inlineScripts) html = html.replace(m[0], "");
 
-CONTEÚDO DE CADA PÁGINA:
-${pageSummaries}
+        // Rewrite links to local files
+        html = html.replace(/(href|src)=["']([^"']+)["']/gi, (m, attr, val) => {
+          if (!val.startsWith(origin)) return m;
+          const path = val.slice(origin.length).split("#")[0].split("?")[0];
+          if (!path || path === "/" || path === "/index.html") return `${attr}="index.html"`;
+          const target = pageName(path);
+          return `${attr}="${target}"`;
+        });
 
-INSTRUÇÕES:
-1. Recrie TODAS as páginas listadas acima com o conteúdo real extraído
-2. Cada página DEVE ser um arquivo HTML independente e editável
-3. Use o formato: ### nome-pagina.html (para cada página)
-4. Mantenha TODOS os tópicos, textos, seções e links do site original
-5. Inclua ### styles.css com CSS compartilhado entre todas as páginas
-6. Inclua ### script.js com JS compartilhado
-7. Links entre páginas devem apontar para os arquivos locais (ex: href="sobre.html")
-8. NÃO omita nenhuma página ou tópico — clone TUDO
-9. HTML completo com <!DOCTYPE html> em cada página
-10. Responda APENAS com os blocos de código. NADA de explicação.
+        // Keep base href pointing to original for external resources
+        html = html.replace(/<base\b[^>]*>/gi, () => `<base href="${origin}">`);
 
-FORMATO OBRIGATÓRIO:
-### index.html
-\`\`\`html
-<!DOCTYPE html>...
-\`\`\`
-
-### sobre.html
-\`\`\`html
-<!DOCTYPE html>...
-\`\`\`
-
-### servicos.html
-\`\`\`html
-<!DOCTYPE html>...
-\`\`\`
-
-(etc para cada página encontrada)
-
-### styles.css
-\`\`\`css
-...
-\`\`\`
-
-### script.js
-\`\`\`js
-...
-\`\`\``;
-
-      const { newFiles } = await generateFilesWithRetry([{ role: "user", content: clonePrompt }]);
-
-      if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) {
-        // Fallback: use scraped HTML directly
-        const fallbackFiles = { ...files };
-        let globalCss = "";
-        let globalJs = "";
-        const pageNames = new Set();
-        const mergeUnique = (existing, chunk) =>
-          chunk && !(existing || "").includes(chunk) ? [existing, chunk].filter(Boolean).join("\n\n") : existing;
-
-        for (const page of data.pages) {
-          let html = page.html || "";
-          let css = page.css || "";
-          let js = page.js || "";
-          const styleMatches = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)];
-          const extractedCss = styleMatches.map((m) => m[1].trim()).filter(Boolean).join("\n");
-          for (const m of styleMatches) html = html.replace(m[0], "");
-          const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)(?<!\\)<\/script>/gi)];
-          const extractedJs = inlineScripts.map((m) => m[1].trim()).filter(Boolean).join("\n");
-          for (const m of inlineScripts) html = html.replace(m[0], "");
-          // Rewrite links to local files
-          html = html.replace(/(href|src)=["']([^"']+)["']/gi, (m, attr, val) => {
-            if (!val.startsWith(origin)) return m;
-            const path = val.slice(origin.length).split("#")[0].split("?")[0];
-            if (!path || path === "/" || path === "/index.html") return `${attr}="index.html"`;
-            const target = pageName(path);
-            return `${attr}="${target}"`;
-          });
-          html = html.replace(/<base\b[^>]*>/gi, () => `<base href="${origin}">`);
-          if (!/<meta[^>]*viewport/i.test(html)) {
-            html = html.replace(/<head([^>]*)>/i, '<head$1>\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
-          }
-          const name = pageName(page.path);
-          pageNames.add(name);
-          fallbackFiles[name] = html;
-          globalCss = mergeUnique(globalCss, [extractedCss, css].filter(Boolean).join("\n\n"));
-          globalJs = mergeUnique(globalJs, [extractedJs, js].filter(Boolean).join("\n\n"));
+        // Ensure viewport meta
+        if (!/<meta[^>]*viewport/i.test(html)) {
+          html = html.replace(/<head([^>]*)>/i, '<head$1>\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
         }
-        if (globalCss) fallbackFiles["styles.css"] = mergeUnique(fallbackFiles["styles.css"], globalCss);
-        if (globalJs) fallbackFiles["script.js"] = mergeUnique(fallbackFiles["script.js"], globalJs);
 
-        setFiles(fallbackFiles);
-        setActiveFile("index.html");
-        setMessages((prev) => [...prev, { role: "assistant", content: `Site clonado (HTML original) de ${data.url || url} (${pageNames.size} página(s)). Arquivos: ${[...pageNames].join(", ")}. Clique em qualquer página no seletor para editar.` }]);
-        toast.success(`Clonado: ${pageNames.size} página(s) editáveis`);
-        return;
+        const name = pageName(page.path);
+        pageNames.add(name);
+        newFiles[name] = html;
+        globalCss = mergeUnique(globalCss, [extractedCss, css].filter(Boolean).join("\n\n"));
+        globalJs = mergeUnique(globalJs, [extractedJs, js].filter(Boolean).join("\n\n"));
       }
 
-      // Post-process AI-generated files: rewrite links between pages
-      const built = { ...files };
-      const htmlFileNames = Object.keys(newFiles).filter((k) => k.endsWith(".html"));
-      for (const [k, v] of Object.entries(newFiles)) {
-        if (typeof v !== "string") continue;
-        let processed = v;
-        if (k.endsWith(".html")) {
-          // Rewrite origin URLs to local file names
-          processed = processed.replace(/(href|src)=["'](https?:\/\/[^"']+)["']/gi, (m, attr, fullUrl) => {
-            try {
-              const u = new URL(fullUrl);
-              const path = u.pathname.split("#")[0].split("?")[0];
-              const base = path.split("/").pop() || "index.html";
-              const localName = (base.endsWith(".html") ? base : `${base}.html`).toLowerCase();
-              if (htmlFileNames.includes(localName)) return `${attr}="${localName}"`;
-              if (path === "/" || path === "/index.html") return `${attr}="index.html"`;
-              const nameGuess = path.replace(/^\/+|\/+$/g, "").split("/").pop() || "index";
-              const guess = (nameGuess.endsWith(".html") ? nameGuess : `${nameGuess}.html`).toLowerCase();
-              if (htmlFileNames.includes(guess)) return `${attr}="${guess}"`;
-            } catch {}
-            return m;
-          });
-          // Also rewrite bare relative links
-          processed = processed.replace(/(href|src)=["']([a-z0-9_-]+\.html)["']/gi, (m, attr, fname) => {
-            const lower = fname.toLowerCase();
-            if (htmlFileNames.includes(lower)) return `${attr}="${lower}"`;
-            return m;
-          });
-        }
-        built[k] = postProcessFile(k, processed);
-      }
-      commitGenerated(built, "Site completo clonado");
-      toast.success(`Clone completo: ${Object.keys(newFiles).length} arquivo(s) — todas as páginas editáveis`);
+      if (globalCss) newFiles["styles.css"] = mergeUnique(newFiles["styles.css"], globalCss);
+      if (globalJs) newFiles["script.js"] = mergeUnique(newFiles["script.js"], globalJs);
+
+      setFiles(newFiles);
+      setActiveFile("index.html");
+      const pagesMsg = [...pageNames].join(", ");
+      setMessages((prev) => [...prev, { role: "assistant", content: `Site clonado fielmente de ${data.url || url} (${pageNames.size} página(s)). Arquivos: ${pagesMsg}. O HTML/CSS/JS original foi preservado. Clique em qualquer página no seletor para editar.` }]);
+      toast.success(`Clonado: ${pageNames.size} página(s) — HTML original preservado`);
     } catch (e) {
       toast.error("Erro ao clonar: " + (e?.message || e));
     } finally {
