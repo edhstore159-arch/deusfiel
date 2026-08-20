@@ -4330,3 +4330,68 @@ async def _start_baileys_watchdog():
     _spawn_baileys()
     asyncio.create_task(_baileys_watchdog_loop())
     logger.info("[baileys-watchdog] started")
+
+
+# ---------------------------------------------------------------------------
+# CTR Predictor API
+# ---------------------------------------------------------------------------
+
+@app.post("/api/ctr/upload")
+async def ctr_upload(file: UploadFile = File(...)):
+    """Upload CSV for CTR prediction."""
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(400, "Apenas arquivos CSV são aceitos")
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10MB limit
+        raise HTTPException(400, "Arquivo muito grande (máximo 10MB)")
+    if len(content) < 100:
+        raise HTTPException(400, "Arquivo muito pequeno ou vazio")
+
+    from ctr_predictor import create_job, process_upload
+    job_id = create_job()
+    try:
+        result = process_upload(job_id, content, file.filename)
+        return {"ok": True, "job_id": job_id, "preview": result}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/ctr/train/{job_id}")
+async def ctr_train(job_id: str, click_col: Optional[str] = None):
+    """Train CTR model and generate predictions."""
+    from ctr_predictor import get_job, train_model
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job não encontrado")
+    if job["status"] not in ("uploaded", "completed"):
+        raise HTTPException(400, f"Status inválido: {job['status']}")
+    try:
+        result = train_model(job_id, click_col=click_col)
+        return {"ok": True, "job_id": job_id, "results": result}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.get("/api/ctr/results/{job_id}")
+async def ctr_results(job_id: str):
+    """Get prediction results."""
+    from ctr_predictor import get_job
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job não encontrado")
+    return {"ok": True, "status": job["status"], "progress": job["progress"],
+            "message": job["message"], "results": job.get("results")}
+
+
+@app.get("/api/ctr/export/{job_id}")
+async def ctr_export(job_id: str):
+    """Export predictions as CSV."""
+    from ctr_predictor import export_predictions
+    csv_bytes = export_predictions(job_id)
+    if not csv_bytes:
+        raise HTTPException(404, "Previsões não disponíveis")
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=ctr_predictions_{job_id}.csv"},
+    )

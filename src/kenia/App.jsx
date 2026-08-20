@@ -142,6 +142,7 @@ const JuizVirtual = lazyWithReload(() => import("@/kenia/pages/JuizVirtual"));
 const Agents = lazyWithReload(() => import("@/kenia/pages/Agents"));
 const SocialConnect = lazyWithReload(() => import("@/kenia/pages/SocialConnect"));
 const Dstboard = lazyWithReload(() => import("@/kenia/pages/Dstboard"));
+const CTRPredictor = lazyWithReload(() => import("@/kenia/pages/CTRPredictor"));
 const DocumentBuilder = lazyWithReload(() => import("@/kenia/pages/DocumentBuilder"));
 const SiteBuilder = lazyWithReload(() => import("@/kenia/pages/SiteBuilder"));
 const LegalTraining = lazyWithReload(() => import("@/kenia/pages/LegalTraining"));
@@ -200,6 +201,7 @@ function App() {
                 <Route path="/app/juiz-virtual" element={<JuizVirtual />} />
                 <Route path="/app/agents" element={<Agents />} />
                 <Route path="/app/dstboard" element={<Dstboard />} />
+                <Route path="/app/ctr-predictor" element={<CTRPredictor />} />
                 <Route path="/app/document-builder" element={<DocumentBuilder />} />
                 <Route path="/app/site-builder" element={<SiteBuilder />} />
                 <Route path="/app/legal-training" element={<LegalTraining />} />

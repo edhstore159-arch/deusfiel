@@ -6,7 +6,7 @@ import {
   BarChart3, LogOut, MessageSquare, Wrench, Radio,
   CalendarDays, Settings as SettingsIcon, Combine,
   ShieldCheck, Bot, Menu, X, Clapperboard, Gavel, Share2,
-  ClipboardCheck, FolderOpen, FileText, GraduationCap, TrendingUp, Code2,
+  ClipboardCheck, FolderOpen, FileText, GraduationCap, TrendingUp, Code2, Target,
 } from "lucide-react";
 import { Button } from "@/kenia/components/ui/button";
 import { Avatar, AvatarFallback } from "@/kenia/components/ui/avatar";
@@ -29,6 +29,7 @@ const NAV = [
   { to: "/app/juiz-virtual", label: "Juiz Virtual", icon: Gavel, testid: "nav-juiz-virtual" },
   { to: "/app/agents", label: "Agentes IA", icon: Bot, testid: "nav-agents" },
   { to: "/app/dstboard", label: "Painel de Controle", icon: ClipboardCheck, testid: "nav-dstboard" },
+  { to: "/app/ctr-predictor", label: "CTR Predictor", icon: Target, testid: "nav-ctr-predictor" },
   { to: "/app/document-builder", label: "Construtor de Documentos", icon: FileText, testid: "nav-document-builder" },
   { to: "/app/site-builder", label: "Criação", icon: Code2, testid: "nav-site-builder" },
   { to: "/app/legal-training", label: "Treinamento Jurídico", icon: GraduationCap, testid: "nav-legal-training" },
@@ -62,6 +63,7 @@ const PREFETCH = {
   "/app/juiz-virtual": () => import("@/kenia/pages/JuizVirtual"),
   "/app/agents": () => import("@/kenia/pages/Agents"),
   "/app/dstboard": () => import("@/kenia/pages/Dstboard"),
+  "/app/ctr-predictor": () => import("@/kenia/pages/CTRPredictor"),
   "/app/document-builder": () => import("@/kenia/pages/DocumentBuilder"),
   "/app/site-builder": () => import("@/kenia/pages/SiteBuilder"),
   "/app/legal-training": () => import("@/kenia/pages/LegalTraining"),
