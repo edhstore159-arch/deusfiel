@@ -1036,10 +1036,10 @@ export default function SiteBuilder() {
   };
 
   const cloneViaRadar = async (target) => {
-    toast.info("Buscando sites de referência do nicho...");
+    toast.info("Buscando site de referência e copiando design...");
     const brief = await fetchDesignRef(String(target).replace(/^https?:\/\//, "").split("/")[0] + " website profissional moderno");
     const refBlock = brief ? brief + "\n\n" : "";
-    const fullPrompt = refBlock + `PEDIDO DO CLIENTE: Gere um site profissional equivalente ao site ${target}, com seções, textos e estilo adequados ao segmento e público dele. ` + "Gere o site COMPLETO e personalizado em blocos. Formato obrigatório:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nInclua sempre HTML completo com <!DOCTYPE html>, CSS completo com design bonito e responsivo, e JS funcional. Não omita nenhum arquivo. Não responda com texto corrido.";
+    const fullPrompt = refBlock + `PEDIDO DO CLIENTE: CLONE O SITE ${target} de forma IDÊNTICA. Copie EXATAMENTE: estrutura HTML, layout, cores, fontes, seções, textos, botões, navegação, imagens, footer — tudo fiel ao original. Não crie um site novo. Copie o site referenciado.\n\nGere o site COMPLETO no formato:\n\n### index.html\n```html\n...\n```\n\n### styles.css\n```css\n...\n```\n\n### script.js\n```js\n...\n```\n\nHTML completo com <!DOCTYPE html>, CSS completo, JS funcional. Não omita nada. Sem texto corrido.";
     const { newFiles } = await generateFilesWithRetry([{ role: "user", content: fullPrompt }]);
     if (Object.keys(newFiles).length === 0 || !newFiles["index.html"]) {
       throw new Error("Não foi possível clonar nem gerar a partir do modelo do nicho");
@@ -1105,6 +1105,9 @@ export default function SiteBuilder() {
         for (const m of inlineScripts) html = html.replace(m[0], "");
         html = rewriteLocalLinks(html, page.path);
         html = html.replace(/<base\b[^>]*>/gi, () => `<base href="${origin}">`);
+        if (!/<meta[^>]*viewport/i.test(html)) {
+          html = html.replace(/<head([^>]*)>/i, '<head$1>\n<meta name="viewport" content="width=device-width, initial-scale=1.0">');
+        }
         const name = pageName(page.path);
         pageNames.add(name);
         newFiles[name] = html;
