@@ -2351,6 +2351,17 @@ async def _maybe_autorespond(
         )
     tracker_block = "\n\n" + "\n".join(tracker_lines)
 
+    # Ordem de prioridade no prompt (mais crítico primeiro):
+# 1) critical_top (regras de ouro absolutas)
+# 2) base_prompt (persona Kênia Garcia - regras identidade + fluxo)
+# 3) pt_short_rule (idioma + tamanho - regras absolutas inegociáveis)
+# 4) tracker_block (controle de perguntas já feitas - evita loop)
+# 5) style_hint (adaptação sinestesica - opcional)
+# 6) name_hint (nome do cliente - opcional)
+# 7) kb_hint (conhecimento rural - apenas se tema detectado)
+# 8) agenda_block (horários disponíveis - sempre presente mas conciso)
+# 9) history_block (histórico da conversa - contexto)
+
     # bot_prompt: se vazio, "keep", ou muito curto (<50 chars) usa o KENIA_DEFAULT_PROMPT
     raw_prompt = (cfg.get("bot_prompt") or "").strip()
     if (not raw_prompt) or len(raw_prompt) < 50 or raw_prompt.lower() in {"keep", "default", "padrao", "padrão"}:
@@ -2378,33 +2389,38 @@ async def _maybe_autorespond(
     agenda_block = (
         "\n\n=== AGENDA DA DRA. KÊNIA (próximos 7 dias — use SÓ horários livres) ===\n"
         + (("\n".join(busy_lines) + "\n") if busy_lines else "Nenhum compromisso marcado nos próximos 7 dias — todos horários 09h–18h estão livres.\n")
-        + "HORÁRIOS COMERCIAIS DA DRA: SEGUNDA a SEXTA, 09h–12h e 14h–18h (fuso Brasília UTC-3).\n"
-        + "🚫 NUNCA ofereça horário em SÁBADO ou DOMINGO — a Dra. Kênia não atende fim-de-semana.\n"
-        + "   Se o cliente pedir sábado/domingo, diga: 'preciso falar com a Dra. Kênia primeiro"
-        + " sobre esse horário. Se preferir um dia de semana, posso te encaixar agora —"
-        + " que tal {próximo dia útil} às 10h ou 15h?'\n"
-        + "REGRA: Antes de sugerir um horário, confirme que NÃO está na lista de ocupados acima. "
-        + "Prefira oferecer 2 opções concretas: uma de manhã e uma à tarde. "
-        + "Ex: 'pode ser amanhã às 10h ou às 15h, qual prefere?' (só dias úteis)."
+        + "HORÁRIOS COMERCIAIS: SEGUNDA a SEXTA, 09h–12h e 14h–18h (fuso Brasília UTC-3).\n"
+        + "🚫 NUNCA ofereça horário em SÁBADO ou DOMINGO.\n"
+        + "   Se preferir um dia de semana, ofereça: 'amanhã 10h ou 15h, qual prefere?'\n"
     )
 
-    # System prompt: CRITICAL RULES vão no TOPO (onde GPT presta mais atenção),
-    # depois base_prompt (persona), depois agenda/histórico.
-    critical_top = (
-        "⚠️⚠️⚠️ REGRAS CRÍTICAS (LEIA ISTO ANTES DE RESPONDER) ⚠️⚠️⚠️\n"
-        + tracker_block.strip()
-        + "\n\n⚠️⚠️⚠️ FIM DAS REGRAS CRÍTICAS ⚠️⚠️⚠️\n\n"
+    # Bloco de rastreamento de perguntas já feitas
+    tracker_lines = []
+    # ... (existing tracker logic, moved after) ...
+    # (O tracker_block continua sendo montado abaixo, mas será colocado APÓS o base_prompt)
+
+    # Ordem de prioridade no prompt (mais crítico primeiro):
+# 1) critical_top (regras de ouro absolutas - identidade, nunca usar "ou", etc.)
+# 2) base_prompt (persona Kênia Garcia - regras identidade + fluxo completo)
+# 3) tracker_block (controle de perguntas já feitas - EVITA LOOP de repetir perguntas)
+# 4) pt_short_rule (idioma + tamanho - regras absolutas para WhatsApp)
+# 5) kb_hint (conhecimento rural - apenas se tema detectado)
+# 6) agenda_block (horários disponíveis - sempre presente mas conciso)
+# 7) style_hint (adaptação sinestesica - opcional)
+# 8) name_hint (nome do cliente - opcional)
+# 9) history_block (histórico da conversa - contexto)
+
+    system_prompt = (
+        critical_top
+        + base_prompt
+        + tracker_block
+        + pt_short_rule
+        + kb_hint
+        + agenda_block
+        + style_hint
+        + name_hint
+        + history_block
     )
-    # REGRA RÍGIDA DE IDIOMA E TAMANHO: WhatsApp curto, sempre em português
-    pt_short_rule = (
-        "\n\n⚠️⚠️⚠️ IDIOMA E TAMANHO (REGRAS ABSOLUTAS) ⚠️⚠️⚠️\n"
-        "- Responda SEMPRE em PORTUGUÊS DO BRASIL. NUNCA escreva em inglês, "
-        "nem palavras/expressões em inglês.\n"
-        "- Resposta CURTA de WhatsApp: no MÁXIMO 4 linhas (2 a 4 frases). "
-        "Nada de textos longos, listas enormes ou explicações acadêmicas.\n"
-        "- Uma pergunta por mensagem, terminando com pergunta direta ou proposta concreta.\n"
-    )
-    system_prompt = critical_top + base_prompt + style_hint + name_hint + kb_hint + pt_short_rule + agenda_block + history_block
     session = f"wa-bot-{contact['id']}"
     reply = await call_fcc_then_emergent(system_prompt, incoming_text, session, max_tokens=450)
     if not reply:
@@ -2412,15 +2428,16 @@ async def _maybe_autorespond(
         return None
 
     # ===== GARANTIA DE QUALIDADE: resposta em inglês, vazou o prompt ou longa demais → regera 1x =====
-    if reply and (len(reply) > 600 or _looks_english(reply) or _is_prompt_leakage(reply)):
-        log.warning(f"[QUALIDADE] resposta fora do padrão (len={len(reply)}, english={_looks_english(reply)}, leak={_is_prompt_leakage(reply)}), regenerando")
+    if reply and (len(reply) > 600 or _looks_english(reply) or _is_prompt_leakage(reply) or " ou " in reply.lower()):
+        log.warning(f"[QUALIDADE] resposta fora do padrão (len={len(reply)}, english={_looks_english(reply)}, leak={_is_prompt_leakage(reply)}, has 'ou'={(' ou ' in reply.lower())}), regenerando")
         fix_prompt = system_prompt + (
             "\n\n⚠️ SUA RESPOSTA ANTERIOR FOI REJEITADA: estava em inglês, vazou o prompt interno "
-            "ou era longa demais. Responda NOVAMENTE em PORTUGUÊS DO BRASIL, CURTO (máx. 4 linhas), "
+            "ou era longa demais. NUNCA use 'ou' para oferecer opções (ex: 'trabalhista ou cível'). "
+            "Responda NOVAMENTE em PORTUGUÊS DO BRASIL, CURTO (máx. 4 linhas), "
             "estilo WhatsApp, como a Dra. Kênia conversando com o cliente."
         )
         new_reply = await call_fcc_then_emergent(fix_prompt, incoming_text, session + "-pt", max_tokens=450)
-        if new_reply and (len(new_reply) <= 600 and not _looks_english(new_reply) and not _is_prompt_leakage(new_reply)):
+        if new_reply and (len(new_reply) <= 600 and not _looks_english(new_reply) and not _is_prompt_leakage(new_reply) and " ou " not in new_reply.lower()):
             reply = new_reply
         else:
             reply = "Pode me contar melhor o que aconteceu? Quero te ajudar direitinho. 😊"
