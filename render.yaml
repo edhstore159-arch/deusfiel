@@ -93,13 +93,13 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: EMERGENT_API_KEY
-        value: sk-emergent-b8cEdA5822d14C0638
+        value: sk-emergent-674Be7e5e2c8b9a08D
         sync: false
       - key: EMERGENT_LLM_KEY
-        value: sk-emergent-b8cEdA5822d14C0638
+        value: sk-emergent-674Be7e5e2c8b9a08D
         sync: false
       - key: EMERGENT_ENABLED
-        value: "true"
+        value: "false"
 
   - type: web
     name: fcc-server
@@ -120,11 +120,11 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: EMERGENT_API_KEY
-        value: sk-emergent-b8cEdA5822d14C0638
+        value: sk-emergent-674Be7e5e2c8b9a08D
       - key: EMERGENT_LLM_KEY
-        value: sk-emergent-b8cEdA5822d14C0638
+        value: sk-emergent-674Be7e5e2c8b9a08D
       - key: EMERGENT_ENABLED
-        value: "true"
+        value: "false"
 
   # baileys-service standalone (sidecar para o FastAPI backend) - 24/7 no Render
   - type: web
