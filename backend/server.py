@@ -793,6 +793,48 @@ async def chat_message(payload: ChatMessageIn):
 
     response = (response or "").strip()
 
+    # ==================== POST-PROCESSING: Garantir regras de mensagem ====================
+    def _truncate_response(text: str) -> str:
+        """Garante no máximo 3 frases curtas, sem 'ou' técnico, formato WhatsApp."""
+        if not text:
+            return text
+        import re
+        sentences = re.split(r'[.!?]+', text.strip())
+        sentences = [s.strip() for s in sentences if s.strip()]
+        sentences = sentences[:3]
+        cleaned = []
+        for s in sentences:
+            if re.search(r'\bou\b', s, re.IGNORECASE):
+                parts = re.split(r'\bOu\b|\bou\b', s, maxsplit=1, flags=re.IGNORECASE)
+                if len(parts) > 1:
+                    s = parts[0].strip()
+            cleaned.append(s)
+        result = " ".join(cleaned)
+        if len(result) > 300:
+            result = result[:300].rsplit(".", 1)[0] + "."
+        return result.strip()
+
+    def _remove_ou_tecnico(text: str) -> str:
+        """Remove construções 'X OU Y' que confundem o cliente no WhatsApp."""
+        import re
+        patterns = [
+            r'caso trabalhista OU trabalhista',
+            r'caso cível OU trabalhista', 
+            r'indenizacao OU verbas rescisorias',
+            r'aposentadoria por idade OU por tempo de contribuição',
+        ]
+        result = text
+        for pattern in patterns:
+            result = re.sub(pattern, "[Converta em pergunta específica]", result, flags=re.IGNORECASE)
+        return result
+
+    if response:
+        response = _truncate_response(response)
+        response = _remove_ou_tecnico(response)
+        words = response.split()
+        if len(words) > 30:
+            response = " ".join(words[:30]) + "..."
+
     await db.chat_messages.insert_one({
         "id": str(uuid.uuid4()), "session_id": session_id,
         "role": "assistant", "content": response, "created_at": now_iso(),
