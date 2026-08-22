@@ -99,7 +99,7 @@ services:
         value: sk-emergent-674Be7e5e2c8b9a08D
         sync: false
       - key: EMERGENT_ENABLED
-        value: "false"
+        value: "true"
 
   - type: web
     name: fcc-server
@@ -124,7 +124,7 @@ services:
       - key: EMERGENT_LLM_KEY
         value: sk-emergent-674Be7e5e2c8b9a08D
       - key: EMERGENT_ENABLED
-        value: "false"
+        value: "true"
 
   # baileys-service standalone (sidecar para o FastAPI backend) - 24/7 no Render
   - type: web
