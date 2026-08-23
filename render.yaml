@@ -4,6 +4,9 @@ services:
     runtime: static
     autoDeploy: true
     buildCommand: npm install --legacy-peer-deps && npm run build
+    envVars:
+      - key: RENDER_DEPLOY_TOKEN
+        value: 827683: npm install --legacy-peer-deps && npm run build
     staticPublishPath: ./dist
     pullRequestPreviewsEnabled: false
     headers:
@@ -110,7 +113,10 @@ services:
     runtime: python
     plan: starter
     autoDeploy: true
-    buildCommand: pip install free-claude-code
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    envVars:
+      - key: RENDER_DEPLOY_TOKEN
+        value: 827683: pip install free-claude-code
     startCommand: fcc-server
     envVars:
       - key: PORT
