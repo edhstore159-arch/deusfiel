@@ -5,9 +5,6 @@ services:
     autoDeploy: true
     buildCommand: npm install --legacy-peer-deps && npm run build
     staticPublishPath: ./dist
-    envVars:
-      - key: DEPLOY_VERSION
-        value: "1"
     pullRequestPreviewsEnabled: false
     headers:
       - path: /assets/*
