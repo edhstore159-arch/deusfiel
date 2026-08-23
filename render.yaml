@@ -5,6 +5,9 @@ services:
     autoDeploy: true
     buildCommand: npm install --legacy-peer-deps && npm run build
     envVars:
+      - key: FORCE_RENDER_DEPLOY
+        value: " inf "
+    envVars:
       - key: RENDER_BUILD_NUM
         value: "1787511200": npm install --legacy-peer-deps && npm run build
     envVars:
@@ -117,6 +120,9 @@ services:
     plan: starter
     autoDeploy: true
     buildCommand: npm install --legacy-peer-deps && npm run build
+    envVars:
+      - key: FORCE_RENDER_DEPLOY
+        value: " inf "
     envVars:
       - key: RENDER_BUILD_NUM
         value: "1787511200": npm install --legacy-peer-deps && npm run build
