@@ -54,6 +54,8 @@ services:
         value: https://fcc-server.onrender.com
       - key: OLLAMA_MODEL
         value: qwen2.5:3b-instruct
+      - key: OLLAMA_CONTEXT_LENGTH
+        value: "65536"
       - key: AI_REQUEST_TIMEOUT_MS
         value: "90000"
       - key: OLLAMA_GENERATE_TIMEOUT_MS
@@ -100,6 +102,8 @@ services:
         sync: false
       - key: EMERGENT_ENABLED
         value: "true"
+      - key: BAILEYS_INTERNAL_TOKEN
+        value: legalflow-baileys-2026
 
   - type: web
     name: fcc-server

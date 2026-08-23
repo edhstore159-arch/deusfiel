@@ -7,7 +7,7 @@ import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
-import { Send, Loader2, Bot, Trash2, Server, Sparkles, Brain, Zap } from "lucide-react";
+import { Send, Loader2, Bot, Trash2, Server, Sparkles, Brain, Zap, Image } from "lucide-react";
 
 // Modelos oferecidos: Nemotron (NVIDIA, gratuito), Claude FCC, Emergent, Ollama local, OpenCode Zen.
 const MODELS = [
@@ -77,6 +77,8 @@ export default function ChatMultiModelo() {
   const [loading, setLoading] = useState(false);
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
   const [ollamaModel, setOllamaModel] = useState("llama3.2");
+  const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const scrollRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -93,6 +95,7 @@ export default function ChatMultiModelo() {
           const m = MODELS.find((x) => x.id === s.selectedId);
           if (m) setSelected(m);
         }
+        if (s.image) setImage(s.image);
       }
     } catch {}
   }, []);
@@ -101,10 +104,10 @@ export default function ChatMultiModelo() {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ ollamaUrl, ollamaModel, system, messages, selectedId: selected.id })
+        JSON.stringify({ ollamaUrl, ollamaModel, system, messages, selectedId: selected.id, image })
       );
     } catch {}
-  }, [ollamaUrl, ollamaModel, system, messages, selected.id]);
+  }, [ollamaUrl, ollamaModel, system, messages, selected.id, image]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -256,10 +259,15 @@ export default function ChatMultiModelo() {
 
   const send = async () => {
     const text = input.trim();
-    if (!text || loading) return;
-    const nextMessages = [...messages, { role: "user", content: text }];
+    if (!text && !image) return;
+    const content = image
+      ? `data:image/jpeg;base64,${image}`
+      : text;
+    const nextMessages = [...messages, { role: "user", content }];
     setMessages(nextMessages);
     setInput("");
+    setImage(null);
+    setImageFile(null);
     setLoading(true);
     abortRef.current = new AbortController();
     try {
@@ -420,19 +428,63 @@ export default function ChatMultiModelo() {
             onKeyDown={onKey}
             placeholder={`Fale com ${selected.label}…`}
             rows={2}
-            className="resize-none"
+            className="resize-none w-[200px] flex-1"
             data-testid="chat-input"
           />
-          {loading ? (
-            <Button onClick={stop} variant="outline" className="h-full">
-              Parar
-            </Button>
-          ) : (
-            <Button onClick={send} disabled={!input.trim()} className="bg-gold-600 hover:bg-gold-700 text-white h-full">
-              <Send className="w-4 h-4" />
-            </Button>
-          )}
+          <div className="flex items-end gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => document.getElementById("file-input")?.click()
+            }
+            disabled={loading}
+            className="h-9 w-9 p-0"
+            title="Anexar imagem"
+          >
+            <Image className="w-4 h-4" />
+          </Button>
+            <input
+              id="file-input"
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                if (!e.target.files?.[0]) return;
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  const base64 = event.target?.result;
+                  setImage(base64.split(",")[1]);
+                  setImageFile(file);
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+            {loading ? (
+              <Button onClick={stop} variant="outline" className="h-full">
+                Parar
+              </Button>
+            ) : (
+              <Button onClick={send} disabled={!input.trim() && !image} className="bg-gold-600 hover:bg-gold-700 text-white h-full">
+                <Send className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
         </div>
+        {image && (
+          <div className="mt-2 flex items-center justify-end">
+            <div
+              className="w-24 h-24 rounded-md bg-nude-100 flex items-center justify-center shrink-0"
+            >
+              <img
+                src={`data:image/jpeg;base64,${image}`}
+                alt="Preview"
+                className="max-w-full max-h-full rounded-md"
+              />
+            </div>
+            <span className="ml-2 text-[10px] text-nude-500">Imagem</span>
+          </div>
+        )}
         <div className="max-w-3xl mx-auto mt-2 text-[10px] text-nude-400 text-center">
           Enter para enviar · Shift+Enter para nova linha · Modelo atual: <b>{selected.label}</b>
         </div>
