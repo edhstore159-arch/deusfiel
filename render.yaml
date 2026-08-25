@@ -6,24 +6,7 @@ services:
     buildCommand: npm install --legacy-peer-deps && npm run build
     envVars:
       - key: FORCE_RENDER_DEPLOY
-        value: "fix-chat-multi-modelo-1787513000"
-    envVars:
-      - key: RENDER_BUILD_NUM
-        value: "1787513000": npm install --legacy-peer-deps && npm run build
-    envVars:
-      - key: RENDER_DEPLOY_TOKEN_827683: 827683
-        value: 827683: npm install --legacy-peer-deps && npm run build
-    staticPublishPath: ./dist
-    pullRequestPreviewsEnabled: false
-    headers:
-      - path: /assets/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
+        value: "fix-chat-1787675000"
       - key: VITE_SUPABASE_URL
         value: https://uzzbgjwpfxokagrvmdoa.supabase.co
       - key: VITE_SUPABASE_PUBLISHABLE_KEY
@@ -36,6 +19,16 @@ services:
         value: https://fcc-server.onrender.com
       - key: VITE_GROQ_API_KEY
         value: ""
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
   - type: web
     name: kenia-whatsapp-backend
     runtime: python
@@ -120,15 +113,6 @@ services:
     plan: starter
     autoDeploy: true
     buildCommand: npm install --legacy-peer-deps && npm run build
-    envVars:
-      - key: FORCE_RENDER_DEPLOY
-        value: " inf "
-    envVars:
-      - key: RENDER_BUILD_NUM
-        value: "1787511200": npm install --legacy-peer-deps && npm run build
-    envVars:
-      - key: RENDER_DEPLOY_TOKEN_827683: 827683
-        value: 827683: pip install free-claude-code
     startCommand: fcc-server
     envVars:
       - key: PORT
