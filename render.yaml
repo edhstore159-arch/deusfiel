@@ -6,10 +6,10 @@ services:
     buildCommand: npm install --legacy-peer-deps && npm run build
     envVars:
       - key: FORCE_RENDER_DEPLOY
-        value: " inf "
+        value: "fix-chat-multi-modelo-1787513000"
     envVars:
       - key: RENDER_BUILD_NUM
-        value: "1787511200": npm install --legacy-peer-deps && npm run build
+        value: "1787513000": npm install --legacy-peer-deps && npm run build
     envVars:
       - key: RENDER_DEPLOY_TOKEN_827683: 827683
         value: 827683: npm install --legacy-peer-deps && npm run build
@@ -168,5 +168,9 @@ services:
         value: legalflow-baileys-2026
       - key: BACKEND_WEBHOOK
         value: https://kenia-whatsapp-backend.onrender.com/api/whatsapp/webhook/baileys
+      - key: KEEP_ALIVE_INTERVAL_MS
+        value: "25000"
+      - key: CONNECT_TIMEOUT_MS
+        value: "60000"
 
   # fcc-server (Claude 3.5 Sonnet grátis)
