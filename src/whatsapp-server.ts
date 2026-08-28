@@ -17,6 +17,13 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_S
 const ZEN_API_KEY = process.env.ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
 const ZEN_BASE_URL = "https://opencode.ai/zen";
 const ZEN_MODEL = "big-pickle";
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+const OPENROUTER_FALLBACK_MODELS = [
+  "nousresearch/hermes-4-70b",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "google/gemma-4-26b-a4b-it:free",
+];
+const FCC_MODEL = "claude-3-5-sonnet-20241022";
 
 const SECRETARY_SYSTEM = `Você é a secretária da Dra. Kenia Garcia, advogada especialista em Direito de Família e Sucessões.
 
@@ -176,38 +183,104 @@ async function generateReply(strategy: string, message: string, history: { role:
 
   const contextMsg = strategyContext[strategy] || "Responda de forma profissional e acolhedora."
 
+  const messages = [
+    { role: "system", content: SECRETARY_SYSTEM },
+    { role: "system", content: `Contexto da estratégia: ${contextMsg}` },
+    ...history.slice(-10),
+    { role: "user", content: "Responda em no máximo 3 frases curtas, estilo WhatsApp (máximo 4 linhas). APENAS uma pergunta por mensagem. Nunca liste perguntas ou respostas múltiplas. Se o cliente fez mais de uma pergunta, responda apenas à primeira e faça uma pergunta nova. Seja direto, acolhedor e direcione para consulta presencial se necessário. Use o histórico para manter contexto e NÃO pergunte novamente o que já foi informado.\n\n" + message },
+  ];
+
+  // Try Zen (big-pickle) first
+  if (ZEN_API_KEY) {
+    const zenModels = [ZEN_MODEL, "deepseek-v4-flash-free", "big-pickle"];
+    for (const candidate of zenModels) {
+      try {
+        const res = await fetch(`${ZEN_BASE_URL}/v1/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${ZEN_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: candidate,
+            messages,
+            max_tokens: 150,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          console.warn(`[Zen] ${candidate} falhou: ${err.slice(0, 200)}`);
+          continue;
+        }
+        const data = await res.json() as any;
+        const content = data?.choices?.[0]?.message?.content;
+        if (content) return content.trim();
+      } catch (err) {
+        console.warn(`[Zen] ${candidate} erro:`, (err as Error)?.message);
+        continue;
+      }
+    }
+  }
+
+  // Try OpenRouter fallback
+  if (OPENROUTER_API_KEY) {
+    const apiMessages = messages.map((m: any) => ({ role: m.role, content: String(m.content || "") }));
+    for (const candidate of OPENROUTER_FALLBACK_MODELS) {
+      try {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            "HTTP-Referer": "https://deusfiel.onrender.com",
+            "X-Title": "Kenia Garcia Advocacia",
+          },
+          body: JSON.stringify({ model: candidate, messages, max_tokens: 150 }),
+        });
+        if (res.ok) {
+          const data = await res.json() as any;
+          const content = data?.choices?.[0]?.message?.content;
+          if (content) return content.trim();
+        }
+      } catch (err) {
+        console.warn(`[OpenRouter] ${candidate} erro:`, (err as Error)?.message);
+        continue;
+      }
+    }
+  }
+
+  // Fallback to Claude FCC
   try {
-    const res = await fetch(`${ZEN_BASE_URL}/v1/chat/completions`, {
+    const FCC_BASE_URL = "https://unabashed-vertical-crispness.ngrok-free.dev";
+    const FCC_AUTH_TOKEN = "freecc";
+    const res = await fetch(`${FCC_BASE_URL}/v1/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${ZEN_API_KEY}`,
+        "x-api-key": FCC_AUTH_TOKEN,
+        "Authorization": `Bearer ${FCC_AUTH_TOKEN}`,
+        "anthropic-version": "2023-06-01",
+        "ngrok-skip-browser-warning": "true",
       },
       body: JSON.stringify({
-        model: ZEN_MODEL,
-        messages: [
-          { role: "system", content: SECRETARY_SYSTEM },
-          { role: "system", content: `Contexto da estratégia: ${contextMsg}` },
-          ...history.slice(-10),
-          { role: "user", content: "Responda em no máximo 3 frases curtas, estilo WhatsApp (máximo 4 linhas). APENAS uma pergunta por mensagem. Nunca liste perguntas ou respostas múltiplas. Se o cliente fez mais de uma pergunta, responda apenas à primeira e faça uma pergunta nova. Seja direto, acolhedor e direcione para consulta presencial se necessário. Use o histórico para manter contexto e NÃO pergunte novamente o que já foi informado.\n\n" + message },
-        ],
+        model: FCC_MODEL,
         max_tokens: 150,
+        stream: false,
+        system: SECRETARY_SYSTEM + " " + contextMsg,
+        messages: messages.map((m: any) => ({ role: m.role, content: String(m.content || "") })),
       }),
     });
-
-    if (!res.ok) {
-      console.error(`[Zen] HTTP ${res.status}`);
-      return fallbackReply(strategy);
+    if (res.ok) {
+      const data = await res.json() as any;
+      const content = data?.content;
+      if (content) return content.trim();
     }
-
-    const data = await res.json() as any;
-    const content = data?.choices?.[0]?.message?.content;
-    if (content) return content.trim();
-    return fallbackReply(strategy);
   } catch (err) {
-    console.error("[Zen] Error:", err);
-    return fallbackReply(strategy);
+    console.error("[Claude FCC] Error:", err);
   }
+
+  return fallbackReply(strategy);
 }
 
 function fallbackReply(strategy: string): string {

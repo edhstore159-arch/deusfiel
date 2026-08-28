@@ -30,9 +30,11 @@ const {
 const PORT = parseInt(process.env.BAILEYS_PORT || process.env.PORT || "8002", 10);
 const AUTH_DIR = process.env.BAILEYS_AUTH_DIR || path.join(__dirname, "auth_info");
 const INTERNAL_TOKEN = process.env.BAILEYS_INTERNAL_TOKEN || "legalflow-baileys-2026";
+const KEEP_ALIVE_INTERVAL_MS = parseInt(process.env.KEEP_ALIVE_INTERVAL_MS || "25000", 10);
+const CONNECT_TIMEOUT_MS = parseInt(process.env.CONNECT_TIMEOUT_MS || "60000", 10);
 const BACKEND_WEBHOOK =
   process.env.BACKEND_WEBHOOK ||
-  "http://localhost:8001/api/whatsapp/webhook/baileys";
+  "http://localhost:8080/api/whatsapp/webhook/baileys";
 
 const logger = pino({ level: "warn" });
 
@@ -107,8 +109,8 @@ async function startSock() {
     // 515 → loop infinito de reconexão sem nunca chegar a 'open'. Aumentamos
     // para 120s e damos tempo ao handshake.
     defaultQueryTimeoutMs: 120_000,
-    keepAliveIntervalMs: 25_000,
-    connectTimeoutMs: 60_000,
+    keepAliveIntervalMs: KEEP_ALIVE_INTERVAL_MS,
+    connectTimeoutMs: CONNECT_TIMEOUT_MS,
     // Ignora status@broadcast no Signal layer (impede PreKeyError em massa)
     shouldIgnoreJid: (jid) => {
       if (!jid) return false;

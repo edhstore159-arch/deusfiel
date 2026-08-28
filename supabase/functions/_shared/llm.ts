@@ -1,4 +1,4 @@
-// Shared LLM helpers with fallback chain: Claude FCC (local, primário) → Ollama → Lovable → Google Gemini (direct) → Emergent (último recurso, opcional).
+// Shared LLM helpers with fallback chain: Emergent (primário, via API) → Claude FCC (local) → Ollama → Lovable → Google Gemini (direct).
 
 type ChatMessage = { role: string; content: any };
 
@@ -32,12 +32,13 @@ const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL")?.trim().replace(/\/+$/, "") ||
 const FCC_AUTH_TOKEN = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
 const FCC_MODEL = Deno.env.get("FCC_MODEL") || "claude-sonnet-4-5";
 
-// Emergent é último recurso e SÓ é usado quando habilitado (painel) ou via EMERGENT_ENABLED,
-// exceto quando o caller força explicitamente preferProvider === "emergent".
+// Emergent é o provedor primário quando habilitado via EMERGENT_ENABLED.
+// FCC é usado como fallback quando Emergent não está disponível.
 function isEmergentAllowed(opts: ChatOptions): boolean {
   if (opts.allowEmergent === true) return true;
   if (opts.preferProvider === "emergent") return true;
-  return Deno.env.get("EMERGENT_ENABLED") === "true";
+  if (Deno.env.get("EMERGENT_ENABLED") === "true") return true;
+  return false;
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = 20000) {
@@ -705,42 +706,21 @@ export async function chatCompletion(opts: ChatOptions) {
       const r = await chatOllama(opts); if (r.ok) return r;
     }
   }
-  // Para voz/atendimento ao vivo, prioriza provedores cloud rápidos antes do Ollama local/ngrok.
-  if (opts.preferFastProvider) {
-    if (FCC_BASE_URL) {
-      const r = await chatClaudeFCC(opts);
-      if (r.ok) return r;
-      console.warn("⚠️ Claude FCC rápido falhou, tentando Lovable/Gemini:", r.status, r.error?.slice?.(0, 200));
-    }
-    if (LOVABLE_KEY) {
-      const r = await chatLovable(opts);
-      if (r.ok) return r;
-      console.warn("⚠️ Lovable chat rápido falhou, tentando Gemini/Ollama:", r.status, r.error?.slice?.(0, 200));
-    }
-    if (GEMINI_KEY) {
-      const r = await chatGemini(opts);
-      if (r.ok) return r;
-      console.warn("⚠️ Gemini rápido falhou, tentando Ollama/Emergent:", r.status, r.error?.slice?.(0, 200));
-    }
-    if (OLLAMA_URL) {
-      const r = await chatOllama(opts);
-      if (r.ok) return r;
-      console.warn("⚠️ Ollama rápido falhou, tentando Emergent:", r.status, r.error?.slice?.(0, 200));
-    }
-    const r3 = await chatEmergent(opts);
-    if (r3.ok) return r3;
-    return { ok: false as const, status: r3.status || 502, error: r3.error || "Nenhum provider rápido disponível", provider: "none" };
-  }
-  // Order: Claude FCC (primário) → Ollama → Lovable → Gemini (direct) → Emergent (último recurso, opcional)
+  // Order: Claude FCC (primário) → Emergent (fallback) → Ollama → Lovable → Gemini (direct)
   if (FCC_BASE_URL) {
     const r = await chatClaudeFCC(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Claude FCC falhou, tentando Ollama/Lovable/Gemini:", r.status, r.error?.slice?.(0, 200));
+    console.warn("⚠️ Claude FCC falhou, caindo para Emergent/Ollama/Lovable/Gemini:", r.status, r.error?.slice?.(0, 200));
+  }
+  if (isEmergentAllowed(opts)) {
+    const r3 = await chatEmergent(opts);
+    if (r3.ok) return r3;
+    console.warn("⚠️ Emergent falhou, tentando Ollama/Lovable/Gemini:", r3.error?.slice?.(0, 200));
   }
   if (OLLAMA_URL) {
     const r = await chatOllama(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Ollama falhou, tentando Lovable/Gemini/Emergent:", r.status, r.error?.slice?.(0, 200));
+    console.warn("⚠️ Ollama falhou, tentando Lovable/Gemini:", r.status, r.error?.slice?.(0, 200));
   }
   if (LOVABLE_KEY) {
     const r = await chatLovable(opts);
@@ -750,7 +730,7 @@ export async function chatCompletion(opts: ChatOptions) {
   if (GEMINI_KEY) {
     const r = await chatGemini(opts);
     if (r.ok) return r;
-    console.warn("⚠️ Gemini direto falhou, tentando Emergent:", r.status, r.error?.slice?.(0, 200));
+    console.warn("⚠️ Gemini direto falhou:", r.status, r.error?.slice?.(0, 200));
   }
   if (isEmergentAllowed(opts)) {
     const r3 = await chatEmergent(opts);
