@@ -59,6 +59,8 @@ const isAdminUnlocked = () => {
   }
 };
 
+const MaintenanceScreen = () => null;
+
 const CHECKLIST_CATEGORIES = [
   {
     id: "comercial",
@@ -539,24 +541,7 @@ export default function Dstboard() {
 
   const allLeads = processes;
 
-  const [unlocked, setUnlocked] = useState(() => isAdminUnlocked());
-  const [gatePassword, setGatePassword] = useState("");
-  const [adminOpen, setAdminOpen] = useState(false);
-
-  if (!unlocked) {
-    return (
-      <MaintenanceScreen
-        adminOpen={adminOpen}
-        setAdminOpen={setAdminOpen}
-        password={gatePassword}
-        setPassword={setGatePassword}
-        onUnlock={() => {
-          try { sessionStorage.setItem(DSTBOARD_ADMIN_KEY, "1"); } catch {}
-          setUnlocked(true);
-        }}
-      />
-    );
-  }
+  const [unlocked, setUnlocked] = useState(true);
 
   return (
     <div className="h-screen flex flex-col bg-nude-50" data-testid="dstboard-page">

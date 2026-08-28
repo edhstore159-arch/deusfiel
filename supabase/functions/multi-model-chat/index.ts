@@ -43,6 +43,31 @@ const MODEL_CANDIDATES: Record<string, string[]> = {
 
 const FALLBACK_CANDIDATES = ["gpt-4o-mini"];
 
+// Converte mensagens com data URLs de imagem para formato apropriado por provedor
+function convertMessagesForProvider(messages: any[], provider: "openai" | "anthropic"): any[] {
+  return messages.map((m) => {
+    const content = m.content;
+    if (typeof content === "string" && content.startsWith("data:image/")) {
+      const match = content.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (match) {
+        if (provider === "anthropic") {
+          return {
+            role: m.role,
+            content: [{ type: "image", source: { type: "base64", media_type: match[1], data: match[2] } }],
+          };
+        } else {
+          // OpenAI format (Emergent, OpenRouter, NVIDIA NIM, etc.)
+          return {
+            role: m.role,
+            content: [{ type: "image_url", image_url: { url: content } }],
+          };
+        }
+      }
+    }
+    return { role: m.role, content: String(content ?? "") };
+  });
+}
+
 async function tryEmergent(key: string, model: string, payload: any): Promise<Response> {
   return fetch(EMERGENT_BASE, {
     method: "POST",
@@ -56,10 +81,10 @@ async function tryZen(messages: any[], system?: string, model?: string): Promise
   const patchedSystem = system
     ? `INSTRUÇÃO CRÍTICA: Responda SEMPRE em português brasileiro. NUNCA responda em inglês. NÃO inclua raciocínio ou análise. Responda apenas com a resposta final.\n\n${system}`
     : undefined;
-  const apiMessages = [
+  const apiMessages = convertMessagesForProvider([
     ...(patchedSystem ? [{ role: "system", content: patchedSystem }] : []),
-    ...messages.map((m: any) => ({ role: m.role, content: String(m.content || "") })),
-  ];
+    ...messages,
+  ], "openai");
   const zenModels = model ? [model, "big-pickle", "deepseek-v4-flash-free"] : ["big-pickle", "deepseek-v4-flash-free"];
   for (const candidate of zenModels) {
     try {
@@ -146,10 +171,10 @@ async function tryZen(messages: any[], system?: string, model?: string): Promise
 
 async function tryOpenRouter(messages: any[], system?: string): Promise<Response | null> {
   if (!OPENROUTER_KEY) return null;
-  const apiMessages = [
+  const apiMessages = convertMessagesForProvider([
     ...(system ? [{ role: "system", content: String(system) }] : []),
-    ...messages.map((m: any) => ({ role: m.role, content: String(m.content || "") })),
-  ];
+    ...messages,
+  ], "openai");
   for (const candidate of OPENROUTER_FALLBACK_MODELS) {
     try {
       const resp = await fetch(OPENROUTER_BASE, {
@@ -175,10 +200,24 @@ async function tryOpenRouter(messages: any[], system?: string): Promise<Response
 }
 
 async function tryClaudeFCC(messages: any[], system?: string): Promise<Response> {
-  const apiMessages = messages.map((m: any) => ({
-    role: m.role === "assistant" ? "assistant" : "user",
-    content: String(m.content || ""),
-  }));
+  // Converte mensagens para formato Anthropic, suportando imagens (base64 data URLs)
+  const apiMessages = messages.map((m: any) => {
+    const content = m.content;
+    if (typeof content === "string" && content.startsWith("data:image/")) {
+      // Imagem em base64
+      const match = content.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (match) {
+        return {
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: [{ type: "image", source: { type: "base64", media_type: match[1], data: match[2] } }],
+        };
+      }
+    }
+    return {
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: String(content || ""),
+    };
+  });
   const resp = await fetch(`${FCC_BASE_URL}/v1/messages`, {
     method: "POST",
     headers: {
@@ -262,13 +301,10 @@ async function tryNemotronDirect(messages: any[], system?: string): Promise<Resp
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  const apiMessages = [
+  const apiMessages = convertMessagesForProvider([
     ...(system ? [{ role: "system", content: String(system) }] : []),
-    ...messages.map((m: any) => ({
-      role: m.role === "assistant" ? "assistant" : "user",
-      content: String(m.content || ""),
-    })),
-  ];
+    ...messages,
+  ], "openai");
   const resp = await fetch(`${NVIDIA_NIM_BASE}/chat/completions`, {
     method: "POST",
     headers: {
@@ -346,36 +382,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Rota dedicada: Claude FCC via ngrok (não precisa de Emergent)
+    // Rota dedicada: Claude FCC via ngrok
     if (model === "claude-fcc") {
-      // ngrok serve Nemotron, não Groq. Pula direto para Emergent/Zen
-      console.log("GROQ: ngrok serve Nemotron, usando Emergent/Zen como primário");
-      const emergentKey = Deno.env.get("EMERGENT_API_KEY") || Deno.env.get("EMERGENT_LLM_KEY") || "";
-      if (emergentKey) {
-        const payload = {
-          stream: true,
-          messages: [
-            ...(system ? [{ role: "system", content: String(system) }] : []),
-            ...messages.map((m: any) => ({ role: m.role, content: String(m.content ?? "") })),
-          ],
-        };
-        // Tenta gpt-4o-mini via Emergent (mais estável)
-        for (const candidate of ["gpt-4o-mini", "gpt-4o"]) {
-          const upstream = await tryEmergent(emergentKey, candidate, payload);
-          if (upstream.ok && upstream.body) {
-            console.log(`[multi-model-chat] GROQ → Emergent OK com ${candidate}`);
-            return new Response(upstream.body, {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
-            });
-          }
-        }
+      console.log("Rota direta: Claude FCC");
+      try {
+        const claudeResp = await tryClaudeFCC(messages, system);
+        if (claudeResp.ok) return claudeResp;
+      } catch (e) {
+        console.warn("Claude FCC erro:", (e as Error)?.message);
       }
-      // Fallback: Zen (big-pickle gratuito)
-      const zenResp = await tryZen(messages, system, "big-pickle");
-      if (zenResp) return zenResp;
-
-      const sseErr = `data: ${JSON.stringify({ error: "GROQ: Emergent e Zen indisponíveis" })}\n\ndata: [DONE]\n\n`;
+      const sseErr = `data: ${JSON.stringify({ error: "Claude FCC indisponível" })}\n\ndata: [DONE]\n\n`;
       return new Response(sseErr, {
         status: 503,
         headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
@@ -404,7 +420,14 @@ Deno.serve(async (req) => {
     if (candidates.length > 0) {
       console.log(`[multi-model-chat] Tentando Emergent para ${model} com candidatos:`, candidates);
       for (const candidate of candidates) {
-        const upstream = await tryEmergent(emergentKey, candidate, payload);
+        const emergentPayload = {
+          stream: true,
+          messages: convertMessagesForProvider([
+            ...(system ? [{ role: "system", content: String(system) }] : []),
+            ...messages,
+          ], "openai"),
+        };
+        const upstream = await tryEmergent(emergentKey, candidate, emergentPayload);
 
         if (!upstream.ok || !upstream.body) {
           const text = await upstream.text().catch(() => "");
