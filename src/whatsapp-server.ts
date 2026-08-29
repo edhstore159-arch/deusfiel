@@ -7,10 +7,11 @@ import makeWASocket, {
   useMultiFileAuthState,
   WASocket,
   proto,
+  downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
-import path from "path";
-import fs from "fs";
+import * as path from "path";
+import * as fs from "fs";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
@@ -24,6 +25,9 @@ const OPENROUTER_FALLBACK_MODELS = [
   "google/gemma-4-26b-a4b-it:free",
 ];
 const FCC_MODEL = "claude-3-5-sonnet-20241022";
+
+const PROXY_URL = process.env.PROXY_URL || "http://127.0.0.1:11111";
+const VISION_MODEL = process.env.VISION_MODEL || "gemma4:12b";
 
 const SECRETARY_SYSTEM = `Você é a secretária da Dra. Kenia Garcia, advogada especialista em Direito de Família e Sucessões.
 
@@ -298,6 +302,46 @@ function fallbackReply(strategy: string): string {
   return replies[strategy] || "Mensagem recebida. Aguarde um momento.";
 }
 
+async function downloadImageAsBase64(msg: proto.IWebMessageInfo): Promise<string | null> {
+  try {
+    const buf = await downloadMediaMessage(msg, "buffer", {});
+    if (buf && buf.length > 0) {
+      return buf.toString("base64");
+    }
+  } catch (e) {
+    console.warn("[WA] image download failed:", (e as Error).message);
+  }
+  return null;
+}
+
+async function processImageWithVision(base64Image: string, prompt: string = "Descreva o conteúdo desta imagem em português, seja conciso."): Promise<string | null> {
+  try {
+    const res = await fetch(`${PROXY_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        messages: [
+          { role: "user", content: prompt, images: [base64Image] }
+        ],
+        stream: false,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.warn("[Vision] Ollama error:", err.slice(0, 200));
+      return null;
+    }
+
+    const data = await res.json() as any;
+    return data?.message?.content?.trim() || null;
+  } catch (err) {
+    console.error("[Vision] Error:", err);
+    return null;
+  }
+}
+
 let sock: WASocket;
 
 async function connectWhatsApp() {
@@ -330,20 +374,24 @@ async function connectWhatsApp() {
         "";
 
       let mediaNote = "";
+      let visionDescription = "";
       if (msg.message.imageMessage) {
         mediaNote = "[O cliente enviou uma IMAGEM] ";
-        try {
-          const buf = await downloadMediaMessage(msg, "buffer", {}, {});
-          void buf;
-        } catch (e) {
-          console.warn("[WA] image download failed:", (e as Error).message);
+        const base64Image = await downloadImageAsBase64(msg);
+        if (base64Image) {
+          visionDescription = await processImageWithVision(base64Image) || "";
+          console.log(`[WA] Vision result: ${visionDescription.slice(0, 100)}`);
         }
         text = text || mediaNote + (msg.message.imageMessage.caption || "");
-        if (text === mediaNote) text = text + "Peça para ele descrever a imagem ou enviar o texto do documento.";
+        if (visionDescription) {
+          text = `${text}\n[Descrição da imagem: ${visionDescription}]`;
+        } else if (text === mediaNote) {
+          text = text + "Peça para ele descrever a imagem ou enviar o texto do documento.";
+        }
       } else if (msg.message.audioMessage) {
         mediaNote = "[O cliente enviou um ÁUDIO] Peça para ele repetir por texto ou áudio mais claro. ";
         try {
-          const buf = await downloadMediaMessage(msg, "buffer", {}, {});
+          const buf = await downloadMediaMessage(msg, "buffer", {});
           void buf;
         } catch (e) {
           console.warn("[WA] audio download failed:", (e as Error).message);
