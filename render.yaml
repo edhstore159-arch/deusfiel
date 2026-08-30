@@ -19,6 +19,12 @@ services:
         value: https://fcc-server.onrender.com
       - key: VITE_GROQ_API_KEY
         value: ""
+      - key: VITE_NEMOTRON_API_KEY
+        sync: false
+      - key: VITE_ZAI_API_KEY
+        sync: false
+      - key: VITE_ZEN_API_KEY
+        sync: false
     staticPublishPath: ./dist
     pullRequestPreviewsEnabled: false
     headers:

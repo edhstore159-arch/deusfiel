@@ -144,14 +144,20 @@ export default function ChatMultiModelo() {
   };
 
   const streamGateway = async (allMessages) => {
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/multi-model-chat`;
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ model: selected.id, system, messages: allMessages }),
+      body: JSON.stringify({ 
+        message: allMessages[allMessages.length - 1]?.content || "",
+        history: allMessages.slice(0, -1).filter(m => m.role !== "system"),
+        system_prompt: system,
+        model: selected.id,
+        stream: true,
+      }),
       signal: abortRef.current?.signal,
     });
     if (!res.ok || !res.body) {
@@ -185,7 +191,7 @@ export default function ChatMultiModelo() {
         if (line.startsWith("data: ")) {
           try {
             const data = JSON.parse(line.slice(6));
-            const chunk = data.choices?.[0]?.delta?.content || "";
+            const chunk = data.choices?.[0]?.delta?.content || data.response || "";
             if (chunk) {
               fullResponse += chunk;
               setStreamingResponse(fullResponse);
@@ -198,7 +204,7 @@ export default function ChatMultiModelo() {
     if (buffer.startsWith("data: ")) {
       try {
         const data = JSON.parse(buffer.slice(6));
-        const chunk = data.choices?.[0]?.delta?.content || "";
+        const chunk = data.choices?.[0]?.delta?.content || data.response || "";
         if (chunk) {
           fullResponse += chunk;
           setStreamingResponse(fullResponse);
@@ -251,7 +257,7 @@ export default function ChatMultiModelo() {
   };
 
   const streamClaudeFCC = async (allMessages) => {
-    const fccUrl = `${import.meta.env.VITE_FCC_URL || "http://localhost:11111"}/v1/messages`;
+    const fccUrl = `${import.meta.env.VITE_FCC_URL || "https://fcc-server.onrender.com"}/v1/messages`;
     const res = await fetch(fccUrl, {
       method: "POST",
       headers: {
@@ -268,7 +274,10 @@ export default function ChatMultiModelo() {
       }),
       signal: abortRef.current?.signal,
     });
-    if (!res.ok || !res.body) throw new Error(`FCC HTTP ${res.status}`);
+    if (!res.ok || !res.body) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`FCC HTTP ${res.status}: ${errText}`);
+    }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -295,15 +304,27 @@ export default function ChatMultiModelo() {
       }
       buffer = lines[lines.length - 1];
     }
+    if (buffer.startsWith("data: ")) {
+      try {
+        const data = JSON.parse(buffer.slice(6));
+        const chunk = data.delta?.text || "";
+        if (chunk) {
+          fullResponse += chunk;
+          setStreamingResponse(fullResponse);
+        }
+      } catch {}
+    }
     return fullResponse;
   };
 
   const streamNemotron = async (allMessages) => {
+    const apiKey = import.meta.env.VITE_NEMOTRON_API_KEY || import.meta.env.VITE_ZAI_API_KEY || "";
+    if (!apiKey) throw new Error("Nemotron API key não configurada (VITE_NEMOTRON_API_KEY ou VITE_ZAI_API_KEY)");
     const res = await fetch("https://api.z.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_NEMOTRON_API_KEY || ""}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: "GLM-4.5",
@@ -312,7 +333,10 @@ export default function ChatMultiModelo() {
       }),
       signal: abortRef.current?.signal,
     });
-    if (!res.ok || !res.body) throw new Error(`Nemotron HTTP ${res.status}`);
+    if (!res.ok || !res.body) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Nemotron HTTP ${res.status}: ${errText}`);
+    }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -339,15 +363,27 @@ export default function ChatMultiModelo() {
       }
       buffer = lines[lines.length - 1];
     }
+    if (buffer.startsWith("data: ")) {
+      try {
+        const data = JSON.parse(buffer.slice(6));
+        const chunk = data.choices?.[0]?.delta?.content || "";
+        if (chunk) {
+          fullResponse += chunk;
+          setStreamingResponse(fullResponse);
+        }
+      } catch {}
+    }
     return fullResponse;
   };
 
   const streamZen = async (allMessages) => {
+    const apiKey = import.meta.env.VITE_ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
+    if (!apiKey) throw new Error("Zen API key não configurada (VITE_ZEN_API_KEY)");
     const res = await fetch("https://opencode.ai/zen/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8"}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: "big-pickle",
@@ -356,7 +392,10 @@ export default function ChatMultiModelo() {
       }),
       signal: abortRef.current?.signal,
     });
-    if (!res.ok || !res.body) throw new Error(`Zen HTTP ${res.status}`);
+    if (!res.ok || !res.body) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Zen HTTP ${res.status}: ${errText}`);
+    }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -382,6 +421,16 @@ export default function ChatMultiModelo() {
         }
       }
       buffer = lines[lines.length - 1];
+    }
+    if (buffer.startsWith("data: ")) {
+      try {
+        const data = JSON.parse(buffer.slice(6));
+        const chunk = data.choices?.[0]?.delta?.content || "";
+        if (chunk) {
+          fullResponse += chunk;
+          setStreamingResponse(fullResponse);
+        }
+      } catch {}
     }
     return fullResponse;
   };
@@ -404,6 +453,7 @@ export default function ChatMultiModelo() {
 
     try {
       let response = "";
+      console.log("Selected model:", selected.id, "provider:", selected.provider);
       if (selected.provider === "gateway") {
         response = await streamGateway(allMessages);
       } else if (selected.provider === "ollama") {
@@ -417,8 +467,10 @@ export default function ChatMultiModelo() {
       }
       finalizeAssistant();
     } catch (e) {
-      toast.error((e as Error).message);
-      setMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${(e as Error).message}` }]);
+      const errorMsg = (e as Error).message;
+      console.error("Chat error:", errorMsg, e);
+      toast.error(errorMsg);
+      setMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${errorMsg}` }]);
     } finally {
       setLoading(false);
     }
