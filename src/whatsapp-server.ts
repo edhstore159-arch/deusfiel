@@ -7,7 +7,6 @@ import makeWASocket, {
   useMultiFileAuthState,
   WASocket,
   proto,
-  downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import * as path from "path";
@@ -15,19 +14,29 @@ import * as fs from "fs";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+
+// Nemotron/Z.ai API configuration (primary)
+const NEMOTRON_API_KEY = process.env.NEMOTRON_API_KEY || process.env.ZAI_API_KEY || "";
+const NEMOTRON_BASE_URL = "https://api.z.ai/v1";
+const NEMOTRON_MODEL = "GLM-4.5";
+
+// Zen API configuration (secondary)
 const ZEN_API_KEY = process.env.ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
 const ZEN_BASE_URL = "https://opencode.ai/zen";
 const ZEN_MODEL = "big-pickle";
+
+// OpenRouter fallback models
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_FALLBACK_MODELS = [
   "nousresearch/hermes-4-70b",
   "nvidia/nemotron-3-super-120b-a12b:free",
   "google/gemma-4-26b-a4b-it:free",
 ];
-const FCC_MODEL = "claude-3-5-sonnet-20241022";
 
-const PROXY_URL = process.env.PROXY_URL || "http://127.0.0.1:11111";
-const VISION_MODEL = process.env.VISION_MODEL || "gemma4:12b";
+// FCC (Free Claude Code) - will use environment variable for production URL
+const FCC_MODEL = "claude-3-5-sonnet-20241022";
+const FCC_BASE_URL = process.env.FCC_BASE_URL || "http://127.0.0.1:11111";
+const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "freecc";
 
 const SECRETARY_SYSTEM = `Você é a secretária da Dra. Kenia Garcia, advogada especialista em Direito de Família e Sucessões.
 
@@ -169,10 +178,25 @@ async function storeMessage(
 
   await supabaseQuery(`wa_conversations?id=eq.${conversationId}`, "PATCH", {
     current_strategy: strategyName,
+    updated_at: new Date().toISOString(),
   });
 }
 
-async function generateReply(strategy: string, message: string, history: { role: string; content: string }[] = []): Promise<string> {
+async function getConversationHistory(conversationId: string, limit: number = 20): Promise<{ role: string; content: string }[]> {
+  const messages = await supabaseQuery(
+    `wa_messages?conversation_id=eq.${conversationId}&order=created_at.asc&limit=${limit}`,
+    "GET"
+  );
+  
+  if (!messages || messages.length === 0) return [];
+  
+  return messages.map((msg: any) => ({
+    role: msg.direction === "incoming" ? "user" : "assistant",
+    content: msg.content
+  }));
+}
+
+async function generateReply(strategy: string, message: string, conversationId: string): Promise<string> {
   const strategyContext: Record<string, string> = {
     saudacao: "O cliente está cumprimentando. Dê boas-vindas calorosamente.",
     identificacao: "O cliente quer se identificar. Peça nome e dados de contato.",
@@ -187,6 +211,9 @@ async function generateReply(strategy: string, message: string, history: { role:
 
   const contextMsg = strategyContext[strategy] || "Responda de forma profissional e acolhedora."
 
+  // Fetch full conversation history from Supabase
+  const history = await getConversationHistory(conversationId, 20);
+  
   const messages = [
     { role: "system", content: SECRETARY_SYSTEM },
     { role: "system", content: `Contexto da estratégia: ${contextMsg}` },
@@ -194,7 +221,37 @@ async function generateReply(strategy: string, message: string, history: { role:
     { role: "user", content: "Responda em no máximo 3 frases curtas, estilo WhatsApp (máximo 4 linhas). APENAS uma pergunta por mensagem. Nunca liste perguntas ou respostas múltiplas. Se o cliente fez mais de uma pergunta, responda apenas à primeira e faça uma pergunta nova. Seja direto, acolhedor e direcione para consulta presencial se necessário. Use o histórico para manter contexto e NÃO pergunte novamente o que já foi informado.\n\n" + message },
   ];
 
-  // Try Zen (big-pickle) first
+  // 1. Try Nemotron/Z.ai (GLM-4.5) FIRST - primary provider
+  if (NEMOTRON_API_KEY) {
+    try {
+      const res = await fetch(`${NEMOTRON_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${NEMOTRON_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: NEMOTRON_MODEL,
+          messages,
+          max_tokens: 150,
+          temperature: 0.3,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json() as any;
+        const content = data?.choices?.[0]?.message?.content;
+        if (content) return content.trim();
+      } else {
+        const err = await res.text();
+        console.warn(`[Nemotron] falhou: ${err.slice(0, 200)}`);
+      }
+    } catch (err) {
+      console.warn(`[Nemotron] erro:`, (err as Error)?.message);
+    }
+  }
+
+  // 2. Try Zen (big-pickle) as second option
   if (ZEN_API_KEY) {
     const zenModels = [ZEN_MODEL, "deepseek-v4-flash-free", "big-pickle"];
     for (const candidate of zenModels) {
@@ -227,7 +284,7 @@ async function generateReply(strategy: string, message: string, history: { role:
     }
   }
 
-  // Try OpenRouter fallback
+  // 3. Try OpenRouter fallback
   if (OPENROUTER_API_KEY) {
     const apiMessages = messages.map((m: any) => ({ role: m.role, content: String(m.content || "") }));
     for (const candidate of OPENROUTER_FALLBACK_MODELS) {
@@ -254,10 +311,8 @@ async function generateReply(strategy: string, message: string, history: { role:
     }
   }
 
-  // Fallback to Claude FCC
+  // 4. Fallback to Claude FCC (Free Claude Code)
   try {
-    const FCC_BASE_URL = "https://unabashed-vertical-crispness.ngrok-free.dev";
-    const FCC_AUTH_TOKEN = "freecc";
     const res = await fetch(`${FCC_BASE_URL}/v1/messages`, {
       method: "POST",
       headers: {
@@ -302,46 +357,6 @@ function fallbackReply(strategy: string): string {
   return replies[strategy] || "Mensagem recebida. Aguarde um momento.";
 }
 
-async function downloadImageAsBase64(msg: proto.IWebMessageInfo): Promise<string | null> {
-  try {
-    const buf = await downloadMediaMessage(msg, "buffer", {});
-    if (buf && buf.length > 0) {
-      return buf.toString("base64");
-    }
-  } catch (e) {
-    console.warn("[WA] image download failed:", (e as Error).message);
-  }
-  return null;
-}
-
-async function processImageWithVision(base64Image: string, prompt: string = "Descreva o conteúdo desta imagem em português, seja conciso."): Promise<string | null> {
-  try {
-    const res = await fetch(`${PROXY_URL}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: VISION_MODEL,
-        messages: [
-          { role: "user", content: prompt, images: [base64Image] }
-        ],
-        stream: false,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.warn("[Vision] Ollama error:", err.slice(0, 200));
-      return null;
-    }
-
-    const data = await res.json() as any;
-    return data?.message?.content?.trim() || null;
-  } catch (err) {
-    console.error("[Vision] Error:", err);
-    return null;
-  }
-}
-
 let sock: WASocket;
 
 async function connectWhatsApp() {
@@ -373,30 +388,10 @@ async function connectWhatsApp() {
         msg.message.extendedTextMessage?.text ||
         "";
 
-      let mediaNote = "";
-      let visionDescription = "";
       if (msg.message.imageMessage) {
-        mediaNote = "[O cliente enviou uma IMAGEM] ";
-        const base64Image = await downloadImageAsBase64(msg);
-        if (base64Image) {
-          visionDescription = await processImageWithVision(base64Image) || "";
-          console.log(`[WA] Vision result: ${visionDescription.slice(0, 100)}`);
-        }
-        text = text || mediaNote + (msg.message.imageMessage.caption || "");
-        if (visionDescription) {
-          text = `${text}\n[Descrição da imagem: ${visionDescription}]`;
-        } else if (text === mediaNote) {
-          text = text + "Peça para ele descrever a imagem ou enviar o texto do documento.";
-        }
+        text = text || "[O cliente enviou uma IMAGEM] " + (msg.message.imageMessage.caption || "");
       } else if (msg.message.audioMessage) {
-        mediaNote = "[O cliente enviou um ÁUDIO] Peça para ele repetir por texto ou áudio mais claro. ";
-        try {
-          const buf = await downloadMediaMessage(msg, "buffer", {});
-          void buf;
-        } catch (e) {
-          console.warn("[WA] audio download failed:", (e as Error).message);
-        }
-        text = mediaNote;
+        text = "[O cliente enviou um ÁUDIO] Peça para ele repetir por texto ou áudio mais claro. ";
       } else if (msg.message.documentMessage) {
         text = "[O cliente enviou um DOCUMENTO: " + (msg.message.documentMessage.fileName || "arquivo") + "] Pergunte o que é o documento.";
       } else if (msg.message.videoMessage) {
@@ -413,7 +408,7 @@ async function connectWhatsApp() {
 
       await storeMessage(convId, "incoming", text, strategy);
 
-      let reply = await generateReply(strategy, text);
+      let reply = await generateReply(strategy, text, convId);
       // Truncate to max 300 chars and ensure max 4 lines
       if (reply.length > 300) {
         reply = reply.slice(0, 300).trim();

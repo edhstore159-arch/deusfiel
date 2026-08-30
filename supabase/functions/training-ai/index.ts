@@ -544,6 +544,16 @@ Deno.serve(async (req: Request) => {
       const areaLabel = area.charAt(0).toUpperCase() + area.slice(1);
       const diffLabel = difficulty === "facil" ? "Fácil" : difficulty === "dificil" ? "Difícil" : "Médio";
       userContent = `Gere um caso simulado para treinamento de ${mode === "lawyer" ? "ADVOCACIA" : "JULGAMENTO"} na área de ${areaLabel} com dificuldade ${diffLabel}. Use nomes fictícios. Caso realista.`;
+      const caseResult = await chatCompletion({ messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userContent }], temperature: 0.7, maxTokens: 3000, preferProvider: "gemini" });
+      if (!caseResult.ok) {
+        console.log("[training-ai] generate_case Gemini falhou, tentando fallback...");
+        const fallbackResult = await aiChat({ messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userContent }], temperature: 0.7, maxTokens: 1200 });
+        if (fallbackResult.ok) {
+          return new Response(JSON.stringify(fallbackResult.data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        return new Response(JSON.stringify({ error: "Falha ao gerar caso", details: fallbackResult.error }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify(caseResult.data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } else if (action === "generate_lawyer_response") {
       // Apenas gera a resposta do advogado/juiz production para referência
       const lawList = Array.isArray(caseData?.applicable_laws) ? caseData.applicable_laws.join(", ") : (caseData?.applicable_laws || "N/A");
@@ -557,7 +567,7 @@ Deno.serve(async (req: Request) => {
         { role: "user" as const, content: msgUser },
       ];
 
-      let lawyerResult = await chatGemini({ messages: lawyerMessages, temperature: 0.5, maxTokens: 3000 });
+      let lawyerResult = await chatCompletion({ messages: lawyerMessages, temperature: 0.5, maxTokens: 3000, preferProvider: "gemini" });
       if (!lawyerResult.ok) {
         console.log("[training-ai] Gemini falhou para generate_lawyer_response, usando fallback...");
         lawyerResult = await aiChat({ messages: lawyerMessages, temperature: 0.5, maxTokens: 1200 });
@@ -570,12 +580,12 @@ Deno.serve(async (req: Request) => {
       // Revisão jurídica: Gemini → fallback Emergent
       if (lawyerResult.ok && mode === "lawyer") {
         console.log("[training-ai] Aplicando revisão jurídica...");
-        let reviewResult = await chatGemini({
+        let reviewResult = await chatCompletion({
           messages: [
             { role: "system", content: LEGAL_REVIEW_PROMPT },
             { role: "user", content: `Texto para revisão:\n\n${response}` },
           ],
-          temperature: 0.3, maxTokens: 2000,
+          temperature: 0.3, maxTokens: 2000, preferProvider: "gemini",
         });
         if (!reviewResult.ok) {
           reviewResult = await aiChat({

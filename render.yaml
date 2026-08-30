@@ -82,12 +82,12 @@ services:
         value: freecc
       - key: FCC_MODEL
         value: claude-3-5-sonnet-20241022
-      - key: PROXY_URL
-        value: https://fcc-server.onrender.com
-      - key: VISION_MODEL
-        value: gemma4:12b
       - key: ZEN_API_KEY
         value: sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8
+      - key: NEMOTRON_API_KEY
+        sync: false
+      - key: ZAI_API_KEY
+        sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: MONGO_URL

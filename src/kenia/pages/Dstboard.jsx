@@ -58,9 +58,6 @@ const isAdminUnlocked = () => {
     return false;
   }
 };
-
-const MaintenanceScreen = () => null;
-
 const CHECKLIST_CATEGORIES = [
   {
     id: "comercial",
