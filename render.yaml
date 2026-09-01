@@ -6,7 +6,7 @@ services:
     buildCommand: npm ci --legacy-peer-deps && npm run build
     envVars:
       - key: FORCE_RENDER_DEPLOY
-        value: "fix-chat-1787675000"
+        value: "fix-axios-1787676000"
       - key: VITE_SUPABASE_URL
         value: https://uzzbgjwpfxokagrvmdoa.supabase.co
       - key: VITE_SUPABASE_PUBLISHABLE_KEY
