@@ -21,12 +21,8 @@ import {
   downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://uzzbgjwpfxokagrvmdoa.supabase.co";
-const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6Imt6bHh5c3h2dmx1cGp0cm14cW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4OTM3MDUsImV4cCI6MjA5MjQ2OTcwNX0.iU5enYnsJExOHtbwpJKQ4bMGZS8hzQIURi6T2y2EQVM";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const SUPABASE_DB_KEY = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 const supabaseDb = SUPABASE_URL && SUPABASE_DB_KEY
@@ -178,9 +174,7 @@ async function transcribeAudioBuffer(buffer, mimetype = "audio/ogg") {
 }
 
 // ---- Ponte para Ollama (via ngrok) usada pelo bot do Baileys ----
-const OLLAMA_RAW_URL =
-  process.env.OLLAMA_URL ||
-  "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate";
+const OLLAMA_RAW_URL = process.env.OLLAMA_URL || "";
 const normalizeOllamaBaseUrl = (value) => {
   const trimmed = String(value || "").trim().replace(/\/+$/g, "");
   const withoutEndpoint = trimmed
@@ -191,8 +185,8 @@ const normalizeOllamaBaseUrl = (value) => {
 const OLLAMA_BASE_URL = normalizeOllamaBaseUrl(OLLAMA_RAW_URL);
 const OLLAMA_URL = `${OLLAMA_BASE_URL}/api/generate`;
 const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
-const OLLAMA_MODEL = "qwen2.5:3b-instruct";
-const OLLAMA_FALLBACK_MODEL = "";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:3b-instruct";
+const OLLAMA_FALLBACK_MODEL = process.env.OLLAMA_FALLBACK_MODEL || "";
 const OLLAMA_REQUEST_RETRIES = Number(process.env.OLLAMA_REQUEST_RETRIES || 0);
 const OLLAMA_GENERATE_TIMEOUT_MS = Number(process.env.OLLAMA_GENERATE_TIMEOUT_MS || 45000);
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "10m";
@@ -454,7 +448,7 @@ const AI_MODEL = process.env.AI_MODEL || "google/gemini-3-flash-preview";
 const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS || 90000);
 
 // ---- OpenCode Zen (gratuito, principal) ----
-const ZEN_API_KEY = process.env.ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
+const ZEN_API_KEY = process.env.ZEN_API_KEY || "";
 const ZEN_BASE_URL = "https://opencode.ai/zen/v1/chat/completions";
 const ZEN_MODELS = ["big-pickle", "deepseek-v4-flash-free", "nemotron-3-ultra-free"];
 
@@ -509,10 +503,10 @@ async function callZen(messagesPayload, options = {}) {
 }
 
 // ---- Claude via FCC Proxy (Free Claude Code) ----
-const FCC_BASE_URL = process.env.FCC_BASE_URL || "http://127.0.0.1:8082";
-const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "freecc";
-const FCC_MODEL = process.env.FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
-const FCC_ENABLED = process.env.FCC_ENABLED !== "false";
+const FCC_BASE_URL = process.env.FCC_BASE_URL || "";
+const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "";
+const FCC_MODEL = process.env.FCC_MODEL || "";
+const FCC_ENABLED = process.env.FCC_ENABLED === "true";
 const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 // ---- OpenRouter (free models cloud fallback) ----
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
@@ -1630,7 +1624,9 @@ function stripEnglishPreamble(reply) {
 }
 
 async function callClaudeFCC(messages, systemPrompt) {
-  if (!FCC_ENABLED) throw new Error("FCC desativado");
+  if (!FCC_ENABLED || !FCC_BASE_URL || !FCC_AUTH_TOKEN || !FCC_MODEL) {
+    throw new Error("FCC não configurado (FCC_BASE_URL, FCC_AUTH_TOKEN, FCC_MODEL)");
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FCC_TIMEOUT_MS);
   try {
