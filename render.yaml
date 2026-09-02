@@ -20,11 +20,11 @@ services:
       - key: VITE_GROQ_API_KEY
         sync: false
       - key: VITE_NEMOTRON_API_KEY
-        sync: false
+        value: ""
       - key: VITE_ZAI_API_KEY
-        sync: false
+        value: ""
       - key: VITE_ZEN_API_KEY
-        sync: false
+        value: ""
       - key: VITE_GEMINI_API_KEY
         sync: false
       - key: VITE_OPENROUTER_API_KEY
@@ -99,9 +99,9 @@ services:
       - key: ZEN_API_KEY
         sync: false
       - key: NEMOTRON_API_KEY
-        sync: false
+        value: ""
       - key: ZAI_API_KEY
-        sync: false
+        value: ""
       - key: NVIDIA_NIM_API_KEY
         sync: false
       - key: GROQ_API_KEY
