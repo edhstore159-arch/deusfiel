@@ -6,7 +6,7 @@ services:
     buildCommand: npm ci --legacy-peer-deps && npm run build
     envVars:
       - key: FORCE_RENDER_DEPLOY
-        value: "fix-all-ai-keys-1787677000"
+        value: "fix-nemotron-keys-1787677000"
       - key: VITE_SUPABASE_URL
         value: https://uzzbgjwpfxokagrvmdoa.supabase.co
       - key: VITE_SUPABASE_PUBLISHABLE_KEY
@@ -20,11 +20,11 @@ services:
       - key: VITE_GROQ_API_KEY
         sync: false
       - key: VITE_NEMOTRON_API_KEY
-        value: ""
+        sync: false
       - key: VITE_ZAI_API_KEY
-        value: ""
+        sync: false
       - key: VITE_ZEN_API_KEY
-        value: ""
+        sync: false
       - key: VITE_GEMINI_API_KEY
         sync: false
       - key: VITE_OPENROUTER_API_KEY
@@ -65,7 +65,7 @@ services:
       - key: SUPABASE_ANON_KEY
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6emJnandwZnhva2FncnZtZG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDk2NzgsImV4cCI6MjA5OTgyNTY3OH0.4lX8OydcmKTx_U2A0MvMCs1-ZBKpQUcKFjSFsNfBttc
       - key: OLLAMA_URL
-        value: https://fcc-server.onrender.com
+        value: https://october-detached-tipped.ngrok-free.dev
       - key: OLLAMA_MODEL
         value: qwen2.5:3b-instruct
       - key: OLLAMA_CONTEXT_LENGTH
@@ -99,9 +99,9 @@ services:
       - key: ZEN_API_KEY
         sync: false
       - key: NEMOTRON_API_KEY
-        value: ""
+        sync: false
       - key: ZAI_API_KEY
-        value: ""
+        sync: false
       - key: NVIDIA_NIM_API_KEY
         sync: false
       - key: GROQ_API_KEY
