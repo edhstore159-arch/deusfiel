@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 const OLLAMA_URL = (
   import.meta.env.VITE_OLLAMA_URL ||
-  "https://unabashed-vertical-crispness.ngrok-free.dev/api/generate"
+  "https://october-detached-tipped.ngrok-free.dev/api/generate"
 ).replace(/\/$/, "");
 const OLLAMA_MODEL = "qwen2.5:3b-instruct";
 
@@ -103,10 +103,10 @@ const callOpenRouterFree = async (msg: string, history: { role: string; content:
 };
 
 const FCC_URL = (
-  import.meta.env.VITE_FCC_URL || "https://unabashed-vertical-crispness.ngrok-free.dev"
+  import.meta.env.VITE_FCC_URL || "https://fcc-server.onrender.com"
 ).replace(/\/$/, "");
-const FCC_AUTH_TOKEN = import.meta.env.VITE_FCC_AUTH_TOKEN || "freecc";
-const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "claude-3-freecc-no-thinking/opencode/nemotron-3-ultra-free";
+const FCC_AUTH_TOKEN = import.meta.env.VITE_FCC_AUTH_TOKEN || import.meta.env.VITE_NEMOTRON_API_KEY || "freecc";
+const FCC_MODEL = import.meta.env.VITE_FCC_MODEL || "opencode/nemotron-3-ultra-free";
 
 const callClaudeFCC = async (msg: string, history: { role: string; content: string }[]): Promise<string> => {
   const systemPrompt = "Voce e um assistente juridico inteligente. Responda de forma clara, objetiva e profissional em portugues do Brasil.";
