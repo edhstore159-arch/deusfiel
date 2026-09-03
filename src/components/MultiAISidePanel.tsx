@@ -91,8 +91,8 @@ const callOpenRouterFree = async (msg: string, history: { role: string; content:
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " },
-      body: JSON.stringify({ model: "mistralai/mistral-7b-instruct:free", messages, max_tokens: 500, temperature: 0.4 }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}` },
+      body: JSON.stringify({ model: "nvidia/nemotron-3-super-120b-a12b:free", messages, max_tokens: 500, temperature: 0.4 }),
     });
     if (!res.ok) throw new Error(`OpenRouter HTTP ${res.status}`);
     const data = await res.json();
