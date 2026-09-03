@@ -13,6 +13,7 @@ const MODELS = [
     id: "nemotron",
     label: "NEM",
     provider: "nemotron",
+    model: "GLM-4.5",
     icon: Zap,
     color: "from-green-500 to-emerald-600",
   },
@@ -20,6 +21,7 @@ const MODELS = [
     id: "claude-fcc",
     label: "CLF",
     provider: "claude-fcc",
+    model: "claude-3-5-sonnet-20241022",
     icon: Bot,
     color: "from-yellow-500 to-orange-600",
   },
@@ -27,6 +29,7 @@ const MODELS = [
     id: "google/gemini-2.5-pro",
     label: "GEM",
     provider: "gateway",
+    model: "google/gemini-2.5-pro",
     icon: Sparkles,
     color: "from-blue-500 to-cyan-500",
   },
@@ -34,6 +37,7 @@ const MODELS = [
     id: "openai/gpt-5.5",
     label: "GPT",
     provider: "gateway",
+    model: "openai/gpt-5.5",
     icon: Brain,
     color: "from-emerald-500 to-teal-600",
   },
@@ -41,6 +45,7 @@ const MODELS = [
     id: "anthropic/claude-sonnet-4-20250514",
     label: "CLD",
     provider: "gateway",
+    model: "anthropic/claude-sonnet-4-20250514",
     icon: Bot,
     color: "from-orange-500 to-amber-600",
   },
@@ -48,6 +53,7 @@ const MODELS = [
     id: "ollama:local",
     label: "OLL",
     provider: "ollama",
+    model: "llama3.2",
     icon: Server,
     color: "from-purple-500 to-fuchsia-600",
   },
@@ -55,8 +61,25 @@ const MODELS = [
     id: "big-pickle",
     label: "ZEN",
     provider: "zen",
+    model: "big-pickle",
     icon: Zap,
     color: "from-cyan-500 to-blue-600",
+  },
+  {
+    id: "deepseek-v4-flash-free",
+    label: "DSK",
+    provider: "zen",
+    model: "deepseek-v4-flash-free",
+    icon: Zap,
+    color: "from-violet-500 to-purple-600",
+  },
+  {
+    id: "nemotron-3-ultra-free",
+    label: "N3U",
+    provider: "zen",
+    model: "nemotron-3-ultra-free",
+    icon: Zap,
+    color: "from-green-500 to-lime-600",
   },
 ];
 
@@ -155,7 +178,7 @@ export default function ChatMultiModelo() {
         message: allMessages[allMessages.length - 1]?.content || "",
         history: allMessages.slice(0, -1).filter(m => m.role !== "system"),
         system_prompt: system,
-        model: selected.id,
+        model: selected.model || selected.id,
         stream: true,
       }),
       signal: abortRef.current?.signal,
@@ -318,8 +341,8 @@ export default function ChatMultiModelo() {
   };
 
   const streamNemotron = async (allMessages) => {
-    const apiKey = import.meta.env.VITE_NEMOTRON_API_KEY || import.meta.env.VITE_ZAI_API_KEY || "";
-    if (!apiKey) throw new Error("Nemotron API key não configurada (VITE_NEMOTRON_API_KEY ou VITE_ZAI_API_KEY)");
+    const apiKey = import.meta.env.VITE_ZAI_API_KEY || import.meta.env.VITE_NEMOTRON_API_KEY || "";
+    if (!apiKey) throw new Error("Z.ai API key não configurada (VITE_ZAI_API_KEY)");
     const res = await fetch("https://api.z.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -327,7 +350,7 @@ export default function ChatMultiModelo() {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "GLM-4.5",
+        model: selected.model || "GLM-4.5",
         messages: allMessages,
         stream: true,
       }),
