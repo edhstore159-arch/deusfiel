@@ -24,7 +24,15 @@ async def proxy_messages(request: Request):
     max_tokens = body.get("max_tokens", 2000)
     temperature = body.get("temperature", 0.3)
 
-    emergent_model = EMERGENT_MODEL
+    # Model mapping for compatibility with old FCC model names
+    MODEL_MAP = {
+        "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b": "gpt-4o-mini",
+        "claude-3-5-sonnet-20241022": "gpt-4o",
+        "claude-3-5-haiku-20241022": "gpt-4o-mini",
+        "claude-sonnet-4": "gpt-4o",
+        "claude-haiku-4-5": "gpt-4o-mini",
+    }
+    emergent_model = MODEL_MAP.get(model, EMERGENT_MODEL)
 
     api_messages = []
     if system:
