@@ -321,6 +321,9 @@ async function generateReply(strategy: string, message: string, conversationId: 
 
   // 4. Fallback to Claude FCC (Free Claude Code)
   try {
+    const apiMessages = messages
+      .filter((m: any) => m.role !== "system")
+      .map((m: any) => ({ role: m.role, content: String(m.content || "") }));
     const res = await fetch(`${FCC_BASE_URL}/v1/messages`, {
       method: "POST",
       headers: {
@@ -334,14 +337,14 @@ async function generateReply(strategy: string, message: string, conversationId: 
         model: FCC_MODEL,
         max_tokens: 150,
         stream: false,
-        system: SECRETARY_SYSTEM + " " + contextMsg,
-        messages: messages.map((m: any) => ({ role: m.role, content: String(m.content || "") })),
+        system: SECRETARY_SYSTEM,
+        messages: apiMessages,
       }),
     });
     if (res.ok) {
       const data = await res.json() as any;
-      const content = data?.content;
-      if (content) return content.trim();
+      const text = data?.content?.[0]?.text || "";
+      if (text) return text.trim();
     }
   } catch (err) {
     console.error("[Claude FCC] Error:", err);
