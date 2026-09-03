@@ -341,16 +341,15 @@ export default function ChatMultiModelo() {
   };
 
   const streamNemotron = async (allMessages) => {
-    const apiKey = import.meta.env.VITE_ZAI_API_KEY || import.meta.env.VITE_NEMOTRON_API_KEY || "";
-    if (!apiKey) throw new Error("Z.ai API key não configurada (VITE_ZAI_API_KEY)");
-    const res = await fetch("https://api.z.ai/v1/chat/completions", {
+    const url = `${import.meta.env.VITE_BACKEND_URL || "https://kenia-whatsapp-backend.onrender.com"}/api/chat/multi-modelo`;
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: selected.model || "GLM-4.5",
+        provider: "nemotron",
+        model: selected.model || "nvidia/nemotron-3-super-120b-a12b:free",
         messages: allMessages,
         stream: true,
       }),

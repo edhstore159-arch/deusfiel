@@ -3351,6 +3351,108 @@ app.post("/api/judge-reports/generate", async (req, res) => {
   res.json(report || { ok: true });
 });
 
+app.post("/api/chat/multi-modelo", async (req, res) => {
+  try {
+    const { provider, model, messages, stream } = req.body;
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "messages array required" });
+    }
+    const systemMsg = messages.find(m => m.role === "system");
+    const userMessages = messages.filter(m => m.role !== "system");
+    let prompt = systemMsg?.content || AI_SYSTEM_PROMPT;
+    if (provider === "ollama") {
+      const ollamaUrl = `${OLLAMA_BASE_URL}/api/chat`;
+      const resp = await fetch(ollamaUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: model || OLLAMA_MODEL, messages, stream: !!stream }),
+      });
+      if (!resp.ok) throw new Error(`Ollama ${resp.status}`);
+      if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(`data: ${decoder.decode(value)}\n\n`);
+        }
+        res.end();
+        return;
+      }
+      const data = await resp.json();
+      return res.json({ response: data.message?.content || "" });
+    }
+    if (provider === "claude-fcc") {
+      const fccUrl = `${FCC_BASE_URL}/v1/messages`;
+      const resp = await fetch(fccUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": FCC_AUTH_TOKEN, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model: model || FCC_MODEL, max_tokens: 2000, stream: !!stream, system: prompt, messages: userMessages }),
+      });
+      if (!resp.ok) throw new Error(`FCC ${resp.status}`);
+      if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(`data: ${decoder.decode(value)}\n\n`);
+        }
+        res.end();
+        return;
+      }
+      const data = await resp.json();
+      return res.json({ response: data.content?.[0]?.text || "" });
+    }
+    if (provider === "zen" || provider === "nemotron") {
+      const result = await callAI(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
+      if (!result.ok) throw new Error(result.error || "AI failed");
+      if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: result.reply } }] })}\n\n`);
+        res.end();
+        return;
+      }
+      return res.json({ response: result.reply });
+    }
+    // default: gateway via Supabase
+    const gatewayUrl = `${SUPABASE_URL}/functions/v1/chat-ai`;
+    const resp = await fetch(gatewayUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ message: userMessages[userMessages.length - 1]?.content || "", history: userMessages.slice(0, -1), system_prompt: prompt, model: model || "google/gemini-2.5-pro", stream: !!stream }),
+    });
+    if (!resp.ok) throw new Error(`Gateway ${resp.status}`);
+    if (stream) {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(`data: ${decoder.decode(value)}\n\n`);
+      }
+      res.end();
+      return;
+    }
+    const data = await resp.json();
+    res.json({ response: data.response || data.choices?.[0]?.message?.content || "" });
+  } catch (e) {
+    console.error("[multi-modelo] error:", e?.message);
+    res.status(500).json({ error: e?.message || "Internal error" });
+  }
+});
+
 app.post("/api/chat/message", async (req, res) => {
   const message = String(req.body?.message || req.body?.text || "").trim();
   if (!message) return res.status(400).json({ error: "message vazio" });
