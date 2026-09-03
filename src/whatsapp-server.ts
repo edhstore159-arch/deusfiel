@@ -34,7 +34,7 @@ const OPENROUTER_FALLBACK_MODELS = [
 ];
 
 // FCC (Free Claude Code) - will use environment variable for production URL
-const FCC_MODEL = "claude-3-5-sonnet-20241022";
+const FCC_MODEL = process.env.FCC_MODEL || "claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b";
 const FCC_BASE_URL = process.env.FCC_BASE_URL || "http://127.0.0.1:11111";
 const FCC_AUTH_TOKEN = process.env.FCC_AUTH_TOKEN || "freecc";
 

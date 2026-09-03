@@ -93,7 +93,7 @@ services:
       - key: FCC_AUTH_TOKEN
         value: freecc
       - key: FCC_MODEL
-        value: claude-3-5-sonnet-20241022
+        value: claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b
       - key: FCC_ENABLED
         value: "true"
       - key: ZEN_API_KEY
@@ -142,7 +142,7 @@ services:
       - key: FCC_AUTH_TOKEN
         value: freecc
       - key: FCC_MODEL
-        value: claude-3-5-sonnet-20241022
+        value: claude-3-freecc-no-thinking/nvidia_nim/nvidia/nemotron-3-super-120b-a12b
       - key: EMERGENT_API_KEY
         sync: false
       - key: EMERGENT_LLM_KEY
