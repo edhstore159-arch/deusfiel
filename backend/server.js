@@ -1794,11 +1794,24 @@ async function callAI(messagesPayload, options = {}) {
   const attempts = [];
   const isWhatsApp = options.whatsapp;
 
-  // WhatsApp: deadline generoso para permitir Zen -> FCC -> OpenRouter -> Hermes
-  // (Zen costuma responder rápido; em caso de falha lenta, o FCC local responde em ~2-5s)
+  // WhatsApp: deadline generoso para permitir OpenRouter -> FCC -> Zen -> Hermes
   const deadline = isWhatsApp ? Date.now() + 40000 : Date.now() + 120000;
 
-  // 0) OpenCode Zen primeiro (gratuito)
+  // WhatsApp: OpenRouter primeiro (gratuito, cloud 24/7, nemotron-3-super-120b-a12b:free)
+  if (isWhatsApp && OPENROUTER_API_KEY) {
+    try {
+      const orResult = await callOpenRouter(messagesPayload, options);
+      if (orResult.ok) {
+        orResult.attempts?.forEach((a) => attempts.push(a));
+        return orResult;
+      }
+    } catch (e) {
+      attempts.push({ ok: false, provider: "openrouter", error: e?.message || String(e) });
+      recordAutoReply({ step: "ai_provider_fail", provider: "openrouter", error: e?.message || String(e) });
+    }
+  }
+
+  // 0) OpenCode Zen (gratuito) - desktop/web ou fallback WhatsApp
   try {
     const zenResult = await callZen(messagesPayload, options);
     if (zenResult.ok) {
@@ -1810,8 +1823,8 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "zen", error: e?.message || String(e) });
   }
 
-    // WhatsApp agora também cai na cadeia de fallback (FCC/OpenRouter/Hermes)
-    // caso o Zen falhe, ao invés de ficar só no fallback local.
+  // WhatsApp agora também cai na cadeia de fallback (FCC/OpenRouter/Hermes)
+  // caso o Zen falhe, ao invés de ficar só no fallback local.
 
   // Desktop/web: continuar com fallback chain
   if (Date.now() > deadline) {
@@ -1842,16 +1855,18 @@ async function callAI(messagesPayload, options = {}) {
     return { ok: false, error: "Timeout global atingido.", attempts };
   }
 
-  // 2) OpenRouter Hermes + free models (cloud 24/7)
-  try {
-    const orResult = await callOpenRouter(messagesPayload, options);
-    if (orResult.ok) {
-      orResult.attempts?.forEach((a) => attempts.push(a));
-      return orResult;
+  // 2) OpenRouter Hermes + free models (cloud 24/7) - para desktop/web ou fallback
+  if (!isWhatsApp || !OPENROUTER_API_KEY) {
+    try {
+      const orResult = await callOpenRouter(messagesPayload, options);
+      if (orResult.ok) {
+        orResult.attempts?.forEach((a) => attempts.push(a));
+        return orResult;
+      }
+    } catch (e) {
+      attempts.push({ ok: false, provider: "openrouter", error: e?.message || String(e) });
+      recordAutoReply({ step: "ai_provider_fail", provider: "openrouter", error: e?.message || String(e) });
     }
-  } catch (e) {
-    attempts.push({ ok: false, provider: "openrouter", error: e?.message || String(e) });
-    recordAutoReply({ step: "ai_provider_fail", provider: "openrouter", error: e?.message || String(e) });
   }
 
   // 3) Hermes via OpenRouter como último recurso
@@ -1864,7 +1879,7 @@ async function callAI(messagesPayload, options = {}) {
     recordAutoReply({ step: "ai_provider_fail", provider: "hermes", error: failed.error });
   }
 
-  return { ok: false, error: "Claude FCC, OpenRouter e Hermes falharam.", attempts, ...attempts[attempts.length - 1] };
+  return { ok: false, error: "OpenRouter, Claude FCC, Zen e Hermes falharam.", attempts, ...attempts[attempts.length - 1] };
 }
 
 // ──────────────────────────────────────────────────────────────────

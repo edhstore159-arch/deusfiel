@@ -14,7 +14,7 @@ services:
       - key: VITE_SUPABASE_PROJECT_ID
         value: uzzbgjwpfxokagrvmdoa
       - key: VITE_BACKEND_URL
-        value: https://kenia-whatsapp-backend.onrender.com
+        value: https://backend-gygy.onrender.com
       - key: VITE_FCC_URL
         value: https://fcc-server.onrender.com
       - key: VITE_GROQ_API_KEY
@@ -109,7 +109,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
-        sync: false
+        value: "sk-or-v1-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
       - key: EMERGENT_API_KEY
         sync: false
       - key: EMERGENT_LLM_KEY
@@ -173,7 +173,7 @@ services:
       - key: BAILEYS_INTERNAL_TOKEN
         value: legalflow-baileys-2026
       - key: BACKEND_WEBHOOK
-        value: https://kenia-whatsapp-backend.onrender.com/api/whatsapp/webhook/baileys
+        value: https://backend-gygy.onrender.com/api/whatsapp/webhook/baileys
       - key: KEEP_ALIVE_INTERVAL_MS
         value: "25000"
       - key: CONNECT_TIMEOUT_MS

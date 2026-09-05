@@ -341,7 +341,7 @@ export default function ChatMultiModelo() {
   };
 
   const streamNemotron = async (allMessages) => {
-    const url = `${import.meta.env.VITE_BACKEND_URL || "https://kenia-whatsapp-backend.onrender.com"}/api/chat/multi-modelo`;
+    const url = `${import.meta.env.VITE_BACKEND_URL}/api/chat/multi-modelo`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
