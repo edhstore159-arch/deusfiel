@@ -519,6 +519,10 @@ const OPENROUTER_FREE_MODELS = [
   "google/gemma-4-26b-a4b-it:free",
   "google/gemma-4-31b-it:free",
   "google/gemma-3-27b-it:free",
+  // Non-free fallbacks (work without ZDR restrictions)
+  "nvidia/nemotron-3-super-120b-a12b",
+  "google/gemma-4-26b-a4b-it",
+  "google/gemma-4-31b-it",
 ];
 
 const AUTO_REPLY_SEND_TIMEOUT_MS = Number(process.env.AUTO_REPLY_SEND_TIMEOUT_MS || 20000);
@@ -1733,6 +1737,10 @@ async function callHermesCloud(messagesPayload, systemPrompt) {
     "google/gemma-4-26b-a4b-it:free",
     "google/gemma-4-31b-it:free",
     "google/gemma-3-27b-it:free",
+    // Non-free fallbacks (work without ZDR restrictions)
+    "nvidia/nemotron-3-super-120b-a12b",
+    "google/gemma-4-26b-a4b-it",
+    "google/gemma-4-31b-it",
   ];
   
   const apiMessages = messagesPayload
