@@ -3432,7 +3432,25 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
     if (provider === "openrouter" || provider === "nemotron") {
       if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY não configurado");
       const nemotronModel = provider === "nemotron" ? "nvidia/nemotron-3-super-120b-a12b:free" : model;
-      const orResult = await callOpenRouter(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "", model: nemotronModel });
+      let orResult = await callOpenRouter(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "", model: nemotronModel });
+      
+      // Fallback to Zen if OpenRouter fails (e.g., ZDR blocking free models)
+      if (!orResult.ok) {
+        const errorMsg = orResult.error || "";
+        const isZdrError = errorMsg.includes("zdr") || errorMsg.includes("ZDR") || errorMsg.includes("guardrail") || errorMsg.includes("404");
+        if (isZdrError) {
+          console.warn("[multi-modelo] OpenRouter ZDR/guardrail error, falling back to Zen:", errorMsg.slice(0, 200));
+          try {
+            const zenResult = await callAI(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
+            if (zenResult.ok) {
+              orResult = zenResult;
+            }
+          } catch (zenErr) {
+            console.error("[multi-modelo] Zen fallback also failed:", zenErr?.message);
+          }
+        }
+      }
+      
       if (!orResult.ok) throw new Error(orResult.error || "OpenRouter failed");
       if (stream) {
         res.setHeader("Content-Type", "text/event-stream");
