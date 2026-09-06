@@ -512,10 +512,13 @@ const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_FREE_MODELS = [
-  "nousresearch/hermes-4-70b",
-  "nousresearch/hermes-3-llama-3.1-70b",
   "nvidia/nemotron-3-super-120b-a12b:free",
+  "nvidia/nemotron-3.5-lightning:free",
+  "nvidia/nemotron-3.5-content-safety:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
   "google/gemma-4-26b-a4b-it:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-3-27b-it:free",
 ];
 
 const AUTO_REPLY_SEND_TIMEOUT_MS = Number(process.env.AUTO_REPLY_SEND_TIMEOUT_MS || 20000);
@@ -1722,9 +1725,15 @@ async function callOpenRouter(messagesPayload, options = {}) {
 
 async function callHermesCloud(messagesPayload, systemPrompt) {
   if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY ausente");
-  const hermesModels = ["nousresearch/hermes-4-70b", "nousresearch/hermes-3-llama-3.1-70b"];
-  const freeModels = ["nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-26b-a4b-it:free"];
-  const allModels = [...hermesModels, ...freeModels];
+  const freeModels = [
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "nvidia/nemotron-3.5-content-safety:free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-3-27b-it:free",
+  ];
   
   const apiMessages = messagesPayload
     .filter((m) => m.role !== "system")
