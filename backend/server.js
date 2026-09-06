@@ -3425,6 +3425,20 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
       const data = await resp.json();
       return res.json({ response: data.content?.[0]?.text || "" });
     }
+    if (provider === "openrouter") {
+      if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY não configurado");
+      const orResult = await callOpenRouter(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
+      if (!orResult.ok) throw new Error(orResult.error || "OpenRouter failed");
+      if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: orResult.reply } }] })}\n\n`);
+        res.end();
+        return;
+      }
+      return res.json({ response: orResult.reply });
+    }
     if (provider === "zen" || provider === "nemotron") {
       const result = await callAI(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
       if (!result.ok) throw new Error(result.error || "AI failed");
