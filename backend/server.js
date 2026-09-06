@@ -512,6 +512,9 @@ const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_FREE_MODELS = [
+  "nvidia/nemotron-3-super-120b-a12b",
+  "google/gemma-4-26b-a4b-it",
+  "google/gemma-4-31b-it",
   "nvidia/nemotron-3-super-120b-a12b:free",
   "nvidia/nemotron-3.5-lightning:free",
   "nvidia/nemotron-3.5-content-safety:free",
@@ -519,10 +522,6 @@ const OPENROUTER_FREE_MODELS = [
   "google/gemma-4-26b-a4b-it:free",
   "google/gemma-4-31b-it:free",
   "google/gemma-3-27b-it:free",
-  // Non-free fallbacks (work without ZDR restrictions)
-  "nvidia/nemotron-3-super-120b-a12b",
-  "google/gemma-4-26b-a4b-it",
-  "google/gemma-4-31b-it",
 ];
 
 const AUTO_REPLY_SEND_TIMEOUT_MS = Number(process.env.AUTO_REPLY_SEND_TIMEOUT_MS || 20000);
@@ -1670,6 +1669,49 @@ async function callClaudeFCC(messages, systemPrompt) {
   }
 }
 
+} finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function chatEmergent(messagesPayload, options = {}) {
+  if (!EMERGENT_API_KEY) throw new Error("EMERGENT_API_KEY ausente");
+  const apiMessages = messagesPayload
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+  const systemMsg = messagesPayload.find((m) => m.role === "system");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+  try {
+    const resp = await fetch("https://integrations.emergentagent.com/llm/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${EMERGENT_API_KEY}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: options.model || "gpt-4o-mini",
+        messages: systemMsg ? [{ role: "system", content: systemMsg.content }, ...apiMessages] : apiMessages,
+        temperature: options.temperature || 0.7,
+        max_tokens: options.maxTokens || 700,
+      }),
+    });
+    clearTimeout(timeout);
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "");
+      throw new Error(`Emergent ${resp.status}: ${errText}`);
+    }
+    const data = await resp.json();
+    const reply = String(data?.choices?.[0]?.message?.content || "").trim();
+    if (!reply) throw new Error("Emergent retornou resposta vazia");
+    return { ok: true, provider: "emergent", endpoint: "emergent", model: options.model || "gpt-4o-mini", reply: sanitizeOllamaReply(reply, options.userText), attempts: [] };
+  } catch (e) {
+    clearTimeout(timeout);
+    throw e;
+  }
+}
+
 async function callOpenRouter(messagesPayload, options = {}) {
   if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY ausente");
   const apiMessages = messagesPayload
@@ -1890,14 +1932,17 @@ async function callAI(messagesPayload, options = {}) {
     }
   }
 
-  // 3) Hermes via OpenRouter como último recurso
-  try {
-    const hermesReply = await callHermesCloud(messagesPayload, systemPrompt);
-    return { ok: true, provider: "hermes", endpoint: "openrouter", model: "nousresearch/hermes-4-70b", reply: sanitizeOllamaReply(hermesReply, options.userText), attempts };
-  } catch (e) {
-    const failed = { ok: false, provider: "hermes", error: e?.message || String(e) };
-    attempts.push(failed);
-    recordAutoReply({ step: "ai_provider_fail", provider: "hermes", error: failed.error });
+  // 3) Emergent as last resort (cloud 24/7)
+  if (EMERGENT_API_KEY) {
+    try {
+      const emergentResult = await chatEmergent(messagesPayload, { ...options, allowEmergent: true });
+      if (emergentResult.ok) {
+        return { ok: true, provider: "emergent", endpoint: "emergent", model: emergentResult.model, reply: emergentResult.reply, attempts };
+      }
+    } catch (e) {
+      attempts.push({ ok: false, provider: "emergent", error: e?.message || String(e) });
+      recordAutoReply({ step: "ai_provider_fail", provider: "emergent", error: e?.message || String(e) });
+    }
   }
 
   return { ok: false, error: "OpenRouter, Claude FCC, Zen e Hermes falharam.", attempts, ...attempts[attempts.length - 1] };
@@ -3448,7 +3493,8 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
     }
     if (provider === "openrouter" || provider === "nemotron") {
       if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY não configurado");
-      const nemotronModel = provider === "nemotron" ? "nvidia/nemotron-3-super-120b-a12b:free" : model;
+      // Use non-free models for nemotron to avoid ZDR restrictions
+      const nemotronModel = provider === "nemotron" ? "nvidia/nemotron-3-super-120b-a12b" : model;
       let orResult;
       
       try {
@@ -3459,7 +3505,7 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
         if (isZdrError) {
           console.warn("[multi-modelo] OpenRouter ZDR/guardrail error, falling back to Zen:", errorMsg.slice(0, 200));
           try {
-            orResult = await callAI(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
+            orResult = await callZen(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
           } catch (zenErr) {
             console.error("[multi-modelo] Zen fallback also failed:", zenErr?.message);
             throw openRouterErr;
@@ -3484,15 +3530,6 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
       const result = await callZen(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
       if (!result.ok) throw new Error(result.error || "AI failed");
       if (stream) {
-        res.setHeader("Content-Type", "text/event-stream");
-        res.setHeader("Cache-Control", "no-cache");
-        res.setHeader("Connection", "keep-alive");
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: result.reply } }] })}\n\n`);
-        res.end();
-        return;
-      }
-      return res.json({ response: result.reply });
-    }
     // default: gateway via Supabase
     const gatewayUrl = `${SUPABASE_URL}/functions/v1/chat-ai`;
     const resp = await fetch(gatewayUrl, {
