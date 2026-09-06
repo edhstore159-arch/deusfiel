@@ -1670,7 +1670,11 @@ async function callOpenRouter(messagesPayload, options = {}) {
     .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
   const systemMsg = messagesPayload.find((m) => m.role === "system");
   const attempts = [];
-  for (const model of OPENROUTER_FREE_MODELS) {
+  
+  // Se model especificado em options, usar apenas ele; senão iterar lista livre
+  const modelsToTry = options.model ? [options.model] : OPENROUTER_FREE_MODELS;
+  
+  for (const model of modelsToTry) {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 45000);
@@ -3425,9 +3429,10 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
       const data = await resp.json();
       return res.json({ response: data.content?.[0]?.text || "" });
     }
-    if (provider === "openrouter") {
+    if (provider === "openrouter" || provider === "nemotron") {
       if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY não configurado");
-      const orResult = await callOpenRouter(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
+      const nemotronModel = provider === "nemotron" ? "nvidia/nemotron-3-super-120b-a12b:free" : model;
+      const orResult = await callOpenRouter(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "", model: nemotronModel });
       if (!orResult.ok) throw new Error(orResult.error || "OpenRouter failed");
       if (stream) {
         res.setHeader("Content-Type", "text/event-stream");
@@ -3439,7 +3444,7 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
       }
       return res.json({ response: orResult.reply });
     }
-    if (provider === "zen" || provider === "nemotron") {
+    if (provider === "zen") {
       const result = await callAI(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
       if (!result.ok) throw new Error(result.error || "AI failed");
       if (stream) {
