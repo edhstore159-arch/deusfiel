@@ -3481,7 +3481,7 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
       return res.json({ response: orResult.reply });
     }
     if (provider === "zen") {
-      const result = await callAI(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
+      const result = await callZen(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
       if (!result.ok) throw new Error(result.error || "AI failed");
       if (stream) {
         res.setHeader("Content-Type", "text/event-stream");
