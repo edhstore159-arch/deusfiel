@@ -1739,7 +1739,7 @@ async function callHermesCloud(messagesPayload, systemPrompt) {
     .filter((m) => m.role !== "system")
     .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
   
-  for (const model of allModels) {
+  for (const model of freeModels) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
