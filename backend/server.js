@@ -512,9 +512,6 @@ const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_FREE_MODELS = [
-  "nvidia/nemotron-3-super-120b-a12b",
-  "google/gemma-4-26b-a4b-it",
-  "google/gemma-4-31b-it",
   "nvidia/nemotron-3-super-120b-a12b:free",
   "nvidia/nemotron-3.5-lightning:free",
   "nvidia/nemotron-3.5-content-safety:free",
@@ -1730,7 +1727,7 @@ async function callOpenRouter(messagesPayload, options = {}) {
         model,
         messages: patchedSystem ? [patchedSystem, ...apiMessages] : apiMessages,
         temperature: 0.7,
-        max_tokens: 700,
+        max_tokens: 300,
       };
       const resp = await fetch(OPENROUTER_BASE, {
         method: "POST",
@@ -1770,14 +1767,9 @@ async function callHermesCloud(messagesPayload, systemPrompt) {
     "nvidia/nemotron-3-super-120b-a12b:free",
     "nvidia/nemotron-3.5-lightning:free",
     "nvidia/nemotron-3.5-content-safety:free",
-    "nvidia/nemotron-3-ultra-550b-a55b:free",
     "google/gemma-4-26b-a4b-it:free",
     "google/gemma-4-31b-it:free",
     "google/gemma-3-27b-it:free",
-    // Non-free fallbacks (work without ZDR restrictions)
-    "nvidia/nemotron-3-super-120b-a12b",
-    "google/gemma-4-26b-a4b-it",
-    "google/gemma-4-31b-it",
   ];
   
   const apiMessages = messagesPayload
@@ -1797,7 +1789,7 @@ async function callHermesCloud(messagesPayload, systemPrompt) {
           model,
           messages: [{ role: "system", content: patchedSystem }, ...apiMessages],
           temperature: 0.3,
-          max_tokens: 600,
+          max_tokens: 300,
         }),
       });
       clearTimeout(timeout);
@@ -1810,7 +1802,7 @@ async function callHermesCloud(messagesPayload, systemPrompt) {
       clearTimeout(timeout);
     }
   }
-  throw new Error("Todos os modelos Hermes falharam");
+  throw new Error("Todos os modelos gratuitos falharam");
 }
 
 function detectStrategy(content, direction) {
