@@ -512,13 +512,11 @@ const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_FREE_MODELS = [
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "nvidia/nemotron-3.5-lightning:free",
-  "nvidia/nemotron-3.5-content-safety:free",
-  "nvidia/nemotron-3-ultra-550b-a55b:free",
   "google/gemma-4-26b-a4b-it:free",
   "google/gemma-4-31b-it:free",
   "google/gemma-3-27b-it:free",
+  "meta-llama/llama-3.2-3b-instruct:free",
+  "meta-llama/llama-3.2-1b-instruct:free",
 ];
 
 const AUTO_REPLY_SEND_TIMEOUT_MS = Number(process.env.AUTO_REPLY_SEND_TIMEOUT_MS || 20000);
