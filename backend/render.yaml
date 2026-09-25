@@ -44,7 +44,15 @@ services:
         value: "15000"
       - key: RECONNECT_MAX_DELAY_MS
         value: "300000"
-      - key: SUPABASE_SERVICE_ROLE_KEY
+      - key: FCC_ENABLED
+        value: "true"
+      - key: FCC_BASE_URL
         sync: false
+      - key: FCC_AUTH_TOKEN
+        sync: false
+      - key: FCC_MODEL
+        value: "claude-3-5-sonnet-20241022"
       - key: OPENROUTER_API_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
