@@ -3480,8 +3480,8 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
     }
     if (provider === "openrouter" || provider === "nemotron") {
       if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY não configurado");
-      // Use non-free models for nemotron to avoid ZDR restrictions
-      const nemotronModel = provider === "nemotron" ? "nvidia/nemotron-3-super-120b-a12b" : model;
+      // Use free model variant to avoid credit issues
+      const nemotronModel = provider === "nemotron" ? "nvidia/nemotron-3-super-120b-a12b:free" : model;
       let orResult;
       
       try {
