@@ -1669,11 +1669,6 @@ async function callClaudeFCC(messages, systemPrompt) {
   }
 }
 
-} finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function chatEmergent(messagesPayload, options = {}) {
   if (!EMERGENT_API_KEY) throw new Error("EMERGENT_API_KEY ausente");
   const apiMessages = messagesPayload
@@ -3530,6 +3525,16 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
       const result = await callZen(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
       if (!result.ok) throw new Error(result.error || "AI failed");
       if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: result.reply } }] })}\n\n`);
+        res.end();
+        return;
+      }
+      return res.json({ response: result.reply });
+    }
+
     // default: gateway via Supabase
     const gatewayUrl = `${SUPABASE_URL}/functions/v1/chat-ai`;
     const resp = await fetch(gatewayUrl, {
