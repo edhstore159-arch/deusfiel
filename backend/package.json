@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@supabase/supabase-js": "^2.108.0",
-    "@whiskeysockets/baileys": "npm:@whiskeysockets/baileys@^6.7.16",
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "pino": "^9.5.0",
+    "@supabase/supabase-js": "^2.117.2",
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "pino": "^10.3.1",
     "qrcode": "^1.5.4"
   }
 }

@@ -3627,7 +3627,7 @@ app.post("/api/chat/message", async (req, res) => {
 registerAiBuilderRoutes(app);
 
 // ---- Fallback /api/* ----
-app.all("/api/*", (_req, res) => res.json(ok({ fallback: true })));
+app.all("/api/*splat", (_req, res) => res.json(ok({ fallback: true })));
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Backend running on :${PORT}`);
