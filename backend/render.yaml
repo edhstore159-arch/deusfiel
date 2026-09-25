@@ -23,7 +23,7 @@ services:
       - key: SUPABASE_ANON_KEY
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmeWNxdWZxZGhlbHV2emhndmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MDEwMjEsImV4cCI6MjA5MjQ3NzAyMX0.tt__n-MunXAz5FJiQiWEKF9XE6NHfd7XHyNwVMG4IV4
       - key: OLLAMA_URL
-        value: https://unabashed-vertical-crispness.ngrok-free.dev
+        value: https://october-detached-tipped.ngrok-free.dev
       - key: OLLAMA_MODEL
         value: qwen2.5:3b-instruct
       - key: AI_REQUEST_TIMEOUT_MS
