@@ -46,3 +46,5 @@ services:
         value: "300000"
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
