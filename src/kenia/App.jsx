@@ -185,11 +185,9 @@ function App() {
             <Route path="/trust" element={<Trust />} />
             <Route
               element={
-                <CloneGate>
-                  <Protected>
-                    <AppLayout />
-                  </Protected>
-                </CloneGate>
+                <Protected>
+                  <AppLayout />
+                </Protected>
               }
             >
               <Route path="/app" element={<Dashboard />} />
