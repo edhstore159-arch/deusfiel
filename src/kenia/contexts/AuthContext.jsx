@@ -148,27 +148,59 @@ export function AuthProvider({ children }) {
 
   const register = async (payload) => {
     const { email, password, name, oab } = payload;
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/app`,
-        data: { name, oab },
-      },
-    });
-    if (error) throw error;
-    if (!data.session) {
-      const signIn = await supabase.auth.signInWithPassword({ email, password });
-      if (signIn.error) throw signIn.error;
-      const built = buildUser(signIn.data.user);
+    // 1) Tentar Supabase com timeout curto
+    try {
+      const { data, error } = await withTimeout(
+        supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/app`,
+            data: { name, oab },
+          },
+        }),
+        SUPABASE_TIMEOUT_MS
+      );
+      if (error) throw error;
+      if (!data.session) {
+        const signIn = await supabase.auth.signInWithPassword({ email, password });
+        if (signIn.error) throw signIn.error;
+        const built = buildUser(signIn.data.user);
+        setUser(built);
+        localStorage.setItem("auth_provider", "supabase");
+        setLoading(false);
+        return built;
+      }
+      const built = buildUser(data.user);
       setUser(built);
+      localStorage.setItem("auth_provider", "supabase");
       setLoading(false);
       return built;
+    } catch (supabaseErr) {
+      // 2) Fallback backend MongoDB (/auth/register)
+      try {
+        const { data } = await api.post("/auth/register", { email, password, name, oab });
+        localStorage.setItem("lf_token", data.token);
+        localStorage.setItem("lf_user", JSON.stringify(data.user));
+        localStorage.setItem("auth_provider", "mongodb");
+        const built = buildMongoUser(data.user);
+        setUser(built);
+        setLoading(false);
+        return built;
+      } catch (mongoErr) {
+        // 3) Último recurso: modo demo local com credenciais pré-configuradas
+        const demo = findDemoUser(email, password);
+        if (demo) {
+          localStorage.setItem("auth_provider", "demo");
+          localStorage.setItem("lf_user", JSON.stringify(demo));
+          const built = buildMongoUser(demo);
+          setUser(built);
+          setLoading(false);
+          return built;
+        }
+        throw supabaseErr;
+      }
     }
-    const built = buildUser(data.user);
-    setUser(built);
-    setLoading(false);
-    return built;
   };
 
   const logout = async () => {
