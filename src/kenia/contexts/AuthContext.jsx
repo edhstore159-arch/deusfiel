@@ -117,6 +117,7 @@ export function AuthProvider({ children }) {
       const built = buildUser(data.user);
       setUser(built);
       localStorage.setItem("auth_provider", "supabase");
+      setLoading(false);
       return built;
     } catch (supabaseErr) {
       // 2) Fallback backend MongoDB (/auth/login)
@@ -127,6 +128,7 @@ export function AuthProvider({ children }) {
         localStorage.setItem("auth_provider", "mongodb");
         const built = buildMongoUser(data.user);
         setUser(built);
+        setLoading(false);
         return built;
       } catch (mongoErr) {
         // 3) Último recurso: modo demo local com credenciais pré-configuradas
@@ -136,6 +138,7 @@ export function AuthProvider({ children }) {
           localStorage.setItem("lf_user", JSON.stringify(demo));
           const built = buildMongoUser(demo);
           setUser(built);
+          setLoading(false);
           return built;
         }
         throw supabaseErr;
@@ -159,10 +162,12 @@ export function AuthProvider({ children }) {
       if (signIn.error) throw signIn.error;
       const built = buildUser(signIn.data.user);
       setUser(built);
+      setLoading(false);
       return built;
     }
     const built = buildUser(data.user);
     setUser(built);
+    setLoading(false);
     return built;
   };
 
