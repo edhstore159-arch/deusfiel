@@ -25,6 +25,15 @@ function buildMongoUser(u) {
   };
 }
 
+const DEMO_USERS = [
+  { email: "admin@kenia-garcia.com.br", password: "Kenia@Admin2026", id: "demo-admin", name: "Dr. Demo", oab: "000000/SP" },
+  { email: "demo@kenia-garcia.com.br", password: "demo123", id: "demo-2", name: "Dr. Demo", oab: "000000/SP" },
+];
+
+function findDemoUser(email, password) {
+  return DEMO_USERS.find((u) => u.email === email && u.password === password);
+}
+
 function isNetworkError(err) {
   const msg = String(err?.message || err || "").toLowerCase();
   return (
@@ -36,16 +45,28 @@ function isNetworkError(err) {
   );
 }
 
+const SUPABASE_TIMEOUT_MS = 6000;
+
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error("supabase_timeout")), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const provider = localStorage.getItem("auth_provider");
-    if (provider === "mongodb") {
+    if (provider === "mongodb" || provider === "demo") {
       const token = localStorage.getItem("lf_token");
       const stored = localStorage.getItem("lf_user");
       if (token && stored) {
+        try { setUser(buildMongoUser(JSON.parse(stored))); } catch { setUser(null); }
+      } else if (stored) {
         try { setUser(buildMongoUser(JSON.parse(stored))); } catch { setUser(null); }
       }
       setLoading(false);
@@ -86,28 +107,45 @@ export function AuthProvider({ children }) {
 
 
   const login = async (email, password) => {
-    // 1) Tentar Supabase
+    // 1) Tentar Supabase com timeout curto para não travar se estiver fora do ar
     try {
-      let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      let { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        SUPABASE_TIMEOUT_MS
+      );
       if (error) throw error;
       const built = buildUser(data.user);
       setUser(built);
       localStorage.setItem("auth_provider", "supabase");
       return built;
     } catch (supabaseErr) {
-      if (!isNetworkError(supabaseErr)) throw supabaseErr;
-      // 2) Fallback backend MongoDB (/auth/login)
-      try {
-        const { data } = await api.post("/auth/login", { email, password });
-        localStorage.setItem("lf_token", data.token);
-        localStorage.setItem("lf_user", JSON.stringify(data.user));
-        localStorage.setItem("auth_provider", "mongodb");
-        const built = buildMongoUser(data.user);
-        setUser(built);
-        return built;
-      } catch (mongoErr) {
-        throw supabaseErr;
+      // Se foi timeout ou erro de rede, tenta fallback MongoDB imediatamente
+      if (
+        supabaseErr?.message === "supabase_timeout" ||
+        isNetworkError(supabaseErr)
+      ) {
+        try {
+          const { data } = await api.post("/auth/login", { email, password });
+          localStorage.setItem("lf_token", data.token);
+          localStorage.setItem("lf_user", JSON.stringify(data.user));
+          localStorage.setItem("auth_provider", "mongodb");
+          const built = buildMongoUser(data.user);
+          setUser(built);
+          return built;
+        } catch (mongoErr) {
+          // 3) Último recurso: modo demo local com credenciais pré-configuradas
+          const demo = findDemoUser(email, password);
+          if (demo) {
+            localStorage.setItem("auth_provider", "demo");
+            localStorage.setItem("lf_user", JSON.stringify(demo));
+            const built = buildMongoUser(demo);
+            setUser(built);
+            return built;
+          }
+          throw supabaseErr;
+        }
       }
+      throw supabaseErr;
     }
   };
 
