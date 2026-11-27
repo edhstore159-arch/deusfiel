@@ -1,0 +1,117 @@
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+function readEnvSupabaseUrl() {
+  return String(import.meta.env.VITE_SUPABASE_URL || "").trim().replace(/\/$/, "");
+}
+
+export async function fetchAuthHealth() {
+  const url = readEnvSupabaseUrl();
+  if (!url) {
+    return { ok: false, reason: "missing_supabase_url" };
+  }
+
+  try {
+    const response = await fetch(`${url}/auth/v1/health`, {
+      method: "GET",
+      headers: {
+        apikey: String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""),
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return { ok: false, reason: `http_${response.status}` };
+    }
+
+    return { ok: true, reason: "ok" };
+  } catch (error) {
+    return { ok: false, reason: String(error?.message || error) };
+  }
+}
+
+export function useSupabaseAuthHealth() {
+  const [state, setState] = useState({ loading: true, ok: false, reason: "" });
+
+  useEffect(() => {
+    let alive = true;
+    fetchAuthHealth().then((result) => {
+      if (alive) setState({ loading: false, ...result });
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return state;
+}
+
+export async function signInWithPassword(email, password) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const normalizedPassword = String(password || "");
+
+  if (!normalizedEmail || !normalizedPassword) {
+    return { data: null, error: new Error("Informe email e senha.") };
+  }
+
+  return supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password: normalizedPassword,
+  });
+}
+
+export async function signUpWithPassword({ name, email, password, oab }) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+
+  const { data, error } = await supabase.auth.signUp({
+    email: normalizedEmail,
+    password,
+    options: {
+      emailRedirectTo: `${window.location.origin}/app`,
+      data: {
+        name: String(name || "").trim(),
+        oab: String(oab || "").trim(),
+      },
+    },
+  });
+
+  return { data, error };
+}
+
+export async function resetPasswordForEmail(email) {
+  return supabase.auth.resetPasswordForEmail(String(email || "").trim().toLowerCase(), {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+}
+
+export function useAuthSession() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) {
+        setSession(null);
+      } else {
+        setSession(data?.session || null);
+      }
+      setLoading(false);
+    });
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!mounted) return;
+      setSession(nextSession || null);
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  return useMemo(() => ({ session, loading }), [session, loading]);
+}
