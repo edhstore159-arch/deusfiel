@@ -169,71 +169,70 @@ function PageFallback() {
 
 function App() {
   return (
-    <CloneGate>
-      <div className="App">
-        <DebugErrorThrower />
-        <AuthProvider>
-          <BrowserRouter>
-            <ScrollToTop />
+    <div className="App">
+      <DebugErrorThrower />
+      <AuthProvider>
+        <BrowserRouter>
+          <ScrollToTop />
 
 
-            <Suspense fallback={<PageFallback />}>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/consulta" element={<Consulta />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/trust" element={<Trust />} />
-              <Route path="/admin/debug" element={<Protected><DebugTool /></Protected>} />
-              <Route
-                element={
+          <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/consulta" element={<Consulta />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/trust" element={<Trust />} />
+            <Route
+              element={
+                <CloneGate>
                   <Protected>
                     <AppLayout />
                   </Protected>
-                }
-              >
-                <Route path="/app" element={<Dashboard />} />
-                <Route path="/app/chat-ia" element={<ChatIA />} />
-                <Route path="/app/chat-multi-modelo" element={<ChatMultiModelo />} />
-                <Route path="/app/admin" element={<AdminGuard><AdminCases /></AdminGuard>} />
-                <Route path="/app/admin/secretaria" element={<AdminGuard><AdminSecretaria /></AdminGuard>} />
-                <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
-                <Route path="/app/juiz-virtual" element={<JuizVirtual />} />
-                <Route path="/app/agents" element={<Agents />} />
-                <Route path="/app/dstboard" element={<Dstboard />} />
-                <Route path="/app/ctr-predictor" element={<CTRPredictor />} />
-                <Route path="/app/document-builder" element={<DocumentBuilder />} />
-                <Route path="/app/site-builder" element={<SiteBuilder />} />
-                <Route path="/app/legal-training" element={<LegalTraining />} />
-                <Route path="/app/secretary-marketing" element={<SecretaryMarketing />} />
-                
-                
-                <Route path="/app/onboarding" element={<Onboarding />} />
-                <Route path="/app/agenda" element={<Agenda />} />
-                <Route path="/app/crm" element={<CRM />} />
-                <Route path="/app/processes" element={<Processes />} />
-                <Route path="/app/finance" element={<Finance />} />
-                <Route path="/app/creatives" element={<Creatives />} />
-                <Route path="/app/creatives/gallery" element={<CreativesGallery />} />
-                <Route path="/app/image-fusion" element={<ImageFusion />} />
-                <Route path="/app/viral-video" element={<ViralVideoStudio />} />
-                <Route path="/app/social-connect" element={<SocialConnect />} />
-                <Route path="/app/analytics" element={<Analytics />} />
-                <Route path="/app/whatsapp" element={<WhatsAppSettings />} />
-                <Route path="/app/whatsapp-logs" element={<WhatsAppLogs />} />
-                <Route path="/app/whatsapp-media" element={<WhatsAppMedia />} />
-                <Route path="/app/settings" element={<AdminGuard><Settings /></AdminGuard>} />
-                <Route path="/app/debug" element={<AdminGuard><DebugTool /></AdminGuard>} />
-                <Route path="/app/emergent-login" element={<EmergentLogin />} />
-              </Route>
-            </Routes>
+                </CloneGate>
+              }
+            >
+              <Route path="/app" element={<Dashboard />} />
+              <Route path="/app/chat-ia" element={<ChatIA />} />
+              <Route path="/app/chat-multi-modelo" element={<ChatMultiModelo />} />
+              <Route path="/app/admin" element={<AdminGuard><AdminCases /></AdminGuard>} />
+              <Route path="/app/admin/secretaria" element={<AdminGuard><AdminSecretaria /></AdminGuard>} />
+              <Route path="/app/secretary-tasks" element={<SecretaryTasks />} />
+              <Route path="/app/juiz-virtual" element={<JuizVirtual />} />
+              <Route path="/app/agents" element={<Agents />} />
+              <Route path="/app/dstboard" element={<Dstboard />} />
+              <Route path="/app/ctr-predictor" element={<CTRPredictor />} />
+              <Route path="/app/document-builder" element={<DocumentBuilder />} />
+              <Route path="/app/site-builder" element={<SiteBuilder />} />
+              <Route path="/app/legal-training" element={<LegalTraining />} />
+              <Route path="/app/secretary-marketing" element={<SecretaryMarketing />} />
+              
+              
+              <Route path="/app/onboarding" element={<Onboarding />} />
+              <Route path="/app/agenda" element={<Agenda />} />
+              <Route path="/app/crm" element={<CRM />} />
+              <Route path="/app/processes" element={<Processes />} />
+              <Route path="/app/finance" element={<Finance />} />
+              <Route path="/app/creatives" element={<Creatives />} />
+              <Route path="/app/creatives/gallery" element={<CreativesGallery />} />
+              <Route path="/app/image-fusion" element={<ImageFusion />} />
+              <Route path="/app/viral-video" element={<ViralVideoStudio />} />
+              <Route path="/app/social-connect" element={<SocialConnect />} />
+              <Route path="/app/analytics" element={<Analytics />} />
+              <Route path="/app/whatsapp" element={<WhatsAppSettings />} />
+              <Route path="/app/whatsapp-logs" element={<WhatsAppLogs />} />
+              <Route path="/app/whatsapp-media" element={<WhatsAppMedia />} />
+              <Route path="/app/settings" element={<AdminGuard><Settings /></AdminGuard>} />
+              <Route path="/app/debug" element={<AdminGuard><DebugTool /></AdminGuard>} />
+              <Route path="/app/emergent-login" element={<EmergentLogin />} />
+            </Route>
+          </Routes>
           </Suspense>
 
         </BrowserRouter>
         <Toaster position="top-right" richColors />
       </AuthProvider>
     </div>
-    </CloneGate>
   );
 }
 
