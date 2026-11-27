@@ -5,13 +5,47 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+const EDGE_TIMEOUT_MS = 8000;
+
+function withTimeout(promise: Promise<any>, ms: number) {
+  let timer: any;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error("edge_function_timeout")), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+const rawSupabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
   }
 });
+
+// Wrap functions.invoke to add timeout + fallback when Supabase Edge Functions are down.
+const originalInvoke = rawSupabase.functions.invoke.bind(rawSupabase.functions);
+rawSupabase.functions.invoke = async (functionName: string, options?: any) => {
+  try {
+    const { data, error } = await withTimeout(originalInvoke(functionName, options), EDGE_TIMEOUT_MS);
+    if (error) throw error;
+    return { data, error: null };
+  } catch (err: any) {
+    const msg = String(err?.message || err || "").toLowerCase();
+    const isNetworkOrTimeout =
+      msg.includes("failed to fetch") ||
+      msg.includes("network error") ||
+      msg.includes("edge_function_timeout") ||
+      msg.includes("transport error") ||
+      !err?.status;
+    if (isNetworkOrTimeout) {
+      return { data: null, error: null, fallback: true };
+    }
+    throw err;
+  }
+};
+
+export const supabase = rawSupabase;

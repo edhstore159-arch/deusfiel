@@ -17,6 +17,7 @@ import {
   Image, Download, Lock, Wrench, ShieldCheck, KeyRound, Search, Globe, Code2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/kenia/lib/edgeFunctions";
 import { toast } from "sonner";
 import AreaAvatar from "@/kenia/components/AreaAvatar";
 import { LAWYERS, LAWYER_COLORS } from "@/kenia/data/lawyers";
@@ -1795,9 +1796,22 @@ function MaintenanceScreen({
   const [wrong, setWrong] = useState(false);
 
   const submit = async () => {
-    const { data, error } = await supabase.functions.invoke("verify-admin", {
-      body: { area: "dstboard", password },
+    const { data, error, fallback } = await invokeEdgeFunction("verify-admin", {
+      area: "dstboard",
+      password,
     });
+    if (fallback) {
+      // Modo offline: aceita a senha local do dstboard
+      if (password === DSTBOARD_ADMIN_PASSWORD) {
+        onUnlock();
+        toast.success("Acesso liberado (modo offline)");
+      } else {
+        setWrong(true);
+        setPassword("");
+        toast.error("Senha incorreta");
+      }
+      return;
+    }
     if (error) {
       setWrong(true);
       setPassword("");
@@ -1927,9 +1941,14 @@ function ReverseEngineeringView() {
     setError("");
     setResult(null);
     try {
-      const { data, error: fnErr } = await supabase.functions.invoke("fetch-site", {
-        body: { url: url.trim(), crawl: true },
+      const { data, error: fnErr, fallback } = await invokeEdgeFunction("fetch-site", {
+        url: url.trim(),
+        crawl: true,
       });
+      if (fallback) {
+        setError("Supabase fora do ar. Tente novamente em instantes.");
+        return;
+      }
       if (fnErr) throw new Error(fnErr.message);
       if (!data?.scraped) throw new Error(data?.error || "Não foi possível acessar o site");
       setResult(data);
