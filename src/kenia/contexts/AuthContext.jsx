@@ -107,7 +107,7 @@ export function AuthProvider({ children }) {
 
 
   const login = async (email, password) => {
-    // 1) Tentar Supabase com timeout curto para não travar se estiver fora do ar
+    // 1) Tentar Supabase com timeout curto
     try {
       let { data, error } = await withTimeout(
         supabase.auth.signInWithPassword({ email, password }),
@@ -119,33 +119,27 @@ export function AuthProvider({ children }) {
       localStorage.setItem("auth_provider", "supabase");
       return built;
     } catch (supabaseErr) {
-      // Se foi timeout ou erro de rede, tenta fallback MongoDB imediatamente
-      if (
-        supabaseErr?.message === "supabase_timeout" ||
-        isNetworkError(supabaseErr)
-      ) {
-        try {
-          const { data } = await api.post("/auth/login", { email, password });
-          localStorage.setItem("lf_token", data.token);
-          localStorage.setItem("lf_user", JSON.stringify(data.user));
-          localStorage.setItem("auth_provider", "mongodb");
-          const built = buildMongoUser(data.user);
+      // 2) Fallback backend MongoDB (/auth/login)
+      try {
+        const { data } = await api.post("/auth/login", { email, password });
+        localStorage.setItem("lf_token", data.token);
+        localStorage.setItem("lf_user", JSON.stringify(data.user));
+        localStorage.setItem("auth_provider", "mongodb");
+        const built = buildMongoUser(data.user);
+        setUser(built);
+        return built;
+      } catch (mongoErr) {
+        // 3) Último recurso: modo demo local com credenciais pré-configuradas
+        const demo = findDemoUser(email, password);
+        if (demo) {
+          localStorage.setItem("auth_provider", "demo");
+          localStorage.setItem("lf_user", JSON.stringify(demo));
+          const built = buildMongoUser(demo);
           setUser(built);
           return built;
-        } catch (mongoErr) {
-          // 3) Último recurso: modo demo local com credenciais pré-configuradas
-          const demo = findDemoUser(email, password);
-          if (demo) {
-            localStorage.setItem("auth_provider", "demo");
-            localStorage.setItem("lf_user", JSON.stringify(demo));
-            const built = buildMongoUser(demo);
-            setUser(built);
-            return built;
-          }
-          throw supabaseErr;
         }
+        throw supabaseErr;
       }
-      throw supabaseErr;
     }
   };
 

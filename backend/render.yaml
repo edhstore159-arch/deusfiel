@@ -1,58 +1,26 @@
 services:
   - type: web
-    name: kenia-whatsapp-backend
-    runtime: node
-    plan: free
-    renderSubdomainPolicy: enabled
+    name: backend-gygy
+    runtime: python
+    plan: starter
     rootDir: backend
-    buildCommand: npm ci --prefer-offline --no-audit --no-fund
-    startCommand: npm start
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
-    autoDeploy: true
-    disk:
-      name: baileys-auth
-      mountPath: /opt/render/project/src/backend/auth
-      sizeGB: 1
     envVars:
-      - key: NODE_VERSION
-        value: "20"
-      - key: AUTH_DIR
-        value: /opt/render/project/src/backend/auth
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: espirito_santo
+      - key: JWT_SECRET
+        sync: false
       - key: SUPABASE_URL
         value: https://uzzbgjwpfxokagrvmdoa.supabase.co
       - key: SUPABASE_ANON_KEY
         sync: false
-      - key: OLLAMA_URL
-        value: https://october-detached-tipped.ngrok-free.dev
-      - key: OLLAMA_MODEL
-        value: qwen2.5:3b-instruct
-      - key: AI_REQUEST_TIMEOUT_MS
-        value: "90000"
-      - key: OLLAMA_GENERATE_TIMEOUT_MS
-        value: "90000"
-      - key: OLLAMA_PROBE_TIMEOUT_MS
-        value: "30000"
-      - key: OLLAMA_REQUEST_RETRIES
-        value: "0"
-      - key: QR_TIMEOUT_MS
-        value: "900000"
-      - key: QR_RENEW_AFTER_MS
-        value: "240000"
-      - key: CONNECT_TIMEOUT_MS
-        value: "120000"
-      - key: KEEP_ALIVE_INTERVAL_MS
-        value: "15000"
-      - key: RECONNECT_MAX_DELAY_MS
-        value: "300000"
-      - key: FCC_ENABLED
-        value: "true"
-      - key: FCC_BASE_URL
+      - key: EMERGENT_API_KEY
         sync: false
-      - key: FCC_AUTH_TOKEN
+      - key: EMERGENT_LLM_KEY
         sync: false
-      - key: FCC_MODEL
-        value: "claude-3-5-sonnet-20241022"
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
+      - key: BAILEYS_INTERNAL_TOKEN
+        value: legalflow-baileys-2026
