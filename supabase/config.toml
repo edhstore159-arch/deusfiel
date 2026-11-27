@@ -1,7 +1,4 @@
-project_id = "kzlxysxvvlupjtrmxqmbdoa"
+project_id = "kzlxysxvvlupjtrmxqmb"
 
-[functions.verify-admin]
-verify_jwt = false
-
-[functions.check-clone-pass]
+[functions.whatsapp-twilio-webhook]
 verify_jwt = false
