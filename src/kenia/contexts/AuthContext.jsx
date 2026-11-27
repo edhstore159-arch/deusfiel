@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/kenia/lib/api";
 
 const AuthContext = createContext(null);
 
@@ -14,11 +15,42 @@ function buildUser(authUser) {
   };
 }
 
+function buildMongoUser(u) {
+  if (!u) return null;
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name || (u.email ? u.email.split("@")[0] : ""),
+    oab: u.oab || null,
+  };
+}
+
+function isNetworkError(err) {
+  const msg = String(err?.message || err || "").toLowerCase();
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("network error") ||
+    msg.includes("transport error") ||
+    msg.includes("fetch failed") ||
+    !err?.status
+  );
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const provider = localStorage.getItem("auth_provider");
+    if (provider === "mongodb") {
+      const token = localStorage.getItem("lf_token");
+      const stored = localStorage.getItem("lf_user");
+      if (token && stored) {
+        try { setUser(buildMongoUser(JSON.parse(stored))); } catch { setUser(null); }
+      }
+      setLoading(false);
+      return;
+    }
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(buildUser(session?.user ?? null));
     });
@@ -54,11 +86,29 @@ export function AuthProvider({ children }) {
 
 
   const login = async (email, password) => {
-    let { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    const built = buildUser(data.user);
-    setUser(built);
-    return built;
+    // 1) Tentar Supabase
+    try {
+      let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      const built = buildUser(data.user);
+      setUser(built);
+      localStorage.setItem("auth_provider", "supabase");
+      return built;
+    } catch (supabaseErr) {
+      if (!isNetworkError(supabaseErr)) throw supabaseErr;
+      // 2) Fallback backend MongoDB (/auth/login)
+      try {
+        const { data } = await api.post("/auth/login", { email, password });
+        localStorage.setItem("lf_token", data.token);
+        localStorage.setItem("lf_user", JSON.stringify(data.user));
+        localStorage.setItem("auth_provider", "mongodb");
+        const built = buildMongoUser(data.user);
+        setUser(built);
+        return built;
+      } catch (mongoErr) {
+        throw supabaseErr;
+      }
+    }
   };
 
   const register = async (payload) => {
@@ -85,7 +135,10 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try { await supabase.auth.signOut(); } catch {}
+    localStorage.removeItem("lf_token");
+    localStorage.removeItem("lf_user");
+    localStorage.removeItem("auth_provider");
     setUser(null);
   };
 
