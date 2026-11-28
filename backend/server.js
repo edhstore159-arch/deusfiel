@@ -363,6 +363,119 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: "5mb" }));
 
+// ===== AUTH ENDPOINTS (para fallback do AuthContext) =====
+const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-change-in-production";
+const MONGO_URL = process.env.MONGO_URL || "mongodb://localhost:27017";
+const DB_NAME = process.env.DB_NAME || "espirito_santo";
+
+// Simple in-memory user store for demo (replace with MongoDB in production)
+const localUsers = new Map();
+
+// POST /auth/register
+app.post("/auth/register", async (req, res) => {
+  try {
+    const { email, password, name, oab } = req.body;
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: "email, password e name são obrigatórios" });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Senha deve ter pelo menos 6 caracteres" });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    if (localUsers.has(normalizedEmail)) {
+      return res.status(409).json({ error: "E-mail já cadastrado" });
+    }
+
+    const crypto = await import("node:crypto");
+    const userId = crypto.randomUUID();
+    const user = {
+      id: userId,
+      email: normalizedEmail,
+      name: name.trim(),
+      oab: oab?.trim() || null,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Store password hash (simple for demo - use bcrypt in production)
+    const passwordHash = crypto.createHash("sha256").update(password + JWT_SECRET).digest("hex");
+    localUsers.set(normalizedEmail, { ...user, passwordHash });
+
+    // Generate JWT token
+    const token = crypto.createHash("sha256").update(userId + Date.now().toString() + JWT_SECRET).digest("hex");
+
+    res.json({ user, token });
+  } catch (err) {
+    console.error("[auth/register] erro:", err);
+    res.status(500).json({ error: "Erro interno no servidor" });
+  }
+});
+
+// POST /auth/login
+app.post("/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "email e password são obrigatórios" });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const stored = localUsers.get(normalizedEmail);
+
+    if (!stored) {
+      return res.status(401).json({ error: "Credenciais inválidas" });
+    }
+
+    const crypto = await import("node:crypto");
+    const passwordHash = crypto.createHash("sha256").update(password + JWT_SECRET).digest("hex");
+
+    if (stored.passwordHash !== passwordHash) {
+      return res.status(401).json({ error: "Credenciais inválidas" });
+    }
+
+    const { passwordHash: _, ...user } = stored;
+    const token = crypto.createHash("sha256").update(user.id + Date.now().toString() + JWT_SECRET).digest("hex");
+
+    res.json({ user, token });
+  } catch (err) {
+    console.error("[auth/login] erro:", err);
+    res.status(500).json({ error: "Erro interno no servidor" });
+  }
+});
+
+// GET /auth/me (validate token)
+app.get("/auth/me", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Token não fornecido" });
+    }
+
+    // In a real implementation, you'd verify the JWT here
+    // For demo, we'll just return a mock user if token looks valid
+    const token = authHeader.slice(7);
+    if (token.length < 32) {
+      return res.status(401).json({ error: "Token inválido" });
+    }
+
+    // Return demo user (in production, decode JWT and fetch from DB)
+    res.json({ user: { id: "demo", email: "demo@local", name: "Demo User", oab: null } });
+  } catch (err) {
+    console.error("[auth/me] erro:", err);
+    res.status(500).json({ error: "Erro interno no servidor" });
+  }
+});
+
+// Health check para Render
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || "1.0.0"
+  });
+});
+
 // ---- Estado do socket Baileys ----
 let sock = null;
 let currentQR = null;

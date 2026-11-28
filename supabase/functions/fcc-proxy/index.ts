@@ -167,9 +167,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const fccUrl = Deno.env.get("FCC_URL") || "https://fcc-server.onrender.com";
+    // FCC Provider (Free Claude Code) - Updated for local development
+    const fccUrl = Deno.env.get("FCC_URL") || "http://localhost:8082";
     const fccToken = Deno.env.get("FCC_AUTH_TOKEN") || "freecc";
-    const fccModel = Deno.env.get("FCC_MODEL") || "anthropic/claude-sonnet-4";
+    const fccModel = Deno.env.get("FCC_MODEL") || "claude-sonnet-4-5";
 
     const rawModel = body.model || fccModel;
     const modelMap: Record<string, string> = {
