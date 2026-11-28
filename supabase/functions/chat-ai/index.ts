@@ -619,7 +619,7 @@ async function callHermes(messages: Array<{ role: string; content: string }>, fm
   if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY não configurado");
   
   const hermesModels = ["nousresearch/hermes-4-70b", "nousresearch/hermes-3-llama-3.1-70b"];
-  const freeModels = ["nvidia/nemotron-3-super-120b-a12b:free", "google/gemma-4-26b-a4b-it:free"];
+  const freeModels = ["openrouter/free"];
   const allModels = [...hermesModels, ...freeModels];
   
   for (const model of allModels) {

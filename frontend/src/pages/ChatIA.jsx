@@ -92,7 +92,10 @@ export default function ChatIA() {
   const [voice, setVoice] = useState("nova");
   const [autoplay, setAutoplay] = useState(true);
   const [thinking, setThinking] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
+  const [sessionId, setSessionId] = useState(() => {
+    const stored = localStorage.getItem('chat_session_id');
+    return stored ? stored : null;
+});
   const [analysis, setAnalysis] = useState(null);
   const [legDate, setLegDate] = useState("");
   const [legBrief, setLegBrief] = useState("");
@@ -196,6 +199,7 @@ export default function ChatIA() {
         { timeout: 90000 }
       );
       setSessionId(data.session_id);
+      localStorage.setItem('chat_session_id', data.session_id);
       const newMsg = {
         role: "assistant",
         content: data.response,

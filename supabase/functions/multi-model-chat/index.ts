@@ -14,8 +14,7 @@ const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
 const OPENROUTER_FALLBACK_MODELS = [
   "nousresearch/hermes-4-70b",
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "google/gemma-4-26b-a4b-it:free",
+  "openrouter/free",
 ];
 
 const FCC_BASE_URL = Deno.env.get("FCC_BASE_URL") || "https://unabashed-vertical-crispness.ngrok-free.dev";

@@ -340,29 +340,44 @@ async def register(payload: UserRegister):
 
 @api_router.post("/auth/login")
 async def login(payload: UserLogin):
+    # 1. First check if user already exists
     user = await db.users.find_one({"email": payload.email})
-    if not user:
-        # auto-create demo account for convenience
-        demo_accounts = {
-            "demo@espirito-santo.com.br": ("Dr. Demo", "000000/SP"),
-            "demo@legalflow.ai": ("Dr. Demo", "000000/SP"),
-            "demo@kenia-garcia.com.br": ("Dr. Demo", "000000/SP"),
-        }
-        if payload.email in demo_accounts and payload.password == "demo123":
-            name, oab = demo_accounts[payload.email]
-            uid = str(uuid.uuid4())
-            await db.users.insert_one({
-                "id": uid, "name": name, "email": payload.email,
-                "password": hash_password(payload.password), "oab": oab,
-                "created_at": now_iso(),
-            })
-            token = create_token(uid, payload.email)
-            return {"token": token, "user": {"id": uid, "name": name, "email": payload.email, "oab": oab}}
-        raise HTTPException(401, "Credenciais inválidas")
-    if not verify_password(payload.password, user["password"]):
-        raise HTTPException(401, "Credenciais inválidas")
-    token = create_token(user["id"], user["email"])
-    return {"token": token, "user": {"id": user["id"], "name": user["name"], "email": user["email"], "oab": user.get("oab")}}
+
+    if user:
+        # User exists - verify password and login normally
+        if not verify_password(payload.password, user["password"]):
+            raise HTTPException(401, "Credenciais inválidas")
+        token = create_token(user["id"], user["email"])
+        return {"token": token, "user": {"id": user["id"], "name": user["name"], "email": user["email"], "oab": user.get("oab")}}
+
+    # 2. User doesn't exist - only create if it's a valid demo account
+    demo_accounts = {
+        "demo@espirito-santo.com.br": ("Dr. Demo", "000000/SP"),
+        "demo@legalflow.ai": ("Dr. Demo", "000000/SP"),
+        "demo@kenia-garcia.com.br": ("Dr. Demo", "000000/SP"),
+    }
+
+    if payload.email in demo_accounts and payload.password == "demo123":
+        name, oab = demo_accounts[payload.email]
+        # Check if user was just created by another request (race condition guard)
+        existing = await db.users.find_one({"email": payload.email})
+        if existing:
+            if not verify_password(payload.password, existing["password"]):
+                raise HTTPException(401, "Credenciais inválidas")
+            token = create_token(existing["id"], existing["email"])
+            return {"token": token, "user": {"id": existing["id"], "name": existing["name"], "email": existing["email"], "oab": existing.get("oab")}}
+
+        user_id = str(uuid.uuid4())
+        await db.users.insert_one({
+            "id": user_id, "name": name, "email": payload.email,
+            "password": hash_password(payload.password), "oab": oab,
+            "created_at": now_iso(),
+        })
+        token = create_token(user_id, payload.email)
+        return {"token": token, "user": {"id": user_id, "name": name, "email": payload.email, "oab": oab}}
+
+    # 3. Neither existing user nor valid demo - credentials invalid
+    raise HTTPException(401, "Credenciais inválidas")
 
 @api_router.get("/auth/me")
 async def me(current_user=Depends(get_current_user)):
@@ -808,6 +823,15 @@ async def chat_message(payload: ChatMessageIn):
         {"session_id": session_id}, {"_id": 0}
     ).sort("created_at", 1).to_list(60)
 
+    # Formata historico de conversa para o prompt
+    history_block = ""
+    if history:
+        for msg in history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if content:
+                history_block += f"\n{role.capitalize()}: {content}"
+
     # Brief diario de legislacao (cache MongoDB, TTL 24h)
     leg_brief = await get_daily_legislation_brief()
     today_h = datetime.now(timezone.utc).strftime("%d/%m/%Y")
@@ -820,6 +844,7 @@ async def chat_message(payload: ChatMessageIn):
     system_prompt = (
         LEGAL_SYSTEM_PROMPT
         + name_block
+        + history_block
         + f"\n\n═══════════════════════════════════════════════════════════\n"
         + f"📅 ATUALIZACAO DIARIA DE LEGISLACAO ({today_h})\n"
         + f"═══════════════════════════════════════════════════════════\n"

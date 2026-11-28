@@ -512,11 +512,7 @@ const FCC_TIMEOUT_MS = Number(process.env.FCC_TIMEOUT_MS || 60000);
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_FREE_MODELS = [
-  "google/gemma-4-26b-a4b-it:free",
-  "google/gemma-4-31b-it:free",
-  "google/gemma-3-27b-it:free",
-  "meta-llama/llama-3.2-3b-instruct:free",
-  "meta-llama/llama-3.2-1b-instruct:free",
+  "openrouter/free",
 ];
 
 const AUTO_REPLY_SEND_TIMEOUT_MS = Number(process.env.AUTO_REPLY_SEND_TIMEOUT_MS || 20000);
@@ -1759,15 +1755,44 @@ async function callOpenRouter(messagesPayload, options = {}) {
   throw new Error(`OpenRouter failed: ${JSON.stringify(attempts.slice(-1))}`);
 }
 
+async function callPollinations(messagesPayload, options = {}) {
+  const systemMsg = messagesPayload.find((m) => m.role === "system");
+  const apiMessages = messagesPayload
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content || "") }));
+  const patchedSystem = systemMsg
+    ? { role: "system", content: `INSTRUÇÃO CRÍTICA: Responda SEMPRE em português brasileiro. NUNCA responda em inglês. NÃO inclua raciocínio interno. Resposta curta e natural (máx 3 frases).\n\n${systemMsg.content}` }
+    : null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
+  try {
+    const resp = await fetch("https://text.pollinations.ai/openai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "openai-fast",
+        messages: patchedSystem ? [patchedSystem, ...apiMessages] : apiMessages,
+        temperature: 0.7,
+        max_tokens: 600,
+      }),
+    });
+    clearTimeout(timeout);
+    if (!resp.ok) throw new Error(`Pollinations ${resp.status}`);
+    const data = await resp.json();
+    let reply = String(data?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/giu, "").trim();
+    if (!reply) throw new Error("Pollinations resposta vazia");
+    return { ok: true, provider: "pollinations", endpoint: "text.pollinations.ai", model: "openai-fast", reply: sanitizeOllamaReply(reply, options.userText), attempts: [{ ok: true, provider: "pollinations", reply: reply.slice(0, 200) }] };
+  } catch (e) {
+    clearTimeout(timeout);
+    return { ok: false, provider: "pollinations", error: e?.message || String(e) };
+  }
+}
+
 async function callHermesCloud(messagesPayload, systemPrompt) {
   if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY ausente");
   const freeModels = [
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "nvidia/nemotron-3.5-lightning:free",
-    "nvidia/nemotron-3.5-content-safety:free",
-    "google/gemma-4-26b-a4b-it:free",
-    "google/gemma-4-31b-it:free",
-    "google/gemma-3-27b-it:free",
+    "openrouter/free",
   ];
   
   const apiMessages = messagesPayload
@@ -1930,6 +1955,20 @@ async function callAI(messagesPayload, options = {}) {
     }
   }
 
+  // 4) Pollinations (gratuito, sem chave, cloud 24/7) - último recurso real
+  try {
+    const pollResult = await callPollinations(messagesPayload, options);
+    if (pollResult.ok) {
+      pollResult.attempts?.forEach((a) => attempts.push(a));
+      return pollResult;
+    }
+    attempts.push({ ok: false, provider: "pollinations", error: pollResult.error });
+    recordAutoReply({ step: "ai_provider_fail", provider: "pollinations", error: pollResult.error });
+  } catch (e) {
+    attempts.push({ ok: false, provider: "pollinations", error: e?.message || String(e) });
+    recordAutoReply({ step: "ai_provider_fail", provider: "pollinations", error: e?.message || String(e) });
+  }
+
   return { ok: false, error: "OpenRouter, Claude FCC, Zen e Hermes falharam.", attempts, ...attempts[attempts.length - 1] };
 }
 
@@ -1949,7 +1988,7 @@ async function llmCall(messages, maxTokens = 300) {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENROUTER_API_KEY}` },
       signal: controller.signal,
       body: JSON.stringify({
-        model: "nvidia/nemotron-3-super-120b-a12b:free",
+        model: "openrouter/free",
         messages,
         max_tokens: maxTokens,
         temperature: 0.3,
@@ -3479,25 +3518,30 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
     if (provider === "openrouter" || provider === "nemotron") {
       if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY não configurado");
       // Use free model variant to avoid credit issues
-      const nemotronModel = provider === "nemotron" ? "nvidia/nemotron-3-super-120b-a12b:free" : model;
+      const nemotronModel = provider === "nemotron" ? "openrouter/free" : model;
+      const userText = userMessages[userMessages.length - 1]?.content || "";
       let orResult;
       
       try {
-        orResult = await callOpenRouter(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "", model: nemotronModel });
+        orResult = await callOpenRouter(messages, { temperature: 0.7, userText, model: nemotronModel });
       } catch (openRouterErr) {
         const errorMsg = openRouterErr?.message || "";
         const isZdrError = errorMsg.includes("zdr") || errorMsg.includes("ZDR") || errorMsg.includes("guardrail") || errorMsg.includes("data policy") || errorMsg.includes("404");
         if (isZdrError) {
           console.warn("[multi-modelo] OpenRouter ZDR/guardrail error, falling back to Zen:", errorMsg.slice(0, 200));
           try {
-            orResult = await callZen(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });
+            orResult = await callZen(messages, { temperature: 0.7, userText });
           } catch (zenErr) {
             console.error("[multi-modelo] Zen fallback also failed:", zenErr?.message);
-            throw openRouterErr;
           }
         } else {
-          throw openRouterErr;
+          console.warn("[multi-modelo] OpenRouter error, falling back:", errorMsg.slice(0, 200));
         }
+      }
+      
+      if (!orResult?.ok) {
+        console.warn("[multi-modelo] OpenRouter/Zen indisponíveis, usando Pollinations");
+        orResult = await callPollinations(messages, { userText });
       }
       
       if (!orResult?.ok) throw new Error(orResult?.error || "OpenRouter failed");
@@ -3527,28 +3571,44 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
 
     // default: gateway via Supabase
     const gatewayUrl = `${SUPABASE_URL}/functions/v1/chat-ai`;
-    const resp = await fetch(gatewayUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
-      body: JSON.stringify({ message: userMessages[userMessages.length - 1]?.content || "", history: userMessages.slice(0, -1), system_prompt: prompt, model: model || "google/gemini-2.5-pro", stream: !!stream }),
-    });
-    if (!resp.ok) throw new Error(`Gateway ${resp.status}`);
-    if (stream) {
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(`data: ${decoder.decode(value)}\n\n`);
+    const userText = userMessages[userMessages.length - 1]?.content || "";
+    try {
+      const resp = await fetch(gatewayUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ message: userText, history: userMessages.slice(0, -1), system_prompt: prompt, model: model || "google/gemini-2.5-pro", stream: !!stream }),
+      });
+      if (!resp.ok) throw new Error(`Gateway ${resp.status}`);
+      if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(`data: ${decoder.decode(value)}\n\n`);
+        }
+        res.end();
+        return;
       }
-      res.end();
-      return;
+      const data = await resp.json();
+      return res.json({ response: data.response || data.choices?.[0]?.message?.content || "" });
+    } catch (gatewayErr) {
+      console.warn("[multi-modelo] gateway falhou, usando Pollinations:", gatewayErr?.message);
+      const pollResult = await callPollinations(messages, { userText });
+      if (!pollResult.ok) throw gatewayErr;
+      if (stream) {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: pollResult.reply } }] })}\n\n`);
+        res.end();
+        return;
+      }
+      return res.json({ response: pollResult.reply });
     }
-    const data = await resp.json();
-    res.json({ response: data.response || data.choices?.[0]?.message?.content || "" });
   } catch (e) {
     console.error("[multi-modelo] error:", e?.message);
     res.status(500).json({ error: e?.message || "Internal error" });
