@@ -1,6 +1,6 @@
 services:
   # ============================================
-  # FRONTEND - Static Site (Vite + React)
+  # FRONTEND - Static Site (Vite + React) - GRÁTIS ilimitado
   # ============================================
   - type: web
     name: deusfiel-frontend
@@ -16,8 +16,6 @@ services:
         value: uzzbgjwpfxokagrvmdoa
       - key: VITE_BACKEND_URL
         value: https://deusfiel-backend.onrender.com
-      - key: VITE_FCC_URL
-        value: https://deusfiel-fcc-proxy.onrender.com
       # Chaves sensíveis - configure no dashboard da Render (sync: false)
       - key: VITE_GROQ_API_KEY
         sync: false
@@ -45,7 +43,7 @@ services:
         destination: /index.html
 
   # ============================================
-  # BACKEND - Node.js (Express + Baileys)
+  # BACKEND - Node.js (Express + Baileys) - 1º Web Service Free
   # ============================================
   - type: web
     name: deusfiel-backend
@@ -86,13 +84,13 @@ services:
       - key: ZEN_API_KEY
         sync: false
       - key: FCC_BASE_URL
-        value: https://deusfiel-fcc-proxy.onrender.com
+        value: ""  # vazio = usa fallback Emergent/OpenRouter
       - key: FCC_AUTH_TOKEN
         sync: false
       - key: FCC_MODEL
         value: claude-sonnet-4-5
       - key: FCC_ENABLED
-        value: "true"
+        value: "false"
       - key: OLLAMA_URL
         value: http://localhost:11434
       - key: OLLAMA_MODEL
@@ -111,67 +109,3 @@ services:
       name: baileys-auth
       mountPath: /opt/render/project/src/backend/auth
       sizeGB: 1
-
-  # ============================================
-  # FCC PROXY - Python FastAPI (proxy para FCC/outros LLMs)
-  # ============================================
-  - type: web
-    name: deusfiel-fcc-proxy
-    runtime: python
-    plan: starter
-    autoDeploy: true
-    rootDir: fcc-proxy
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
-    envVars:
-      - key: PORT
-        value: "8082"
-      - key: FCC_URL
-        sync: false  # Configure no dashboard se tiver FCC server hospedado
-      - key: FCC_AUTH_TOKEN
-        sync: false
-      - key: FCC_MODEL
-        value: claude-sonnet-4-5
-      - key: EMERGENT_API_KEY
-        sync: false
-      - key: EMERGENT_LLM_KEY
-        sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: ZEN_API_KEY
-        sync: false
-      - key: OLLAMA_URL
-        value: http://localhost:11434
-      - key: OLLAMA_MODEL
-        value: qwen2.5:3b-instruct
-
-  # ============================================
-  # BAILEYS SIDECAR - Node.js (WhatsApp connection 24/7)
-  # ============================================
-  - type: web
-    name: deusfiel-baileys
-    runtime: node
-    plan: starter
-    autoDeploy: true
-    rootDir: baileys-service
-    buildCommand: npm ci --legacy-peer-deps
-    startCommand: npm start
-    healthCheckPath: /health
-    disk:
-      name: baileys-sidecar-auth
-      mountPath: /opt/render/project/src/baileys-service/auth_info
-      sizeGB: 1
-    envVars:
-      - key: NODE_VERSION
-        value: "20"
-      - key: BAILEYS_INTERNAL_TOKEN
-        sync: false
-      - key: BACKEND_WEBHOOK
-        value: https://deusfiel-backend.onrender.com/api/whatsapp/webhook/baileys
-      - key: KEEP_ALIVE_INTERVAL_MS
-        value: "25000"
-      - key: CONNECT_TIMEOUT_MS
-        value: "60000"
