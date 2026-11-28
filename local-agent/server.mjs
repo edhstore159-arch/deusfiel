@@ -8,13 +8,18 @@
 
 import http from "node:http";
 import { exec } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROXY = path.join(DIR, "proxy-fcc-ollama.mjs");
 
 const PORT = 7777;
 const HOST = "127.0.0.1";
 
 // Apenas estes comandos são permitidos. Edite à vontade.
 const ALLOWED = {
-  "ngrok-restart": "pkill ngrok; sleep 1; ngrok http 11111 > /tmp/ngrok.log 2>&1 &",
+  "ngrok-restart": `pkill -f proxy-fcc-ollama.mjs; pkill ngrok; sleep 1; nohup node "${PROXY}" > /tmp/proxy-fcc-ollama.log 2>&1 & sleep 1; ngrok http 11111 > /tmp/ngrok.log 2>&1 &`,
 };
 
 // Liste aqui as origens do seu app Lovable que podem chamar o agente.

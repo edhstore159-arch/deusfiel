@@ -51,3 +51,29 @@ const ALLOWED = {
 
 Não exponha esta porta na internet. Não adicione comandos vindos de input do
 usuário sem revisão — a allowlist é a defesa.
+
+## ⚠️ Erro ERR_NGROK_6030 / ERR_NGROK_334 (múltiplos endpoints)
+
+Esse erro acontece quando **dois túneis ngrok usam a mesma URL** (por exemplo,
+um `ngrok http 11434` antigo ainda aberto e um `ngrok http 11111` novo). A conta
+free tem **um único domínio fixo**, então os dois disputam a mesma URL.
+
+Correção:
+
+```bash
+pkill ngrok          # encerra TODOS os túneis
+ngrok http 11111     # sobe somente o túnel do proxy combinado
+```
+
+Nunca rode `ngrok http 11434` junto com o túnel do 11111. O botão
+"reiniciar ngrok" da bolinha já faz esse restart limpo (mata os túneis antigos,
+sobe o proxy e abre só o 11111).
+
+## Início rápido do túnel
+
+```bash
+./local-agent/start-tunnel.sh
+```
+
+O script mata túneis antigos, sobe o proxy (11111) e o ngrok apontando para ele,
+e imprime a URL pública atual.

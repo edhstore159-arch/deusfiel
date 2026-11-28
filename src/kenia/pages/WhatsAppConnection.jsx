@@ -5,6 +5,7 @@ import { Input } from "@/kenia/components/ui/input";
 import { Label } from "@/kenia/components/ui/label";
 import { Badge } from "@/kenia/components/ui/badge";
 import { toast } from "sonner";
+import { BACKEND_URL } from "@/kenia/lib/api";
 import {
   CheckCircle2, XCircle, Loader2, QrCode, LogOut, RefreshCw, AlertTriangle, Smartphone,
 } from "lucide-react";
@@ -18,7 +19,7 @@ const EP_QR = "/api/whatsapp/qr";
 const EP_RESTART = "/api/whatsapp/baileys/restart";
 const EP_LOGOUT = "/api/whatsapp/logout";
 
-const DEFAULT_BASE = import.meta.env.VITE_BACKEND_URL || "";
+const DEFAULT_BASE = BACKEND_URL;
 
 export default function WhatsAppConnection() {
   const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem(LS_BASE) || DEFAULT_BASE);

@@ -917,11 +917,14 @@ function recentAssistantReplies(history: Array<{ role: string; content: string }
 function isNearDuplicateReply(reply: string, history: Array<{ role: string; content: string }>): boolean {
   const normalizedReply = normalizeForSimilarity(reply);
   if (!normalizedReply) return false;
-  return recentAssistantReplies(history).some((previous) => {
+  // Only check against last 2 assistant replies (not 4) to avoid false positives on follow-ups
+  const recent = recentAssistantReplies(history).slice(-2);
+  return recent.some((previous) => {
     const normalizedPrevious = normalizeForSimilarity(previous);
     if (!normalizedPrevious) return false;
     const score = similarityScore(normalizedReply, normalizedPrevious);
-    return normalizedReply === normalizedPrevious || score >= 0.86 || (normalizedReply.length < 240 && score >= 0.72);
+    // Higher thresholds, only flag exact/near-exact duplicates
+    return normalizedReply === normalizedPrevious || score >= 0.92 || (normalizedReply.length < 150 && score >= 0.85);
   });
 }
 
@@ -1109,10 +1112,35 @@ function inferAppointmentFromConversation(userMessage: string, history: Array<{ 
   };
 }
 
-function compactHistory(history: Array<{ role: string; content: string }>, maxItems = 8) {
+async function fetchConversationHistory(supabase: any, sessionId: string, limit = 40): Promise<Array<{ role: string; content: string }>> {
+  try {
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("message, response, created_at")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true })
+      .limit(limit);
+    if (error || !data || !data.length) return [];
+    const history: Array<{ role: string; content: string }> = [];
+    for (const row of data) {
+      if (row.message && String(row.message).trim()) {
+        history.push({ role: "user", content: String(row.message).trim() });
+      }
+      if (row.response && String(row.response).trim()) {
+        history.push({ role: "assistant", content: String(row.response).trim() });
+      }
+    }
+    return history;
+  } catch (e) {
+    console.warn("[chat-ai] Falha ao buscar histórico do Supabase:", e);
+    return [];
+  }
+}
+
+function compactHistory(history: Array<{ role: string; content: string }>, maxItems = 50) {
   return (Array.isArray(history) ? history : [])
     .slice(-maxItems)
-    .map((m) => ({ role: m.role, content: String(m.content || "").slice(0, 900) }));
+    .map((m) => ({ role: m.role, content: String(m.content || "").slice(0, 2000) }));
 }
 
 
@@ -1129,7 +1157,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body.message ?? body.text ?? "").trim();
-    const history: Array<{ role: string; content: string }> = compactHistory(Array.isArray(body.history) ? body.history : []);
+    const frontendHistory: Array<{ role: string; content: string }> = Array.isArray(body.history) ? body.history : [];
     const sessionId: string | null = body.session_id ? String(body.session_id) : null;
     const userId: string | null = body.user_id ? String(body.user_id) : null;
 
@@ -1171,12 +1199,34 @@ Deno.serve(async (req) => {
       10,
     );
 
+    // Create Supabase client early to fetch conversation history
+    const sbAgent = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Fetch full conversation history from Supabase if session_id is provided
+    let mergedHistory = frontendHistory;
+    if (sessionId) {
+      const dbHistory = await fetchConversationHistory(sbAgent, sessionId);
+      if (dbHistory.length > 0) {
+        // Merge: prefer DB history as source of truth, but append any newer messages from frontend
+        // Use content-based comparison to avoid index-based issues
+        const lastDbUserMsg = [...dbHistory].reverse().find(m => m.role === "user");
+        const frontendOnly = frontendHistory.filter((m) => {
+          if (!lastDbUserMsg) return true;
+          // Only include frontend messages that are newer than the last DB user message
+          return m.role === "user" && m.content !== lastDbUserMsg.content;
+        });
+        mergedHistory = [...dbHistory, ...frontendOnly];
+        console.log(`[chat-ai] Histórico mesclado: ${dbHistory.length} do DB + ${frontendOnly.length} do frontend = ${mergedHistory.length} total`);
+      }
+    }
+    const history = compactHistory(mergedHistory);
+
     // ===== FAST-PATH: shortcuts ANTES de qualquer query DB ou LLM =====
     const normalizedFast = userMessage.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const wordCount = userMessage.trim().split(/\s+/).length;
 
     // Saudações (resposta instantânea, sem LLM)
-    const isGreeting = wordCount <= 4 && /\b(oi|ol[áa]|bom\s+dia|boa\s+tarde|boa\s+noite|hey|hello|hi|eai|eai\?|salve|fala|opa|bom dia|boa tarde|boa noite|bom dia\!|boa tarde\!|boa noite\!)\b/i.test(normalizedFast);
+    const isGreeting = wordCount <= 2 && /^(oi|ol[áa]|bom\s+dia|boa\s+tarde|boa\s+noite|hey|hello|hi|eai|eai\?|salve|fala|opa)$/i.test(userMessage.trim());
     if (isGreeting) {
       const now2 = new Date();
       const h = parseInt(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(now2), 10);
@@ -1238,7 +1288,6 @@ Deno.serve(async (req) => {
     let agentConfig: any = null;
     let availabilityDays: { weekday: string; iso: string; br: string; hours: string[] }[] = [];
 
-    const sbAgent = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const startISO = now.toISOString().slice(0, 10);
     const endDate = new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10);
 

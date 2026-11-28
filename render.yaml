@@ -15,7 +15,7 @@ services:
       - key: VITE_SUPABASE_PROJECT_ID
         value: uzzbgjwpfxokagrvmdoa
       - key: VITE_BACKEND_URL
-        value: https://deusfiel-backend.onrender.com
+        value: https://backend-gygy.onrender.com
       # Chaves sensíveis - configure no dashboard da Render (sync: false)
       - key: VITE_GROQ_API_KEY
         sync: false
@@ -43,69 +43,12 @@ services:
         destination: /index.html
 
   # ============================================
-  # BACKEND - Node.js (Express + Baileys) - 1º Web Service Free
+  # BACKEND - publicado separadamente
   # ============================================
-  - type: web
-    name: deusfiel-backend
-    runtime: node
-    plan: starter
-    autoDeploy: true
-    rootDir: backend
-    buildCommand: npm ci --legacy-peer-deps
-    startCommand: node server.js
-    healthCheckPath: /api/health
-    envVars:
-      - key: NODE_VERSION
-        value: "20"
-      - key: PORT
-        value: "8080"
-      - key: MONGO_URL
-        sync: false
-      - key: DB_NAME
-        value: espirito_santo
-      - key: JWT_SECRET
-        sync: false
-      - key: SUPABASE_URL
-        value: https://uzzbgjwpfxokagrvmdoa.supabase.co
-      - key: SUPABASE_ANON_KEY
-        sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: EMERGENT_API_KEY
-        sync: false
-      - key: EMERGENT_LLM_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: OPENROUTER_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: ZEN_API_KEY
-        sync: false
-      - key: FCC_BASE_URL
-        value: ""  # vazio = usa fallback Emergent/OpenRouter
-      - key: FCC_AUTH_TOKEN
-        sync: false
-      - key: FCC_MODEL
-        value: claude-sonnet-4-5
-      - key: FCC_ENABLED
-        value: "false"
-      - key: OLLAMA_URL
-        value: http://localhost:11434
-      - key: OLLAMA_MODEL
-        value: qwen2.5:3b-instruct
-      - key: BAILEYS_INTERNAL_TOKEN
-        sync: false
-      - key: KEEP_ALIVE_INTERVAL_MS
-        value: "15000"
-      - key: RECONNECT_DELAY_MS
-        value: "2000"
-      - key: RECONNECT_MAX_DELAY_MS
-        value: "300000"
-      - key: QR_TIMEOUT_MS
-        value: "900000"
-    disk:
-      name: baileys-auth
-      mountPath: /opt/render/project/src/backend/auth
-      sizeGB: 1
+  # O backend Baileys (FastAPI + Node sidecar) é publicado a partir de
+  # backend/render.yaml como o serviço "backend-gygy". O frontend acima
+  # aponta para ele em VITE_BACKEND_URL.
+  #
+  # Não declare outro serviço de backend aqui: o Render usa o nome do
+  # serviço como identidade e um segundo blueprint (deusfiel-backend)
+  # acabava apontando para uma URL que não existe (404).

@@ -1,0 +1,22 @@
+name: Keep backend warm
+
+on:
+  schedule:
+    # Render Free hiberna após ~15 min sem requisições. Ping a cada 5 min.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping backend (primário)
+        run: |
+          curl -fsS --max-time 90 --retry 2 --retry-delay 5 \
+            https://backend-gygy.onrender.com/api/health || true
+
+      - name: Ping backend (secundário)
+        run: |
+          curl -fsS --max-time 90 --retry 2 --retry-delay 5 \
+            https://segundo-backend-n5pf.onrender.com/api/health || true

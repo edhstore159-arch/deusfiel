@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { api, HAS_BACKEND } from "@/kenia/lib/api";
+import { api, BACKEND_URL, HAS_BACKEND } from "@/kenia/lib/api";
 import { Card } from "@/kenia/components/ui/card";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
@@ -89,7 +89,7 @@ export default function WhatsAppSettings() {
   const centerDigits = pickWhatsAppNumber(baileysStatus, cfg);
   const centerPhone = centerDigits ? formatWhatsAppPhone(centerDigits) : "—";
 
-  const backendUrl = (import.meta.env.VITE_BACKEND_URL || "");
+  const backendUrl = BACKEND_URL;
   const webhookBase = `${backendUrl}/api/whatsapp/webhook`;
 
   const normalizeBaileysStatus = (status = {}) => {
@@ -115,7 +115,7 @@ export default function WhatsAppSettings() {
   // Contadores de flapping para evitar desconexões falsas por glitch de rede/sidecar
   const failureCountRef = useRef(0);
   const disconnectCountRef = useRef(0);
-  const MAX_FAILURES_BEFORE_OFFLINE = 8;
+  const MAX_FAILURES_BEFORE_OFFLINE = 20;
   const MAX_DISCONNECTS_BEFORE_OFFLINE = 5;
 
   // Auto-renew QR when it's about to expire (every 25 seconds when QR is visible)
@@ -136,11 +136,15 @@ export default function WhatsAppSettings() {
     return () => clearInterval(t);
   }, [cfg?.provider, baileysStatus?.connected, baileysQr?.qr]);
 
-  const load = async () => {
+  const load = async (attempt = 0) => {
     try {
       const { data } = await api.get("/whatsapp/config");
       setCfg(data);
     } catch {
+      if (attempt < 3) {
+        setTimeout(() => load(attempt + 1), 3000);
+        return;
+      }
       toast.error("Erro ao carregar configuração");
     }
   };
@@ -178,6 +182,8 @@ export default function WhatsAppSettings() {
       // Mantém o último estado conectado para não derrubar a UI por um glitch de rede.
       failureCountRef.current += 1;
       if (failureCountRef.current < MAX_FAILURES_BEFORE_OFFLINE) {
+        // Backend free (Render) pode estar acordando: tenta de novo em 3s.
+        setTimeout(pollBaileys, 3000);
         return;
       }
       const msg =

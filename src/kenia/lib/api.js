@@ -9,7 +9,9 @@ const readBaileysInstance = () => {
   try { return (localStorage.getItem("kenia:baileys-instance") || "").trim(); } catch { return ""; }
 };
 const DEFAULT_BACKEND = "https://backend-gygy.onrender.com";
-const BACKEND_URL = (readBackendOverride() || import.meta.env.VITE_BACKEND_URL || DEFAULT_BACKEND).replace(/\/$/, "");
+const DEAD_BACKENDS = new Set(["https://deusfiel-backend.onrender.com"]);
+const configuredBackend = (readBackendOverride() || import.meta.env.VITE_BACKEND_URL || "").trim().replace(/\/$/, "");
+const BACKEND_URL = (DEAD_BACKENDS.has(configuredBackend) ? DEFAULT_BACKEND : configuredBackend || DEFAULT_BACKEND).replace(/\/$/, "");
 export { BACKEND_URL };
 export const HAS_BACKEND = Boolean(BACKEND_URL);
 export const API = HAS_BACKEND ? `${BACKEND_URL}/api` : "";
@@ -1516,9 +1518,6 @@ const isEmptyPayload = (data) => {
 };
 
 const backendSafeGetPaths = new Set([
-  "/whatsapp/diagnostics",
-  "/whatsapp/baileys/status",
-  "/whatsapp/baileys/qr",
   "/whatsapp/qr",
   "/whatsapp/qr/image",
 ]);
