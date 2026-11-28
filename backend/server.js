@@ -3629,44 +3629,48 @@ app.post("/api/chat/multi-modelo", async (req, res) => {
       return res.json({ response: data.content?.[0]?.text || "" });
     }
     if (provider === "openrouter" || provider === "nemotron") {
-      if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY não configurado");
-      // Use free model variant to avoid credit issues
-      const nemotronModel = provider === "nemotron" ? "openrouter/free" : model;
-      const userText = userMessages[userMessages.length - 1]?.content || "";
-      let orResult;
-      
-      try {
-        orResult = await callOpenRouter(messages, { temperature: 0.7, userText, model: nemotronModel });
-      } catch (openRouterErr) {
-        const errorMsg = openRouterErr?.message || "";
-        const isZdrError = errorMsg.includes("zdr") || errorMsg.includes("ZDR") || errorMsg.includes("guardrail") || errorMsg.includes("data policy") || errorMsg.includes("404");
-        if (isZdrError) {
-          console.warn("[multi-modelo] OpenRouter ZDR/guardrail error, falling back to Zen:", errorMsg.slice(0, 200));
-          try {
-            orResult = await callZen(messages, { temperature: 0.7, userText });
-          } catch (zenErr) {
-            console.error("[multi-modelo] Zen fallback also failed:", zenErr?.message);
+      if (!OPENROUTER_API_KEY) {
+        console.warn("[multi-modelo] OPENROUTER_API_KEY não configurado, usando gateway (chat-ai) como fallback");
+        // Fall through to gateway logic below
+      } else {
+        // Use free model variant to avoid credit issues
+        const nemotronModel = provider === "nemotron" ? "openrouter/free" : model;
+        const userText = userMessages[userMessages.length - 1]?.content || "";
+        let orResult;
+
+        try {
+          orResult = await callOpenRouter(messages, { temperature: 0.7, userText, model: nemotronModel });
+        } catch (openRouterErr) {
+          const errorMsg = openRouterErr?.message || "";
+          const isZdrError = errorMsg.includes("zdr") || errorMsg.includes("ZDR") || errorMsg.includes("guardrail") || errorMsg.includes("data policy") || errorMsg.includes("404");
+          if (isZdrError) {
+            console.warn("[multi-modelo] OpenRouter ZDR/guardrail error, falling back to Zen:", errorMsg.slice(0, 200));
+            try {
+              orResult = await callZen(messages, { temperature: 0.7, userText });
+            } catch (zenErr) {
+              console.error("[multi-modelo] Zen fallback also failed:", zenErr?.message);
+            }
+          } else {
+            console.warn("[multi-modelo] OpenRouter error, falling back:", errorMsg.slice(0, 200));
           }
-        } else {
-          console.warn("[multi-modelo] OpenRouter error, falling back:", errorMsg.slice(0, 200));
         }
+
+        if (!orResult?.ok) {
+          console.warn("[multi-modelo] OpenRouter/Zen indisponíveis, usando Pollinations");
+          orResult = await callPollinations(messages, { userText });
+        }
+
+        if (!orResult?.ok) throw new Error(orResult?.error || "OpenRouter failed");
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: orResult.reply } }] })}\n\n`);
+          res.end();
+          return;
+        }
+        return res.json({ response: orResult.reply });
       }
-      
-      if (!orResult?.ok) {
-        console.warn("[multi-modelo] OpenRouter/Zen indisponíveis, usando Pollinations");
-        orResult = await callPollinations(messages, { userText });
-      }
-      
-      if (!orResult?.ok) throw new Error(orResult?.error || "OpenRouter failed");
-      if (stream) {
-        res.setHeader("Content-Type", "text/event-stream");
-        res.setHeader("Cache-Control", "no-cache");
-        res.setHeader("Connection", "keep-alive");
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: orResult.reply } }] })}\n\n`);
-        res.end();
-        return;
-      }
-      return res.json({ response: orResult.reply });
     }
     if (provider === "zen") {
       const result = await callZen(messages, { temperature: 0.7, userText: userMessages[userMessages.length - 1]?.content || "" });

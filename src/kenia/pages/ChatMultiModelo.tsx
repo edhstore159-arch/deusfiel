@@ -1,19 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/kenia/components/ui/button";
 import { Input } from "@/kenia/components/ui/input";
-import { Badge } from "@/kenia/components/ui/badge";
 import { ScrollArea } from "@/kenia/components/ui/scroll-area";
 import { Label } from "@/kenia/components/ui/label";
 import { toast } from "sonner";
-import { Send, Loader2, Bot, Trash2, Server, Sparkles, Brain, Zap, Image } from "lucide-react";
+import { Send, Loader2, Bot, Trash2, Server, Sparkles, Brain, Zap } from "lucide-react";
 
-// Modelos oferecidos: Nemotron (NVIDIA, gratuito), Claude FCC, Emergent, Ollama local, OpenCode Zen.
+// Modelos oferecidos: Nemotron, Claude FCC, gateway (Gemini/GPT/Claude), Ollama local e OpenCode Zen.
 const MODELS = [
   {
     id: "nemotron",
     label: "NEM",
     provider: "nemotron",
-    model: "GLM-4.5",
+    model: "nemotron",
     icon: Zap,
     color: "from-green-500 to-emerald-600",
   },
@@ -21,7 +20,7 @@ const MODELS = [
     id: "claude-fcc",
     label: "CLF",
     provider: "claude-fcc",
-    model: "claude-3-5-sonnet-20241022",
+    model: "claude-fcc",
     icon: Bot,
     color: "from-yellow-500 to-orange-600",
   },
@@ -53,7 +52,7 @@ const MODELS = [
     id: "ollama:local",
     label: "OLL",
     provider: "ollama",
-    model: "llama3.2",
+    model: "qwen2.5:3b-instruct",
     icon: Server,
     color: "from-purple-500 to-fuchsia-600",
   },
@@ -88,6 +87,36 @@ const DEFAULT_SYSTEM =
 
 const STORAGE_KEY = "kenia:chat-multi-modelo:v1";
 
+// Chave pública (anon) do projeto Supabase — pode ficar no frontend.
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || "https://uzzbgjwpfxokagrvmdoa.supabase.co";
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6emJnandwZnhva2FncnZtZG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDk2NzgsImV4cCI6MjA5OTgyNTY3OH0.4lX8OydcmKTx_U2A0MvMCs1-ZBKpQUcKFjSFsNfBttc";
+
+const MULTI_MODEL_FN = `${SUPABASE_URL}/functions/v1/multi-model-chat`;
+const CHAT_AI_FN = `${SUPABASE_URL}/functions/v1/chat-ai`;
+
+// O proxy local (FCC + Ollama) é exposto pelo ngrok na porta 11111.
+// NUNCA aponte o túnel direto para a 11434: o Ollama bloqueia Host/Origin externos.
+const DEFAULT_OLLAMA_URL =
+  import.meta.env.VITE_OLLAMA_URL || "https://october-detached-tipped.ngrok-free.dev";
+const DEFAULT_OLLAMA_MODEL =
+  import.meta.env.VITE_OLLAMA_MODEL || "qwen2.5:3b-instruct";
+
+const authHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+});
+
+const readJsonReply = (data) =>
+  String(
+    data?.response ??
+      data?.choices?.[0]?.message?.content ??
+      data?.content?.[0]?.text ??
+      ""
+  ).trim();
+
 export default function ChatMultiModelo() {
   const [selected, setSelected] = useState(MODELS[0]);
   const [messages, setMessages] = useState([
@@ -96,10 +125,8 @@ export default function ChatMultiModelo() {
   const [input, setInput] = useState("");
   const [system, setSystem] = useState(DEFAULT_SYSTEM);
   const [loading, setLoading] = useState(false);
-  const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
-  const [ollamaModel, setOllamaModel] = useState("llama3.2");
-  const [image, setImage] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [ollamaUrl, setOllamaUrl] = useState(DEFAULT_OLLAMA_URL);
+  const [ollamaModel, setOllamaModel] = useState(DEFAULT_OLLAMA_MODEL);
   const scrollRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -116,7 +143,6 @@ export default function ChatMultiModelo() {
           const m = MODELS.find((x) => x.id === s.selectedId);
           if (m) setSelected(m);
         }
-        if (s.image) setImage(s.image);
       }
     } catch {}
   }, []);
@@ -125,10 +151,10 @@ export default function ChatMultiModelo() {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ ollamaUrl, ollamaModel, system, messages, selectedId: selected.id, image })
+        JSON.stringify({ ollamaUrl, ollamaModel, system, messages, selectedId: selected.id })
       );
     } catch {}
-  }, [ollamaUrl, ollamaModel, system, messages, selected.id, image]);
+  }, [ollamaUrl, ollamaModel, system, messages, selected.id]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -166,306 +192,195 @@ export default function ChatMultiModelo() {
     });
   };
 
+  const dropStreamingAssistant = () => {
+    setMessages((prev) => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (last?.role === "assistant" && last.streaming) copy.pop();
+      return copy;
+    });
+  };
+
+  const userAborted = () => Boolean(abortRef.current?.signal?.aborted);
+
+  const friendlyError = (msg) => {
+    if (/failed to fetch|networkerror|load failed|fetch failed/i.test(msg)) {
+      return "Não foi possível conectar ao serviço de IA. Verifique sua internet e tente novamente.";
+    }
+    return msg;
+  };
+
+  const readSse = async (res, onDelta) => {
+    if (!res.body) throw new Error("Resposta sem corpo");
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullResponse = "";
+    const handleLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) return;
+      const payload = trimmed.slice(5).trim();
+      if (!payload || payload === "[DONE]") return;
+      try {
+        const data = JSON.parse(payload);
+        if (data?.error) throw new Error(data.error);
+        const delta =
+          data?.choices?.[0]?.delta?.content ??
+          data?.choices?.[0]?.message?.content ??
+          data?.delta?.text ??
+          data?.response ??
+          "";
+        if (typeof delta === "string" && delta) {
+          fullResponse += delta;
+          onDelta(delta);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message && !/JSON/i.test(e.message)) throw e;
+      }
+    };
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) handleLine(line);
+    }
+    if (buffer) handleLine(buffer);
+    return fullResponse;
+  };
+
   const streamGateway = async (allMessages) => {
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
-    const res = await fetch(url, {
+    const res = await fetch(CHAT_AI_FN, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-      },
-      body: JSON.stringify({ 
+      headers: authHeaders(),
+      body: JSON.stringify({
         message: allMessages[allMessages.length - 1]?.content || "",
-        history: allMessages.slice(0, -1).filter(m => m.role !== "system"),
+        history: allMessages.slice(0, -1).filter((m) => m.role !== "system"),
         system_prompt: system,
         model: selected.model || selected.id,
         stream: true,
       }),
       signal: abortRef.current?.signal,
     });
-    if (!res.ok || !res.body) {
-      let msg = `HTTP ${res.status}`;
+    if (!res.ok) {
+      let msg = `Gateway HTTP ${res.status}`;
       try {
-        const ct = res.headers.get("content-type") || "";
-        if (ct.includes("text/event-stream")) {
-          const text = await res.text();
-          const m = text.match(/data:\s*({[^}]*"error"[^}]*})/);
-          if (m) msg = JSON.parse(m[1]).error || msg;
-        } else {
-          const err = await res.json();
-          msg = err.error || msg;
-        }
+        const err = await res.json();
+        msg = err?.error || msg;
       } catch {}
       throw new Error(msg);
     }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let fullResponse = "";
-    const setStreamingResponse = (text: string) => {
-      appendAssistantChunk(text);
-    };
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      for (const line of lines.slice(0, -1)) {
-        if (line.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            const chunk = data.choices?.[0]?.delta?.content || data.response || "";
-            if (chunk) {
-              fullResponse += chunk;
-              setStreamingResponse(fullResponse);
-            }
-          } catch {}
-        }
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await res.json();
+      const reply = readJsonReply(data);
+      if (!reply) throw new Error(data?.error || "O gateway retornou uma resposta vazia.");
+      appendAssistantChunk(reply);
+      return reply;
+    }
+    return readSse(res, appendAssistantChunk);
+  };
+
+  const streamMultiModel = async (modelId, allMessages) => {
+    try {
+      const res = await fetch(MULTI_MODEL_FN, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          messages: allMessages.filter((m) => m.role !== "system"),
+          system,
+          model: modelId,
+        }),
+        signal: abortRef.current?.signal,
+      });
+      if (!res.ok) {
+        let msg = `Multi-modelo HTTP ${res.status}`;
+        try {
+          const err = await res.json();
+          msg = err?.error || msg;
+        } catch {}
+        throw new Error(msg);
       }
-      buffer = lines[lines.length - 1];
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        const reply = readJsonReply(data);
+        if (!reply) throw new Error(data?.error || "Resposta vazia do multi-modelo.");
+        appendAssistantChunk(reply);
+        return reply;
+      }
+      return await readSse(res, appendAssistantChunk);
+    } catch (e) {
+      if (userAborted()) throw e;
+      console.warn("[ChatMultiModelo] multi-modelo falhou, usando chat-ai:", (e as Error)?.message);
+      dropStreamingAssistant();
+      toast.warning("Modelo indisponível — usando o gateway como alternativa.");
+      return streamGateway(allMessages);
     }
-    if (buffer.startsWith("data: ")) {
-      try {
-        const data = JSON.parse(buffer.slice(6));
-        const chunk = data.choices?.[0]?.delta?.content || data.response || "";
-        if (chunk) {
-          fullResponse += chunk;
-          setStreamingResponse(fullResponse);
-        }
-      } catch {}
-    }
-    return fullResponse;
   };
 
   const streamOllama = async (allMessages) => {
-    const url = `${ollamaUrl}/api/chat`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: ollamaModel,
-        messages: allMessages,
-        stream: true,
-      }),
-      signal: abortRef.current?.signal,
-    });
-    if (!res.ok || !res.body) throw new Error(`Ollama HTTP ${res.status}`);
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let fullResponse = "";
-    const setStreamingResponse = (text: string) => {
-      appendAssistantChunk(text);
-    };
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      for (const line of lines.slice(0, -1)) {
-        if (line.trim()) {
+    const base = (ollamaUrl || DEFAULT_OLLAMA_URL).trim().replace(/\/$/, "");
+    try {
+      const res = await fetch(`${base}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
+        body: JSON.stringify({
+          model: ollamaModel || DEFAULT_OLLAMA_MODEL,
+          messages: allMessages,
+          stream: true,
+        }),
+        signal: abortRef.current?.signal,
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(`Ollama HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
+      }
+      if (!res.body) throw new Error("Ollama não retornou corpo");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullResponse = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
           try {
             const data = JSON.parse(line);
-            const chunk = data.message?.content || "";
+            const chunk = data?.message?.content || "";
             if (chunk) {
               fullResponse += chunk;
-              setStreamingResponse(fullResponse);
+              appendAssistantChunk(chunk);
             }
           } catch {}
         }
       }
-      buffer = lines[lines.length - 1];
+      if (!fullResponse) throw new Error("Ollama retornou resposta vazia");
+      return fullResponse;
+    } catch (e) {
+      if (userAborted()) throw e;
+      console.warn("[ChatMultiModelo] Ollama indisponível, usando gateway:", (e as Error)?.message);
+      dropStreamingAssistant();
+      toast.warning("Ollama indisponível — usando o gateway como alternativa.");
+      return streamGateway(allMessages);
     }
-    return fullResponse;
-  };
-
-  const streamClaudeFCC = async (allMessages) => {
-    const fccUrl = `${import.meta.env.VITE_FCC_URL || "https://fcc-server.onrender.com"}/v1/messages`;
-    const res = await fetch(fccUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": "freecc",
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 2000,
-        stream: true,
-        system,
-        messages: allMessages.filter((m) => m.role !== "system"),
-      }),
-      signal: abortRef.current?.signal,
-    });
-    if (!res.ok || !res.body) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`FCC HTTP ${res.status}: ${errText}`);
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let fullResponse = "";
-    const setStreamingResponse = (text: string) => {
-      appendAssistantChunk(text);
-    };
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      for (const line of lines.slice(0, -1)) {
-        if (line.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            const chunk = data.delta?.text || "";
-            if (chunk) {
-              fullResponse += chunk;
-              setStreamingResponse(fullResponse);
-            }
-          } catch {}
-        }
-      }
-      buffer = lines[lines.length - 1];
-    }
-    if (buffer.startsWith("data: ")) {
-      try {
-        const data = JSON.parse(buffer.slice(6));
-        const chunk = data.delta?.text || "";
-        if (chunk) {
-          fullResponse += chunk;
-          setStreamingResponse(fullResponse);
-        }
-      } catch {}
-    }
-    return fullResponse;
-  };
-
-  const streamNemotron = async (allMessages) => {
-    const url = `${import.meta.env.VITE_BACKEND_URL}/api/chat/multi-modelo`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        provider: "nemotron",
-        model: selected.model || "nvidia/nemotron-3-super-120b-a12b:free",
-        messages: allMessages,
-        stream: true,
-      }),
-      signal: abortRef.current?.signal,
-    });
-    if (!res.ok || !res.body) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Nemotron HTTP ${res.status}: ${errText}`);
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let fullResponse = "";
-    const setStreamingResponse = (text: string) => {
-      appendAssistantChunk(text);
-    };
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      for (const line of lines.slice(0, -1)) {
-        if (line.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            const chunk = data.choices?.[0]?.delta?.content || "";
-            if (chunk) {
-              fullResponse += chunk;
-              setStreamingResponse(fullResponse);
-            }
-          } catch {}
-        }
-      }
-      buffer = lines[lines.length - 1];
-    }
-    if (buffer.startsWith("data: ")) {
-      try {
-        const data = JSON.parse(buffer.slice(6));
-        const chunk = data.choices?.[0]?.delta?.content || "";
-        if (chunk) {
-          fullResponse += chunk;
-          setStreamingResponse(fullResponse);
-        }
-      } catch {}
-    }
-    return fullResponse;
-  };
-
-  const streamZen = async (allMessages) => {
-    const apiKey = import.meta.env.VITE_ZEN_API_KEY || "sk-xxtVUim9LH01AvL5ZYfecVTWXP9IbHLLrowGXrCTlQMwf5fndFqq5bsFeHURbNl8";
-    if (!apiKey) throw new Error("Zen API key não configurada (VITE_ZEN_API_KEY)");
-    const res = await fetch("https://opencode.ai/zen/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "big-pickle",
-        messages: allMessages,
-        stream: true,
-      }),
-      signal: abortRef.current?.signal,
-    });
-    if (!res.ok || !res.body) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Zen HTTP ${res.status}: ${errText}`);
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let fullResponse = "";
-    const setStreamingResponse = (text: string) => {
-      appendAssistantChunk(text);
-    };
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      for (const line of lines.slice(0, -1)) {
-        if (line.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            const chunk = data.choices?.[0]?.delta?.content || "";
-            if (chunk) {
-              fullResponse += chunk;
-              setStreamingResponse(fullResponse);
-            }
-          } catch {}
-        }
-      }
-      buffer = lines[lines.length - 1];
-    }
-    if (buffer.startsWith("data: ")) {
-      try {
-        const data = JSON.parse(buffer.slice(6));
-        const chunk = data.choices?.[0]?.delta?.content || "";
-        if (chunk) {
-          fullResponse += chunk;
-          setStreamingResponse(fullResponse);
-        }
-      } catch {}
-    }
-    return fullResponse;
   };
 
   const sendMessage = async () => {
-    if (!input.trim() && !imageFile) return;
+    if (!input.trim()) return;
     abortRef.current = new AbortController();
     setLoading(true);
     const userMessage = { role: "user", content: input };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    setImageFile(null);
-    setImage(null);
 
     const allMessages = [
       { role: "system", content: system },
@@ -475,21 +390,28 @@ export default function ChatMultiModelo() {
 
     try {
       let response = "";
-      console.log("Selected model:", selected.id, "provider:", selected.provider);
-      if (selected.provider === "gateway") {
-        response = await streamGateway(allMessages);
-      } else if (selected.provider === "ollama") {
+      if (selected.provider === "ollama") {
         response = await streamOllama(allMessages);
       } else if (selected.provider === "claude-fcc") {
-        response = await streamClaudeFCC(allMessages);
+        response = await streamMultiModel("claude-fcc", allMessages);
       } else if (selected.provider === "nemotron") {
-        response = await streamNemotron(allMessages);
+        response = await streamMultiModel("nemotron", allMessages);
       } else if (selected.provider === "zen") {
-        response = await streamZen(allMessages);
+        response = await streamMultiModel(selected.model || selected.id, allMessages);
+      } else {
+        response = await streamMultiModel(selected.model || selected.id, allMessages);
+      }
+      if (!response.trim()) {
+        dropStreamingAssistant();
+        response = await streamGateway(allMessages);
       }
       finalizeAssistant();
     } catch (e) {
-      const errorMsg = (e as Error).message;
+      if (userAborted()) {
+        finalizeAssistant();
+        return;
+      }
+      const errorMsg = friendlyError((e as Error)?.message || String(e));
       console.error("Chat error:", errorMsg, e);
       toast.error(errorMsg);
       setMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${errorMsg}` }]);
@@ -515,12 +437,39 @@ export default function ChatMultiModelo() {
             </Button>
           ))}
         </div>
+        <Button variant="ghost" size="sm" className="ml-auto shrink-0" onClick={clearChat} title="Limpar conversa">
+          <Trash2 className="w-4 h-4" />
+        </Button>
       </div>
+
+      {selected.provider === "ollama" && (
+        <div className="px-3 py-2 border-b bg-white space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Label className="text-xs text-nude-600">URL do Ollama</Label>
+            <Input
+              value={ollamaUrl}
+              onChange={(e) => setOllamaUrl(e.target.value)}
+              placeholder={DEFAULT_OLLAMA_URL}
+              className="h-8 max-w-[340px] text-xs"
+            />
+            <Label className="text-xs text-nude-600">Modelo</Label>
+            <Input
+              value={ollamaModel}
+              onChange={(e) => setOllamaModel(e.target.value)}
+              placeholder={DEFAULT_OLLAMA_MODEL}
+              className="h-8 max-w-[200px] text-xs"
+            />
+          </div>
+          <p className="text-[11px] text-nude-500">
+            Use o túnel do proxy (porta 11111), nunca direto a 11434. O proxy libera CORS e reescreve o Host.
+          </p>
+        </div>
+      )}
 
       <ScrollArea className="flex-1 p-4 space-y-4" ref={scrollRef}>
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex gap-2 ${msg.role === "assistant" ? "" : "flex-row-reverse"}`}>
-            <div className={`max-w-[75%] px-4 py-2 rounded-2xl ${
+            <div className={`max-w-[75%] px-4 py-2 rounded-2xl whitespace-pre-wrap ${
               msg.role === "assistant"
                 ? "bg-white border border-nude-200"
                 : "bg-gold-500 text-white"
@@ -549,7 +498,7 @@ export default function ChatMultiModelo() {
             className="flex-1"
             disabled={loading}
           />
-          <Button onClick={sendMessage} disabled={loading || (!input.trim() && !imageFile)}>
+          <Button onClick={sendMessage} disabled={loading || !input.trim()}>
             <Send className="w-5 h-5" />
           </Button>
         </div>
